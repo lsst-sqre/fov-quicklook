@@ -1,0 +1,50 @@
+from dataclasses import dataclass
+from pathlib import Path
+
+import astropy.io.fits as pyfits
+import minio
+
+from quicklook.config import config
+from quicklook.types import Visit
+from quicklook.utils.fits import fits_partial_load
+from quicklook.utils.s3 import download_object_from_s3
+
+
+def test_s3_partial_load():
+    visit = Visit('calexp', '192350')
+    ccd_name = 'R01_S00'
+
+    def read(start: int, end: int) -> bytes:
+        bucket = config.s3_repository.bucket
+        key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
+        return download_object_from_s3(s3_client(), bucket, key, offset=start, length=end - start)
+
+    data = fits_partial_load(read, [0, 1])
+    Path('a.fits').write_bytes(data)
+    with pyfits.open('a.fits') as hdul:
+        hdul[1].data[-1]  # type: ignore
+
+
+def s3_client():
+    s3_config = config.s3_repository
+    return minio.Minio(
+        s3_config.endpoint[0],
+        access_key=s3_config.access_key,
+        secret_key=s3_config.secret,
+        secure=s3_config.secure,
+    )
+
+
+# def test_stride_fits(example_ccd: tuple[Path, str]):
+#     path, ccd = example_ccd
+
+#     with timeit('stride_fits', loglevel=logging.INFO):
+
+#         def select(h: afits.Header):
+#             extname: str | None = h.get('EXTNAME')  # type: ignore
+#             if extname is not None:
+#                 return extname.startswith('Segment')
+#             return False
+
+#         ranges = stride_fits(path, select)
+#         assert len(ranges) == 16

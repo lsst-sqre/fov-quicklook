@@ -1,0 +1,60 @@
+import tempfile
+import io
+import pickle
+from pathlib import Path
+
+import minio
+
+from quicklook.config import config
+from quicklook.generator.preprocess_ccd import preprocess_ccd
+from quicklook.types import CcdId, Visit
+from quicklook.utils.fits import preload_pyfits_compression_code
+from quicklook.utils.s3 import download_object_from_s3
+from quicklook.utils.timeit import timeit
+
+# pytestmark = pytest.mark.focus
+
+
+# @pytest.mark.focus
+def test_preprocess_ccd_raw():
+    s3_config = config.s3_repository
+    client = minio.Minio(
+        s3_config.endpoint[0],
+        access_key=s3_config.access_key,
+        secret_key=s3_config.secret,
+        secure=s3_config.secure,
+    )
+
+    visit = Visit(name='20230511PH', data_type='raw')
+    with timeit('load-fits'):
+        file_contents = download_object_from_s3(client, s3_config.bucket, f'raw/broccoli/R00_SG0.fits')
+
+        with timeit('preprocess'):
+            with tempfile.NamedTemporaryFile() as f:
+                Path(f.name).write_bytes(file_contents)
+                ppccd = preprocess_ccd(CcdId(visit, 'R00_SG0'), Path(f.name))
+    with timeit('pickle'):
+        Path('./example/preprocessed_ccd.pkl').write_bytes(pickle.dumps(ppccd))
+
+
+# @pytest.mark.focus
+def test_preprocess_ccd_calexp():
+    s3_config = config.s3_repository
+    client = minio.Minio(
+        s3_config.endpoint[0],
+        access_key=s3_config.access_key,
+        secret_key=s3_config.secret,
+        secure=s3_config.secure,
+    )
+
+    visit = Visit(name='calexp-192350', data_type='calexp')
+    with timeit('load-fits'):
+        file_contents = download_object_from_s3(client, s3_config.bucket, f'calexp/192350/R01_S00.fits')
+
+        with timeit('preprocess'):
+            with tempfile.NamedTemporaryFile() as f:
+                Path(f.name).write_bytes(file_contents)
+                ppccd = preprocess_ccd(CcdId(visit, 'R01_S00'), Path(f.name))
+
+
+preload_pyfits_compression_code()

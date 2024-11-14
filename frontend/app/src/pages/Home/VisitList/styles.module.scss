@@ -1,0 +1,12 @@
+.list {
+  cursor: default;
+  user-select: none;
+}
+
+.entry {
+  padding: 0.5em;
+}
+
+.selected {
+  background-color: rgba(white, 0.2);
+}

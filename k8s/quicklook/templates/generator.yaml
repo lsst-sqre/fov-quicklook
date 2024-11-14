@@ -18,11 +18,11 @@ spec:
         app: quicklook-generator
     spec:
       nodeSelector:
-        quicklook: "true" # このラベルに一致するノードのみにスケジュールされる
+        quicklook: "true"
       containers:
         - name: quicklook-generator
           image: localhost:32000/quicklook
-          command: ["python", "-m", "quicklook.generator.api"]
+          command: ["python", "-u", "-m", "quicklook.generator.api"]
           ports:
             - containerPort: 9502
           env:
