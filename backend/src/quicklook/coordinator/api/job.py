@@ -7,9 +7,7 @@ from fastapi import APIRouter
 from quicklook.coordinator.api.generators import get_generators
 from quicklook.coordinator.quicklook import Quicklook, QuicklookMeta
 from quicklook.coordinator.tasks import GeneratorTask, make_generator_tasks
-from quicklook.db import db_context
 from quicklook.generator.progress import GeneratorProgress
-from quicklook.generator.tasks import process_ccd
 from quicklook.types import GeneratorResult, MessageFromGeneratorToCoordinator, ProcessCcdResult
 from quicklook.utils.message import message_from_async_reader
 

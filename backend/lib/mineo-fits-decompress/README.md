@@ -1,14 +1,14 @@
 # fast FITS reader from fuse-fitsfs
 
-峯尾総吾氏による[fuse-fits](https://hscpfs-dev-gitlab.mtk.nao.ac.jp/sogo.mineo/fuse-fitsfs)のコードにPython用のwrapperを追加したもの。
+A Python wrapper has been added to the [fuse-fits](https://hscpfs-dev-gitlab.mtk.nao.ac.jp/sogo.mineo/fuse-fitsfs) code by Mr. Sogo Mineo.
 
-## テスト
+## Test
 
 ```bash
 ln -s ../../.venv
 make test
 ```
 
-## インストール
+## Installation
 
-[Dockerfile](../../Dockerfile)を参照。
+Refer to the Dockerfile.

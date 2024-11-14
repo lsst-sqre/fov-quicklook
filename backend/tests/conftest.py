@@ -15,9 +15,9 @@ def example_ccd():
     if not path.exists():
         s3_config = config.s3_repository
         client = minio.Minio(
-            s3_config.endpoint[0],
+            s3_config.endpoint,
             access_key=s3_config.access_key,
-            secret_key=s3_config.secret,
+            secret_key=s3_config.secret_key,
             secure=s3_config.secure,
         )
         file_contents = download_object_from_s3(client, s3_config.bucket, f'raw/broccoli/R01_S12.fits')

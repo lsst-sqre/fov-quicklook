@@ -1,9 +1,6 @@
 [submodule "frontend/app/src/StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/viridisLite"]
 	path = frontend/app/src/StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/viridisLite
 	url = https://github.com/sjmgarnier/viridisLite.git
-[submodule "lib/stellar-globe"]
-	path = lib/stellar-globe
-	url = git@adc-gitlab.mtk.nao.ac.jp:science-platform/stellar-globe.git
 [submodule "frontend/lib/stellar-globe"]
 	path = frontend/lib/stellar-globe
 	url = git@adc-gitlab.mtk.nao.ac.jp:science-platform/stellar-globe.git

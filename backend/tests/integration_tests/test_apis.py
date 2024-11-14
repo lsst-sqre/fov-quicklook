@@ -11,8 +11,8 @@ import websockets.sync.client as websockets
 from websockets.exceptions import ConnectionClosedOK
 
 from quicklook.config import config
+from quicklook.frontend.api.quicklooks import QuicklookStatus
 from quicklook.utils.uvicorn import uvicorn_run
-from quicklook.frontend.api import QuicklookStatus
 
 
 @pytest.mark.focus

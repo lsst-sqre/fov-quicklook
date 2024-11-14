@@ -21,18 +21,6 @@ pyright:
 	[ -x ./pyright/node_modules/.bin/pyright ] || ( mkdir -p pyright && cd pyright && npm install pyright  )
 	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python 
 
-build:
-	docker build -t localhost:32000/quicklook .
-
-push: build
-	docker push localhost:32000/quicklook
-
-deploy: pyright push
-	kubectl -n quicklook rollout restart deployment quicklook-coordinator
-	kubectl -n quicklook rollout restart deployment quicklook-frontend
-	kubectl -n quicklook rollout restart daemonset quicklook-generator
-
-
 db/create-migration:
 	@ [ "$(message)" ] || (echo "message is not set" && false)
 	./.venv/bin/alembic revision --autogenerate -m "$(message)"

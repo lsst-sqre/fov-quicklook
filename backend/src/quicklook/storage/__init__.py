@@ -53,8 +53,8 @@ def s3_list_visit_ccds(visit: Visit) -> Iterable[S3CcdObject]:
 def s3_client():
     s3_config = config.s3_repository
     return minio.Minio(
-        s3_config.endpoint[0],
+        s3_config.endpoint,
         access_key=s3_config.access_key,
-        secret_key=s3_config.secret,
+        secret_key=s3_config.secret_key,
         secure=s3_config.secure,
     )

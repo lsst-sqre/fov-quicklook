@@ -12,29 +12,35 @@ spec:
       labels:
         app: quicklook-db
     spec:
+      initContainers:
+        - name: init-permissions
+          image: 'busybox'
+          command: ['sh', '-c', 'chown -R 999:999 /var/lib/postgresql/data']
+          volumeMounts:
+            - name: quicklook-db
+              mountPath: /var/lib/postgresql/data
       containers:
         - name: quicklook-db
-          # docker run --rm \
-          #   --name quicklook-db \
-          #   -e POSTGRES_USER=quicklook \
-          #   -e POSTGRES_PASSWORD=quicklook \
-          #   -e POSTGRES_DB=quicklook \
-          #   -p 5432:5432 \
-          #   -v $(PWD)/docker-volumes/postgres:/var/lib/postgresql/data \
-          #   postgres:16
           image: 'postgres:16'
           env:
             - name: POSTGRES_USER
               value: quicklook
-            - name: POSTGRES_PASSWORD
-              value: quicklook
             - name: POSTGRES_DB
               value: quicklook
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quicklook-db
+                  key: password
           ports:
             - containerPort: 5432
           volumeMounts:
             - name: quicklook-db
               mountPath: /var/lib/postgresql/data
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
       volumes:
         - name: quicklook-db
           persistentVolumeClaim:
@@ -54,15 +60,34 @@ spec:
       protocol: TCP
       port: 5432
       targetPort: 5432
-
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: quicklook-db
 spec:
+  {{- if .Values.db_storage_class }}
+  storageClassName: {{ .Values.db_storage_class }}
+  {{- end }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: 10Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quicklook-db-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: quicklook-db
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: quicklook-coordinator
+      ports:
+        - protocol: TCP
+          port: 5432

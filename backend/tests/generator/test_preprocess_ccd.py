@@ -19,9 +19,9 @@ from quicklook.utils.timeit import timeit
 def test_preprocess_ccd_raw():
     s3_config = config.s3_repository
     client = minio.Minio(
-        s3_config.endpoint[0],
+        s3_config.endpoint,
         access_key=s3_config.access_key,
-        secret_key=s3_config.secret,
+        secret_key=s3_config.secret_key,
         secure=s3_config.secure,
     )
 
@@ -41,9 +41,9 @@ def test_preprocess_ccd_raw():
 def test_preprocess_ccd_calexp():
     s3_config = config.s3_repository
     client = minio.Minio(
-        s3_config.endpoint[0],
+        s3_config.endpoint,
         access_key=s3_config.access_key,
-        secret_key=s3_config.secret,
+        secret_key=s3_config.secret_key,
         secure=s3_config.secure,
     )
 

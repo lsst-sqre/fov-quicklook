@@ -21,21 +21,46 @@ spec:
         quicklook: "true"
       containers:
         - name: quicklook-generator
-          image: localhost:32000/quicklook
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           command: ["python", "-u", "-m", "quicklook.generator.api"]
           ports:
             - containerPort: 9502
           env:
             - name: QUICKLOOK_coordinator_base_url
               value: http://quicklook-coordinator:9501
-            - name: QUICKLOOK_s3_repository
-              value: {{ .Values.s3_repository | toJson | quote }}
-            - name: QUICKLOOK_s3_tile
-              value: {{ .Values.s3_tile | toJson | quote }}
+            {{- include "fov-quicklook.env.s3_tile" . | nindent 12 }}
+            {{- include "fov-quicklook.env.s3_repository" . | nindent 12 }}
           volumeMounts:
             - mountPath: /dev/shm/quicklook
               name: shm
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
       volumes:
         - name: shm
           emptyDir:
             medium: Memory
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quicklook-generator-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: quicklook-generator
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: quicklook-coordinator
+        - podSelector:
+            matchLabels:
+              app: quicklook-frontend
+        - podSelector:
+            matchLabels:
+              app: quicklook-generator
+      ports:
+        - protocol: TCP
+          port: 9502

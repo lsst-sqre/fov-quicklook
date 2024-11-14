@@ -1,0 +1,12 @@
+frontend/**/node_modules
+
+backend/.venv
+backend/docker-volumes
+backend/pyright
+backend/example
+backend/**/__pycache__
+backend/**/*.pyc
+backend/**/*.fits
+
+notes/*
+.git

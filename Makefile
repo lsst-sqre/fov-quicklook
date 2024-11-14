@@ -1,0 +1,21 @@
+image_ref := localhost:32000/quicklook
+
+.PHONY: build push deploy dev-update
+
+build:
+	$(MAKE) -C backend pyright
+	docker build -t $(image_ref) .
+
+push: build
+	docker push $(image_ref)
+
+deploy: push
+	kubectl -n quicklook rollout restart deployment quicklook-coordinator
+	kubectl -n quicklook rollout restart deployment quicklook-frontend
+	kubectl -n quicklook rollout restart daemonset quicklook-generator
+
+dev-update:
+	helm upgrade --install  --create-namespace -n quicklook quicklook ./k8s/quicklook \
+		--debug \
+		--set global.vaultSecretsPathPrefix=secret --set use_gafaelfawr=false \
+		--set image.repository=$(image_ref) --set image.tag=latest
