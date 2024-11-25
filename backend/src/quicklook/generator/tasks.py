@@ -17,7 +17,7 @@ from quicklook.generator.progress import GeneratorProgress, GeneratorProgressRep
 from quicklook.generator.tilewriter import TileWriter, TileWriterBase
 from quicklook.storage import s3_get_visit_ccd_fits
 from quicklook.tileinfo import TileInfo
-from quicklook.types import CcdId, ImageStat, PreProcessedCcd, ProcessCcdResult, Progress, Tile, Visit
+from quicklook.types import CcdId, PreProcessedCcd, ProcessCcdResult, Progress, Tile, Visit
 from quicklook.utils import multiprocessing_coverage_compatible as mp
 from quicklook.utils.dynamicsemaphore import DynamicSemaphore
 from quicklook.utils.timeit import timeit
@@ -67,6 +67,8 @@ def process_ccd(args: ProcessCcdArgs) -> ProcessCcdResult:
     return ProcessCcdResult(
         ccd_id=args.ccd_id,
         image_stat=ppccd.stat,
+        amps=ppccd.amps,
+        bbox=ppccd.bbox,
     )
 
 

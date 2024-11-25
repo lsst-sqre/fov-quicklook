@@ -120,6 +120,8 @@ class GeneratorProgress:
 class ProcessCcdResult:
     ccd_id: CcdId
     image_stat: ImageStat
+    amps: list[AmpMeta]
+    bbox: BBox
 
 
 @dataclass

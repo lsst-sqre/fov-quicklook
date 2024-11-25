@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+import tempfile
 
 import astropy.io.fits as pyfits
 import minio
@@ -20,9 +21,11 @@ def test_s3_partial_load():
         return download_object_from_s3(s3_client(), bucket, key, offset=start, length=end - start)
 
     data = fits_partial_load(read, [0, 1])
-    Path('a.fits').write_bytes(data)
-    with pyfits.open('a.fits') as hdul:
-        hdul[1].data[-1]  # type: ignore
+    with tempfile.NamedTemporaryFile(suffix='.fits') as f:
+        f.write(data)
+        f.flush()
+        with pyfits.open(f.name) as hdul:
+            hdul[1].data[-1]  # type: ignore
 
 
 def s3_client():
