@@ -68,9 +68,10 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
     readonly filter: RubinImageFilter,
   ) {
     super(globe)
-    console.log({ metadata })
     this.tracts = [this.mainTract()]
-    this.updateImageCacheSize()
+    // @ts-ignore
+    const cacheSize: number = this.cache.maxSize
+    this.npyCache.setLimit(cacheSize)
   }
 
   private mainTract() {
@@ -81,17 +82,6 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
   }
 
   private npyCache = new Cache<string, Npy>({ maxSize: 0 })
-
-  private updateImageCacheSize() {
-    const { width, height } = this.globe.gl.canvas
-    const margin = 2
-    const n = Math.floor(
-      margin *
-      4 * // 1レベル上の画像
-      width * height / (TILE_SIZE ** 2)
-    )
-    this.npyCache.setLimit(n)
-  }
 
   walkTracts(cb: (tract: tile.Tract) => void) {
     for (const t of this.tracts) {
@@ -172,11 +162,7 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
   }
 
   pixelValue(coords: V2): PixelInfo {
-    let [x, y] = coords
-    // @ts-ignore
-    x += this.metadata.wcs['CRPIX1']
-    // @ts-ignore
-    y += this.metadata.wcs['CRPIX2']
+    const [x, y] = coords
     for (let level = 0; level <= 8; ++level) {
       const q = x >> (8 + level)
       const p = y >> (8 + level)

@@ -1,7 +1,8 @@
 import { SkyCoord, Tract, V2, angle } from "@stellar-globe/stellar-globe"
 import { useCallback, useMemo } from "react"
-import { useGlobe, useHomeContext } from "./context"
 import { useAppSelector } from "../../store/hooks"
+import { includedInPolygon } from "../../utils/geometry"
+import { useGlobe, useHomeContext } from "./context"
 
 export function useResetView() {
   const { globeHandle } = useHomeContext()
@@ -15,27 +16,16 @@ function useQuicklookMetadata() {
   return currentQuicklook.metadata
 }
 
-export function useCrvalOriginWcs() {
-  const shotmeta = useQuicklookMetadata()
-  return useMemo(() => {
-    if (shotmeta) {
-      const wcs = { ...shotmeta.wcs }
-      Object.assign(wcs, { CRPIX1: 0, CRPIX2: 0 })
-      return Tract.fromFitsHeader(wcs)
-    }
-  }, [shotmeta])
-}
-
 export function useWcs() {
-  const shotmeta = useQuicklookMetadata()
+  const metadata = useQuicklookMetadata()
   return useMemo(() => {
-    if (shotmeta) {
-      return Tract.fromFitsHeader(shotmeta.wcs)
+    if (metadata) {
+      return Tract.fromFitsHeader(metadata.wcs)
     }
-  }, [shotmeta])
+  }, [metadata])
 }
 
-export function useMouseCursorSkyCoord(): SkyCoord | undefined {
+function useMouseCursorSkyCoord(): SkyCoord | undefined {
   const _camera = useAppSelector(state => state.home.viewerCamera) // viewerCameraの変更のたびに再計算される必要がある
   const clientCoord = useAppSelector(state => state.home.mouseCursorClientCoord)
   const globe = useGlobe()
@@ -48,7 +38,7 @@ export function useMouseCursorSkyCoord(): SkyCoord | undefined {
   }, [_camera, clientCoord, globe])
 }
 
-export function useMouseCursorFocalPlaneCoord(): V2 {
+function useMouseCursorFocalPlaneCoord(): V2 {
   const wcs = useWcs()
   const skyCoord = useMouseCursorSkyCoord()
   return useMemo(() => {
@@ -59,53 +49,48 @@ export function useMouseCursorFocalPlaneCoord(): V2 {
   }, [skyCoord, wcs])
 }
 
-export function useMouseCursorCrvalOriginFocalPlaneCoord(): V2 {
-  const wcs = useCrvalOriginWcs()
-  const skyCoord = useMouseCursorSkyCoord()
+export function useFocusedCcd() {
+  const metadata = useQuicklookMetadata()
+  const [x, y] = useMouseCursorFocalPlaneCoord()
+
   return useMemo(() => {
-    if (wcs && skyCoord) {
-      return wcs.xyz2pixel(skyCoord.xyz)
+    if (metadata && metadata.process_ccd_results) {
+      for (const ccd of metadata.process_ccd_results) {
+        const { ccd_id, bbox } = ccd
+        const [p1, p2, p3, p4] = [
+          [bbox.minx, bbox.miny],
+          [bbox.maxx, bbox.miny],
+          [bbox.maxx, bbox.maxy],
+          [bbox.minx, bbox.maxy],
+        ] as V2[]
+        if (includedInPolygon([x, y], [p1, p2, p3, p4])) {
+          return ccd
+        }
+      }
     }
-    return [0, 0]
-  }, [skyCoord, wcs])
+  }, [metadata, x, y])
 }
 
-// export function useFocusCcd() {
-//   const metadata = useQuicklookMetadata()
-//   const [x, y] = useMouseCursorFocalPlaneCoord()
+export function useFocusedAmp() {
+  const focusedCcd = useFocusedCcd()
+  const [x, y] = useMouseCursorFocalPlaneCoord()
 
-//   return useMemo(() => {
-//     if (metadata) {
-//       for (const ccdname in metadata.ccd_meta) {
-//         const ccdmeta = metadata.ccd_meta[ccdname]
-//         const [p1, p2, p3, p4] = ccdmeta.ccd_corners
-//         if (includedInPolygon([x, y], [p1, p2, p3, p4])) {
-//           return ccdmeta
-//         }
-//       }
-//     }
-//   }, [metadata, x, y])
-// }
-
-// export function useFocusAmp() {
-//   const metadata = useQuicklookMetadata()
-//   const focusCcd = useFocusCcd()
-//   const [x, y] = useMouseCursorFocalPlaneCoord()
-
-//   if (focusCcd && metadata) {
-//     for (const amp of focusCcd.amps) {
-//       const b = amp.bbox
-//       if (includedInPolygon([x, y], [
-//         [b.minx, b.miny],
-//         [b.maxx, b.miny],
-//         [b.maxx, b.maxy],
-//         [b.minx, b.maxy]
-//       ])) {
-//         return amp
-//       }
-//     }
-//   }
-// }
+  return useMemo(() => {
+    if (focusedCcd?.amps) {
+      for (const amp of focusedCcd.amps) {
+        const b = amp.bbox
+        if (includedInPolygon([x, y], [
+          [b.minx, b.miny],
+          [b.maxx, b.miny],
+          [b.maxx, b.maxy],
+          [b.minx, b.maxy]
+        ])) {
+          return amp
+        }
+      }
+    }
+  }, [focusedCcd, x, y])
+}
 
 // export function useFocusCcdFitsHeader() {
 //   const shotId = useAppSelector(state => state.home.shotId)

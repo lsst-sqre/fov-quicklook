@@ -1,5 +1,4 @@
 import { ImageFilter } from "@stellar-globe/stellar-globe"
-import { Texture } from "../../../../../../lib/stellar-globe/types/lib/gl-wrapper"
 import colormapGray from './colormap-Gray.glsl?raw'
 
 // 'optionA.csv': 'magma',
@@ -12,18 +11,19 @@ import colormapGray from './colormap-Gray.glsl?raw'
 // 'optionH.csv': 'turbo',
 // 'viridis_map.csv': 'viridis',
 
-import colormapViridis from './viridisLite/colormaps/viridis.glsl?raw'
-import colormapMagma from './viridisLite/colormaps/magma.glsl?raw'
-import colormapInferno from './viridisLite/colormaps/inferno.glsl?raw'
-import colormapPlasma from './viridisLite/colormaps/plasma.glsl?raw'
 import colormapCividis from './viridisLite/colormaps/cividis.glsl?raw'
-import colormapRocket from './viridisLite/colormaps/rocket.glsl?raw'
+import colormapInferno from './viridisLite/colormaps/inferno.glsl?raw'
+import colormapMagma from './viridisLite/colormaps/magma.glsl?raw'
 import colormapMako from './viridisLite/colormaps/mako.glsl?raw'
+import colormapPlasma from './viridisLite/colormaps/plasma.glsl?raw'
+import colormapRocket from './viridisLite/colormaps/rocket.glsl?raw'
 import colormapTurbo from './viridisLite/colormaps/turbo.glsl?raw'
+import colormapViridis from './viridisLite/colormaps/viridis.glsl?raw'
 
 import shaderBase from './frag.glsl?raw'
 import scaleArsinh from './scale-Arsinh.glsl?raw'
 import scaleLinear from './scale-Linear.glsl?raw'
+import { Texture } from "../../../../../../lib/stellar-globe/stellar-globe/types/lib/gl-wrapper"
 
 
 export type RubinImageFilterParams = {

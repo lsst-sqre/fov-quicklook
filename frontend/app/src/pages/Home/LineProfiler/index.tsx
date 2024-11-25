@@ -3,9 +3,9 @@ import { memo, useEffect, useMemo, useRef } from "react"
 import { useGlobe, useHomeContext } from "../context"
 
 // import { useCrvalOriginWcs } from "../hooks"
-import { WebglPlot, WebglPlotProps } from "./WebglPlot"
 import { useAppSelector } from "../../../store/hooks"
-import { useCrvalOriginWcs } from "../hooks"
+import { useWcs } from "../hooks"
+import { WebglPlot, WebglPlotProps } from "./WebglPlot"
 
 
 export const LineProfiler = memo(() => {
@@ -13,7 +13,7 @@ export const LineProfiler = memo(() => {
   const globe = useGlobe()
   const [, mouseY] = useAppSelector(state => state.home.mouseCursorClientCoord)
   const camera = useAppSelector(state => state.home.viewerCamera)
-  const wcs = useCrvalOriginWcs()
+  const wcs = useWcs()
   const quicklookLayer = quicklookHandle.current?.layer()
 
   const chartData: WebglPlotProps | undefined = useMemo(() => {

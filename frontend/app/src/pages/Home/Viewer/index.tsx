@@ -8,6 +8,7 @@ import { useHomeContext } from "../context"
 import { CursorLine } from './CursorLine'
 import { QuicklookProgress } from './QuicklookProgress'
 import styles from './styles.module.scss'
+import { CcdFrames } from './CcdFrames/CcdFrames'
 
 type ViewerProps = {
   style?: React.CSSProperties
@@ -61,7 +62,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
           />
         }
         <GridLayer$ />
-        {/* <CcdFrames /> */}
+        <CcdFrames />
       </Globe$>
       <CursorLine />
       {(currentQuicklook.status?.phase === 'processing' || currentQuicklook.metadata === undefined) && (
