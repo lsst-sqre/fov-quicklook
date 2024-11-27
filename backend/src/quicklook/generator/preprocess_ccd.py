@@ -1,6 +1,3 @@
-import io
-import mineo_fits_decompress
-import contextlib
 import functools
 import io
 from dataclasses import dataclass
@@ -8,13 +5,15 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import astropy.io.fits as afits
+import mineo_fits_decompress
 import numpy
 
+from quicklook.config import config
 from quicklook.generator.isr import bias_correction, parse_slice
 from quicklook.tileinfo import ccds_by_name
 from quicklook.types import AmpMeta, BBox, CcdId, ImageStat, PreProcessedCcd
+from quicklook.utils.fitsheader import fitsheader_to_list
 from quicklook.utils.timeit import timeit
-from quicklook.config import config
 
 from .isr import parse_slice
 
@@ -38,7 +37,7 @@ def preprocess_ccd_calexp(
 ) -> PreProcessedCcd:
     ccd_name = ccd_id.ccd_name
     with timeit(f'preprocess-{ccd_id.name}'):
-        hdul= fast_open_comressed_fits(path)
+        hdul = fast_open_comressed_fits(path)
         header = hdul[0].header  # type: ignore
         assert ccd_name == f'{header["RAFTNAME"]}_{header["SENSNAME"]}'
         bbox = ccds_by_name()[ccd_name].bbox
@@ -51,6 +50,7 @@ def preprocess_ccd_calexp(
             pool=pool,
             stat=stat,
             amps=[],
+            headers=fitsheader_to_list(hdul),
         )
 
 
@@ -95,6 +95,7 @@ def preprocess_ccd_raw(
             pool=assembly.data,
             stat=stat,
             amps=assembly.amp_metas,
+            headers=fitsheader_to_list(hdul),
         )
 
 

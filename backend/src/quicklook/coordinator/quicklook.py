@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from quicklook.db import db_context
 from quicklook.models import QuicklookMetaRecord, QuicklookRecord
-from quicklook.types import GeneratorPod, GeneratorProgress, ProcessCcdResult, Visit
+from quicklook.types import AmpMeta, BBox, CcdId, GeneratorPod, GeneratorProgress, ImageStat, ProcessCcdResult, Visit
 from quicklook.utils.broadcastqueue import BroadcastQueue
 from quicklook.utils.event import WatchEvent
 
@@ -21,7 +21,7 @@ class Quicklook:
 
     visit: Visit
     phase: QuicklookRecord.Phase
-    ccd_generator_map: dict[str, GeneratorPod] | None = None
+    ccd_generator_map: dict[str, GeneratorPod] | None = None # ccd_name -> GeneratorPod
     generating_progress: dict[str, GeneratorProgress] | None = None
     transferreing_progress: dict[str, GeneratorProgress] | None = None
     meta: Union['QuicklookMeta', None] = None
@@ -127,8 +127,29 @@ class Quicklook:
             db.commit()
 
 
+class CcdMeta(BaseModel):
+    ccd_id: CcdId
+    image_stat: ImageStat
+    amps: list[AmpMeta]
+    bbox: BBox
+
+
 class QuicklookMeta(BaseModel):
-    process_ccd_results: list[ProcessCcdResult]
+    ccd_meta: list[CcdMeta]
+
+    @classmethod
+    def from_process_ccd_results(cls, results: list[ProcessCcdResult]) -> 'QuicklookMeta':
+        return cls(
+            ccd_meta=[
+                CcdMeta(
+                    ccd_id=result.ccd_id,
+                    image_stat=result.image_stat,
+                    amps=result.amps,
+                    bbox=result.bbox,
+                )
+                for result in results
+            ]
+        )
 
 
 @dataclass

@@ -1,10 +1,9 @@
-from dataclasses import dataclass
-from functools import cache
 import logging
-from pathlib import Path
 import queue
 import threading
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated
 
 import numpy
@@ -15,9 +14,7 @@ from quicklook.config import config
 from quicklook.coordinator.tasks import GeneratorTask
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.generator.api.tilegeneratorprocess import TileGeneratorProcess
-from quicklook.tileinfo import TileInfo, ccds_intersecting
 from quicklook.types import CcdId, MessageFromGeneratorToCoordinator, Visit
-from quicklook.utils import timeit
 from quicklook.utils.globalstack import GlobalStack
 from quicklook.utils.lrudict import LRUDict
 from quicklook.utils.message import encode_message
@@ -101,5 +98,19 @@ def get_tile(
         else:  # pragma: no cover
             pool += arr
     if pool is None:
-        return numpy.zeros((256, 256), dtype=numpy.float32)
+        return numpy.zeros((config.tile_size, config.tile_size), dtype=numpy.float32)
     return Response(ndarray2npybytes(pool), media_type='application/npy')
+
+
+@app.get('/quicklooks/{id}/fits_header/{ccd_name}')
+def get_fits_header(
+    visit: Annotated[Visit, Depends(visit_from_path)],
+    ccd_name: str,
+):
+    ccd_id = CcdId(visit, ccd_name)
+    outfile = Path(f'{config.fits_header_tmpdir}/{ccd_id.name}.json')
+    if not outfile.exists():
+        return
+    # ファイルの内容はjsonであることが保証されている
+    # 内容が大きいのでそのまま返す
+    return Response(outfile.read_text(), media_type='application/json')

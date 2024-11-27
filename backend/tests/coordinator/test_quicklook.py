@@ -1,7 +1,6 @@
 import asyncio
 
 from quicklook.coordinator.quicklook import Quicklook, QuicklookMeta
-from quicklook.db import db_context
 from quicklook.models import QuicklookRecord
 from quicklook.types import BBox, CcdId, ImageStat, ProcessCcdResult, Visit
 from quicklook.utils.event import WatchEvent
@@ -39,16 +38,16 @@ async def test_quicklook_meta():
     ql = Quicklook.get(visit)
     assert ql
     assert ql.load_meta().meta is None
-    ql.save_meta(QuicklookMeta(process_ccd_results=[]))
-    assert ql.load_meta().meta == QuicklookMeta(process_ccd_results=[])
+    ql.save_meta(QuicklookMeta(ccd_meta=[]))
+    assert ql.load_meta().meta == QuicklookMeta(ccd_meta=[])
     process_ccd_result = ProcessCcdResult(
         ccd_id=CcdId(visit=visit, ccd_name='R00_SG0'),
         image_stat=ImageStat(median=0.0, mad=0.0, shape=(0, 0)),
         amps=[],
         bbox=BBox(minx=0, miny=0, maxx=0, maxy=0),
     )
-    ql.save_meta(QuicklookMeta(process_ccd_results=[process_ccd_result]))
-    assert ql.load_meta().meta == QuicklookMeta(process_ccd_results=[process_ccd_result])
+    ql.save_meta(QuicklookMeta.from_process_ccd_results([process_ccd_result]))
+    assert ql.load_meta().meta == QuicklookMeta.from_process_ccd_results([process_ccd_result])
 
 
 @pytest.fixture(autouse=True)

@@ -8,7 +8,7 @@ from typing import Callable
 from quicklook.coordinator.tasks import GeneratorTask
 from quicklook.generator.progress import GeneratorProgress, GeneratorProgressReporter
 from quicklook.generator.tasks import run_generator
-from quicklook.types import GeneratorResult, MessageFromGeneratorToCoordinator
+from quicklook.types import MessageFromGeneratorToCoordinator
 from quicklook.utils import throttle
 from quicklook.utils.timeit import timeit
 
@@ -63,9 +63,9 @@ def process(comm: Connection):
             if task is None:
                 break
             try:
-                result = run_generator(task, on_update)
+                for process_ccd_result in run_generator(task, on_update):
+                    comm.send(process_ccd_result)
                 throttle.flush(on_update)
-                comm.send(GeneratorResult(result))
             except Exception as e:  # pragma: no cover
                 traceback.print_exc()
                 comm.send(e)

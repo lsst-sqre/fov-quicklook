@@ -8,7 +8,7 @@ from quicklook.coordinator.api.generators import get_generators
 from quicklook.coordinator.quicklook import Quicklook, QuicklookMeta
 from quicklook.coordinator.tasks import GeneratorTask, make_generator_tasks
 from quicklook.generator.progress import GeneratorProgress
-from quicklook.types import GeneratorResult, MessageFromGeneratorToCoordinator, ProcessCcdResult
+from quicklook.types import MessageFromGeneratorToCoordinator, ProcessCcdResult
 from quicklook.utils.message import message_from_async_reader
 
 router = APIRouter()
@@ -18,7 +18,7 @@ async def run_next_job():
     ql = Quicklook.dequeue()
     if ql:  # pragma: no branch
         process_ccd_results = await run_generators(ql)
-        ql.save_meta(QuicklookMeta(process_ccd_results=process_ccd_results))
+        ql.save_meta(QuicklookMeta.from_process_ccd_results(process_ccd_results))
         ql.notify()
         await run_transfers(ql)
         ql.phase = 'ready'
@@ -52,8 +52,8 @@ async def run_generators(ql: Quicklook) -> list[ProcessCcdResult]:
                             nodes[task.generator.name] = msg
                             ql.generating_progress = nodes
                             ql.notify()
-                        case GeneratorResult():
-                            process_ccd_results.extend(msg.process_ccd_resulsts)
+                        case ProcessCcdResult():
+                            process_ccd_results.append(msg)
                         case _:
                             raise TypeError(f'Unexpected message: {msg}')
                 return process_ccd_results

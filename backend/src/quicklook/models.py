@@ -5,7 +5,7 @@ from typing import Literal, Union
 from sqlalchemy import ForeignKey, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from quicklook.types import Visit
+from quicklook.types import HeaderType, Visit
 
 
 class Base(DeclarativeBase):

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from pathlib import Path
 import tempfile
 
 import astropy.io.fits as pyfits
@@ -36,18 +35,3 @@ def s3_client():
         secret_key=s3_config.secret_key,
         secure=s3_config.secure,
     )
-
-
-# def test_stride_fits(example_ccd: tuple[Path, str]):
-#     path, ccd = example_ccd
-
-#     with timeit('stride_fits', loglevel=logging.INFO):
-
-#         def select(h: afits.Header):
-#             extname: str | None = h.get('EXTNAME')  # type: ignore
-#             if extname is not None:
-#                 return extname.startswith('Segment')
-#             return False
-
-#         ranges = stride_fits(path, select)
-#         assert len(ranges) == 16

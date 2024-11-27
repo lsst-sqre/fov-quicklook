@@ -86,10 +86,17 @@ def test_get_tile(one_quicklook_created):
     assert res.headers['Content-Type'] == 'application/npy'
 
 
+def test_get_fits_header(one_quicklook_created):
+    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/fits_header/R00_SG1')
+    assert res.status_code == 200
+    assert res.headers['Content-Type'] == 'application/json'
+
+
 def test_get_tile_for_blank_region(one_quicklook_created):
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/tiles/0/0/0')
     assert res.status_code == 200
     assert res.headers['Content-Type'] == 'application/npy+zstd'
+
 
 
 @pytest.fixture(scope='module', autouse=True)

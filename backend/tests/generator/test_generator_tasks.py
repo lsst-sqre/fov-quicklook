@@ -1,5 +1,6 @@
 import multiprocessing
 from pathlib import Path
+import tempfile
 
 import pytest
 
@@ -72,8 +73,8 @@ def test_progress():
     pickle.dumps(progress)
 
 
-def test_processccd(example_ccd: tuple[Path, str]):
-    path, ccd = example_ccd
+def test_processccd(broccoli_fits_and_ccd_id: tuple[Path, str]):
+    path, ccd = broccoli_fits_and_ccd_id
 
     def on_update(progress: GeneratorProgress):
         print(progress)
@@ -87,9 +88,13 @@ def test_processccd(example_ccd: tuple[Path, str]):
         ),
         on_update=on_update,
     ) as progress_reporter:
-        args = tasks.ProcessCcdArgs(
-            ccd_id=CcdId(visit=Visit(name='broccoli', data_type='raw'), ccd_name=ccd),
-            path=path,
-            progress_updator=progress_reporter.updator,
-        )
-        tasks.process_ccd(args)
+        # to prevent the fixture from being deleted
+        with tempfile.NamedTemporaryFile() as tmp:
+            tmp.write(path.read_bytes())
+            tmp.flush()
+            args = tasks.ProcessCcdArgs(
+                ccd_id=CcdId(visit=Visit(name='broccoli', data_type='raw'), ccd_name=ccd),
+                path=Path(tmp.name),
+                progress_updator=progress_reporter.updator,
+            )
+            tasks.process_ccd(args)

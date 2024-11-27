@@ -1,5 +1,5 @@
 /.venv
-/example
+/tmp
 *.egg-info
 __pycache__
 /docker-volumes

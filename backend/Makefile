@@ -1,4 +1,4 @@
-.PHONY: test test/watch test/covhtml-server pyright db/create-migration db/migrate db/rollback db/docker
+.PHONY: test test/watch test/covhtml-server pyright pyright/watch db/create-migration db/migrate db/rollback db/docker 
 
 targets ?= tests
 
@@ -19,7 +19,11 @@ test/covhtml-server:
 
 pyright:
 	[ -x ./pyright/node_modules/.bin/pyright ] || ( mkdir -p pyright && cd pyright && npm install pyright  )
-	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python 
+	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python
+
+pyright/watch:
+	[ -x ./pyright/node_modules/.bin/pyright ] || ( mkdir -p pyright && cd pyright && npm install pyright  )
+	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python --watch
 
 db/create-migration:
 	@ [ "$(message)" ] || (echo "message is not set" && false)
@@ -40,3 +44,6 @@ db/docker:
 		-p 5432:5432 \
 		-v $(PWD)/docker-volumes/postgres:/var/lib/postgresql/data \
 		postgres:16
+
+dev/openapi:
+	@./.venv/bin/python -m quicklook.frontend.api.openapi

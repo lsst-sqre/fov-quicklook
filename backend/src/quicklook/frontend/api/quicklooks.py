@@ -1,15 +1,16 @@
 import logging
+
 from fastapi import APIRouter, WebSocket
 from pydantic import BaseModel, ConfigDict
 from starlette.websockets import WebSocketDisconnect
 
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
-from quicklook.coordinator.quicklook import Quicklook, QuicklookMeta
+from quicklook.coordinator.quicklook import CcdMeta, Quicklook, QuicklookMeta
 from quicklook.frontend.api.http_request import http_request
 from quicklook.frontend.api.remotequicklook import RemoteQuicklookWather, remote_quicklook
 from quicklook.models import QuicklookRecord
-from quicklook.types import GeneratorProgress, ProcessCcdResult, Visit
+from quicklook.types import GeneratorProgress, Visit
 from quicklook.utils.websocket import safe_websocket
 
 router = APIRouter()
@@ -56,9 +57,10 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
 
 
 class QuicklookMetadata(BaseModel):
+    # QuicklookMetaと紛らわしいがこちらはフロントエンド用
     id: str
     wcs: dict
-    process_ccd_results: list[ProcessCcdResult] | None
+    ccd_meta: list[CcdMeta] | None
 
 
 @router.get('/api/quicklooks/{id}/metadata', response_model=QuicklookMetadata)
@@ -81,7 +83,7 @@ async def show_quicklook_metadata(
             "CD2_1": 0,
             "CD2_2": scale,
         },
-        process_ccd_results=ql and ql.meta and ql.meta.process_ccd_results,
+        ccd_meta=ql and ql.meta and ql.meta.ccd_meta,
     )
 
 

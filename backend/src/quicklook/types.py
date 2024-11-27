@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Literal, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 import numpy
 
@@ -88,6 +88,10 @@ class AmpMeta:
     bbox: BBox
 
 
+type CardType = tuple[str, str, str, str]
+type HeaderType = list[CardType]
+
+
 @dataclass
 class PreProcessedCcd:
     ccd_id: CcdId
@@ -95,6 +99,7 @@ class PreProcessedCcd:
     pool: numpy.ndarray
     stat: ImageStat
     amps: list[AmpMeta]
+    headers: list[HeaderType]
 
 
 @dataclass(frozen=True)
@@ -124,9 +129,4 @@ class ProcessCcdResult:
     bbox: BBox
 
 
-@dataclass
-class GeneratorResult:
-    process_ccd_resulsts: list[ProcessCcdResult]
-
-
-MessageFromGeneratorToCoordinator = None | GeneratorProgress | BaseException | GeneratorResult
+MessageFromGeneratorToCoordinator = None | GeneratorProgress | BaseException | ProcessCcdResult

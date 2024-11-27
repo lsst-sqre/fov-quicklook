@@ -1,11 +1,12 @@
 import contextlib
+import json
 import logging
 import tempfile
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Generator
 
 import minio
 
@@ -23,7 +24,7 @@ from quicklook.utils.dynamicsemaphore import DynamicSemaphore
 from quicklook.utils.timeit import timeit
 
 
-def run_generator(task: GeneratorTask, on_update: Callable[[GeneratorProgress], None] | None = None) -> list[ProcessCcdResult]:
+def run_generator(task: GeneratorTask, on_update: Callable[[GeneratorProgress], None] | None = None) -> Generator[ProcessCcdResult]:
     with iterate_downloaded_ccds(task.visit, task.ccd_names) as files:
         with timeit('generator'):
             with mp.Pool(config.tile_ccd_processing_parallel) as pool:
@@ -34,10 +35,8 @@ def run_generator(task: GeneratorTask, on_update: Callable[[GeneratorProgress], 
                             progress.download_done()
                             yield ProcessCcdArgs(ccd_id, file, progress.updator)
 
-                    results: list[ProcessCcdResult] = []
                     for result in pool.imap_unordered(process_ccd, args()):
-                        results.append(result)
-                    return results
+                        yield result
 
 
 @dataclass
@@ -56,6 +55,8 @@ def process_ccd(args: ProcessCcdArgs) -> ProcessCcdResult:
         ppccd = preprocess_ccd(args.ccd_id, args.path)
         args.progress_updator.preprocess_done()
         args.path.unlink()
+
+        save_headers(ppccd)
 
         with TileWriter(args.ccd_id) as tile_writer:
             make_tiles(
@@ -123,3 +124,10 @@ def iterate_downloaded_ccds(
                         traceback.print_exc()
 
         yield g()
+
+
+def save_headers(ppccd: PreProcessedCcd):
+    outfile = Path(f'{config.fits_header_tmpdir}/{ppccd.ccd_id.name}.json')
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    with outfile.open('w') as f:
+        json.dump(ppccd.headers, f)

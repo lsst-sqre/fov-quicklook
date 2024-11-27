@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import logging
-import pprint
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import cache
@@ -32,7 +31,7 @@ class CoordinatorContext:
             await asyncio.sleep(config.heartbeat_interval)
 
     def _print_generators(self):
-        logger.info(f'generators: {pprint.pformat([f"{g.host}:{g.port}" for g in self.generators])}')
+        logger.info(f'generators: {[f"{g.host}:{g.port}" for g in self.generators]}')
 
     # generatorsの状態を確認
     async def _check_generators(self):

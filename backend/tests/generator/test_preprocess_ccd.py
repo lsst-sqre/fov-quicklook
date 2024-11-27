@@ -12,10 +12,7 @@ from quicklook.utils.fits import preload_pyfits_compression_code
 from quicklook.utils.s3 import download_object_from_s3
 from quicklook.utils.timeit import timeit
 
-# pytestmark = pytest.mark.focus
 
-
-# @pytest.mark.focus
 def test_preprocess_ccd_raw():
     s3_config = config.s3_repository
     client = minio.Minio(
@@ -33,11 +30,8 @@ def test_preprocess_ccd_raw():
             with tempfile.NamedTemporaryFile() as f:
                 Path(f.name).write_bytes(file_contents)
                 ppccd = preprocess_ccd(CcdId(visit, 'R00_SG0'), Path(f.name))
-    with timeit('pickle'):
-        Path('./example/preprocessed_ccd.pkl').write_bytes(pickle.dumps(ppccd))
 
 
-# @pytest.mark.focus
 def test_preprocess_ccd_calexp():
     s3_config = config.s3_repository
     client = minio.Minio(

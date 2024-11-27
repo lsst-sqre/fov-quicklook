@@ -57,6 +57,7 @@ class Config(BaseSettings):
     tile_compression_level: int = 9
     tile_compression_parallel: int = 8
     tile_tmpdir: str = '/dev/shm/quicklook/tile_tmp'
+    fits_header_tmpdir: str = '/dev/shm/quicklook/fits_header'
 
     fitsio_tmpdir: str = '/dev/shm/quicklook/fitsio'
     fitsio_decompress_parallel: int = 4

@@ -9,7 +9,8 @@ from quicklook.coordinator.quicklook import Quicklook
 from quicklook.frontend.api.remotequicklook import RemoteQuicklookWather
 from quicklook.frontend.api.staticassets import setup_static_assets
 
-from .gettile import router as gettile_router
+from .get_tile import router as gettile_router
+from .get_fits_header import router as get_fits_header_router
 from .health import router as health_router
 from .quicklooks import router as quicklooks_router
 from .visits import router as visits_router
@@ -28,6 +29,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(health_router, prefix=config.frontend_app_prefix)
 app.include_router(gettile_router, prefix=config.frontend_app_prefix)
+app.include_router(get_fits_header_router, prefix=config.frontend_app_prefix)
 app.include_router(quicklooks_router, prefix=config.frontend_app_prefix)
 app.include_router(visits_router, prefix=config.frontend_app_prefix)
 
