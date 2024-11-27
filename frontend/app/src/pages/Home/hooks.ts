@@ -54,8 +54,8 @@ export function useFocusedCcd() {
   const [x, y] = useMouseCursorFocalPlaneCoord()
 
   return useMemo(() => {
-    if (metadata && metadata.process_ccd_results) {
-      for (const ccd of metadata.process_ccd_results) {
+    if (metadata && metadata.ccd_meta) {
+      for (const ccd of metadata.ccd_meta) {
         const { ccd_id, bbox } = ccd
         const [p1, p2, p3, p4] = [
           [bbox.minx, bbox.miny],

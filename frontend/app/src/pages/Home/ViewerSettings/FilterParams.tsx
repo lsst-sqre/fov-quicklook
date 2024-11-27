@@ -91,7 +91,7 @@ const MAD2STDDEV = Math.sqrt(2 / Math.PI)
 
 function autoBarMinMax(tileMeta: QuicklookMetadata) {
   const n = 1000
-  const ccds = tileMeta.process_ccd_results ?? []
+  const ccds = tileMeta.ccd_meta ?? []
   const min = Math.min(+Infinity, ...ccds.map(ccd => ccd.image_stat.median))
   const max = Math.max(-Infinity, ...ccds.map(ccd => ccd.image_stat.median))
   const maxMad = Math.max(-Infinity, ...ccds.map(ccd => ccd.image_stat.mad))
@@ -101,7 +101,7 @@ function autoBarMinMax(tileMeta: QuicklookMetadata) {
 
 function autoMinMax(tileMeta: QuicklookMetadata) {
   const n = 1
-  const ccds = tileMeta.process_ccd_results ?? []
+  const ccds = tileMeta.ccd_meta ?? []
   const min = Math.min(+Infinity, ...ccds.map(ccd => ccd.image_stat).map(s => s.median - n * MAD2STDDEV * s.mad))
   const max = Math.max(-Infinity, ...ccds.map(ccd => ccd.image_stat).map(s => s.median + n * MAD2STDDEV * s.mad))
   return {

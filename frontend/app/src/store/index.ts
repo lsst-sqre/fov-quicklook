@@ -11,7 +11,9 @@ export function makeStore() {
       [homeSlice.name]: homeSlice.reducer,
       [api.reducerPath]: api.reducer,
     },
-    middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
+    middleware: (getDefaultMiddleware) => getDefaultMiddleware({
+      serializableCheck: false,
+    }).concat(api.middleware),
   })
 }
 

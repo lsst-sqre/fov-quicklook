@@ -9,6 +9,11 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/quicklooks/${queryArg.id}/tiles/${queryArg.z}/${queryArg.y}/${queryArg.x}`,
       }),
     }),
+    getFitsHeader: build.query<GetFitsHeaderApiResponse, GetFitsHeaderApiArg>({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.id}/fits_header/${queryArg.ccdName}`,
+      }),
+    }),
     listQuicklooks: build.query<
       ListQuicklooksApiResponse,
       ListQuicklooksApiArg
@@ -46,12 +51,6 @@ const injectedRtkApi = api.injectEndpoints({
     listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
       query: () => ({ url: `/api/visits` }),
     }),
-    staticAssets1: build.query<StaticAssets1ApiResponse, StaticAssets1ApiArg>({
-      query: () => ({ url: `/` }),
-    }),
-    staticAssets2: build.query<StaticAssets2ApiResponse, StaticAssets2ApiArg>({
-      query: () => ({ url: `/vite.svg` }),
-    }),
   }),
   overrideExisting: false,
 });
@@ -63,6 +62,12 @@ export type GetTileApiArg = {
   z: number;
   y: number;
   x: number;
+  id: string;
+};
+export type GetFitsHeaderApiResponse =
+  /** status 200 Successful Response */ HeaderType[];
+export type GetFitsHeaderApiArg = {
+  ccdName: string;
   id: string;
 };
 export type ListQuicklooksApiResponse =
@@ -89,12 +94,6 @@ export type DeleteAllQuicklooksApiArg = void;
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitListEntry[];
 export type ListVisitsApiArg = void;
-export type StaticAssets1ApiResponse =
-  /** status 200 Successful Response */ any;
-export type StaticAssets1ApiArg = void;
-export type StaticAssets2ApiResponse =
-  /** status 200 Successful Response */ any;
-export type StaticAssets2ApiArg = void;
 export type ValidationError = {
   loc: (string | number)[];
   msg: string;
@@ -103,6 +102,8 @@ export type ValidationError = {
 export type HttpValidationError = {
   detail?: ValidationError[];
 };
+export type CardType = [string, string, string, string];
+export type HeaderType = CardType[];
 export type Progress = {
   count: number;
   total: number;
@@ -135,14 +136,14 @@ export type AmpMeta = {
   amp_id: number;
   bbox: BBox;
 };
-export type ProcessCcdResult = {
+export type CcdMeta = {
   ccd_id: CcdId;
   image_stat: ImageStat;
   amps: AmpMeta[];
   bbox: BBox;
 };
 export type QuicklookMeta = {
-  process_ccd_results: ProcessCcdResult[];
+  ccd_meta: CcdMeta[];
 };
 export type QuicklookStatus = {
   id: string;
@@ -158,7 +159,7 @@ export type QuicklookCreateFrontend = {
 export type QuicklookMetadata = {
   id: string;
   wcs: object;
-  process_ccd_results: ProcessCcdResult[] | null;
+  ccd_meta: CcdMeta[] | null;
 };
 export type VisitListEntry = {
   name: string;
@@ -166,12 +167,11 @@ export type VisitListEntry = {
 export const {
   useHealthzQuery,
   useGetTileQuery,
+  useGetFitsHeaderQuery,
   useListQuicklooksQuery,
   useCreateQuicklookMutation,
   useShowQuicklookStatusQuery,
   useShowQuicklookMetadataQuery,
   useDeleteAllQuicklooksMutation,
   useListVisitsQuery,
-  useStaticAssets1Query,
-  useStaticAssets2Query,
 } = injectedRtkApi;

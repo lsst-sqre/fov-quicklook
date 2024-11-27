@@ -17,8 +17,8 @@ const CcdFrameLayer$: React.FC = memo(() => {
 
   useEffect(() => {
     ifLayerReady(layer => {
-      if (metadata?.process_ccd_results && wcs) {
-        layer.update(metadata.process_ccd_results.map(r => r.bbox).flat(), wcs)
+      if (metadata?.ccd_meta && wcs) {
+        layer.update(metadata.ccd_meta.map(r => r.bbox).flat(), wcs)
       }
     })
   }, [ifLayerReady, metadata, wcs])

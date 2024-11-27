@@ -1,0 +1,702 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "FastAPI",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/api/healthz": {
+            "get": {
+                "summary": "Healthz",
+                "description": "Health check",
+                "operationId": "healthz",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{id}/tiles/{z}/{y}/{x}": {
+            "get": {
+                "summary": "Get Tile",
+                "operationId": "get_tile",
+                "parameters": [
+                    {
+                        "name": "z",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Z"
+                        }
+                    },
+                    {
+                        "name": "y",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Y"
+                        }
+                    },
+                    {
+                        "name": "x",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "X"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{id}/fits_header/{ccd_name}": {
+            "get": {
+                "summary": "Get Fits Header",
+                "operationId": "get_fits_header",
+                "parameters": [
+                    {
+                        "name": "ccd_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Ccd Name"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/HeaderType"
+                                    },
+                                    "title": "Response Get Fits Header Api Quicklooks  Id  Fits Header  Ccd Name  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks": {
+            "get": {
+                "summary": "List Quicklooks",
+                "operationId": "list_quicklooks",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/QuicklookStatus"
+                                    },
+                                    "type": "array",
+                                    "title": "Response List Quicklooks Api Quicklooks Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create Quicklook",
+                "description": "Create a quicklook",
+                "operationId": "create_quicklook",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QuicklookCreateFrontend"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{id}/status": {
+            "get": {
+                "summary": "Show Quicklook Status",
+                "operationId": "show_quicklook_status",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/QuicklookStatus"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ],
+                                    "title": "Response Show Quicklook Status Api Quicklooks  Id  Status Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{id}/metadata": {
+            "get": {
+                "summary": "Show Quicklook Metadata",
+                "operationId": "show_quicklook_metadata",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QuicklookMetadata"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/*": {
+            "delete": {
+                "summary": "Delete All Quicklooks",
+                "description": "Delete all quicklooks",
+                "operationId": "delete_all_quicklooks",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/visits": {
+            "get": {
+                "summary": "List Visits",
+                "operationId": "list_visits",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/VisitListEntry"
+                                    },
+                                    "type": "array",
+                                    "title": "Response List Visits Api Visits Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AmpMeta": {
+                "properties": {
+                    "amp_id": {
+                        "type": "integer",
+                        "title": "Amp Id"
+                    },
+                    "bbox": {
+                        "$ref": "#/components/schemas/BBox"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "amp_id",
+                    "bbox"
+                ],
+                "title": "AmpMeta"
+            },
+            "BBox": {
+                "properties": {
+                    "miny": {
+                        "type": "number",
+                        "title": "Miny"
+                    },
+                    "maxy": {
+                        "type": "number",
+                        "title": "Maxy"
+                    },
+                    "minx": {
+                        "type": "number",
+                        "title": "Minx"
+                    },
+                    "maxx": {
+                        "type": "number",
+                        "title": "Maxx"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "miny",
+                    "maxy",
+                    "minx",
+                    "maxx"
+                ],
+                "title": "BBox"
+            },
+            "CardType": {
+                "prefixItems": [
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "string"
+                    }
+                ],
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
+            },
+            "CcdId": {
+                "properties": {
+                    "visit": {
+                        "$ref": "#/components/schemas/Visit"
+                    },
+                    "ccd_name": {
+                        "type": "string",
+                        "title": "Ccd Name"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit",
+                    "ccd_name"
+                ],
+                "title": "CcdId"
+            },
+            "CcdMeta": {
+                "properties": {
+                    "ccd_id": {
+                        "$ref": "#/components/schemas/CcdId"
+                    },
+                    "image_stat": {
+                        "$ref": "#/components/schemas/ImageStat"
+                    },
+                    "amps": {
+                        "items": {
+                            "$ref": "#/components/schemas/AmpMeta"
+                        },
+                        "type": "array",
+                        "title": "Amps"
+                    },
+                    "bbox": {
+                        "$ref": "#/components/schemas/BBox"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "ccd_id",
+                    "image_stat",
+                    "amps",
+                    "bbox"
+                ],
+                "title": "CcdMeta"
+            },
+            "GeneratorProgress": {
+                "properties": {
+                    "download": {
+                        "$ref": "#/components/schemas/Progress"
+                    },
+                    "preprocess": {
+                        "$ref": "#/components/schemas/Progress"
+                    },
+                    "maketile": {
+                        "$ref": "#/components/schemas/Progress"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "download",
+                    "preprocess",
+                    "maketile"
+                ],
+                "title": "GeneratorProgress"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "HeaderType": {
+                "items": {
+                    "$ref": "#/components/schemas/CardType"
+                },
+                "type": "array"
+            },
+            "ImageStat": {
+                "properties": {
+                    "median": {
+                        "type": "number",
+                        "title": "Median"
+                    },
+                    "mad": {
+                        "type": "number",
+                        "title": "Mad"
+                    },
+                    "shape": {
+                        "items": {
+                            "type": "integer"
+                        },
+                        "type": "array",
+                        "title": "Shape"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "median",
+                    "mad",
+                    "shape"
+                ],
+                "title": "ImageStat"
+            },
+            "Progress": {
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "title": "Count"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "count",
+                    "total"
+                ],
+                "title": "Progress"
+            },
+            "QuicklookCreateFrontend": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id"
+                ],
+                "title": "QuicklookCreateFrontend"
+            },
+            "QuicklookMeta": {
+                "properties": {
+                    "ccd_meta": {
+                        "items": {
+                            "$ref": "#/components/schemas/CcdMeta"
+                        },
+                        "type": "array",
+                        "title": "Ccd Meta"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "ccd_meta"
+                ],
+                "title": "QuicklookMeta"
+            },
+            "QuicklookMetadata": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "wcs": {
+                        "type": "object",
+                        "title": "Wcs"
+                    },
+                    "ccd_meta": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "$ref": "#/components/schemas/CcdMeta"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Ccd Meta"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "wcs",
+                    "ccd_meta"
+                ],
+                "title": "QuicklookMetadata"
+            },
+            "QuicklookStatus": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "phase": {
+                        "type": "string",
+                        "enum": [
+                            "queued",
+                            "processing",
+                            "ready",
+                            "deleting"
+                        ],
+                        "title": "Phase"
+                    },
+                    "generating_progress": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": {
+                                    "$ref": "#/components/schemas/GeneratorProgress"
+                                },
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Generating Progress"
+                    },
+                    "meta": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/QuicklookMeta"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "phase",
+                    "generating_progress",
+                    "meta"
+                ],
+                "title": "QuicklookStatus"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            },
+            "Visit": {
+                "properties": {
+                    "data_type": {
+                        "type": "string",
+                        "enum": [
+                            "raw",
+                            "calexp"
+                        ],
+                        "title": "Data Type"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "data_type",
+                    "name"
+                ],
+                "title": "Visit"
+            },
+            "VisitListEntry": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "VisitListEntry"
+            }
+        }
+    }
+}
