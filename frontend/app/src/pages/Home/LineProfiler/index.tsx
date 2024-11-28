@@ -31,7 +31,7 @@ export const LineProfiler = memo(() => {
         const m: V2 = [minX + (i / (n - 1)) * width, mouseY]
         const skyCoord: SkyCoord = globe.canvas.coordFromClientCoord({ clientX: m[0], clientY: m[1] })
         const pixelCoords = wcs.xyz2pixel(skyCoord.xyz)
-        const { value } = quicklookLayer.pixelValue(pixelCoords) ?? [-1, Number.NaN]
+        const { value } = quicklookLayer.pixelValue(pixelCoords)
         xy[i * 2] = i
         xy[i * 2 + 1] = value
         if (value > max) max = value

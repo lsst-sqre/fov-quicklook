@@ -7,9 +7,13 @@ import { Header } from "./Header"
 import { VisitList } from "./VisitList"
 import { LineProfiler } from "./LineProfiler"
 import { Colorbar } from "./ViewerSettings/Colorbar"
-import { HeaderViewer } from "./HeaderViewer"
+import { useAppSelector } from "../../store/hooks"
+import { Example } from "./HeaderViewerDialogs"
+
 
 export const Home = wrapByHomeContext(memo(() => {
+  const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)
+
   return (
     <div className={styles.home}>
       <Header />
@@ -22,9 +26,10 @@ export const Home = wrapByHomeContext(memo(() => {
         <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <Viewer style={{ flexGrow: 1 }} />
           <Colorbar />
-          <LineProfiler />
+          {lineProfilerEnabled && <LineProfiler />}
         </div>
       </div>
+      {/* <Example /> */}
     </div>
   )
 }))

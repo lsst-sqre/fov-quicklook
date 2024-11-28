@@ -38,7 +38,7 @@ function useMouseCursorSkyCoord(): SkyCoord | undefined {
   }, [_camera, clientCoord, globe])
 }
 
-function useMouseCursorFocalPlaneCoord(): V2 {
+export function useMouseCursorFocalPlaneCoord(): V2 {
   const wcs = useWcs()
   const skyCoord = useMouseCursorSkyCoord()
   return useMemo(() => {

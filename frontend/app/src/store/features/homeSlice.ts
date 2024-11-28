@@ -45,5 +45,8 @@ export const homeSlice = createSlice({
     setFilterParams: (state, action: PayloadAction<RubinImageFilterParams>) => {
       state.filterParams = action.payload
     },
+    toggleLineProfiler: state => {
+      state.lineProfiler.enabled = !state.lineProfiler.enabled
+    },
   },
 })

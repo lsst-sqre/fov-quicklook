@@ -11,14 +11,14 @@ import colormapGray from './colormap-Gray.glsl?raw'
 // 'optionH.csv': 'turbo',
 // 'viridis_map.csv': 'viridis',
 
-import colormapCividis from './viridisLite/colormaps/cividis.glsl?raw'
-import colormapInferno from './viridisLite/colormaps/inferno.glsl?raw'
-import colormapMagma from './viridisLite/colormaps/magma.glsl?raw'
-import colormapMako from './viridisLite/colormaps/mako.glsl?raw'
-import colormapPlasma from './viridisLite/colormaps/plasma.glsl?raw'
-import colormapRocket from './viridisLite/colormaps/rocket.glsl?raw'
-import colormapTurbo from './viridisLite/colormaps/turbo.glsl?raw'
-import colormapViridis from './viridisLite/colormaps/viridis.glsl?raw'
+import colormapCividis from './viridisLite/colormap/cividis.glsl?raw'
+import colormapInferno from './viridisLite/colormap/inferno.glsl?raw'
+import colormapMagma from './viridisLite/colormap/magma.glsl?raw'
+import colormapMako from './viridisLite/colormap/mako.glsl?raw'
+import colormapPlasma from './viridisLite/colormap/plasma.glsl?raw'
+import colormapRocket from './viridisLite/colormap/rocket.glsl?raw'
+import colormapTurbo from './viridisLite/colormap/turbo.glsl?raw'
+import colormapViridis from './viridisLite/colormap/viridis.glsl?raw'
 
 import shaderBase from './frag.glsl?raw'
 import scaleArsinh from './scale-Arsinh.glsl?raw'

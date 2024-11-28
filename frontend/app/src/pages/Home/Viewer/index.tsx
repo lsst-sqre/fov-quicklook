@@ -1,24 +1,19 @@
 import { Globe$, GlobeEventLayer$, GridLayer$, PanLayer$, RollLayer$, TouchLayer$, ZoomLayer$ } from '@stellar-globe/react-stellar-globe'
-import { angle, GlobePointerEvent, SkyCoord, V2 } from "@stellar-globe/stellar-globe"
+import { GlobePointerEvent, V2 } from "@stellar-globe/stellar-globe"
 import { memo, useCallback, useEffect } from "react"
 import { Quicklook$ } from '../../../StellarGlobe/Quicklook/QuicklookLayer'
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
-import { useHomeContext } from "../context"
+import { useHomeContext, useResetView } from "../context"
+import { CcdFrames } from './CcdFrames/CcdFrames'
 import { CursorLine } from './CursorLine'
+import { Info } from './Info'
 import { QuicklookProgress } from './QuicklookProgress'
 import styles from './styles.module.scss'
-import { CcdFrames } from './CcdFrames/CcdFrames'
+import { ViewerContextMenu } from './ViewerContextMenu'
 
 type ViewerProps = {
   style?: React.CSSProperties
-}
-
-function useResetView() {
-  const { globeHandle } = useHomeContext()
-  return useCallback((duration: number = 400) => {
-    globeHandle.current?.().camera.jumpTo({ fovy: angle.deg2rad(3.6) }, { coord: SkyCoord.fromDeg(0, 0), duration })
-  }, [globeHandle])
 }
 
 export const Viewer = memo(({ style }: ViewerProps) => {
@@ -39,7 +34,6 @@ export const Viewer = memo(({ style }: ViewerProps) => {
   }, [dispatch])
 
   const filterParams = useAppSelector(state => state.home.filterParams)
-  const id = useAppSelector(state => state.home.currentQuicklook)
 
   return (
     <div style={{ ...style, position: 'relative', height: 0 }}>
@@ -49,7 +43,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
         retina
       >
         <GlobeEventLayer$ onPointerMove={onPointerMove} onCameraMove={onCameraMove} />
-        {/* <MainContextMenu /> */}
+        <ViewerContextMenu />
         <ZoomLayer$ />
         <RollLayer$ />
         <TouchLayer$ />
@@ -65,6 +59,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
         <CcdFrames />
       </Globe$>
       <CursorLine />
+      <Info />
       {(currentQuicklook.status?.phase === 'processing' || currentQuicklook.metadata === undefined) && (
         <div className={styles.viewerBlock}>
           {currentQuicklook.status?.phase === 'processing' &&
@@ -72,10 +67,6 @@ export const Viewer = memo(({ style }: ViewerProps) => {
           }
         </div>
       )}
-      <div style={{ position: 'absolute', top: 0, left: 0, }}>
-        {/* <pre>{JSON.stringify(currentQuicklook.status)}</pre> */}
-        {/* <pre>{JSON.stringify(quicklookHandle)}</pre> */}
-      </div>
     </div>
   )
 })

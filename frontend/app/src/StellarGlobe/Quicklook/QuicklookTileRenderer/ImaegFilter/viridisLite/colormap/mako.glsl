@@ -7,6 +7,6 @@ vec3 colormap(float value) {
     float scaledValue = value * float(n);
     int index = int(floor(scaledValue));
     float fraction = scaledValue - float(index);
-    index = clamp(index, 0, n - 1);
+    index = clamp(index, 0, n);
     return mix(colorTable[index], colorTable[index + 1], fraction);
 }

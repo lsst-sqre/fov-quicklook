@@ -10,7 +10,7 @@ export class BBoxLayer extends Layer {
     this.r = new path.Renderer(globe.gl, {
       blendMode: "NORMAL",
       darkenNarrowLine: false,
-      minWidth: 5 * globe.camera.pixelRatio,
+      minWidth: 3 * globe.camera.pixelRatio,
     })
     this.onRelease(() => this.r.release())
   }

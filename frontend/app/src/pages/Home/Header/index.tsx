@@ -2,6 +2,7 @@ import { memo, useCallback } from "react"
 import { FlexiblePadding } from "../../../components/layout"
 import { useDeleteAllQuicklooksMutation, useListQuicklooksQuery } from "../../../store/api/openapi"
 import styles from './styles.module.scss'
+import { MainMenu } from "./MainMenu"
 
 export const Header = memo(() => {
   const { refetch } = useListQuicklooksQuery()
@@ -14,6 +15,7 @@ export const Header = memo(() => {
 
   return (
     <div className={styles.header}>
+      <MainMenu />
       <FlexiblePadding />
       <button onClick={deleteAllAndRefresh}>Clear Cache</button>
     </div>
