@@ -9,6 +9,7 @@ import { createHashRouter, RouterProvider } from 'react-router-dom'
 import './style.scss'
 import { Home } from './pages/Home'
 import { makeStore } from './store'
+import { FItsHeaderPage } from './pages/FitsHeader'
 
 
 const router = createHashRouter([
@@ -18,6 +19,12 @@ const router = createHashRouter([
       <Home />
     ),
   },
+  {
+    path: '/header/:visitId/:ccdName',
+    element: (
+      <FItsHeaderPage />
+    ),
+  }
 ])
 
 

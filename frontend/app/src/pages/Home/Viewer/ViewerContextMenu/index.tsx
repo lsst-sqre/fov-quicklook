@@ -25,6 +25,14 @@ function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMe
     await copyTextToClipboard(ccdMeta?.ccd_id.ccd_name ?? '-')
   }, [ccdMeta?.ccd_id.ccd_name])
 
+  const openHeaerPage = useCallback(() => {
+    if (ccdMeta) {
+      const visit = ccdMeta.ccd_id.visit
+      const visitId = `${visit.data_type}:${visit.name}`
+      window.open(`#/header/${visitId}/${ccdMeta.ccd_id.ccd_name}`)
+    }
+  }, [ccdMeta])
+
   return (
     <Fragment>
       {ccdMeta &&
@@ -32,6 +40,8 @@ function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMe
       }
       <MenuDivider />
       <MenuItem disabled={!ccdMeta} onClick={copyId}>Copy ID to Clipboard</MenuItem>
+      <MenuItem disabled={!ccdMeta} onClick={openHeaerPage}>Show FITS Header</MenuItem>
+
       {/* <MenuItem disabled={!ccdMeta} onClick={showHeader}>Show Headers</MenuItem> */}
       {/* <MenuItem onClick={donwload}>Download Raw FITS</MenuItem> */}
     </Fragment>

@@ -1,0 +1,40 @@
+.fitsHeader {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+
+  font-family: monospace;
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background-color: black;
+    vertical-align: top;
+  }
+
+  .odd {
+    background-color: #122;
+  }
+}
+
+.str {
+  color: #aaa;
+}
+
+.int {
+  color: #0ff;
+}
+
+.float {
+  color: #0aa;
+}
+
+.bool {
+  color: #f00;
+}

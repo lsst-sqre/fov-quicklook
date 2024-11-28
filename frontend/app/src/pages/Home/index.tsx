@@ -1,14 +1,13 @@
 import { memo } from "react"
+import { useAppSelector } from "../../store/hooks"
 import { wrapByHomeContext } from "./context"
+import { Header } from "./Header"
+import { LineProfiler } from "./LineProfiler"
 import styles from './styles.module.scss'
 import { Viewer } from "./Viewer"
 import { ViewerSettings } from "./ViewerSettings"
-import { Header } from "./Header"
-import { VisitList } from "./VisitList"
-import { LineProfiler } from "./LineProfiler"
 import { Colorbar } from "./ViewerSettings/Colorbar"
-import { useAppSelector } from "../../store/hooks"
-import { Example } from "./HeaderViewerDialogs"
+import { VisitList } from "./VisitList"
 
 
 export const Home = wrapByHomeContext(memo(() => {
