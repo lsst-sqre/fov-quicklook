@@ -10,9 +10,9 @@ push: build
 	docker push $(image_ref)
 
 restart:
-	kubectl -n quicklook rollout restart deployment quicklook-coordinator
-	kubectl -n quicklook rollout restart deployment quicklook-frontend
-	kubectl -n quicklook rollout restart daemonset quicklook-generator
+	kubectl -n quicklook rollout restart deployment fov-quicklook-coordinator
+	kubectl -n quicklook rollout restart deployment fov-quicklook-frontend
+	kubectl -n quicklook rollout restart daemonset fov-quicklook-generator
 
 deploy: push restart
 
@@ -23,4 +23,4 @@ dev-update:
 		--set use_gafaelfawr=false \
 		--set image.repository=$(image_ref) \
 		--set image.tag=latest \
-		-f ./k8s/quicklook/notes/dev-values.yaml
+		-f ./notes/dev-values.yaml
