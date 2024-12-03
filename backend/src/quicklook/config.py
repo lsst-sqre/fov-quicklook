@@ -66,8 +66,6 @@ class Config(BaseSettings):
 
     db_url: str = 'postgresql://quicklook:quicklook@localhost:5432/quicklook'
 
-    coordinator_work_dir: str = '/dev/shm/quicklook/coordinator'
-
     heartbeat_interval: float = 10
 
     @cached_property

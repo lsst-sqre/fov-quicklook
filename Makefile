@@ -12,7 +12,7 @@ push: build
 restart:
 	kubectl -n quicklook rollout restart deployment fov-quicklook-coordinator
 	kubectl -n quicklook rollout restart deployment fov-quicklook-frontend
-	kubectl -n quicklook rollout restart daemonset fov-quicklook-generator
+	kubectl -n quicklook rollout restart deployment fov-quicklook-generator
 
 deploy: push restart
 
