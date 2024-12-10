@@ -24,6 +24,7 @@ setup(
         'alembic==1.12.*',
         'psycopg2-binary',
         'tqdm',
+        'lsst-daf-butler',
     ],
     extras_require={
         'dev': [
