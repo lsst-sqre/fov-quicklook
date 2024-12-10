@@ -3,5 +3,10 @@
     "**/__pycache__": true,
     "**/.ipynb_checkpoints": true,
     "**/*.egg-info": true
-  }
+  },
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }
