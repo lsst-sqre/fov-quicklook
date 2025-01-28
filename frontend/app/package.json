@@ -11,7 +11,7 @@
     "type-check": "tsc -b",
     "scss-types": "typed-scss-modules src -i node_modules",
     "refresh-api-schema": "ssh da12 -lmichitaro make -s -C rubin-quicklook-k8s/backend dev/openapi > openapi.json",
-    "api:rtk-query": "npm run refresh-api-schema && rtk-query-codegen-openapi ./openapi-config.cts"
+    "api:rtk-query": "npm run refresh-api-schema && rtk-query-codegen-openapi ./openapi-config.json"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.3.0",
