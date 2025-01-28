@@ -25,12 +25,20 @@ def fits_partial_load(
     probe_pos = 1440 * 20
     while probe_pos < 500_000:
         f = io.BytesIO(read(0, probe_pos))
+        print(probe_pos)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=AstropyUserWarning)
             try:
                 with pyfits.open(f) as hdul:
-                    fi = hdul[1].fileinfo()  # type: ignore
-                    size: int = fi['datLoc'] + fi['datSpan']
+                    # ここは内部実装によるのでastropyのバージョンが変わると動かなくなるかもしれない
+                    # ローカルでは動くがk8sでは動かないなどの場合、ローカルでも `pip install -U -e .` などしてライブラリをアップデートすること
+                    hdu = hdul[1]
+                    size: int = hdu._data_offset + hdu._data_size  # type: ignore
+                    # fi = hdul[1].fileinfo()  # type: ignore
+                    # "hdrLoc": self._header_offset,
+                    # "datLoc": self._data_offset,
+                    # "datSpan": self._data_size,
+                    # size: int = fi['datLoc'] + fi['datSpan']
                     break
             except (OSError, IndexError):
                 pass

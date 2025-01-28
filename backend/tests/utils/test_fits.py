@@ -5,6 +5,7 @@ import astropy.io.fits as pyfits
 import minio
 
 from quicklook.config import config
+from quicklook.storage import s3_get_visit_ccd_fits
 from quicklook.types import Visit
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import download_object_from_s3
@@ -12,7 +13,7 @@ from quicklook.utils.s3 import download_object_from_s3
 
 def test_s3_partial_load():
     visit = Visit('calexp', '192350')
-    ccd_name = 'R01_S00'
+    ccd_name = 'R11_S21'
 
     def read(start: int, end: int) -> bytes:
         bucket = config.s3_repository.bucket
