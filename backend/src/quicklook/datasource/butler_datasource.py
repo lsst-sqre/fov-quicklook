@@ -11,7 +11,7 @@ class ButlerDataSource(DataSourceBase):
 
         self._butler = Butler("embargo", instrument="LSSTComCam", collections="LSSTComCam/raw/all")  # type: ignore
 
-    def query_datasets(self, q: Query) -> list[DataSourceVisit]:
+    def query_visits(self, q: Query) -> list[DataSourceVisit]:
         from lsst.daf.butler import EmptyQueryResultError
 
         conds: list[str] = ["detector=0"]
@@ -26,5 +26,9 @@ class ButlerDataSource(DataSourceBase):
             refs = []
         return [DataSourceVisit(q.data_type, str(ref.dataId['exposure'])) for ref in refs]
 
+    def list_ccds(self, visit: DataSourceVisit) -> list[str]:
+        ...
+
     def get_data(self, ref: CcdId) -> bytes:
         return b''
+
