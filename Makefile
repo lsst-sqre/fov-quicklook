@@ -3,7 +3,7 @@ image_ref := localhost:32000/quicklook
 .PHONY: build push deploy dev-update restart
 
 build:
-	$(MAKE) -C backend pyright
+	if [ "$(PYRIGHT_BEFORE_PUSH)" ]; then $(MAKE) -C backend pyright; fi
 	docker build -t $(image_ref) .
 
 push: build
