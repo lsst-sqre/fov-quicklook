@@ -23,4 +23,9 @@ dev-update:
 		--set use_gafaelfawr=false \
 		--set image.repository=$(image_ref) \
 		--set image.tag=latest \
+		--set data_source=dummy \
 		-f ./notes/dev-values.yaml
+
+push-to-ghcr: build
+	docker tag $(image_ref) ghcr.io/michitaro/rubin-fov-viewer
+	docker push ghcr.io/michitaro/rubin-fov-viewer
