@@ -1,5 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
+from quicklook.datasource import get_datasource
+from quicklook.datasource.types import Query as DataSourceQuery
 
 router = APIRouter()
 
@@ -9,8 +11,18 @@ class VisitListEntry(BaseModel):
 
 
 @router.get('/api/visits', response_model=list[VisitListEntry])
-def list_visits():
-    return [
-        VisitListEntry(name='raw:broccoli'),
-        VisitListEntry(name='calexp:192350'),
-    ]
+def list_visits(
+    exposure: str | None = Query(None),
+    day_obs: int | None = Query(None),
+    limit: int = Query(default=100, le=1000),
+):
+    ds = get_datasource()
+    refs = ds.query_datasets(
+        DataSourceQuery(
+            data_type='raw',
+            exposure=exposure,
+            day_obs=day_obs,
+            limit=limit,
+        )
+    )
+    return [VisitListEntry(name=ref.exposure) for ref in refs]

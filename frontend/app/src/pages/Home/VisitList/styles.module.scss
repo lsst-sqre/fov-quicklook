@@ -1,6 +1,22 @@
+.listWrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .list {
   cursor: default;
   user-select: none;
+  flex-grow: 1;
+  height: 0;
+  overflow: auto;
+}
+
+.searchBox {
+  display: flex;
+  input {
+    flex-grow: 1;
+  }
 }
 
 .entry {

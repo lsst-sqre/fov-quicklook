@@ -8,6 +8,7 @@ type State = {
   mouseCursorClientCoord: V2
   lineProfiler: LineProfilerState
   filterParams: RubinImageFilterParams
+  searchString: string
 }
 
 type ViewerCamera = object
@@ -26,6 +27,7 @@ function initialState(): State {
       enabled: true,
     },
     filterParams: RubinImageFilter.defaultParams(),
+    searchString: '',
   }
 }
 
@@ -47,6 +49,9 @@ export const homeSlice = createSlice({
     },
     toggleLineProfiler: state => {
       state.lineProfiler.enabled = !state.lineProfiler.enabled
+    },
+    setSearchString: (state, action: PayloadAction<string>) => {
+      state.searchString = action.payload
     },
   },
 })

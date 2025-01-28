@@ -49,7 +49,14 @@ const injectedRtkApi = api.injectEndpoints({
       query: () => ({ url: `/api/quicklooks/*`, method: "DELETE" }),
     }),
     listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
-      query: () => ({ url: `/api/visits` }),
+      query: (queryArg) => ({
+        url: `/api/visits`,
+        params: {
+          exposure: queryArg.exposure,
+          day_obs: queryArg.dayObs,
+          limit: queryArg.limit,
+        },
+      }),
     }),
   }),
   overrideExisting: false,
@@ -93,7 +100,11 @@ export type DeleteAllQuicklooksApiResponse =
 export type DeleteAllQuicklooksApiArg = void;
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitListEntry[];
-export type ListVisitsApiArg = void;
+export type ListVisitsApiArg = {
+  exposure?: string | null;
+  dayObs?: number | null;
+  limit?: number;
+};
 export type ValidationError = {
   loc: (string | number)[];
   msg: string;

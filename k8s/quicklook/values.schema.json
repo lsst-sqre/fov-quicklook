@@ -19,8 +19,19 @@
       "type": "boolean"
     },
     "db_storage_class": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "default": null
+    },
+    "data_source": {
+      "type": "string",
+      "enum": [
+        "butler",
+        "dummy"
+      ],
+      "default": "butler"
     },
     "global": {},
     "coordinator": {
@@ -30,7 +41,9 @@
           "$ref": "#/definitions/resources"
         }
       },
-      "required": ["resources"]
+      "required": [
+        "resources"
+      ]
     },
     "frontend": {
       "type": "object",
@@ -39,7 +52,9 @@
           "$ref": "#/definitions/resources"
         }
       },
-      "required": ["resources"]
+      "required": [
+        "resources"
+      ]
     },
     "db": {
       "type": "object",
@@ -48,7 +63,9 @@
           "$ref": "#/definitions/resources"
         }
       },
-      "required": ["resources"]
+      "required": [
+        "resources"
+      ]
     },
     "generator": {
       "type": "object",
@@ -61,17 +78,26 @@
           "properties": {
             "medium": {
               "type": "string",
-              "enum": ["", "Memory"]
+              "enum": [
+                "",
+                "Memory"
+              ]
             }
           },
-          "required": ["medium"]
+          "required": [
+            "medium"
+          ]
         },
         "replicas": {
           "type": "integer",
           "minimum": 1
         }
       },
-      "required": ["resources", "workdir", "replicas"]
+      "required": [
+        "resources",
+        "workdir",
+        "replicas"
+      ]
     }
   },
   "required": [
@@ -159,7 +185,10 @@
               "type": "string"
             }
           },
-          "required": ["cpu", "memory"]
+          "required": [
+            "cpu",
+            "memory"
+          ]
         }
       }
     }

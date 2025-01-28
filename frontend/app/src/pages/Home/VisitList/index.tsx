@@ -11,8 +11,16 @@ type VisitListProps = {
 }
 
 
+function isValidDate(s: string) {
+  return /^[0-9]{8}$/.test(s)
+}
+
+
 export const VisitList = memo(({ style }: VisitListProps) => {
-  const { data: list } = useListVisitsQuery()
+  const searchString = useAppSelector(state => state.home.searchString)
+  const { data: list } = useListVisitsQuery({
+    dayObs: isValidDate(searchString) ? Number(searchString) : undefined,
+  })
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const dispatch = useAppDispatch()
 
@@ -23,10 +31,13 @@ export const VisitList = memo(({ style }: VisitListProps) => {
   }, [dispatch, list, currentQuicklook])
 
   return (
-    <div className={styles.list} style={style}>
-      {list?.map((entry) => (
-        <VisitListEntry key={entry.name} entry={entry} />
-      ))}
+    <div className={styles.listWrapper}>
+      <SearchBox />
+      <div className={styles.list} style={style}>
+        {list?.map((entry) => (
+          <VisitListEntry key={entry.name} entry={entry} />
+        ))}
+      </div>
     </div>
   )
 })
@@ -49,6 +60,26 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
       onClick={select}
     >
       {entry.name}
+    </div>
+  )
+}
+
+
+function SearchBox() {
+  const dispatch = useAppDispatch()
+  const searchString = useAppSelector(state => state.home.searchString)
+
+  return (
+    <div className={styles.searchBox}>
+      <input
+        type="search"
+        placeholder='Date ex. 20241204'
+        value={searchString}
+        onChange={e => dispatch(homeSlice.actions.setSearchString(e.target.value))}
+        style={{
+          color: isValidDate(searchString) ? 'white' : 'gray',
+        }}
+      />
     </div>
   )
 }
