@@ -1,14 +1,15 @@
-from .types import CcdRef, DataSourceBase, Query, Visit
+from quicklook.types import CcdId
+from .types import DataSourceBase, DataSourceVisit, Query
 
 
 class DummyDataSource(DataSourceBase):
-    def query_datasets(self, q: Query) -> list[Visit]:
+    def query_datasets(self, q: Query) -> list[DataSourceVisit]:
         return [
-            Visit(exposure='raw:broccoli'),
-            Visit(exposure='calexp:192350'),
-            Visit(exposure=f'query:{q.day_obs}'),
-            *[Visit(exposure=f'raw:{i}') for i in range(50)],
+            DataSourceVisit('raw', 'raw:broccoli'),
+            DataSourceVisit('calexp', 'calexp:192350'),
+            DataSourceVisit('raw', f'query:{q.day_obs}'),
+            *[DataSourceVisit('raw', f'raw:{i}') for i in range(50)],
         ][: q.limit]
 
-    def get_data(self, ref: CcdRef) -> bytes:
+    def get_data(self, ref: CcdId) -> bytes:
         return b''
