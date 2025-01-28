@@ -344,7 +344,7 @@
                         "schema": {
                             "type": "integer",
                             "maximum": 1000,
-                            "default": 1000,
+                            "default": 100,
                             "title": "Limit"
                         }
                     }

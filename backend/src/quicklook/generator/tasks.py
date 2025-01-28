@@ -12,11 +12,11 @@ import minio
 
 from quicklook.config import config
 from quicklook.coordinator.tasks import GeneratorTask
+from quicklook.datasource import get_datasource
 from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.generator.progress import GeneratorProgress, GeneratorProgressReporter
 from quicklook.generator.tilewriter import TileWriter, TileWriterBase
-from quicklook.storage import s3_get_visit_ccd_fits
 from quicklook.tileinfo import TileInfo
 from quicklook.types import CcdId, PreProcessedCcd, ProcessCcdResult, Progress, Tile, Visit
 from quicklook.utils import multiprocessing_coverage_compatible as mp
@@ -96,11 +96,12 @@ def iterate_downloaded_ccds(
     update_progress: Callable[[Progress], None] = Progress.noop_progress,
 ):
     sem = DynamicSemaphore(1)
+    ds = get_datasource()
 
     def download(visit: Visit, ccd_name: str):
         with sem:
             with timeit(f'download-{visit.name}/{ccd_name}'):
-                filecontents = s3_get_visit_ccd_fits(visit, ccd_name)
+                filecontents = ds.get_data(CcdId(visit, ccd_name))
                 filename = Path(f'{tmpdir}/{ccd_name}.fits')
                 filename.parent.mkdir(parents=True, exist_ok=True)
                 Path(filename).write_bytes(filecontents)

@@ -1,11 +1,9 @@
-from dataclasses import dataclass
 import tempfile
 
 import astropy.io.fits as pyfits
 import minio
 
 from quicklook.config import config
-from quicklook.storage import s3_get_visit_ccd_fits
 from quicklook.types import Visit
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import download_object_from_s3

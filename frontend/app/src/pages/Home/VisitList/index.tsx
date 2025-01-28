@@ -1,5 +1,5 @@
 import styles from './styles.module.scss'
-import { memo, useEffect } from "react"
+import { memo, useEffect, useMemo } from "react"
 import { ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
 import { useAppDispatch, useAppSelector } from '../../../store/hooks'
 import classNames from 'classnames'
@@ -11,16 +11,28 @@ type VisitListProps = {
 }
 
 
-function isValidDate(s: string) {
-  return /^[0-9]{8}$/.test(s)
+function isValidSearchString(s: string) {
+  // 20241021 or 2024102100002
+  return /^\d{8}(\d{4})?$/.test(s)
 }
 
 
 export const VisitList = memo(({ style }: VisitListProps) => {
   const searchString = useAppSelector(state => state.home.searchString)
-  const { data: list } = useListVisitsQuery({
-    dayObs: isValidDate(searchString) ? Number(searchString) : undefined,
-  })
+  const query = useMemo(() => {
+    if (isValidSearchString(searchString)) {
+      switch (searchString.length) {
+        case 8:
+          return { dayObs: Number(searchString) }
+        case 12:
+          return { exposure: searchString }
+      }
+    }
+    return {}
+  }, [searchString])
+  console.log(query)
+  
+  const { data: list } = useListVisitsQuery(query)
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const dispatch = useAppDispatch()
 
@@ -73,11 +85,11 @@ function SearchBox() {
     <div className={styles.searchBox}>
       <input
         type="search"
-        placeholder='Date ex. 20241204'
+        placeholder='Date or Exposure ex. 20241204 or 2024120400003'
         value={searchString}
         onChange={e => dispatch(homeSlice.actions.setSearchString(e.target.value))}
         style={{
-          color: isValidDate(searchString) ? 'white' : 'gray',
+          color: isValidSearchString(searchString) ? 'white' : 'gray',
         }}
       />
     </div>

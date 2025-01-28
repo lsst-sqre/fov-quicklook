@@ -14,7 +14,7 @@ class VisitListEntry(BaseModel):
 def list_visits(
     exposure: str | None = Query(None),
     day_obs: int | None = Query(None),
-    limit: int = Query(default=100, le=1000),
+    limit: int = Query(default=1000, le=10000),
 ):
     ds = get_datasource()
     visits = ds.query_visits(
