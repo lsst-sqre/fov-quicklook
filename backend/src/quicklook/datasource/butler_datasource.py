@@ -1,5 +1,5 @@
 from quicklook.types import CcdId
-from .types import DataSourceBase, Query, DataSourceVisit
+from .types import DataSourceBase, Query, Visit
 
 
 class ButlerDataSource(DataSourceBase):
@@ -11,7 +11,7 @@ class ButlerDataSource(DataSourceBase):
 
         self._butler = Butler("embargo", instrument="LSSTComCam", collections="LSSTComCam/raw/all")  # type: ignore
 
-    def query_visits(self, q: Query) -> list[DataSourceVisit]:
+    def query_visits(self, q: Query) -> list[Visit]:
         from lsst.daf.butler import EmptyQueryResultError
 
         conds: list[str] = ["detector=0"]
@@ -24,9 +24,9 @@ class ButlerDataSource(DataSourceBase):
             refs = self._butler.query_datasets(q.data_type, where=where, limit=q.limit)
         except EmptyQueryResultError:
             refs = []
-        return [DataSourceVisit(q.data_type, str(ref.dataId['exposure'])) for ref in refs]
+        return [Visit(q.data_type, str(ref.dataId['exposure'])) for ref in refs]
 
-    def list_ccds(self, visit: DataSourceVisit) -> list[str]:
+    def list_ccds(self, visit: Visit) -> list[str]:
         ...
 
     def get_data(self, ref: CcdId) -> bytes:

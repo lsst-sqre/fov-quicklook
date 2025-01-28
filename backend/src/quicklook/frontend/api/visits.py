@@ -17,7 +17,7 @@ def list_visits(
     limit: int = Query(default=100, le=1000),
 ):
     ds = get_datasource()
-    refs = ds.query_visits(
+    visits = ds.query_visits(
         DataSourceQuery(
             data_type='raw',
             exposure=exposure,
@@ -25,4 +25,4 @@ def list_visits(
             limit=limit,
         )
     )
-    return [VisitListEntry(name=ref.exposure) for ref in refs]
+    return [VisitListEntry(name=visit.name) for visit in visits]
