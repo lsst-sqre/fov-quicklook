@@ -22,9 +22,10 @@ setup(
         'aiohttp',
         'SQLAlchemy==2.*',
         'alembic==1.12.*',
-        'psycopg2-binary',
         'tqdm',
         'lsst-daf-butler',
+        'boto3',
+        'psycopg2-binary',
     ],
     extras_require={
         'dev': [
