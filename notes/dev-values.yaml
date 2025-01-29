@@ -1,0 +1,82 @@
+admin_page: true
+data_source: dummy
+
+# -- Use vault to store secrets
+use_vault: true
+
+# -- Use gafaelfawr to authenticate
+use_gafaelfawr: false
+
+image:
+  # -- Image to use in the fov-quicklook deployment
+  repository: localhost:32000/quicklook
+
+  # -- Pull policy for the fov-quicklook image
+  pullPolicy: Always
+
+  # -- Tag of image to use
+  tag: latest
+
+config:
+  # -- URL path prefix
+  pathPrefix: /fov-quicklook
+
+# -- S3 configuration for the repository
+s3_repository:
+  endpoint: "192.168.13.201:9000"
+  secure: false
+
+# -- S3 configuration for the tile storage
+s3_tile:
+  endpoint: "192.168.13.201:9000"
+  secure: true
+
+# -- Storage class to use for the database
+db_storage_class: null
+
+
+coordinator:
+  resources:
+    # -- Resource requests for the coordinator
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    # -- Resource limits for the coordinator
+    limits:
+      cpu: 4000m
+      memory: 256Mid
+
+frontend:
+  resources:
+    # -- Resource requests for the frontend
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    # -- Resource limits for the frontend
+    limits:
+      cpu: 8000m
+      memory: 256Mi
+
+db:
+  resources:
+    # -- Resource requests for the database
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    # -- Resource limits for the database
+    limits:
+      cpu: 2000m
+      memory: 256Mi
+
+generator:
+  resources:
+    # -- Resource requests for the generator
+    requests:
+      cpu: 100m
+      memory: 32Gi
+    # -- Resource limits for the generator
+    limits:
+      cpu: 16000m
+      memory: 32Gi
+  workdir:
+    medium: Memory
