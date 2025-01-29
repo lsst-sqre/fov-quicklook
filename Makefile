@@ -24,6 +24,7 @@ dev-update:
 		--set image.repository=$(image_ref) \
 		--set image.tag=latest \
 		--set data_source=dummy \
+		--set admin_page=true \
 		-f ./notes/dev-values.yaml
 
 push-to-ghcr: build

@@ -10,6 +10,7 @@ import './style.scss'
 import { Home } from './pages/Home'
 import { makeStore } from './store'
 import { FItsHeaderPage } from './pages/FitsHeader'
+import { AdminPage } from './pages/Admin'
 
 
 const router = createHashRouter([
@@ -24,7 +25,13 @@ const router = createHashRouter([
     element: (
       <FItsHeaderPage />
     ),
-  }
+  },
+  {
+    path: '/admin',
+    element: (
+      <AdminPage />
+    ),
+  },
 ])
 
 

@@ -46,4 +46,5 @@ db/docker:
 		postgres:16
 
 dev/openapi:
-	@./.venv/bin/python -m quicklook.frontend.api.openapi
+	@QUICKLOOK_admin_page=True \
+		./.venv/bin/python -m quicklook.frontend.api.openapi

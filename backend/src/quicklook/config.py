@@ -27,6 +27,7 @@ class Config(BaseSettings):
     frontend_app_prefix: str = ''
 
     data_source: Literal['butler', 'dummy'] = 'butler'
+    admin_page: bool = False
 
     @field_validator('frontend_app_prefix')
     def check_frontend_app_prefix(cls, value: str):

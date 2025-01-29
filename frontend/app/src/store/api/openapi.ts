@@ -58,6 +58,9 @@ const injectedRtkApi = api.injectEndpoints({
         },
       }),
     }),
+    getPodStatus: build.query<GetPodStatusApiResponse, GetPodStatusApiArg>({
+      query: () => ({ url: `/api/status` }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -105,6 +108,9 @@ export type ListVisitsApiArg = {
   dayObs?: number | null;
   limit?: number;
 };
+export type GetPodStatusApiResponse =
+  /** status 200 Successful Response */ StatusResponse;
+export type GetPodStatusApiArg = void;
 export type ValidationError = {
   loc: (string | number)[];
   msg: string;
@@ -175,6 +181,23 @@ export type QuicklookMetadata = {
 export type VisitListEntry = {
   name: string;
 };
+export type DiskInfo = {
+  mount_point: string;
+  total: number;
+  used: number;
+  device: string;
+};
+export type PodStatus = {
+  hostname: string;
+  memory_total: number;
+  memory_used: number;
+  disks: DiskInfo[];
+};
+export type StatusResponse = {
+  frontend: PodStatus;
+  coordinator: PodStatus;
+  generators: PodStatus[];
+};
 export const {
   useHealthzQuery,
   useGetTileQuery,
@@ -185,4 +208,5 @@ export const {
   useShowQuicklookMetadataQuery,
   useDeleteAllQuicklooksMutation,
   useListVisitsQuery,
+  useGetPodStatusQuery,
 } = injectedRtkApi;

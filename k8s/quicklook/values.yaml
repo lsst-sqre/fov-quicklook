@@ -1,3 +1,5 @@
+admin_page: false
+
 # -- Use vault to store secrets
 use_vault: true
 

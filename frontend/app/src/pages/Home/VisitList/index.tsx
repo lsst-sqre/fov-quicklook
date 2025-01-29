@@ -30,7 +30,6 @@ export const VisitList = memo(({ style }: VisitListProps) => {
     }
     return {}
   }, [searchString])
-  console.log(query)
   
   const { data: list } = useListVisitsQuery(query)
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)

@@ -343,8 +343,8 @@
                         "required": false,
                         "schema": {
                             "type": "integer",
-                            "maximum": 1000,
-                            "default": 100,
+                            "maximum": 10000,
+                            "default": 1000,
                             "title": "Limit"
                         }
                     }
@@ -370,6 +370,24 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/status": {
+            "get": {
+                "summary": "Get Pod Status",
+                "operationId": "get_pod_status",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StatusResponse"
                                 }
                             }
                         }
@@ -489,6 +507,34 @@
                 ],
                 "title": "CcdMeta"
             },
+            "DiskInfo": {
+                "properties": {
+                    "mount_point": {
+                        "type": "string",
+                        "title": "Mount Point"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "used": {
+                        "type": "integer",
+                        "title": "Used"
+                    },
+                    "device": {
+                        "type": "string",
+                        "title": "Device"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "mount_point",
+                    "total",
+                    "used",
+                    "device"
+                ],
+                "title": "DiskInfo"
+            },
             "GeneratorProgress": {
                 "properties": {
                     "download": {
@@ -553,6 +599,37 @@
                     "shape"
                 ],
                 "title": "ImageStat"
+            },
+            "PodStatus": {
+                "properties": {
+                    "hostname": {
+                        "type": "string",
+                        "title": "Hostname"
+                    },
+                    "memory_total": {
+                        "type": "integer",
+                        "title": "Memory Total"
+                    },
+                    "memory_used": {
+                        "type": "integer",
+                        "title": "Memory Used"
+                    },
+                    "disks": {
+                        "items": {
+                            "$ref": "#/components/schemas/DiskInfo"
+                        },
+                        "type": "array",
+                        "title": "Disks"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "hostname",
+                    "memory_total",
+                    "memory_used",
+                    "disks"
+                ],
+                "title": "PodStatus"
             },
             "Progress": {
                 "properties": {
@@ -683,6 +760,30 @@
                     "meta"
                 ],
                 "title": "QuicklookStatus"
+            },
+            "StatusResponse": {
+                "properties": {
+                    "frontend": {
+                        "$ref": "#/components/schemas/PodStatus"
+                    },
+                    "coordinator": {
+                        "$ref": "#/components/schemas/PodStatus"
+                    },
+                    "generators": {
+                        "items": {
+                            "$ref": "#/components/schemas/PodStatus"
+                        },
+                        "type": "array",
+                        "title": "Generators"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "frontend",
+                    "coordinator",
+                    "generators"
+                ],
+                "title": "StatusResponse"
             },
             "ValidationError": {
                 "properties": {

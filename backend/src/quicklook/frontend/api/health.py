@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from quicklook.config import config
-from quicklook.frontend.api.http_request import http_request
+from quicklook.utils.http_request import http_request
 
 router = APIRouter()
 

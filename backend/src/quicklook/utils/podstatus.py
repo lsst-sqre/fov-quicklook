@@ -44,6 +44,8 @@ async def get_disk_info() -> list[DiskInfo]:
             parts = line.split()
             if len(parts) < 6:  # dfの出力は少なくとも6カラムある
                 continue
+            if '/secrets/' in parts[5]:
+                continue
             disks.append(DiskInfo(
                 device=parts[0],
                 mount_point=parts[5],

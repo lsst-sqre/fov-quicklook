@@ -33,6 +33,10 @@
       ],
       "default": "butler"
     },
+    "admin_page": {
+      "type": "boolean",
+      "default": false
+    },
     "global": {},
     "coordinator": {
       "type": "object",

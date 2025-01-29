@@ -13,6 +13,7 @@ async def test_pod_status():
     Filesystem     1K-blocks    Used Available Use% Mounted on
     /dev/sda1      61411456 20123456  41288000  33% /
     /dev/sdb1      30000000 15000000  15000000  50% /data
+    /dev/sdc1      10000000 5000000   5000000  50% /secrets/storage
     """
 
     mock_proc = AsyncMock()
@@ -31,6 +32,7 @@ async def test_pod_status():
         assert result.memory_total == 4001796 * 1024
         assert result.memory_used == 2001796 * 1024
         assert len(result.disks) == 2
+        assert not any('/secrets/' in disk.mount_point for disk in result.disks)
         
         root_disk = next(d for d in result.disks if d.mount_point == "/")
         assert root_disk.device == "/dev/sda1"

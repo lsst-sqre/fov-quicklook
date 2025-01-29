@@ -7,7 +7,7 @@ from starlette.websockets import WebSocketDisconnect
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
 from quicklook.coordinator.quicklook import CcdMeta, Quicklook, QuicklookMeta
-from quicklook.frontend.api.http_request import http_request
+from quicklook.utils.http_request import http_request
 from quicklook.frontend.api.remotequicklook import RemoteQuicklookWather, remote_quicklook
 from quicklook.models import QuicklookRecord
 from quicklook.types import GeneratorProgress, Visit

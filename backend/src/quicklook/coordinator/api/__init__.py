@@ -8,6 +8,7 @@ from .generators import active_context
 from .generators import router as context_router
 from .healthz import router as healthz_router
 from .quicklooks import router as quicklooks_router
+from .podstatus import router as podstatus_router
 
 
 @asynccontextmanager
@@ -19,7 +20,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-
 app.include_router(healthz_router)
 app.include_router(context_router)
 app.include_router(quicklooks_router)
+app.include_router(podstatus_router)

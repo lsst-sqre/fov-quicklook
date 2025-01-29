@@ -19,6 +19,7 @@ from quicklook.utils.globalstack import GlobalStack
 from quicklook.utils.lrudict import LRUDict
 from quicklook.utils.message import encode_message
 from quicklook.utils.numpyutils import ndarray2npybytes
+from quicklook.utils.podstatus import pod_status
 
 from .context import GeneratorContext
 
@@ -114,3 +115,8 @@ def get_fits_header(
     # ファイルの内容はjsonであることが保証されている
     # 内容が大きいのでそのまま返す
     return Response(outfile.read_text(), media_type='application/json')
+
+
+@app.get('/pod_status')
+async def get_pod_status():
+    return await pod_status()
