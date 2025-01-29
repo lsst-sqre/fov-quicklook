@@ -9,7 +9,8 @@ from ..types import DataSourceBase, Query, Visit
 from .instrument import Instrument
 from .retrieve_data import retrieve_data
 
-default_instrument = 'LSSTComCam'
+default_instrument = 'LSSTCam'
+# default_instrument = 'LSSTComCam'
 DataRef = Any
 
 
@@ -20,7 +21,7 @@ class ButlerDataSource(DataSourceBase):
         chown_pgpassfile()
         from lsst.daf.butler import Butler
 
-        self._butler = Butler("embargo", instrument=default_instrument, collections="LSSTComCam/raw/all")  # type: ignore
+        self._butler = Butler("embargo", instrument=default_instrument, collections=f"{default_instrument}/raw/all")  # type: ignore
 
     def query_visits(self, q: Query) -> list[Visit]:
         from lsst.daf.butler import EmptyQueryResultError
