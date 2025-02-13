@@ -3,6 +3,7 @@ import { MenuDivider, MenuItem } from "@szhsin/react-menu"
 import { Fragment, useCallback, useRef } from "react"
 import { CcdMeta } from "../../../../store/api/openapi"
 import { copyTextToClipboard } from "../../../../utils/copyTextToClipboard"
+import { download } from "../../../../utils/download"
 import { useFocusedCcd } from "../../hooks"
 import { ContextMenuWithClickedCoord } from "./ContextMenuWithClickedCoord"
 
@@ -33,6 +34,14 @@ function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMe
     }
   }, [ccdMeta])
 
+  const downloadThisFitsFile = useCallback(() => {
+    if (ccdMeta) {
+      const { data_type, name } = ccdMeta.ccd_id.visit
+      const fitsUrl = `./api/quicklooks/${data_type}:${name}/fits/${ccdMeta.ccd_id.ccd_name}`
+      download(fitsUrl, `${data_type}-${name}-${ccdMeta.ccd_id.ccd_name}.fits`)
+    }
+  }, [ccdMeta])
+
   return (
     <Fragment>
       {ccdMeta &&
@@ -41,7 +50,8 @@ function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMe
       <MenuDivider />
       <MenuItem disabled={!ccdMeta} onClick={copyId}>Copy ID to Clipboard</MenuItem>
       <MenuItem disabled={!ccdMeta} onClick={openHeaerPage}>Show FITS Header</MenuItem>
-
+      <MenuDivider />
+      <MenuItem disabled={!ccdMeta} onClick={downloadThisFitsFile}>Download this FITS File</MenuItem>
       {/* <MenuItem disabled={!ccdMeta} onClick={showHeader}>Show Headers</MenuItem> */}
       {/* <MenuItem onClick={donwload}>Download Raw FITS</MenuItem> */}
     </Fragment>

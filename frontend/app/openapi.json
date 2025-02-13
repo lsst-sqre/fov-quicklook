@@ -5,6 +5,24 @@
         "version": "0.1.0"
     },
     "paths": {
+        "/api/system_info": {
+            "get": {
+                "summary": "Get System Info",
+                "operationId": "get_system_info",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SystemInfo"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/healthz": {
             "get": {
                 "summary": "Healthz",
@@ -389,6 +407,22 @@
                                 "schema": {
                                     "$ref": "#/components/schemas/StatusResponse"
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/kill": {
+            "post": {
+                "summary": "Kill",
+                "operationId": "kill",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
                             }
                         }
                     }
@@ -784,6 +818,17 @@
                     "generators"
                 ],
                 "title": "StatusResponse"
+            },
+            "SystemInfo": {
+                "properties": {
+                    "admin_page": {
+                        "type": "boolean",
+                        "title": "Admin Page",
+                        "default": true
+                    }
+                },
+                "type": "object",
+                "title": "SystemInfo"
             },
             "ValidationError": {
                 "properties": {

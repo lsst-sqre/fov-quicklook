@@ -1,6 +1,9 @@
 import { baseApi as api } from "./base";
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
+    getSystemInfo: build.query<GetSystemInfoApiResponse, GetSystemInfoApiArg>({
+      query: () => ({ url: `/api/system_info` }),
+    }),
     healthz: build.query<HealthzApiResponse, HealthzApiArg>({
       query: () => ({ url: `/api/healthz` }),
     }),
@@ -61,10 +64,16 @@ const injectedRtkApi = api.injectEndpoints({
     getPodStatus: build.query<GetPodStatusApiResponse, GetPodStatusApiArg>({
       query: () => ({ url: `/api/status` }),
     }),
+    kill: build.mutation<KillApiResponse, KillApiArg>({
+      query: () => ({ url: `/api/kill`, method: "POST" }),
+    }),
   }),
   overrideExisting: false,
 });
 export { injectedRtkApi as api };
+export type GetSystemInfoApiResponse =
+  /** status 200 Successful Response */ SystemInfo;
+export type GetSystemInfoApiArg = void;
 export type HealthzApiResponse = /** status 200 Successful Response */ any;
 export type HealthzApiArg = void;
 export type GetTileApiResponse = /** status 200 Successful Response */ any;
@@ -111,6 +120,11 @@ export type ListVisitsApiArg = {
 export type GetPodStatusApiResponse =
   /** status 200 Successful Response */ StatusResponse;
 export type GetPodStatusApiArg = void;
+export type KillApiResponse = /** status 200 Successful Response */ any;
+export type KillApiArg = void;
+export type SystemInfo = {
+  admin_page?: boolean;
+};
 export type ValidationError = {
   loc: (string | number)[];
   msg: string;
@@ -199,6 +213,7 @@ export type StatusResponse = {
   generators: PodStatus[];
 };
 export const {
+  useGetSystemInfoQuery,
   useHealthzQuery,
   useGetTileQuery,
   useGetFitsHeaderQuery,
@@ -209,4 +224,5 @@ export const {
   useDeleteAllQuicklooksMutation,
   useListVisitsQuery,
   useGetPodStatusQuery,
+  useKillMutation,
 } = injectedRtkApi;

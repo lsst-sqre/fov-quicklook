@@ -1,3 +1,12 @@
+.adminPage {
+  display: block;
+}
+
+.header {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+}
+
 .PodStatus {
   display: div;
 }
@@ -11,4 +20,16 @@
   padding: 1em;
   border-radius: 8px;
   box-shadow: 0 0 4px rgba(lightgreen, 0.5);
+}
+
+.quicklookList {
+  border-collapse: collapse;
+  margin: 1em 0;
+
+  th,
+  td {
+    border: 1px solid rgba(white, 0.25);
+    padding: 8px;
+    text-align: left;
+  }
 }
