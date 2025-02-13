@@ -10,7 +10,7 @@ DataSection: TypeAlias = tuple[tuple[int, int], tuple[int, int]]
 @dataclass
 class IsrConfig:
     do_col_bias: bool = True
-    do_row_bias: bool = False
+    do_row_bias: bool = True
 
 
 def bias_correction(data: numpy.ndarray, datasec: DataSection, config: IsrConfig = IsrConfig()):
@@ -19,12 +19,12 @@ def bias_correction(data: numpy.ndarray, datasec: DataSection, config: IsrConfig
     assert y1 < y2
     # h, w = hdu.data.shape
     data = numpy.array(data, dtype=numpy.float32)
-    assert config.do_row_bias is False
-    # if config.do_row_bias:
-    #     row_bias = data[:, x2:].mean(axis=1)
-    #     operator.isub(data.T, row_bias)
-    #     # ↑ is equivalent to ↓
-    #     # data -= numpy.repeat(row_bias.reshape((-1, 1)), w, axis=1)
+    # assert config.do_row_bias is False
+    if config.do_row_bias:
+        row_bias = data[:, x2:].mean(axis=1)
+        operator.isub(data.T, row_bias)
+        # ↑ is equivalent to ↓
+        # data -= numpy.repeat(row_bias.reshape((-1, 1)), w, axis=1)
     if config.do_col_bias:  # pragma: no branch
         col_bias = data[y2 - 1 :, :].mean(axis=0)
         data -= col_bias
