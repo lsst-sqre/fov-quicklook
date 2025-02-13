@@ -1,9 +1,10 @@
 import { memo, useCallback } from "react"
 import { FlexiblePadding } from "../../../components/layout"
-import { useDeleteAllQuicklooksMutation, useListQuicklooksQuery } from "../../../store/api/openapi"
+import { useDeleteAllQuicklooksMutation, useKillMutation, useListQuicklooksQuery } from "../../../store/api/openapi"
 import styles from './styles.module.scss'
 import { MainMenu } from "./MainMenu"
 import { LinkButton } from "../../../components/LinkButton"
+import { useAdminPageEnabled } from "../../../hooks/useAdminPageEnabled"
 
 export const Header = memo(() => {
   const { refetch } = useListQuicklooksQuery()
@@ -21,12 +22,23 @@ export const Header = memo(() => {
     )
   }, [])
 
+  const [killGenerators,] = useKillMutation()
+
+  const RestartGenerators = useCallback(async () => {
+    await killGenerators()
+  }, [killGenerators])
+
+  const adminPageEnabled = useAdminPageEnabled()
+
   return (
     <div className={styles.header}>
       <MainMenu />
       <FlexiblePadding />
-      <LinkButton to="/admin">Admin</LinkButton>
+      {adminPageEnabled && (
+        <LinkButton to="/admin">Admin</LinkButton>
+      )}
       <button onClick={openIssues}>Issues</button>
+      <button onClick={RestartGenerators}>Restart</button>
       <button onClick={deleteAllAndRefresh}>Clear Cache</button>
     </div>
   )

@@ -6,6 +6,7 @@ from quicklook.config import config
 from quicklook.types import CcdId, Tile
 from quicklook.utils.exitstack import exit_stack
 from quicklook.utils.numpyutils import ndarray2npybytes
+import shutil
 
 
 class TileWriterBase(Protocol):
@@ -30,3 +31,10 @@ class TileWriter(TileWriterBase):
         outfile = Path(f'{config.tile_tmpdir}/{self.ccd_id.name}/{tile.level}/{tile.i}/{tile.j}.npy')
         outfile.parent.mkdir(parents=True, exist_ok=True)
         outfile.write_bytes(ndarray2npybytes(tile.data))
+
+    @classmethod
+    def delete_all_cache(cls):
+        try:
+            shutil.rmtree(Path(config.tile_tmpdir))
+        except FileNotFoundError:
+            pass

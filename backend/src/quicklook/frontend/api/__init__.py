@@ -8,14 +8,16 @@ from quicklook.config import config
 from quicklook.coordinator.quicklook import Quicklook
 from quicklook.frontend.api.remotequicklook import RemoteQuicklookWather
 from quicklook.frontend.api.staticassets import setup_static_assets
+from quicklook.utils.http_request import http_request
 
-from .get_tile import router as gettile_router
 from .get_fits_header import router as get_fits_header_router
+from .get_tile import router as gettile_router
 from .health import router as health_router
 from .podstatus import router as pod_status_router
-from .systeminfo import router as systeminfo_router
 from .quicklooks import router as quicklooks_router
+from .systeminfo import router as systeminfo_router
 from .visits import router as visits_router
+from .get_fits_file import router as get_fits_file_router
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
 
@@ -35,9 +37,16 @@ app.include_router(gettile_router, prefix=config.frontend_app_prefix)
 app.include_router(get_fits_header_router, prefix=config.frontend_app_prefix)
 app.include_router(quicklooks_router, prefix=config.frontend_app_prefix)
 app.include_router(visits_router, prefix=config.frontend_app_prefix)
+app.include_router(get_fits_file_router, prefix=config.frontend_app_prefix)
+
 
 if config.admin_page:
     app.include_router(pod_status_router, prefix=config.frontend_app_prefix)
+
+    @app.post(f"{config.frontend_app_prefix}/api/kill")
+    async def kill():
+        await http_request('post', f'{config.coordinator_base_url}/kill')
+
 
 setup_static_assets(app)
 

@@ -1,4 +1,5 @@
 import logging
+import os
 import queue
 import threading
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ from quicklook.config import config
 from quicklook.coordinator.tasks import GeneratorTask
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.generator.api.tilegeneratorprocess import TileGeneratorProcess
+from quicklook.generator.tilewriter import TileWriter
 from quicklook.types import CcdId, MessageFromGeneratorToCoordinator, Visit
 from quicklook.utils.globalstack import GlobalStack
 from quicklook.utils.lrudict import LRUDict
@@ -120,3 +122,13 @@ def get_fits_header(
 @app.get('/pod_status')
 async def get_pod_status():
     return await pod_status()
+
+
+@app.delete('/quicklooks/*')
+async def delete_all_quicklooks():
+    TileWriter.delete_all_cache()
+
+
+@app.post('/kill')
+async def kill():
+    os._exit(0)

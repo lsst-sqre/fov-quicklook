@@ -5,13 +5,14 @@ from typing import AsyncGenerator, Union
 
 from pydantic import BaseModel
 from sqlalchemy import Delete, delete, insert, select
-from sqlalchemy.orm import Session
 
 from quicklook.db import db_context
 from quicklook.models import QuicklookMetaRecord, QuicklookRecord
 from quicklook.types import AmpMeta, BBox, CcdId, GeneratorPod, GeneratorProgress, ImageStat, ProcessCcdResult, Visit
+from quicklook.utils.http_request import http_request
 from quicklook.utils.broadcastqueue import BroadcastQueue
 from quicklook.utils.event import WatchEvent
+import asyncio
 
 
 @dataclass
@@ -21,7 +22,7 @@ class Quicklook:
 
     visit: Visit
     phase: QuicklookRecord.Phase
-    ccd_generator_map: dict[str, GeneratorPod] | None = None # ccd_name -> GeneratorPod
+    ccd_generator_map: dict[str, GeneratorPod] | None = None  # ccd_name -> GeneratorPod
     generating_progress: dict[str, GeneratorProgress] | None = None
     transferreing_progress: dict[str, GeneratorProgress] | None = None
     meta: Union['QuicklookMeta', None] = None
@@ -59,12 +60,19 @@ class Quicklook:
 
     @classmethod
     async def delete_all(cls):
+        from quicklook.coordinator.api.generators import ctx
+        
         with cls._db() as db:
             stmt = select(QuicklookRecord)
             records = db.execute(stmt).scalars().all()
         for r in records:
             ql = cls.from_record(r)
             ql.delete()
+
+        async def delete_generator(g: GeneratorPod):
+            await http_request('delete', f'http://{g.host}:{g.port}/quicklooks/*')
+
+        await asyncio.gather(*(delete_generator(g) for g in ctx().generators))
 
     @classmethod
     def get(cls, visit: Visit):
@@ -165,9 +173,6 @@ class _QuicklookManager:
     def unregister(self, ql: Quicklook):
         self._entries.pop(ql.visit)
         self._event_queue.put(WatchEvent(ql, 'deleted'))
-
-    def has(self, visit: Visit):
-        return visit in self._entries
 
     def notify_modified(self, ql: Quicklook):
         self._event_queue.put(WatchEvent(ql, 'modified'))
