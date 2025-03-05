@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cache, cached_property
 from typing import Any, Literal, TypeAlias
 
 import numpy
@@ -43,17 +43,23 @@ class BBox:
 
 @dataclass(frozen=True)
 class Visit:
-    data_type: CcdDataType
-    name: str
+    id: str # 'embargo:{instrument}:{collection}:{data_type}:{exposure}'
 
-    @cached_property
-    def id(self):
-        return f'{self.data_type}:{self.name}'
+    @cache
+    def _parts(self):
+        return self.id.split(':')
+
+    @property
+    def data_type(self):
+        return self._parts()[-2]
+    
+    @property
+    def name(self):
+        return self._parts()[-1]
 
     @classmethod
     def from_id(cls, id: str):
-        data_type, name = id.split(':')
-        return cls(data_type, name)  # type: ignore
+        return cls(id)
 
 
 @dataclass

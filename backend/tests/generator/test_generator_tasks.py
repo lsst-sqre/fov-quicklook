@@ -19,10 +19,7 @@ async def test_phase_raw():
     #     R23_S00  R23_S01  R23_S02  R23_S10  R23_S11  R23_S12  R23_S20  R23_S21  R23_S22'''.split()
     # ]
 
-    visit = Visit(
-        name='broccoli',
-        data_type='raw',
-    )
+    visit = Visit.from_id('raw:broccoli')
     task = GeneratorTask(
         visit=visit,
         ccd_names=ccd_names,
@@ -43,10 +40,7 @@ async def test_phase_calexp():
     #     R23_S00  R23_S01  R23_S02  R23_S10  R23_S11  R23_S12  R23_S20  R23_S21  R23_S22'''.split()
     # ]
 
-    visit = Visit(
-        name='192350',
-        data_type='calexp',
-    )
+    visit = Visit.from_id('calexp:192350')
     task = GeneratorTask(
         visit=visit,
         ccd_names=ccd_names,
@@ -65,7 +59,7 @@ def test_progress():
     task = GeneratorTask(
         generator=GeneratorPod(host='localhost', port=8000),
         ccd_names=['R23_S00'],
-        visit=Visit(name='broccoli', data_type='raw'),
+        visit=Visit.from_id('raw:broccoli'),
         ccd_generator_map={},
     )
 
@@ -81,7 +75,7 @@ def test_processccd(broccoli_fits_and_ccd_id: tuple[Path, str]):
 
     with GeneratorProgressReporter(
         task=GeneratorTask(
-            visit=Visit(name='broccoli', data_type='raw'),
+            visit=Visit.from_id('raw:broccoli'),
             ccd_names=[ccd],
             generator=GeneratorPod(host='localhost', port=8000),
             ccd_generator_map={},
@@ -93,7 +87,7 @@ def test_processccd(broccoli_fits_and_ccd_id: tuple[Path, str]):
             tmp.write(path.read_bytes())
             tmp.flush()
             args = tasks.ProcessCcdArgs(
-                ccd_id=CcdId(visit=Visit(name='broccoli', data_type='raw'), ccd_name=ccd),
+                ccd_id=CcdId(visit=Visit.from_id('raw:broccoli'), ccd_name=ccd),
                 path=Path(tmp.name),
                 progress_updator=progress_reporter.updator,
             )

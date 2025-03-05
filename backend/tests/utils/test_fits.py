@@ -10,7 +10,7 @@ from quicklook.utils.s3 import download_object_from_s3
 
 
 def test_s3_partial_load():
-    visit = Visit('calexp', '192350')
+    visit = Visit.from_id('calexp:192350')
     ccd_name = 'R11_S21'
 
     def read(start: int, end: int) -> bytes:
@@ -22,7 +22,7 @@ def test_s3_partial_load():
     with tempfile.NamedTemporaryFile(suffix='.fits') as f:
         f.write(data)
         f.flush()
-        with pyfits.open(f.name) as hdul:
+        with pyfits.open(f.name) as hdul:  # type: ignore
             hdul[1].data[-1]  # type: ignore
 
 

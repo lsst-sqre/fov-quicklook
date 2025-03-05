@@ -42,7 +42,7 @@ def preprocessed_ccd(broccoli_fits: Path) -> PreProcessedCcd:
     if cache_path.exists():
         return pickle.loads(cache_path.read_bytes())
 
-    visit = Visit(name='broccoli', data_type='raw')
+    visit = Visit.from_id('raw:broccoli')
     ppccd = preprocess_ccd(CcdId(visit, ccd_id), broccoli_fits)
     cache_path.write_bytes(pickle.dumps(ppccd))
     return ppccd

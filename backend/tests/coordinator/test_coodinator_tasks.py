@@ -13,9 +13,9 @@ def test_make_generator_tasks():
     ]
 
     tasks = make_generator_tasks(
-        visit=Visit('raw', 'broccoli'),
+        visit=Visit.from_id('raw:broccoli'),
         generators=generators,
     )
 
     assert tasks[0].generator == generators[0]
-    assert tasks[0].visit == Visit('raw', 'broccoli')
+    assert tasks[0].visit == Visit.from_id('raw:broccoli')

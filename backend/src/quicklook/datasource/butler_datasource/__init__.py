@@ -36,7 +36,7 @@ class ButlerDataSource(DataSourceBase):
             refs = self._butler.query_datasets(q.data_type, where=where, limit=q.limit)
         except EmptyQueryResultError:
             refs = []
-        return [Visit(q.data_type, f'{q.data_type}:{ref.dataId['exposure']}') for ref in refs]
+        return [Visit.from_id(f'embargo:LSSTCam:LSSTCam/{q.data_type}/all:raw:{ref.dataId["exposure"]}') for ref in refs]
 
     def list_ccds(self, visit: Visit) -> list[str]:
         b = self._butler

@@ -14,10 +14,10 @@ from .types import DataSourceBase, Query, Visit
 class DummyDataSource(DataSourceBase):
     def query_visits(self, q: Query) -> list[Visit]:
         return [
-            Visit('raw', 'raw:broccoli'),
-            Visit('calexp', 'calexp:192350'),
-            Visit('raw', f'raw:{q.day_obs}'),
-            *[Visit('raw', f'raw:{i}') for i in range(50)],
+            Visit.from_id('raw:broccoli'),
+            Visit.from_id('calexp:192350'),
+            Visit.from_id(f'raw:{q.day_obs}'),
+            *[Visit.from_id(f'raw:{i}') for i in range(50)],
         ][: q.limit]
 
     def get_data(self, ref: CcdId) -> bytes:

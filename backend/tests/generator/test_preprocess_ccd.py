@@ -22,7 +22,7 @@ def test_preprocess_ccd_raw():
         secure=s3_config.secure,
     )
 
-    visit = Visit(name='20230511PH', data_type='raw')
+    visit = Visit.from_id('raw:20230511PH')
     with timeit('load-fits'):
         file_contents = download_object_from_s3(client, s3_config.bucket, f'raw/broccoli/R00_SG0.fits')
 
@@ -41,7 +41,7 @@ def test_preprocess_ccd_calexp():
         secure=s3_config.secure,
     )
 
-    visit = Visit(name='calexp-192350', data_type='calexp')
+    visit = Visit.from_id('calexp:192350')
     with timeit('load-fits'):
         file_contents = download_object_from_s3(client, s3_config.bucket, f'calexp/192350/R01_S00.fits')
 

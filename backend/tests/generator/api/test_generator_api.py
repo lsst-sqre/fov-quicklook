@@ -28,7 +28,7 @@ def test_healthz(client: TestClient):
 def test_create_quicklook(client: TestClient):
     task = GeneratorTask(
         generator=GeneratorPod(host='localhost', port=8000),
-        visit=Visit(name='broccoli', data_type='raw'),
+        visit=Visit.from_id('raw:broccoli'),
         ccd_names=['R30_S20'],
         ccd_generator_map={},
     )

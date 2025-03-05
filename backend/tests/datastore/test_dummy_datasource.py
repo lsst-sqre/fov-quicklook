@@ -7,10 +7,7 @@ pytestmark = pytest.mark.focus
 
 
 def test_list_visit_ccds():
-    visit = Visit(
-        name='broccoli',
-        data_type='raw',
-    )
+    visit = Visit.from_id('raw:broccoli')
     ds = get_datasource()
     res = ds.list_ccds(visit)
     assert len(res) == 205
