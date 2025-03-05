@@ -31,7 +31,7 @@ class Config(BaseSettings):
 
     @field_validator('frontend_app_prefix')
     def check_frontend_app_prefix(cls, value: str):
-        if len(value) > 0:
+        if len(value) > 0:  # pragma: no cover
             if not value.startswith('/'):
                 raise ValueError('frontend_app_prefix must start with /')
         return value

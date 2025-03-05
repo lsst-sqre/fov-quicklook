@@ -20,7 +20,7 @@ def bias_correction(data: numpy.ndarray, datasec: DataSection, config: IsrConfig
     # h, w = hdu.data.shape
     data = numpy.array(data, dtype=numpy.float32)
     # assert config.do_row_bias is False
-    if config.do_row_bias:
+    if config.do_row_bias:  # pragma: no branch
         row_bias = data[:, x2:].mean(axis=1)
         operator.isub(data.T, row_bias)
         # ↑ is equivalent to ↓

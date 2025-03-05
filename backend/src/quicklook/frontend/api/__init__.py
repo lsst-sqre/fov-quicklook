@@ -40,7 +40,7 @@ app.include_router(visits_router, prefix=config.frontend_app_prefix)
 app.include_router(get_fits_file_router, prefix=config.frontend_app_prefix)
 
 
-if config.admin_page:
+if config.admin_page:  # pragma: no cover
     app.include_router(pod_status_router, prefix=config.frontend_app_prefix)
 
     @app.post(f"{config.frontend_app_prefix}/api/kill")

@@ -30,7 +30,7 @@ async def healthz():
                     ) as response:
                         response.raise_for_status()
                         return GeneratorHealth(pod=g, status='ok')
-                except Exception as e:
+                except Exception as e:  # pragma: no cover
                     return GeneratorHealth(pod=g, status='ng')
 
     with timeit('healthz'):

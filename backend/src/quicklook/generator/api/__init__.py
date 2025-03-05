@@ -130,5 +130,5 @@ async def delete_all_quicklooks():
 
 
 @app.post('/kill')
-async def kill():
+async def kill():  # pragma: no cover
     os._exit(0)

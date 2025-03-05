@@ -22,10 +22,6 @@ class QuicklookRecord(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(nullable=False, server_default=func.now())
     updated_at: Mapped[datetime.datetime] = mapped_column(nullable=False, server_default=func.now(), onupdate=func.now())
 
-    @property
-    def visit(self):
-        return Visit.from_id(self.id)
-
     meta: Mapped[Union[None, 'QuicklookMetaRecord']] = relationship('QuicklookMetaRecord', uselist=False, back_populates='quicklook', cascade="all, delete")
 
 

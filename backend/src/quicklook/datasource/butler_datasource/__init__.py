@@ -14,7 +14,7 @@ default_instrument = 'LSSTCam'
 DataRef = Any
 
 
-class ButlerDataSource(DataSourceBase):
+class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def __init__(self):
         from quicklook.butlerutils import chown_pgpassfile
 

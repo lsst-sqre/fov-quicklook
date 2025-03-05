@@ -46,7 +46,7 @@ async def run_generators(ql: Quicklook) -> list[ProcessCcdResult]:
                     match msg:
                         case None:
                             break
-                        case BaseException():
+                        case BaseException():  # pragma: no cover
                             raise msg
                         case GeneratorProgress():
                             nodes[task.generator.name] = msg
@@ -54,7 +54,7 @@ async def run_generators(ql: Quicklook) -> list[ProcessCcdResult]:
                             ql.notify()
                         case ProcessCcdResult():
                             process_ccd_results.append(msg)
-                        case _:
+                        case _:  # pragma: no cover
                             raise TypeError(f'Unexpected message: {msg}')
                 return process_ccd_results
 

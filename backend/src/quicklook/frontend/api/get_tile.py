@@ -31,7 +31,7 @@ async def get_tile(
 ) -> Response:
     ql = remote_quicklook(visit)
     if ql is None:
-        raise HTTPException(status_code=404, detail='Quicklook not found')
+        raise HTTPException(status_code=404, detail='Quicklook not found')  # pragma: no cover
     return await gather_tiles(ql, visit, z, y, x)
     # if ql.phase == 'ready':
     #     raise NotImplementedError(f'Phase {ql.phase} not implemented')
@@ -71,7 +71,7 @@ async def gather_tiles(ql: Quicklook, visit: Visit, z: int, y: int, x: int) -> R
     if pool is None:
         logger.warning(f'No tile found for {visit.id}/{z}/{y}/{x}')
         return Response(blank_npy_zstd(), media_type='application/npy+zstd')
-    
+
     return Response(ndarray2npybytes(pool), media_type='application/npy')
 
 

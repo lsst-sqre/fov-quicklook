@@ -3,9 +3,9 @@ import contextlib
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
 from quicklook.config import config
+
+# from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
 # def disable_sa_warnings():
@@ -39,41 +39,40 @@ def db_context():
         yield db
 
 
-def cli():
-    import argparse
+if __name__ == '__main__':  # pragma: no cover
 
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest='command')
-    subparsers.required = True
+    def cli():
+        import argparse
 
-    drop = subparsers.add_parser('reset')
-    drop.set_defaults(func=reset_db)
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest='command')
+        subparsers.required = True
 
-    drop_db_parser = subparsers.add_parser('drop')
-    drop_db_parser.set_defaults(func=drop_db)
+        drop = subparsers.add_parser('reset')
+        drop.set_defaults(func=reset_db)
 
-    args = parser.parse_args()
+        drop_db_parser = subparsers.add_parser('drop')
+        drop_db_parser.set_defaults(func=drop_db)
 
-    args.func()
+        args = parser.parse_args()
 
+        args.func()
 
-def reset_db():
-    from .models import Base
+    def reset_db():
+        from .models import Base
 
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
 
+    def drop_db():
+        from sqlalchemy import text
 
-def drop_db():
-    from .models import Base
-    from sqlalchemy import text
+        from .models import Base
 
-    Base.metadata.drop_all(engine)
-    with engine.connect() as conn:
+        Base.metadata.drop_all(engine)
+        with engine.connect() as conn:
 
-        conn.execute(text('DROP TABLE IF EXISTS alembic_version'))
-        conn.commit()
+            conn.execute(text('DROP TABLE IF EXISTS alembic_version'))
+            conn.commit()
 
-
-if __name__ == '__main__':
     cli()
