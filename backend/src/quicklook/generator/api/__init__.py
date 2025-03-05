@@ -101,7 +101,7 @@ def get_tile(
         else:  # pragma: no cover
             pool += arr
     if pool is None:
-        return numpy.zeros((config.tile_size, config.tile_size), dtype=numpy.float32)
+        pool = numpy.zeros((config.tile_size, config.tile_size), dtype=numpy.float32)
     return Response(ndarray2npybytes(pool), media_type='application/npy')
 
 
