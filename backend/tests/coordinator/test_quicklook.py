@@ -1,6 +1,6 @@
 import asyncio
 
-from quicklook.coordinator.quicklook import Quicklook, QuicklookMeta
+from quicklook.coordinator.jobmanager import QuicklookJob, QuicklookMeta
 from quicklook.models import QuicklookRecord
 from quicklook.types import BBox, CcdId, ImageStat, ProcessCcdResult, Visit
 from quicklook.utils.event import WatchEvent
@@ -8,12 +8,12 @@ import pytest
 
 
 async def test_quicklook_subscribe():
-    events: list[WatchEvent[Quicklook]] = []
+    events: list[WatchEvent[QuicklookJob]] = []
     gather_ready = asyncio.Event()
 
     async def gather_events():
         nonlocal events
-        async for _ in Quicklook.subscribe():
+        async for _ in QuicklookJob.subscribe():
             gather_ready.set()
             events = [*events, *_]
             if len(_) > 0 and _[-1].type == 'deleted':
@@ -21,7 +21,7 @@ async def test_quicklook_subscribe():
 
     async def generate_events():
         await gather_ready.wait()
-        ql = Quicklook.from_record(QuicklookRecord(id='raw:broccoli', phase='ready'))
+        ql = QuicklookJob.from_record(QuicklookRecord(id='raw:broccoli', phase='ready'))
         ql.notify()
         ql.delete()
 
@@ -34,8 +34,8 @@ async def test_quicklook_subscribe():
 
 async def test_quicklook_meta():
     visit = Visit.from_id('raw:example')
-    Quicklook.enqueue(visit=visit)
-    ql = Quicklook.get(visit)
+    QuicklookJob.enqueue(visit=visit)
+    ql = QuicklookJob.get(visit)
     assert ql
     assert ql.load_meta().meta is None
     ql.save_meta(QuicklookMeta(ccd_meta=[]))
@@ -52,6 +52,6 @@ async def test_quicklook_meta():
 
 @pytest.fixture(autouse=True)
 async def setup():
-    await Quicklook.delete_all()
+    await QuicklookJob.delete_all()
     yield
-    await Quicklook.delete_all()
+    await QuicklookJob.delete_all()

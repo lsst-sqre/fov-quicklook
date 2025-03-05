@@ -5,7 +5,7 @@ import aiohttp
 from fastapi import APIRouter
 
 from quicklook.coordinator.api.generators import get_generators
-from quicklook.coordinator.quicklook import Quicklook, QuicklookMeta
+from quicklook.coordinator.quicklookjob import QuicklookJob, QuicklookMeta
 from quicklook.coordinator.tasks import GeneratorTask, make_generator_tasks
 from quicklook.generator.progress import GeneratorProgress
 from quicklook.types import MessageFromGeneratorToCoordinator, ProcessCcdResult
@@ -15,23 +15,23 @@ router = APIRouter()
 
 
 async def run_next_job():
-    ql = Quicklook.dequeue()
-    if ql:  # pragma: no branch
-        process_ccd_results = await run_generators(ql)
-        ql.save_meta(QuicklookMeta.from_process_ccd_results(process_ccd_results))
-        ql.notify()
-        await run_transfers(ql)
-        ql.phase = 'ready'
-        ql.notify()
-        ql.save()
+    job = QuicklookJob.dequeue()
+    if job:  # pragma: no branch
+        process_ccd_results = await _run_generators(job)
+        job.save_meta(QuicklookMeta.from_process_ccd_results(process_ccd_results))
+        job.notify()
+        await _run_transfers(job)
+        job.phase = 'ready'
+        job.notify()
+        job.save()
 
 
-async def run_generators(ql: Quicklook) -> list[ProcessCcdResult]:
-    visit = ql.visit
+async def _run_generators(job: QuicklookJob) -> list[ProcessCcdResult]:
+    visit = job.visit
     nodes: dict[str, GeneratorProgress] = {}
     tasks = make_generator_tasks(visit, get_generators())
     assert len(get_generators()) > 0
-    ql.ccd_generator_map = tasks[0].ccd_generator_map
+    job.ccd_generator_map = tasks[0].ccd_generator_map
 
     async def run_1_generator(task: GeneratorTask):
         async with aiohttp.ClientSession() as session:
@@ -50,8 +50,8 @@ async def run_generators(ql: Quicklook) -> list[ProcessCcdResult]:
                             raise msg
                         case GeneratorProgress():
                             nodes[task.generator.name] = msg
-                            ql.generating_progress = nodes
-                            ql.notify()
+                            job.generating_progress = nodes
+                            job.notify()
                         case ProcessCcdResult():
                             process_ccd_results.append(msg)
                         case _:  # pragma: no cover
@@ -64,4 +64,4 @@ async def run_generators(ql: Quicklook) -> list[ProcessCcdResult]:
     return gathered_results
 
 
-async def run_transfers(ql: Quicklook): ...
+async def _run_transfers(job: QuicklookJob): ...

@@ -9,7 +9,7 @@ from typing import Callable, TypeVar
 import websockets
 
 from quicklook.config import config
-from quicklook.coordinator.quicklook import Quicklook
+from quicklook.coordinator.quicklookjob import QuicklookJob
 from quicklook.types import Visit
 from quicklook.utils.asynctask import cancel_at_exit
 from quicklook.utils.broadcastqueue import BroadcastQueue
@@ -19,10 +19,10 @@ T = TypeVar('T')
 logger = logging.getLogger(f'uvicorn.{__name__}')
 
 
-class _RemoteQuicklookWatcher:
+class _RemoteQuicklookJobsWatcher:
     def __init__(self):
-        self._qls: dict[Visit, Quicklook] = {}
-        self._q = BroadcastQueue[dict[Visit, Quicklook]]()
+        self._qls: dict[Visit, QuicklookJob] = {}
+        self._q = BroadcastQueue[dict[Visit, QuicklookJob]]()
         self._active = False
 
     @asynccontextmanager
@@ -38,9 +38,9 @@ class _RemoteQuicklookWatcher:
         while True:
             self._qls = {}
             try:
-                async with websockets.connect(f'{config.coordinator_ws_base_url}/quicklooks/*/events.ws') as ws:
+                async with websockets.connect(f'{config.coordinator_ws_base_url}/quicklook-jobs/events.ws') as ws:
                     while True:
-                        events: list[WatchEvent[Quicklook]] = pickle.loads(await ws.recv())  # type: ignore
+                        events: list[WatchEvent[QuicklookJob]] = pickle.loads(await ws.recv())  # type: ignore
                         for event in events:
                             match event.type:
                                 case 'added':
@@ -61,7 +61,7 @@ class _RemoteQuicklookWatcher:
         assert self._active
         return self._q.subscribe()
 
-    async def watch(self, pick: Callable[[dict[Visit, Quicklook]], T]):
+    async def watch(self, pick: Callable[[dict[Visit, QuicklookJob]], T]):
         v0 = pick(self._qls)
         yield v0
         with self.subscribe() as sub:
@@ -77,9 +77,9 @@ class _RemoteQuicklookWatcher:
 
 
 @cache
-def RemoteQuicklookWather():
-    return _RemoteQuicklookWatcher()
+def RemoteQuicklookJobsWather():
+    return _RemoteQuicklookJobsWatcher()
 
 
-def remote_quicklook(visit: Visit) -> Quicklook | None:
-    return RemoteQuicklookWather().quicklooks.get(visit)
+def remote_quicklook_job(visit: Visit) -> QuicklookJob | None:
+    return RemoteQuicklookJobsWather().quicklooks.get(visit)

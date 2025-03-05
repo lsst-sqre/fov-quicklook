@@ -6,9 +6,9 @@ from starlette.websockets import WebSocketDisconnect
 
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
-from quicklook.coordinator.quicklook import CcdMeta, Quicklook, QuicklookMeta
+from quicklook.coordinator.quicklookjob import CcdMeta, QuicklookJob, QuicklookMeta
 from quicklook.utils.http_request import http_request
-from quicklook.frontend.api.remotequicklook import RemoteQuicklookWather, remote_quicklook
+from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather, remote_quicklook_job
 from quicklook.models import QuicklookRecord
 from quicklook.types import GeneratorProgress, Visit
 from quicklook.utils.websocket import safe_websocket
@@ -31,12 +31,12 @@ class QuicklookStatus(BaseModel):
 
 @router.get('/api/quicklooks', response_model=list[QuicklookStatus])
 async def list_quicklooks():
-    return [*RemoteQuicklookWather().quicklooks.values()]
+    return [*RemoteQuicklookJobsWather().quicklooks.values()]
 
 
 @router.get('/api/quicklooks/{id}/status', response_model=QuicklookStatus | None)
 async def show_quicklook_status(id: str):
-    return RemoteQuicklookWather().quicklooks.get(Visit.from_id(id))
+    return RemoteQuicklookJobsWather().quicklooks.get(Visit.from_id(id))
 
 
 @router.websocket('/api/quicklooks/{id}/status.ws')
@@ -45,10 +45,10 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
     await client_ws.accept()
     async with safe_websocket(client_ws):
 
-        def pick(qls: dict[Visit, Quicklook]) -> Quicklook | None:
+        def pick(qls: dict[Visit, QuicklookJob]) -> QuicklookJob | None:
             return qls.get(visit)
 
-        async for ql in RemoteQuicklookWather().watch(pick):
+        async for ql in RemoteQuicklookJobsWather().watch(pick):
             try:
                 model = QuicklookStatus.model_validate(ql).model_dump() if ql else None
                 await client_ws.send_json(model)
@@ -68,7 +68,7 @@ async def show_quicklook_metadata(
     id: str,
 ):
     scale = 0.2 / 3600.0  # pixel size in degree
-    ql = remote_quicklook(Visit.from_id(id))
+    ql = remote_quicklook_job(Visit.from_id(id))
     return QuicklookMetadata(
         id=id,
         wcs={

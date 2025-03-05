@@ -5,8 +5,8 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
 from quicklook.config import config
-from quicklook.coordinator.quicklook import Quicklook
-from quicklook.frontend.api.remotequicklook import RemoteQuicklookWather
+from quicklook.coordinator.quicklookjob import QuicklookJob
+from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
 from quicklook.frontend.api.staticassets import setup_static_assets
 from quicklook.utils.http_request import http_request
 
@@ -24,8 +24,8 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with RemoteQuicklookWather().activate():
-        with Quicklook.enable_subscription():
+    async with RemoteQuicklookJobsWather().activate():
+        with QuicklookJob.enable_subscription():
             yield
 
 

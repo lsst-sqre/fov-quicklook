@@ -16,10 +16,7 @@ import asyncio
 
 
 @dataclass
-class Quicklook:
-    # Quicklookを表すクラス
-    # DBのラッパー
-
+class QuicklookJob:
     visit: Visit
     phase: QuicklookRecord.Phase
     ccd_generator_map: dict[str, GeneratorPod] | None = None  # ccd_name -> GeneratorPod
@@ -55,7 +52,7 @@ class Quicklook:
             return ql
 
     @classmethod
-    def from_record(cls, r: QuicklookRecord) -> 'Quicklook':
+    def from_record(cls, r: QuicklookRecord) -> 'QuicklookJob':
         return cls._manager().from_record(r)
 
     @classmethod
@@ -84,11 +81,11 @@ class Quicklook:
 
     @classmethod
     @cache
-    def _manager(cls) -> '_QuicklookManager':
-        return _QuicklookManager()
+    def _manager(cls) -> '_QuicklookJobManager':
+        return _QuicklookJobManager()
 
     @classmethod
-    def subscribe(cls) -> AsyncGenerator[list[WatchEvent['Quicklook']], None]:
+    def subscribe(cls) -> AsyncGenerator[list[WatchEvent['QuicklookJob']], None]:
         return cls._manager().subscribe()
 
     def save(self) -> None:
@@ -117,7 +114,7 @@ class Quicklook:
     def enable_subscription(cls):
         yield
 
-    def load_meta(self) -> 'Quicklook':
+    def load_meta(self) -> 'QuicklookJob':
         with self._db() as db:
             stmt = select(QuicklookRecord).where(QuicklookRecord.id == self.id)
             r = db.execute(stmt).scalar_one()
@@ -162,30 +159,30 @@ class QuicklookMeta(BaseModel):
 
 @dataclass
 class CacheEntry:
-    ql: Quicklook
+    ql: QuicklookJob
 
 
-class _QuicklookManager:
+class _QuicklookJobManager:
     def __init__(self):
         self._entries: dict[Visit, CacheEntry] = {}
-        self._event_queue = BroadcastQueue[WatchEvent[Quicklook]]()
+        self._event_queue = BroadcastQueue[WatchEvent[QuicklookJob]]()
 
-    def unregister(self, ql: Quicklook):
+    def unregister(self, ql: QuicklookJob):
         self._entries.pop(ql.visit)
         self._event_queue.put(WatchEvent(ql, 'deleted'))
 
-    def notify_modified(self, ql: Quicklook):
+    def notify_modified(self, ql: QuicklookJob):
         self._event_queue.put(WatchEvent(ql, 'modified'))
 
-    def from_record(self, r: QuicklookRecord) -> Quicklook:
+    def from_record(self, r: QuicklookRecord) -> QuicklookJob:
         visit = Visit.from_id(r.id)
         if visit not in self._entries:
-            ql = Quicklook(visit=visit, phase=r.phase)
+            ql = QuicklookJob(visit=visit, phase=r.phase)
             self._entries[visit] = CacheEntry(ql)
             self._event_queue.put(WatchEvent(ql, 'added'))
         return self._entries[visit].ql
 
-    async def subscribe(self) -> AsyncGenerator[list[WatchEvent[Quicklook]], None]:
+    async def subscribe(self) -> AsyncGenerator[list[WatchEvent[QuicklookJob]], None]:
         yield [WatchEvent(e.ql, 'added') for e in self._entries.values()]
         with self._event_queue.subscribe() as events:
             while True:

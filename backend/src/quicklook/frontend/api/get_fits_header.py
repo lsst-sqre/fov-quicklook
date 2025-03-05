@@ -5,7 +5,7 @@ import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from quicklook.deps.visit_from_path import visit_from_path
-from quicklook.frontend.api.remotequicklook import remote_quicklook
+from quicklook.frontend.api.remotejobs import remote_quicklook_job
 from quicklook.types import Visit, HeaderType
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
@@ -18,12 +18,12 @@ async def get_fits_header(
     visit: Annotated[Visit, Depends(visit_from_path)],
     ccd_name: str,
 ) -> Response:
-    ql = remote_quicklook(visit)
+    job = remote_quicklook_job(visit)
 
-    if ql is None:  # pragma: no cover
+    if job is None:  # pragma: no cover
         raise HTTPException(status_code=404, detail='Quicklook not found')
 
-    ccd_generator_map = ql.ccd_generator_map
+    ccd_generator_map = job.ccd_generator_map
 
     if ccd_generator_map is None:  # pragma: no cover
         raise HTTPException(status_code=503, detail='Quicklook is not ready')

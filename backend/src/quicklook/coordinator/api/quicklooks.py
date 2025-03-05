@@ -1,18 +1,16 @@
 import asyncio
 import pickle
-from typing import Annotated
 
 import starlette
 import starlette.websockets
 from fastapi import APIRouter, BackgroundTasks, WebSocket
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
-from quicklook.coordinator.api.job import run_next_job
+from quicklook.coordinator.run_quicklookjob import run_next_job
 from quicklook.types import Visit
 from quicklook.utils.websocket import safe_websocket
 
-from ..quicklook import Quicklook
+from ..quicklookjob import QuicklookJob
 
 router = APIRouter()
 
@@ -27,11 +25,16 @@ async def create_quicklook(
     background_tasks: BackgroundTasks,
 ):
     visit = parmas.visit
-    Quicklook.enqueue(visit)
+    QuicklookJob.enqueue(visit)
     background_tasks.add_task(run_next_job)
 
 
-@router.websocket("/quicklooks/*/events.ws")
+@router.delete("/quicklooks/*")
+async def delete_all_quicklooks():
+    await QuicklookJob.delete_all()
+
+
+@router.websocket("/quicklook-jobs/events.ws")
 async def quicklook_events(
     ws: WebSocket,
 ):
@@ -39,7 +42,7 @@ async def quicklook_events(
     async with safe_websocket(ws):
 
         async def send_events():
-            async for events in Quicklook.subscribe():
+            async for events in QuicklookJob.subscribe():
                 await ws.send_bytes(pickle.dumps(events))
 
         try:
@@ -48,8 +51,3 @@ async def quicklook_events(
                 tg.create_task(send_events())
         except* starlette.websockets.WebSocketDisconnect:
             pass
-
-
-@router.delete("/quicklooks/*")
-async def delete_all_quicklooks():
-    await Quicklook.delete_all()

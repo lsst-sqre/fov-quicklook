@@ -9,9 +9,9 @@ import numpy
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from quicklook.config import config
-from quicklook.coordinator.quicklook import Quicklook
+from quicklook.coordinator.quicklookjob import QuicklookJob
 from quicklook.deps.visit_from_path import visit_from_path
-from quicklook.frontend.api.remotequicklook import remote_quicklook
+from quicklook.frontend.api.remotejobs import remote_quicklook_job
 from quicklook.tileinfo import TileInfo
 from quicklook.types import GeneratorPod, Visit
 from quicklook.utils import zstd
@@ -29,7 +29,7 @@ async def get_tile(
     y: int,
     x: int,
 ) -> Response:
-    ql = remote_quicklook(visit)
+    ql = remote_quicklook_job(visit)
     if ql is None:
         raise HTTPException(status_code=404, detail='Quicklook not found')  # pragma: no cover
     return await gather_tiles(ql, visit, z, y, x)
@@ -40,7 +40,7 @@ async def get_tile(
     raise HTTPException(status_code=503, detail='Quicklook is not ready')
 
 
-async def gather_tiles(ql: Quicklook, visit: Visit, z: int, y: int, x: int) -> Response:
+async def gather_tiles(ql: QuicklookJob, visit: Visit, z: int, y: int, x: int) -> Response:
     ccd_generator_map = ql.ccd_generator_map
 
     if ccd_generator_map is None:  # pragma: no cover
