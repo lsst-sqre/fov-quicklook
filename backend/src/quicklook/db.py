@@ -37,3 +37,43 @@ def get_db():
 def db_context():
     for db in get_db():
         yield db
+
+
+def cli():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='command')
+    subparsers.required = True
+
+    drop = subparsers.add_parser('reset')
+    drop.set_defaults(func=reset_db)
+
+    drop_db_parser = subparsers.add_parser('drop')
+    drop_db_parser.set_defaults(func=drop_db)
+
+    args = parser.parse_args()
+
+    args.func()
+
+
+def reset_db():
+    from .models import Base
+
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+
+
+def drop_db():
+    from .models import Base
+    from sqlalchemy import text
+
+    Base.metadata.drop_all(engine)
+    with engine.connect() as conn:
+
+        conn.execute(text('DROP TABLE IF EXISTS alembic_version'))
+        conn.commit()
+
+
+if __name__ == '__main__':
+    cli()
