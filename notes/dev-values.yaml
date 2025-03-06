@@ -44,7 +44,7 @@ coordinator:
     # -- Resource limits for the coordinator
     limits:
       cpu: 4000m
-      memory: 256Mid
+      memory: 256Mi
 
 frontend:
   resources:

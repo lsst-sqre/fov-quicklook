@@ -1,12 +1,12 @@
 import logging
 
 from fastapi import APIRouter, WebSocket
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.websockets import WebSocketDisconnect
 
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
-from quicklook.coordinator.quicklookjob import CcdMeta, QuicklookJob, QuicklookMeta
+from quicklook.coordinator.quicklookjob import ProcessCcdResult, QuicklookJob, QuicklookMeta
 from quicklook.utils.http_request import http_request
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather, remote_quicklook_job
 from quicklook.models import QuicklookRecord
@@ -19,8 +19,7 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 
 
 class QuicklookStatus(BaseModel):
-    id: str
-    phase: QuicklookRecord.Phase
+    phase: QuicklookJob.Phase
     generating_progress: dict[str, GeneratorProgress] | None
     meta: QuicklookMeta | None
 
@@ -31,12 +30,12 @@ class QuicklookStatus(BaseModel):
 
 @router.get('/api/quicklooks', response_model=list[QuicklookStatus])
 async def list_quicklooks():
-    return [*RemoteQuicklookJobsWather().quicklooks.values()]
+    return [*RemoteQuicklookJobsWather().jobs.values()]
 
 
 @router.get('/api/quicklooks/{id}/status', response_model=QuicklookStatus | None)
 async def show_quicklook_status(id: str):
-    return RemoteQuicklookJobsWather().quicklooks.get(Visit.from_id(id))
+    return RemoteQuicklookJobsWather().jobs.get(Visit.from_id(id))
 
 
 @router.websocket('/api/quicklooks/{id}/status.ws')
@@ -48,9 +47,9 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
         def pick(qls: dict[Visit, QuicklookJob]) -> QuicklookJob | None:
             return qls.get(visit)
 
-        async for ql in RemoteQuicklookJobsWather().watch(pick):
+        async for job in RemoteQuicklookJobsWather().watch(pick):
             try:
-                model = QuicklookStatus.model_validate(ql).model_dump() if ql else None
+                model = QuicklookStatus.model_validate(job).model_dump() if job else None
                 await client_ws.send_json(model)
             except WebSocketDisconnect:
                 break
@@ -60,7 +59,7 @@ class QuicklookMetadata(BaseModel):
     # QuicklookMetaと紛らわしいがこちらはフロントエンド用
     id: str
     wcs: dict
-    ccd_meta: list[CcdMeta] | None
+    ccd_meta: list[ProcessCcdResult] | None
 
 
 @router.get('/api/quicklooks/{id}/metadata', response_model=QuicklookMetadata)

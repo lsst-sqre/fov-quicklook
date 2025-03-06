@@ -20,8 +20,9 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 
 
 class _RemoteQuicklookJobsWatcher:
+
     def __init__(self):
-        self._qls: dict[Visit, QuicklookJob] = {}
+        self._jobs: dict[Visit, QuicklookJob] = {}
         self._q = BroadcastQueue[dict[Visit, QuicklookJob]]()
         self._active = False
 
@@ -36,7 +37,7 @@ class _RemoteQuicklookJobsWatcher:
 
     async def _watch(self):
         while True:
-            self._qls = {}
+            self._jobs = {}
             try:
                 async with websockets.connect(f'{config.coordinator_ws_base_url}/quicklook-jobs/events.ws') as ws:
                     while True:
@@ -44,12 +45,12 @@ class _RemoteQuicklookJobsWatcher:
                         for event in events:
                             match event.type:
                                 case 'added':
-                                    self._qls[event.value.visit] = event.value
+                                    self._jobs[event.value.visit] = event.value
                                 case 'deleted':
-                                    self._qls.pop(event.value.visit, None)
+                                    self._jobs.pop(event.value.visit, None)
                                 case 'modified':
-                                    self._qls[event.value.visit] = event.value
-                        self._q.put(self._qls)
+                                    self._jobs[event.value.visit] = event.value
+                        self._q.put(self._jobs)
             except asyncio.CancelledError:
                 break
             except:
@@ -62,7 +63,7 @@ class _RemoteQuicklookJobsWatcher:
         return self._q.subscribe()
 
     async def watch(self, pick: Callable[[dict[Visit, QuicklookJob]], T]):
-        v0 = pick(self._qls)
+        v0 = pick(self._jobs)
         yield v0
         with self.subscribe() as sub:
             while True:
@@ -72,8 +73,8 @@ class _RemoteQuicklookJobsWatcher:
                     v0 = v1
 
     @property
-    def quicklooks(self):
-        return self._qls
+    def jobs(self):
+        return self._jobs
 
 
 @cache
@@ -82,4 +83,4 @@ def RemoteQuicklookJobsWather():
 
 
 def remote_quicklook_job(visit: Visit) -> QuicklookJob | None:
-    return RemoteQuicklookJobsWather().quicklooks.get(visit)
+    return RemoteQuicklookJobsWather().jobs.get(visit)

@@ -6,7 +6,7 @@ import aiohttp
 from fastapi import APIRouter
 
 from quicklook.coordinator.api.generators import get_generators
-from . import QuicklookJob, QuicklookMeta
+from . import QuicklookJob, QuicklookMeta, job_queue
 from quicklook.coordinator.tasks import GeneratorTask, make_generator_tasks
 from quicklook.generator.progress import GeneratorProgress
 from quicklook.types import MessageFromGeneratorToCoordinator, ProcessCcdResult
@@ -16,15 +16,13 @@ router = APIRouter()
 
 
 async def run_next_job():
-    job = QuicklookJob.dequeue()
-    if job:  # pragma: no branch
+    async for job in job_queue.dequeue():
         process_ccd_results = await _run_generators(job)
-        job.save_meta(QuicklookMeta.from_process_ccd_results(process_ccd_results))
-        job.notify()
+        job.meta = QuicklookMeta.from_process_ccd_results(process_ccd_results)
+        job.sync()
         await _run_transfers(job)
         job.phase = 'ready'
-        job.notify()
-        job.save()
+        job.sync()
 
 
 async def _run_generators(job: QuicklookJob) -> list[ProcessCcdResult]:
@@ -52,7 +50,7 @@ async def _run_generators(job: QuicklookJob) -> list[ProcessCcdResult]:
                         case GeneratorProgress():
                             nodes[task.generator.name] = msg
                             job.generating_progress = nodes
-                            job.notify()
+                            job.sync()
                         case ProcessCcdResult():
                             process_ccd_results.append(msg)
                         case _:  # pragma: no cover

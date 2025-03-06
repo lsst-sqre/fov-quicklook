@@ -10,7 +10,7 @@ from quicklook.coordinator.quicklookjob.run_quicklookjob import run_next_job
 from quicklook.types import Visit
 from quicklook.utils.websocket import safe_websocket
 
-from ..quicklookjob import QuicklookJob
+from ..quicklookjob import QuicklookJob, job_queue
 
 router = APIRouter()
 
@@ -25,13 +25,13 @@ async def create_quicklook(
     background_tasks: BackgroundTasks,
 ):
     visit = parmas.visit
-    QuicklookJob.enqueue(visit)
+    job_queue.enqueue(visit)
     background_tasks.add_task(run_next_job)
 
 
 @router.delete("/quicklooks/*")
 async def delete_all_quicklooks():
-    await QuicklookJob.delete_all()
+    await job_queue.clear()
 
 
 @router.websocket("/quicklook-jobs/events.ws")
@@ -42,7 +42,7 @@ async def quicklook_events(
     async with safe_websocket(ws):
 
         async def send_events():
-            async for events in QuicklookJob.subscribe():
+            async for events in job_queue.subscribe():
                 await ws.send_bytes(pickle.dumps(events))
 
         try:

@@ -10,7 +10,7 @@ class Base(DeclarativeBase):
 
 
 class QuicklookRecord(Base):
-    Phase = Literal['queued', 'processing', 'ready', 'deleting']
+    Phase = Literal['ready', 'transferring', 'deleting']
 
     __tablename__ = 'quicklooks'
 

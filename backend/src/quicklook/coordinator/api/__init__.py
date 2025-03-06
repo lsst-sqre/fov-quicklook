@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob import QuicklookJob
 
 from .admin_page import router as admin_page_router
 from .generators import active_context
@@ -16,8 +15,7 @@ from .quicklooks import router as quicklooks_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with active_context():
-        with QuicklookJob.enable_subscription():
-            yield
+        yield
 
 
 app = FastAPI(lifespan=lifespan)

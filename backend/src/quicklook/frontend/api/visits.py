@@ -7,7 +7,7 @@ router = APIRouter()
 
 
 class VisitListEntry(BaseModel):
-    name: str
+    id: str
 
 
 @router.get('/api/visits', response_model=list[VisitListEntry])
@@ -25,4 +25,4 @@ def list_visits(
             limit=limit,
         )
     )
-    return [VisitListEntry(name=visit.name) for visit in visits]
+    return [VisitListEntry(id=visit.id) for visit in visits]

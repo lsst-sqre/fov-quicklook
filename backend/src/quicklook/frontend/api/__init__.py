@@ -25,8 +25,7 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with RemoteQuicklookJobsWather().activate():
-        with QuicklookJob.enable_subscription():
-            yield
+        yield
 
 
 app = FastAPI(lifespan=lifespan)

@@ -43,7 +43,7 @@ class BBox:
 
 @dataclass(frozen=True)
 class Visit:
-    id: str # 'embargo:{instrument}:{collection}:{data_type}:{exposure}'
+    id: str # '{data_type}:{exposure}'
 
     @cache
     def _parts(self):
