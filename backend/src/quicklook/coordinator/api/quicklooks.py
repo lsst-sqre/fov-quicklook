@@ -6,7 +6,7 @@ import starlette.websockets
 from fastapi import APIRouter, BackgroundTasks, WebSocket
 from pydantic import BaseModel
 
-from quicklook.coordinator.run_quicklookjob import run_next_job
+from quicklook.coordinator.quicklookjob.run_quicklookjob import run_next_job
 from quicklook.types import Visit
 from quicklook.utils.websocket import safe_websocket
 

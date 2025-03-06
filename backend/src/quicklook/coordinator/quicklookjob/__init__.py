@@ -1,18 +1,18 @@
+import asyncio
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import cache
 from typing import AsyncGenerator, Union
 
 from pydantic import BaseModel
-from sqlalchemy import Delete, delete, insert, select
+from sqlalchemy import delete, select
 
 from quicklook.db import db_context
-from quicklook.models import QuicklookMetaRecord, QuicklookRecord
+from quicklook.models import QuicklookRecord
 from quicklook.types import AmpMeta, BBox, CcdId, GeneratorPod, GeneratorProgress, ImageStat, ProcessCcdResult, Visit
-from quicklook.utils.http_request import http_request
 from quicklook.utils.broadcastqueue import BroadcastQueue
 from quicklook.utils.event import WatchEvent
-import asyncio
+from quicklook.utils.http_request import http_request
 
 
 @dataclass
@@ -25,15 +25,9 @@ class QuicklookJob:
     meta: Union['QuicklookMeta', None] = None
 
     @classmethod
-    @contextmanager
-    def _db(cls):
-        with db_context() as db:
-            yield db
-
-    @classmethod
     def enqueue(cls, visit: Visit):
         stmt = select(QuicklookRecord).filter(QuicklookRecord.id == visit.id)
-        with cls._db() as db:
+        with db_context() as db:
             r = db.execute(stmt).scalar_one_or_none()
             if r is None:  # pragma: no branch
                 r = QuicklookRecord(id=visit.id, phase='queued')
@@ -42,7 +36,7 @@ class QuicklookJob:
 
     @classmethod
     def dequeue(cls):
-        with cls._db() as db:
+        with db_context() as db:
             stmt = select(QuicklookRecord).filter(QuicklookRecord.phase == 'queued').order_by(QuicklookRecord.created_at)
             r = db.execute(stmt).scalar_one_or_none()
         if r:  # pragma: no branch
@@ -58,8 +52,8 @@ class QuicklookJob:
     @classmethod
     async def delete_all(cls):
         from quicklook.coordinator.api.generators import ctx
-        
-        with cls._db() as db:
+
+        with db_context() as db:
             stmt = select(QuicklookRecord)
             records = db.execute(stmt).scalars().all()
         for r in records:
@@ -73,7 +67,7 @@ class QuicklookJob:
 
     @classmethod
     def get(cls, visit: Visit):
-        with cls._db() as db:
+        with db_context() as db:
             stmt = select(QuicklookRecord).filter(QuicklookRecord.id == visit.id)
             r = db.execute(stmt).scalar_one_or_none()
         if r:  # pragma: no branch
@@ -81,15 +75,15 @@ class QuicklookJob:
 
     @classmethod
     @cache
-    def _manager(cls) -> '_QuicklookJobManager':
-        return _QuicklookJobManager()
+    def _manager(cls) -> 'QuicklookJobManager':
+        return QuicklookJobManager()
 
     @classmethod
     def subscribe(cls) -> AsyncGenerator[list[WatchEvent['QuicklookJob']], None]:
         return cls._manager().subscribe()
 
     def save(self) -> None:
-        with self._db() as db:
+        with db_context() as db:
             stmt = select(QuicklookRecord).filter(QuicklookRecord.id == self.visit.id)
             r = db.execute(stmt).scalar_one()
             r.phase = self.phase
@@ -103,7 +97,7 @@ class QuicklookJob:
         self._manager().notify_modified(self)
 
     def delete(self):
-        with self._db() as db:
+        with db_context() as db:
             stmt = delete(QuicklookRecord).filter(QuicklookRecord.id == self.visit.id)
             db.execute(stmt)
             db.commit()
@@ -114,22 +108,8 @@ class QuicklookJob:
     def enable_subscription(cls):
         yield
 
-    def load_meta(self) -> 'QuicklookJob':
-        with self._db() as db:
-            stmt = select(QuicklookRecord).where(QuicklookRecord.id == self.id)
-            r = db.execute(stmt).scalar_one()
-            if r.meta:
-                self.meta = QuicklookMeta.model_validate(r.meta.body)
-        return self
-
     def save_meta(self, meta: 'QuicklookMeta'):
         self.meta = meta
-        body_json = meta.model_dump_json()
-        with self._db() as db:
-            db.execute(Delete(QuicklookMetaRecord).where(QuicklookMetaRecord.id == self.id))
-            stmt = insert(QuicklookMetaRecord).values(id=self.id, body_json=body_json)
-            db.execute(stmt)
-            db.commit()
 
 
 class CcdMeta(BaseModel):
@@ -159,10 +139,10 @@ class QuicklookMeta(BaseModel):
 
 @dataclass
 class CacheEntry:
-    ql: QuicklookJob
+    job: QuicklookJob
 
 
-class _QuicklookJobManager:
+class QuicklookJobManager:
     def __init__(self):
         self._entries: dict[Visit, CacheEntry] = {}
         self._event_queue = BroadcastQueue[WatchEvent[QuicklookJob]]()
@@ -180,10 +160,10 @@ class _QuicklookJobManager:
             ql = QuicklookJob(visit=visit, phase=r.phase)
             self._entries[visit] = CacheEntry(ql)
             self._event_queue.put(WatchEvent(ql, 'added'))
-        return self._entries[visit].ql
+        return self._entries[visit].job
 
     async def subscribe(self) -> AsyncGenerator[list[WatchEvent[QuicklookJob]], None]:
-        yield [WatchEvent(e.ql, 'added') for e in self._entries.values()]
+        yield [WatchEvent(e.job, 'added') for e in self._entries.values()]
         with self._event_queue.subscribe() as events:
             while True:
                 yield [await events.get()]

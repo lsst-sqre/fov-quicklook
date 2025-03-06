@@ -1,3 +1,4 @@
+# このファイルの内容は ./quicklookjob.py にあるべきもののような気がする
 import asyncio
 from dataclasses import asdict
 
@@ -5,7 +6,7 @@ import aiohttp
 from fastapi import APIRouter
 
 from quicklook.coordinator.api.generators import get_generators
-from quicklook.coordinator.quicklookjob import QuicklookJob, QuicklookMeta
+from . import QuicklookJob, QuicklookMeta
 from quicklook.coordinator.tasks import GeneratorTask, make_generator_tasks
 from quicklook.generator.progress import GeneratorProgress
 from quicklook.types import MessageFromGeneratorToCoordinator, ProcessCcdResult
