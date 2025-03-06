@@ -1,14 +1,14 @@
 import logging
 
 from fastapi import APIRouter, WebSocket
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 from starlette.websockets import WebSocketDisconnect
 
+from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
 from quicklook.coordinator.quicklookjob import QuicklookJob
-from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather, remote_quicklook_job
-from quicklook.models import QuicklookRecord
+from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
 from quicklook.types import CcdMeta, GeneratorProgress, QuicklookMeta, Visit
 from quicklook.utils.http_request import http_request
 from quicklook.utils.websocket import safe_websocket
@@ -21,7 +21,6 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 class QuicklookStatus(BaseModel):
     phase: QuicklookJob.Phase
     generating_progress: dict[str, GeneratorProgress] | None
-    meta: QuicklookMeta | None
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -67,7 +66,7 @@ async def show_quicklook_metadata(
     id: str,
 ):
     scale = 0.2 / 3600.0  # pixel size in degree
-    ql = remote_quicklook_job(Visit.from_id(id))
+    meta = storage.get_quicklook_meta(Visit.from_id(id))
     return QuicklookMetadata(
         id=id,
         wcs={
@@ -82,7 +81,7 @@ async def show_quicklook_metadata(
             "CD2_1": 0,
             "CD2_2": scale,
         },
-        ccd_meta=ql and ql.meta and ql.meta.ccd_meta,
+        ccd_meta=meta.ccd_meta,
     )
 
 

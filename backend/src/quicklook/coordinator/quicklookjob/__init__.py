@@ -21,8 +21,6 @@ class QuicklookJob:
     transferreing_progress: dict[str, float] | None = None
     ccd_generator_map: dict[str, GeneratorPod] | None = None  # ccd_name -> GeneratorPod
 
-    meta: Union[QuicklookMeta, None] = None
-
     async def cleanup(self): ...
 
     def sync(self):

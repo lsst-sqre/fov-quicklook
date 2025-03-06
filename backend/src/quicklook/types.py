@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from dataclasses import dataclass
 from functools import cache, cached_property
 from typing import Any, Literal, TypeAlias
@@ -135,8 +136,8 @@ class CcdMeta:
     bbox: BBox
 
 
-@dataclass
-class QuicklookMeta:
+
+class QuicklookMeta(BaseModel):
     ccd_meta: list[CcdMeta]
 
 

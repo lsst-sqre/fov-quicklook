@@ -5,6 +5,7 @@ from dataclasses import asdict
 import aiohttp
 from fastapi import APIRouter
 
+from quicklook import storage
 from quicklook.coordinator.api.generators import get_generators
 from . import QuicklookJob, job_queue
 from quicklook.coordinator.tasks import GeneratorTask, make_generator_tasks
@@ -18,7 +19,8 @@ router = APIRouter()
 async def run_next_job():
     async for job in job_queue.dequeue():
         process_ccd_results = await _run_generators(job)
-        job.meta = QuicklookMeta(ccd_meta=process_ccd_results)
+        storage.put_quicklook_meta(job.visit, QuicklookMeta(ccd_meta=process_ccd_results))
+        job.phase = 'transferring'
         job.sync()
         await _run_transfers(job)
         job.phase = 'ready'
