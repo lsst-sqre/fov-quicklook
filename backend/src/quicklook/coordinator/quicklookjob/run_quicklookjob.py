@@ -6,10 +6,10 @@ import aiohttp
 from fastapi import APIRouter
 
 from quicklook.coordinator.api.generators import get_generators
-from . import QuicklookJob, QuicklookMeta, job_queue
+from . import QuicklookJob, job_queue
 from quicklook.coordinator.tasks import GeneratorTask, make_generator_tasks
 from quicklook.generator.progress import GeneratorProgress
-from quicklook.types import MessageFromGeneratorToCoordinator, ProcessCcdResult
+from quicklook.types import MessageFromGeneratorToCoordinator, CcdMeta, QuicklookMeta
 from quicklook.utils.message import message_from_async_reader
 
 router = APIRouter()
@@ -18,14 +18,14 @@ router = APIRouter()
 async def run_next_job():
     async for job in job_queue.dequeue():
         process_ccd_results = await _run_generators(job)
-        job.meta = QuicklookMeta.from_process_ccd_results(process_ccd_results)
+        job.meta = QuicklookMeta(ccd_meta=process_ccd_results)
         job.sync()
         await _run_transfers(job)
         job.phase = 'ready'
         job.sync()
 
 
-async def _run_generators(job: QuicklookJob) -> list[ProcessCcdResult]:
+async def _run_generators(job: QuicklookJob) -> list[CcdMeta]:
     visit = job.visit
     nodes: dict[str, GeneratorProgress] = {}
     tasks = make_generator_tasks(visit, get_generators())
@@ -39,7 +39,7 @@ async def _run_generators(job: QuicklookJob) -> list[ProcessCcdResult]:
                 json=asdict(task),
                 raise_for_status=True,
             ) as res:
-                process_ccd_results: list[ProcessCcdResult] = []
+                process_ccd_results: list[CcdMeta] = []
                 while True:
                     msg: MessageFromGeneratorToCoordinator = await message_from_async_reader(res.content.readexactly)
                     match msg:
@@ -51,13 +51,13 @@ async def _run_generators(job: QuicklookJob) -> list[ProcessCcdResult]:
                             nodes[task.generator.name] = msg
                             job.generating_progress = nodes
                             job.sync()
-                        case ProcessCcdResult():
+                        case CcdMeta():
                             process_ccd_results.append(msg)
                         case _:  # pragma: no cover
                             raise TypeError(f'Unexpected message: {msg}')
                 return process_ccd_results
 
-    gathered_results: list[ProcessCcdResult] = []
+    gathered_results: list[CcdMeta] = []
     for fut in asyncio.as_completed([run_1_generator(task) for task in tasks]):
         gathered_results.extend(await fut)
     return gathered_results

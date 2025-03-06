@@ -43,7 +43,7 @@ class BBox:
 
 @dataclass(frozen=True)
 class Visit:
-    id: str # '{data_type}:{exposure}'
+    id: str  # '{data_type}:{exposure}'
 
     @cache
     def _parts(self):
@@ -52,7 +52,7 @@ class Visit:
     @property
     def data_type(self):
         return self._parts()[-2]
-    
+
     @property
     def name(self):
         return self._parts()[-1]
@@ -128,11 +128,16 @@ class GeneratorProgress:
 
 
 @dataclass
-class ProcessCcdResult:
+class CcdMeta:
     ccd_id: CcdId
     image_stat: ImageStat
     amps: list[AmpMeta]
     bbox: BBox
 
 
-MessageFromGeneratorToCoordinator = None | GeneratorProgress | BaseException | ProcessCcdResult
+@dataclass
+class QuicklookMeta:
+    ccd_meta: list[CcdMeta]
+
+
+MessageFromGeneratorToCoordinator = None | GeneratorProgress | BaseException | CcdMeta

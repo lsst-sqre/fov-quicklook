@@ -6,11 +6,11 @@ from starlette.websockets import WebSocketDisconnect
 
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
-from quicklook.coordinator.quicklookjob import ProcessCcdResult, QuicklookJob, QuicklookMeta
-from quicklook.utils.http_request import http_request
+from quicklook.coordinator.quicklookjob import QuicklookJob
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather, remote_quicklook_job
 from quicklook.models import QuicklookRecord
-from quicklook.types import GeneratorProgress, Visit
+from quicklook.types import CcdMeta, GeneratorProgress, QuicklookMeta, Visit
+from quicklook.utils.http_request import http_request
 from quicklook.utils.websocket import safe_websocket
 
 router = APIRouter()
@@ -59,7 +59,7 @@ class QuicklookMetadata(BaseModel):
     # QuicklookMetaと紛らわしいがこちらはフロントエンド用
     id: str
     wcs: dict
-    ccd_meta: list[ProcessCcdResult] | None
+    ccd_meta: list[CcdMeta] | None
 
 
 @router.get('/api/quicklooks/{id}/metadata', response_model=QuicklookMetadata)

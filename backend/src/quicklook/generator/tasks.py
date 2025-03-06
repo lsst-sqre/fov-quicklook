@@ -17,13 +17,13 @@ from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.generator.progress import GeneratorProgress, GeneratorProgressReporter
 from quicklook.generator.tmptile import TmpTile
-from quicklook.types import CcdId, PreProcessedCcd, ProcessCcdResult, Progress, Tile, Visit
+from quicklook.types import CcdId, PreProcessedCcd, CcdMeta, Progress, Tile, Visit
 from quicklook.utils import multiprocessing_coverage_compatible as mp
 from quicklook.utils.dynamicsemaphore import DynamicSemaphore
 from quicklook.utils.timeit import timeit
 
 
-def run_generator(task: GeneratorTask, on_update: Callable[[GeneratorProgress], None] | None = None) -> Generator[ProcessCcdResult]:
+def run_generator(task: GeneratorTask, on_update: Callable[[GeneratorProgress], None] | None = None) -> Generator[CcdMeta]:
     with iterate_downloaded_ccds(task.visit, task.ccd_names) as files:
         with timeit('generator'):
             with mp.Pool(config.tile_ccd_processing_parallel) as pool:
@@ -45,7 +45,7 @@ class ProcessCcdArgs:
     progress_updator: GeneratorProgressReporter.InterProcessUpdator
 
 
-def process_ccd(args: ProcessCcdArgs) -> ProcessCcdResult:
+def process_ccd(args: ProcessCcdArgs) -> CcdMeta:
     def update_maketile_progress(progress: Progress):
         if (progress.count == progress.total) or (progress.count % 32 == 0):
             args.progress_updator.update_maketile_progress(args.ccd_id.ccd_name, progress)
@@ -62,7 +62,7 @@ def process_ccd(args: ProcessCcdArgs) -> ProcessCcdResult:
             update_progress=update_maketile_progress,
         )
 
-    return ProcessCcdResult(
+    return CcdMeta(
         ccd_id=args.ccd_id,
         image_stat=ppccd.stat,
         amps=ppccd.amps,

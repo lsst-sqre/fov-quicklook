@@ -4,9 +4,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import AsyncGenerator, Literal, Union
 
-from pydantic import BaseModel
-
-from quicklook.types import GeneratorPod, GeneratorProgress, ProcessCcdResult, Visit
+from quicklook.types import GeneratorPod, GeneratorProgress, QuicklookMeta, Visit
 from quicklook.utils.broadcastqueue import BroadcastQueue
 from quicklook.utils.event import WatchEvent
 from quicklook.utils.http_request import http_request
@@ -22,22 +20,13 @@ class QuicklookJob:
     generating_progress: dict[str, GeneratorProgress] | None = None
     transferreing_progress: dict[str, float] | None = None
     ccd_generator_map: dict[str, GeneratorPod] | None = None  # ccd_name -> GeneratorPod
-    
-    meta: Union['QuicklookMeta', None] = None
 
-    async def cleanup(self):
-        ...
+    meta: Union[QuicklookMeta, None] = None
+
+    async def cleanup(self): ...
 
     def sync(self):
         job_queue._sync_job(self)
-
-
-class QuicklookMeta(BaseModel):
-    ccd_meta: list[ProcessCcdResult]
-
-    @classmethod
-    def from_process_ccd_results(cls, results: list[ProcessCcdResult]) -> 'QuicklookMeta':
-        return cls(ccd_meta=results)
 
 
 class JobQueue:

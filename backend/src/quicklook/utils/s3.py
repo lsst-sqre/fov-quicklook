@@ -1,3 +1,4 @@
+import io
 import minio
 
 
@@ -24,3 +25,19 @@ def download_object_from_s3(
             response.close()
             response.release_conn()
 
+
+def upload_object_to_s3(
+    client: minio.Minio,
+    bucket: str,
+    key: str,
+    data: bytes,
+    content_type: str,
+) -> None:
+    data_buf = io.BytesIO(data)
+    client.put_object(
+        bucket,
+        key,
+        data_buf,
+        len(data),
+        content_type=content_type,
+    )
