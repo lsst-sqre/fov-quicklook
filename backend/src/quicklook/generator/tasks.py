@@ -16,8 +16,7 @@ from quicklook.datasource import get_datasource
 from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.generator.progress import GeneratorProgress, GeneratorProgressReporter
-from quicklook.generator.tilewriter import TileWriter, TileWriterBase
-from quicklook.tileinfo import TileInfo
+from quicklook.generator.tmptile import TmpTile
 from quicklook.types import CcdId, PreProcessedCcd, ProcessCcdResult, Progress, Tile, Visit
 from quicklook.utils import multiprocessing_coverage_compatible as mp
 from quicklook.utils.dynamicsemaphore import DynamicSemaphore
@@ -58,12 +57,10 @@ def process_ccd(args: ProcessCcdArgs) -> ProcessCcdResult:
 
         save_headers(ppccd)
 
-        with TileWriter(args.ccd_id) as tile_writer:
-            make_tiles(
-                ppccd,
-                tile_writer=tile_writer,
-                update_progress=update_maketile_progress,
-            )
+        make_tiles(
+            ppccd,
+            update_progress=update_maketile_progress,
+        )
 
     return ProcessCcdResult(
         ccd_id=args.ccd_id,
@@ -72,17 +69,13 @@ def process_ccd(args: ProcessCcdArgs) -> ProcessCcdResult:
         bbox=ppccd.bbox,
     )
 
-
 def make_tiles(
     ppccd: PreProcessedCcd,
     *,
-    tile_writer: TileWriterBase,
     update_progress: Callable[[Progress], None],
 ):
     def cb(tile: Tile, progress: Progress):
-        tile_info = TileInfo.of(tile.level, tile.i, tile.j)
-        fragment = len(tile_info.ccd_names) >= 2
-        tile_writer.put(tile, fragment=fragment)
+        TmpTile.put(ppccd.ccd_id, tile)
         update_progress(progress)
 
     iterate_tiles(ppccd, cb)

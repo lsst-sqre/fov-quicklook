@@ -40,7 +40,13 @@ async def get_tile(
     raise HTTPException(status_code=503, detail='Quicklook is not ready')
 
 
-async def gather_tiles(ql: QuicklookJob, visit: Visit, z: int, y: int, x: int) -> Response:
+async def gather_tiles(
+    ql: QuicklookJob,
+    visit: Visit,
+    z: int,
+    y: int,
+    x: int,
+) -> Response:
     ccd_generator_map = ql.ccd_generator_map
 
     if ccd_generator_map is None:  # pragma: no cover

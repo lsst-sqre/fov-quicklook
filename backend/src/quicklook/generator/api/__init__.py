@@ -15,7 +15,7 @@ from quicklook.config import config
 from quicklook.coordinator.tasks import GeneratorTask
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.generator.api.tilegeneratorprocess import TileGeneratorProcess
-from quicklook.generator.tilewriter import TileWriter
+from quicklook.generator.tmptile import TmpTile
 from quicklook.types import CcdId, MessageFromGeneratorToCoordinator, Visit
 from quicklook.utils.globalstack import GlobalStack
 from quicklook.utils.lrudict import LRUDict
@@ -90,7 +90,7 @@ def get_tile(
     pool: numpy.ndarray | None = None
     for ccd_name in ccd_names:
         ccd_id = CcdId(visit, ccd_name)
-        path = f'{config.tile_tmpdir}/{ccd_id.name}/{z}/{y}/{x}.npy'
+        path = TmpTile.path(ccd_id, z, y, x)
         if not Path(path).exists():
             # こういうことはまれにある
             # TileInfo.ofの結果は不安定なので
@@ -126,7 +126,7 @@ async def get_pod_status():
 
 @app.delete('/quicklooks/*')
 async def delete_all_quicklooks():
-    TileWriter.delete_all_cache()
+    TmpTile.delete_all_cache()
 
 
 @app.post('/kill')
