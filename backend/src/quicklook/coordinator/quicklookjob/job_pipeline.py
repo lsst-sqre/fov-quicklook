@@ -26,6 +26,8 @@ from .job import QuicklookJob, QuicklookJobReport
 logger = logging.getLogger(f'uvicorn.{__name__}')
 
 backoff_time = 1 if config.environment == 'test' else 30
+# テスト時は0にしたいのだが、ここを0にするとfrontendプロセスが止まらなくなってしまう。
+# 詳しくはREADME.ja.mdのtouble shootingを参照
 
 
 def job_stages() -> list[Stage[QuicklookJob]]:
@@ -144,7 +146,6 @@ class _JobManager:
             await backoff(job)
 
         async def on_task_error(job: QuicklookJob, e: Exception):
-            logger.warning(f'Error processing task {job}: {e}')
             job.phase = 'failed'
             sync_job(job)
             await backoff(job)
