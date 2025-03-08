@@ -9,7 +9,7 @@ from typing import Callable, TypeVar
 import websockets
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob import QuicklookJob
+from quicklook.coordinator.quicklookjob.job import QuicklookJob
 from quicklook.types import Visit
 from quicklook.utils.asynctask import cancel_at_exit
 from quicklook.utils.broadcastqueue import BroadcastQueue

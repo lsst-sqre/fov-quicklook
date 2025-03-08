@@ -6,7 +6,7 @@ from quicklook.config import config
 
 
 class settings:
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(f'uvicorn.{__name__}')
     loglevel = logging._nameToLevel[config.timeit_log_level]
 
 

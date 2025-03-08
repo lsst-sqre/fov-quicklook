@@ -7,7 +7,7 @@ from starlette.websockets import WebSocketDisconnect
 from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
-from quicklook.coordinator.quicklookjob import QuicklookJob
+from quicklook.coordinator.quicklookjob.job import QuicklookJob
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
 from quicklook.types import CcdMeta, GeneratorProgress, QuicklookMeta, Visit
 from quicklook.utils.http_request import http_request
@@ -20,7 +20,7 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 
 class QuicklookStatus(BaseModel):
     phase: QuicklookJob.Phase
-    generating_progress: dict[str, GeneratorProgress] | None
+    generate_progress: dict[str, GeneratorProgress] | None
 
     model_config = ConfigDict(
         from_attributes=True,

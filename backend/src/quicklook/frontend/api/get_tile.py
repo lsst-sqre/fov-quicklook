@@ -1,3 +1,4 @@
+from fastapi import status
 import asyncio
 import logging
 import traceback
@@ -9,7 +10,7 @@ import numpy
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob import QuicklookJob
+from quicklook.coordinator.quicklookjob.job import QuicklookJob
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.frontend.api.remotejobs import remote_quicklook_job
 from quicklook.tileinfo import TileInfo
@@ -37,7 +38,7 @@ async def get_tile(
     #     raise NotImplementedError(f'Phase {ql.phase} not implemented')
     # elif ql.phase == 'processing' and ql.transferreing_progress:
     #     return await gather_tiles(visit, z, y, x)
-    raise HTTPException(status_code=503, detail='Quicklook is not ready')
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Quicklook is not ready')
 
 
 async def gather_tiles(
@@ -50,7 +51,7 @@ async def gather_tiles(
     ccd_generator_map = ql.ccd_generator_map
 
     if ccd_generator_map is None:  # pragma: no cover
-        raise HTTPException(status_code=503, detail='Quicklook is not ready')
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Quicklook is not ready')
 
     ccd_names = TileInfo.of(z, y, x).ccd_names
     generators = set(ccd_generator_map[ccd_name] for ccd_name in ccd_names if ccd_name in ccd_generator_map)

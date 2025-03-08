@@ -1,17 +1,21 @@
 import asyncio
+import logging
 import pickle
 
 import starlette
 import starlette.websockets
 from fastapi import APIRouter, BackgroundTasks, WebSocket
 from pydantic import BaseModel
+from sqlalchemy import delete
 
-from quicklook.coordinator.quicklookjob.run_quicklookjob import run_next_job
+from quicklook.db import db_context
+from quicklook.models import QuicklookRecord
 from quicklook.types import Visit
 from quicklook.utils.websocket import safe_websocket
 
-from ..quicklookjob import QuicklookJob, job_queue
+from ..quicklookjob.job_pipeline import job_manager
 
+logger = logging.getLogger(f'uvicorn.{__name__}')
 router = APIRouter()
 
 
@@ -20,18 +24,16 @@ class QuicklookCreate(BaseModel):
 
 
 @router.post("/quicklooks")
-async def create_quicklook(
-    parmas: QuicklookCreate,
-    background_tasks: BackgroundTasks,
-):
-    visit = parmas.visit
-    job_queue.enqueue(visit)
-    background_tasks.add_task(run_next_job)
+async def create_quicklook(params: QuicklookCreate):
+    visit = params.visit
+    await job_manager.enqueue(visit)
 
 
 @router.delete("/quicklooks/*")
 async def delete_all_quicklooks():
-    await job_queue.clear()
+    with db_context() as db:
+        db.execute(delete(QuicklookRecord))
+    await job_manager.clear()
 
 
 @router.websocket("/quicklook-jobs/events.ws")
@@ -42,7 +44,7 @@ async def quicklook_events(
     async with safe_websocket(ws):
 
         async def send_events():
-            async for events in job_queue.subscribe():
+            async for events in job_manager.subscribe():
                 await ws.send_bytes(pickle.dumps(events))
 
         try:

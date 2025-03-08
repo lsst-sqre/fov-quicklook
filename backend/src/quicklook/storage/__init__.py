@@ -32,3 +32,18 @@ def put_quicklook_meta(visit: Visit, meta: QuicklookMeta) -> None:
 
 def get_quicklook_meta(visit: Visit) -> QuicklookMeta:
     return QuicklookMeta.model_validate_json(get(f'quicklook-meta/{visit.id}'))
+
+
+# from minio import Minio
+# import os
+
+
+# client = Minio(
+#     endpoint='sdfembs3.sdf.slac.stanford.edu:443',
+#     access_key=os.environ['QUICKLOOK_s3_repository__access_key'],
+#     secret_key=os.environ['QUICKLOOK_s3_repository__secret_key'],
+#     secure=True,
+# )
+
+# bucket_name = 'fov-quicklook-tile'
+# print(client.bucket_exists(bucket_name))
