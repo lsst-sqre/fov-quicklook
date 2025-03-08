@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import AsyncGenerator
@@ -20,9 +21,11 @@ from quicklook.utils.http_request import http_request
 from quicklook.utils.message import message_from_async_reader
 from quicklook.utils.pipeline import Pipeline, Stage
 
-from .job import QuicklookJob
+from .job import QuicklookJob, QuicklookJobReport
 
-backoff_time = 0.1 if config.environment == 'test' else 30
+logger = logging.getLogger(f'uvicorn.{__name__}')
+
+backoff_time = 1 if config.environment == 'test' else 30
 
 
 def job_stages() -> list[Stage[QuicklookJob]]:
@@ -57,22 +60,37 @@ async def limit_temporary_quicklooks(job: QuicklookJob):
 async def generate(job: QuicklookJob):
     job.phase = 'generate:running'
     sync_job(job)
-    process_ccd_results = await scatter_generator_job(job)
+    process_ccd_results = await scatter_generate_job(job)
     storage.put_quicklook_meta(job.visit, QuicklookMeta(ccd_meta=process_ccd_results))
+    job.generate_progress = None
     job.phase = 'transfer:queued'
     sync_job(job)
 
 
 async def transfer(job: QuicklookJob):
+    with db_context() as db:
+        db.add(QuicklookRecord(id=job.visit.id, phase='in_progress'))
+        db.commit()
+
+    storage.put_quicklook_job_config(job)
+
     job.phase = 'transfer:running'
-    ...
     sync_job(job)
+    # await scatter_transfer_job(job)
+    job.transfer_progress = None
     job.phase = 'ready'
     sync_job(job)
 
+    with db_context() as db:
+        db.query(QuicklookRecord).filter(QuicklookRecord.id == job.visit.id).update({'phase': 'ready'})
+        db.commit()
 
 
-async def scatter_generator_job(job: QuicklookJob) -> list[CcdMeta]:
+async def cleanup(job: QuicklookJob):
+    pass
+
+
+async def scatter_generate_job(job: QuicklookJob) -> list[CcdMeta]:
     visit = job.visit
     nodes: dict[str, GeneratorProgress] = {}
     tasks = make_generator_tasks(visit, get_generators())
@@ -116,19 +134,20 @@ class _JobManager:
 
     @asynccontextmanager
     async def activate(self):
-        def unregister_from_synchronizer(job: QuicklookJob):
+        async def backoff(job: QuicklookJob):
+            await cleanup(job)
+            await asyncio.sleep(backoff_time)
             temporary_quicklooks_queue.get_nowait()
             self._synchronizer.delete(job)
 
         async def on_task_complete(job: QuicklookJob):
-            await asyncio.sleep(backoff_time)
-            unregister_from_synchronizer(job)
+            await backoff(job)
 
         async def on_task_error(job: QuicklookJob, e: Exception):
+            logger.warning(f'Error processing task {job}: {e}')
             job.phase = 'failed'
             sync_job(job)
-            await asyncio.sleep(backoff_time)
-            unregister_from_synchronizer(job)
+            await backoff(job)
 
         async with Pipeline(
             job_stages(),
@@ -143,7 +162,7 @@ class _JobManager:
             self._synchronizer.add(job)
             await self._pipeline.push_task(job)
 
-    def subscribe(self) -> AsyncGenerator[list[WatchEvent[QuicklookJob]], None]:
+    def subscribe(self) -> AsyncGenerator[list[WatchEvent[QuicklookJobReport]], None]:
         return self._synchronizer.subscribe()
 
     async def clear(self):
@@ -157,24 +176,27 @@ class _JobManager:
 
 class _JobSynchronizer:
     def __init__(self):
-        self._entries: dict[Visit, QuicklookJob] = {}
-        self._q = BroadcastQueue[WatchEvent[QuicklookJob]]()
+        self._entries: dict[Visit, QuicklookJobReport] = {}
+        self._q = BroadcastQueue[WatchEvent[QuicklookJobReport]]()
 
     def add(self, job: QuicklookJob):
-        self._entries[job.visit] = job
-        self._q.put(WatchEvent(job, 'added'))
+        report = QuicklookJobReport.from_job(job)
+        self._entries[job.visit] = report
+        self._q.put(WatchEvent(report, 'added'))
 
     def delete(self, job: QuicklookJob):
         del self._entries[job.visit]
-        self._q.put(WatchEvent(job, 'deleted'))
+        self._q.put(WatchEvent(QuicklookJobReport.from_job(job), 'deleted'))
 
     def modify(self, job: QuicklookJob):
-        self._q.put(WatchEvent(job, 'modified'))
+        report = QuicklookJobReport.from_job(job)
+        self._entries[job.visit] = report
+        self._q.put(WatchEvent(report, 'modified'))
 
     def has(self, visit: Visit) -> bool:
         return visit in self._entries
 
-    async def subscribe(self) -> AsyncGenerator[list[WatchEvent[QuicklookJob]], None]:
+    async def subscribe(self) -> AsyncGenerator[list[WatchEvent[QuicklookJobReport]], None]:
         yield [WatchEvent(e, 'added') for e in self._entries.values()]
         with self._q.subscribe() as events:
             while True:

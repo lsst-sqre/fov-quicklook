@@ -4,6 +4,7 @@ from typing import Annotated
 import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, Response
 
+from quicklook import storage
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.frontend.api.remotejobs import remote_quicklook_job
 from quicklook.types import Visit, HeaderType
@@ -18,11 +19,7 @@ async def get_fits_header(
     visit: Annotated[Visit, Depends(visit_from_path)],
     ccd_name: str,
 ) -> Response:
-    job = remote_quicklook_job(visit)
-
-    if job is None:  # pragma: no cover
-        raise HTTPException(status_code=404, detail='Quicklook not found')
-
+    job = storage.get_quicklook_job_config(visit)
     ccd_generator_map = job.ccd_generator_map
 
     if ccd_generator_map is None:  # pragma: no cover

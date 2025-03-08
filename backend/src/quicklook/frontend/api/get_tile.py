@@ -9,6 +9,7 @@ import aiohttp
 import numpy
 from fastapi import APIRouter, Depends, HTTPException, Response
 
+from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.quicklookjob.job import QuicklookJob
 from quicklook.deps.visit_from_path import visit_from_path
@@ -30,10 +31,10 @@ async def get_tile(
     y: int,
     x: int,
 ) -> Response:
-    ql = remote_quicklook_job(visit)
-    if ql is None:
-        raise HTTPException(status_code=404, detail='Quicklook not found')  # pragma: no cover
-    return await gather_tiles(ql, visit, z, y, x)
+    job = storage.get_quicklook_job_config(visit)
+    # if job is None:
+    #     raise HTTPException(status_code=404, detail='Quicklook not found')  # pragma: no cover
+    return await gather_tiles(job, visit, z, y, x)
     # if ql.phase == 'ready':
     #     raise NotImplementedError(f'Phase {ql.phase} not implemented')
     # elif ql.phase == 'processing' and ql.transferreing_progress:

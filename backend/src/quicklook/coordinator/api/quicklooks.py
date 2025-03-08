@@ -33,6 +33,7 @@ async def create_quicklook(params: QuicklookCreate):
 async def delete_all_quicklooks():
     with db_context() as db:
         db.execute(delete(QuicklookRecord))
+        db.commit()
     await job_manager.clear()
 
 

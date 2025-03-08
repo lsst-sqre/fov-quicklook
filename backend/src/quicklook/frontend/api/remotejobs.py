@@ -9,7 +9,7 @@ from typing import Callable, TypeVar
 import websockets
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.job import QuicklookJob
+from quicklook.coordinator.quicklookjob.job import QuicklookJobReport
 from quicklook.types import Visit
 from quicklook.utils.asynctask import cancel_at_exit
 from quicklook.utils.broadcastqueue import BroadcastQueue
@@ -22,8 +22,8 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 class _RemoteQuicklookJobsWatcher:
 
     def __init__(self):
-        self._jobs: dict[Visit, QuicklookJob] = {}
-        self._q = BroadcastQueue[dict[Visit, QuicklookJob]]()
+        self._jobs: dict[Visit, QuicklookJobReport] = {}
+        self._q = BroadcastQueue[dict[Visit, QuicklookJobReport]]()
         self._active = False
 
     @asynccontextmanager
@@ -41,7 +41,7 @@ class _RemoteQuicklookJobsWatcher:
             try:
                 async with websockets.connect(f'{config.coordinator_ws_base_url}/quicklook-jobs/events.ws') as ws:
                     while True:
-                        events: list[WatchEvent[QuicklookJob]] = pickle.loads(await ws.recv())  # type: ignore
+                        events: list[WatchEvent[QuicklookJobReport]] = pickle.loads(await ws.recv())  # type: ignore
                         for event in events:
                             match event.type:
                                 case 'added':
@@ -62,7 +62,7 @@ class _RemoteQuicklookJobsWatcher:
         assert self._active
         return self._q.subscribe()
 
-    async def watch(self, pick: Callable[[dict[Visit, QuicklookJob]], T]):
+    async def watch(self, pick: Callable[[dict[Visit, QuicklookJobReport]], T]):
         v0 = pick(self._jobs)
         yield v0
         with self.subscribe() as sub:
@@ -82,5 +82,5 @@ def RemoteQuicklookJobsWather():
     return _RemoteQuicklookJobsWatcher()
 
 
-def remote_quicklook_job(visit: Visit) -> QuicklookJob | None:
+def remote_quicklook_job(visit: Visit) -> QuicklookJobReport | None:
     return RemoteQuicklookJobsWather().jobs.get(visit)

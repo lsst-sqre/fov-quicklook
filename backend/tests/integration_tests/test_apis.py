@@ -53,7 +53,7 @@ def one_quicklook_created(quicklooks_cleared):
             try:
                 status = json.loads(ws.recv())
                 if isinstance(status, dict):
-                    if status['phase'] == 'ready':
+                    if status['phase'] in {'ready', 'failed'}:
                         break
             except ConnectionClosedOK:
                 break

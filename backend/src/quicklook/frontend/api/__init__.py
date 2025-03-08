@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.job import QuicklookJob
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
 from quicklook.frontend.api.staticassets import setup_static_assets
 from quicklook.utils.http_request import http_request
