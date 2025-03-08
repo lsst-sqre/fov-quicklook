@@ -53,7 +53,7 @@ class _RemoteQuicklookJobsWatcher:
                         self._q.put(self._jobs)
             except asyncio.CancelledError:
                 break
-            except:
+            except Exception:
                 traceback.print_exc()
                 logger.warning('retrying in 5 seconds')
                 await asyncio.sleep(5)

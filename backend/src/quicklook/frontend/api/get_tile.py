@@ -69,7 +69,7 @@ async def gather_tiles(
     for fut in asyncio.as_completed([get_npy(g) for g in generators]):
         try:
             arr = await fut
-        except:  # pragma: no cover
+        except Exception:  # pragma: no cover
             traceback.print_exc()
             continue
         if pool is None:
