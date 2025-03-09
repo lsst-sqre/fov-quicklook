@@ -122,10 +122,15 @@ class GeneratorPod:
 
 
 @dataclass
-class GeneratorProgress:
+class GenerateProgress:
     download: Progress
     preprocess: Progress
     maketile: Progress
+
+
+@dataclass
+class TransferProgress:
+    transfer: Progress
 
 
 @dataclass
@@ -136,9 +141,9 @@ class CcdMeta:
     bbox: BBox
 
 
-
 class QuicklookMeta(BaseModel):
     ccd_meta: list[CcdMeta]
 
 
-MessageFromGeneratorToCoordinator = None | GeneratorProgress | BaseException | CcdMeta
+GenerateTaskResponse = None | GenerateProgress | BaseException | CcdMeta
+TransferTaskResponse = None | TransferProgress | BaseException

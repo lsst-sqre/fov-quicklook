@@ -1,75 +1,15 @@
 import logging
-import multiprocessing
-import threading
-import traceback
-from multiprocessing.connection import Connection
-from typing import Callable
+from typing import Any, Callable, TypeVar
 
 from quicklook.coordinator.quicklookjob.tasks import GenerateTask
-from quicklook.generator.progress import GeneratorProgress, GeneratorProgressReporter
-from quicklook.generator.tasks import run_generator
-from quicklook.types import MessageFromGeneratorToCoordinator
-from quicklook.utils import throttle
+from quicklook.generator.api import tile_transfer_process_target
+from quicklook.generator.api.baseprocesshandler import BaseProcessHandler
+from quicklook.generator.progress import GenerateProgress
+from quicklook.types import GenerateTaskResponse
 from quicklook.utils.timeit import timeit
 
-logger = logging.getLogger('uvicorn')
+logger = logging.getLogger(f'uvicorn.{__name__}')
 
 
-class TileGeneratorProcess:
-    # uvicorn内ではmultiprocessing.Poolが使えないので別プロセスで処理を行う
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        self._comm, child_comm = multiprocessing.Pipe()
-        self._server = multiprocessing.Process(target=process, args=(child_comm,))
-        self._server.start()
-        self._lock = threading.Lock()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._comm.send(None)
-        self._comm.close()
-        self._server.join()
-
-    def create_quicklook(
-        self,
-        task: GenerateTask,
-        *,
-        on_update: Callable[[MessageFromGeneratorToCoordinator], None],
-    ):
-        with self._lock:
-            logger.info(f'Create quicklook for {task}')
-            with timeit(f'create_quicklook {task}'):
-                self._comm.send(task)
-                while True:
-                    progress: GeneratorProgress = self._comm.recv()
-                    if progress is None:
-                        break
-                    on_update(progress)
-            on_update(None)
-            logger.info(f'Finished quicklook for {task}')
-
-
-def process(comm: Connection):
-
-    @throttle.throttle(0.1)
-    def on_update(progress: GeneratorProgress):
-        comm.send(progress)
-
-    try:
-        while True:
-            task: GenerateTask | None = comm.recv()
-            if task is None:
-                break
-            try:
-                for process_ccd_result in run_generator(task, on_update):
-                    comm.send(process_ccd_result)
-                throttle.flush(on_update)
-            except Exception as e:  # pragma: no cover
-                traceback.print_exc()
-                comm.send(e)
-            finally:
-                comm.send(None)
-    finally:
-        comm.close()
+def create_tile_generate_process() -> BaseProcessHandler[GenerateTask, GenerateProgress]:
+    return BaseProcessHandler[GenerateTask, GenerateProgress](process_target=tile_transfer_process_target)

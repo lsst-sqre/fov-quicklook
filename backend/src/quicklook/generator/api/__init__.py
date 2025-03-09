@@ -2,9 +2,12 @@ import logging
 import os
 import queue
 import threading
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
+from functools import cache
+from multiprocessing.connection import Connection
 from pathlib import Path
+import traceback
 from typing import Annotated
 
 import numpy
@@ -12,22 +15,25 @@ from fastapi import Depends, FastAPI, Response
 from fastapi.responses import StreamingResponse
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.tasks import GenerateTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask, TransferTask
 from quicklook.deps.visit_from_path import visit_from_path
-from quicklook.generator.api.tilegeneratorprocess import TileGeneratorProcess
+from quicklook.generator.api.baseprocesshandler import BaseProcessHandler
+from quicklook.generator.progress import GenerateProgress
+from quicklook.generator.tasks import run_generator
 from quicklook.generator.tmptile import TmpTile
-from quicklook.types import CcdId, MessageFromGeneratorToCoordinator, Visit
+from quicklook.types import CcdId, GenerateTaskResponse, TransferProgress, TransferTaskResponse, Visit
+from quicklook.utils import throttle
 from quicklook.utils.globalstack import GlobalStack
 from quicklook.utils.lrudict import LRUDict
 from quicklook.utils.message import encode_message
 from quicklook.utils.numpyutils import ndarray2npybytes
 from quicklook.utils.podstatus import pod_status
+from quicklook.utils.timeit import timeit
 
 from .context import GeneratorContext
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
 ctx = GeneratorContext()
-tile_generator = TileGeneratorProcess()
 
 
 @dataclass
@@ -42,7 +48,7 @@ GeneratorRuntimeSettings.stack.set_default(GeneratorRuntimeSettings(port=config.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with ctx.activate(GeneratorRuntimeSettings.stack.top.port):
-        with tile_generator:
+        with tile_generate_process0():
             yield
 
 
@@ -63,19 +69,67 @@ def create_quicklook(task: GenerateTask):
     q = queue.Queue()
 
     def main():
-        tile_generator.create_quicklook(task, on_update=q.put)
+        with tile_generate_process() as p:
+            logger.info(f'Create quicklook for {task}')
+            with timeit(f'create_quicklook {task}'):
+                p.execute_task(task, on_update=q.put)
 
     def stream_task_updates():
         t = threading.Thread(target=main)
         t.start()
         while True:
-            msg: MessageFromGeneratorToCoordinator = q.get()
+            msg: GenerateTaskResponse = q.get()
             yield encode_message(msg)
             if msg is None:
                 break
         t.join()
 
     return StreamingResponse(stream_task_updates())
+
+
+@cache
+def tile_generate_process0():
+    return create_tile_generate_process()
+
+
+def create_tile_generate_process() -> BaseProcessHandler[GenerateTask, GenerateProgress]:
+    return BaseProcessHandler[GenerateTask, GenerateProgress](process_target=tile_transfer_process_target)
+
+
+@contextmanager
+def tile_generate_process():
+    # process0だけは常に使い回す
+    if not tile_generate_process0().available():
+        yield tile_generate_process0()
+    else:
+        with create_tile_generate_process() as p:
+            yield p
+
+
+@app.post('/quicklooks/transfer')
+def transfer_quicklook(task: TransferTask):
+    logger.warning(f'transfer_quicklook {task}')
+    q = queue.Queue()
+
+    def main():
+        with tile_transfer_process() as p:
+            p.execute_task(task, on_update=q.put)
+
+    def stream_task_updates():
+        t = threading.Thread(target=main)
+        t.start()
+        while True:
+            msg: TransferTaskResponse = q.get()
+            yield encode_message(msg)
+            if msg is None:
+                break
+        t.join()
+
+    return StreamingResponse(stream_task_updates())
+
+
+def tile_transfer_process():
+    return BaseProcessHandler[TransferTask, TransferProgress](process_target=tile_transfer_process_target)
 
 
 @app.get('/quicklooks/{id}/tiles/{z}/{y}/{x}')
@@ -132,3 +186,43 @@ async def delete_all_quicklooks():
 @app.post('/kill')
 async def kill():  # pragma: no cover
     os._exit(0)
+
+
+def tile_generate_process_target(comm: Connection) -> None:
+    @throttle.throttle(0.1)
+    def on_update(progress: GenerateProgress):
+        comm.send(progress)
+
+    while True:
+        task: GenerateTask | None = comm.recv()
+        if task is None:
+            break
+        try:
+            for process_ccd_result in run_generator(task, on_update):
+                comm.send(process_ccd_result)
+            throttle.flush(on_update)
+        except Exception as e:  # pragma: no cover
+            traceback.print_exc()
+            comm.send(e)
+        finally:
+            comm.send(None)
+
+
+def tile_transfer_process_target(comm: Connection) -> None:
+    @throttle.throttle(0.1)
+    def on_update(progress: TransferProgress):
+        comm.send(progress)
+
+    while True:
+        task: TransferTask | None = comm.recv()
+        if task is None:
+            break
+        try:
+            # for process_ccd_result in run_generator(task, on_update):
+            #     comm.send(process_ccd_result)
+            throttle.flush(on_update)
+        except Exception as e:  # pragma: no cover
+            traceback.print_exc()
+            comm.send(e)
+        finally:
+            comm.send(None)

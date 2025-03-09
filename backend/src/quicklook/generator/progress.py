@@ -9,7 +9,7 @@ from typing import Any, Callable
 import tqdm
 
 from quicklook.coordinator.quicklookjob.tasks import GenerateTask
-from quicklook.types import GeneratorProgress, Progress
+from quicklook.types import GenerateProgress, Progress
 from quicklook.utils.exitstack import exit_stack
 
 
@@ -18,11 +18,11 @@ class GeneratorProgressReporter:
         self,
         task: GenerateTask,
         *,
-        on_update: Callable[[GeneratorProgress], None] | None = None,
+        on_update: Callable[[GenerateProgress], None] | None = None,
     ):
         self._task = task
         self._on_update = on_update
-        self._progress = GeneratorProgress(
+        self._progress = GenerateProgress(
             download=Progress(0, len(task.ccd_names)),
             preprocess=Progress(0, len(task.ccd_names)),
             maketile=Progress(0, 0),
@@ -138,7 +138,7 @@ def tqdm_progres_bar(task: GenerateTask):
     for bar in bars:
         stack.enter_context(bar)
 
-    def on_update(progress: GeneratorProgress):
+    def on_update(progress: GenerateProgress):
         for bar, p in zip(
             bars,
             [

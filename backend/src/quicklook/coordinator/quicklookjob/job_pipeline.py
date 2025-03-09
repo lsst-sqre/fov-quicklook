@@ -10,12 +10,12 @@ from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.api.generators import get_generators
 from quicklook.coordinator.quicklookjob.job import QuicklookJob
-from quicklook.coordinator.quicklookjob.tasks import GenerateTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask, TransferTask
 from quicklook.datasource import get_datasource
 from quicklook.db import db_context
-from quicklook.generator.progress import GeneratorProgress
+from quicklook.generator.progress import GenerateProgress
 from quicklook.models import QuicklookRecord
-from quicklook.types import CcdMeta, GeneratorPod, MessageFromGeneratorToCoordinator, QuicklookMeta, Visit
+from quicklook.types import CcdMeta, GeneratorPod, GenerateTaskResponse, QuicklookMeta, TransferProgress, TransferTaskResponse, Visit
 from quicklook.utils.broadcastqueue import BroadcastQueue
 from quicklook.utils.event import WatchEvent
 from quicklook.utils.http_request import http_request
@@ -80,7 +80,7 @@ async def transfer(job: QuicklookJob):
 
     job.phase = 'transfer:running'
     sync_job(job)
-    # await scatter_transfer_job(job)
+    await scatter_transfer_job(job)
     job.transfer_progress = None
     job.phase = 'ready'
     sync_job(job)
@@ -123,13 +123,12 @@ def make_generate_tasks(job: QuicklookJob, generators: list[GeneratorPod]):
 
 
 async def scatter_generate_job(job: QuicklookJob) -> list[CcdMeta]:
-    visit = job.visit
-    nodes: dict[str, GeneratorProgress] = {}
+    nodes: dict[str, GenerateProgress] = {}
     tasks, ccd_generator_map = make_generate_tasks(job, get_generators())
     assert len(get_generators()) > 0
     job.ccd_generator_map = ccd_generator_map
 
-    async def run_generator(task: GenerateTask):
+    async def run_1_task(task: GenerateTask):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f'http://{task.generator.host}:{task.generator.port}/quicklooks',
@@ -138,13 +137,13 @@ async def scatter_generate_job(job: QuicklookJob) -> list[CcdMeta]:
             ) as res:
                 process_ccd_results: list[CcdMeta] = []
                 while True:
-                    msg: MessageFromGeneratorToCoordinator = await message_from_async_reader(res.content.readexactly)
+                    msg: GenerateTaskResponse = await message_from_async_reader(res.content.readexactly)
                     match msg:
                         case None:
                             break
                         case BaseException():  # pragma: no cover
                             raise msg
-                        case GeneratorProgress():
+                        case GenerateProgress():
                             nodes[task.generator.name] = msg
                             job.generate_progress = nodes
                             sync_job(job)
@@ -155,9 +154,41 @@ async def scatter_generate_job(job: QuicklookJob) -> list[CcdMeta]:
                 return process_ccd_results
 
     gathered_results: list[CcdMeta] = []
-    for fut in asyncio.as_completed([run_generator(task) for task in tasks]):
+    for fut in asyncio.as_completed([run_1_task(task) for task in tasks]):
         gathered_results.extend(await fut)
     return gathered_results
+
+
+async def scatter_transfer_job(job: QuicklookJob):
+    ccd_generator_map = job.ccd_generator_map
+    assert ccd_generator_map
+
+    nodes: dict[str, TransferProgress] = {}
+
+    async def run_1_task(g: GeneratorPod):
+        task = TransferTask(generator=g, visit=job.visit, ccd_generator_map=ccd_generator_map)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f'http://{g.host}:{g.port}/quicklooks/transfer',
+                json=asdict(task),
+                raise_for_status=True,
+            ) as res:
+                while True:
+                    msg: TransferTaskResponse = await message_from_async_reader(res.content.readexactly)
+                    match msg:
+                        case None:
+                            break
+                        case BaseException():
+                            raise msg
+                        case TransferProgress():
+                            nodes[g.name] = msg
+                            job.transfer_progress = nodes
+                            sync_job(job)
+                        case _:  # pragma: no cover
+                            raise TypeError(f'Unexpected message: {msg}')
+
+    generators = [*set(ccd_generator_map.values())]
+    await asyncio.gather(*(run_1_task(g) for g in generators))
 
 
 class _JobManager:

@@ -7,7 +7,7 @@ import pytest
 from quicklook.coordinator.quicklookjob.tasks import GeneratorPod, GenerateTask
 from quicklook.generator import progress, tasks
 from quicklook.generator.progress import GeneratorProgressReporter, tqdm_progres_bar
-from quicklook.types import CcdId, GeneratorProgress, Visit
+from quicklook.types import CcdId, GenerateProgress, Visit
 
 
 # @pytest.mark.focus
@@ -67,7 +67,7 @@ def test_progress():
 def test_processccd(broccoli_fits_and_ccd_id: tuple[Path, str]):
     path, ccd = broccoli_fits_and_ccd_id
 
-    def on_update(progress: GeneratorProgress):
+    def on_update(progress: GenerateProgress):
         print(progress)
 
     with GeneratorProgressReporter(

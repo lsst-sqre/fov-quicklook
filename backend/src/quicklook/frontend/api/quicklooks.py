@@ -9,7 +9,7 @@ from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
 from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase, QuicklookJobReport
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
-from quicklook.types import CcdMeta, GeneratorProgress, QuicklookMeta, Visit
+from quicklook.types import CcdMeta, GenerateProgress, QuicklookMeta, Visit
 from quicklook.utils.http_request import http_request
 from quicklook.utils.websocket import safe_websocket
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 
 class QuicklookStatus(BaseModel):
     phase: QuicklookJobPhase
-    generate_progress: dict[str, GeneratorProgress] | None
+    generate_progress: dict[str, GenerateProgress] | None
 
     model_config = ConfigDict(
         from_attributes=True,

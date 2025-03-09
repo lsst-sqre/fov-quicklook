@@ -41,7 +41,7 @@ class Stage(Generic[T]):
                     elif self._pipeline and self._pipeline.on_task_complete:
                         await self._pipeline.on_task_complete(task)
             except Exception as e:
-                logger.error(f"Error processing task {task} in {self.name}: {e}")
+                logger.exception(f"Error processing task {task} in {self.name}")
                 if self._pipeline and self._pipeline.on_task_error:
                     await self._pipeline.on_task_error(task, e)
 

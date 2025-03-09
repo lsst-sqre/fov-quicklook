@@ -5,6 +5,13 @@ from quicklook.types import GeneratorPod, Visit
 
 @dataclass
 class GenerateTask:
-    generator: GeneratorPod
     visit: Visit
+    generator: GeneratorPod
     ccd_names: list[str]
+
+
+@dataclass
+class TransferTask:
+    visit: Visit
+    generator: GeneratorPod
+    ccd_generator_map: dict[str, GeneratorPod]
