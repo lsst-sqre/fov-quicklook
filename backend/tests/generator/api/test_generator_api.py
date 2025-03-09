@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from quicklook.config import config
-from quicklook.coordinator.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
 from quicklook.generator.api import GeneratorRuntimeSettings, app
 from quicklook.types import GeneratorPod, GeneratorProgress, CcdMeta, Visit
 from quicklook.utils.message import message_from_stream

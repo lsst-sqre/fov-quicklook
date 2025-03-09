@@ -11,7 +11,7 @@ from typing import Callable, Generator
 import minio
 
 from quicklook.config import config
-from quicklook.coordinator.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
 from quicklook.datasource import get_datasource
 from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import preprocess_ccd

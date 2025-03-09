@@ -5,7 +5,7 @@ import traceback
 from multiprocessing.connection import Connection
 from typing import Callable
 
-from quicklook.coordinator.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
 from quicklook.generator.progress import GeneratorProgress, GeneratorProgressReporter
 from quicklook.generator.tasks import run_generator
 from quicklook.types import MessageFromGeneratorToCoordinator

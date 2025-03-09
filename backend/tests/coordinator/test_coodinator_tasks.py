@@ -1,6 +1,6 @@
 import pytest
 
-from quicklook.coordinator.tasks import make_generator_tasks
+from quicklook.coordinator.quicklookjob.job_pipeline import make_generate_tasks
 from quicklook.types import GeneratorPod, Visit
 
 pytestmark = pytest.mark.focus
@@ -12,7 +12,7 @@ def test_make_generator_tasks():
         GeneratorPod(host='localhost', port=8001),
     ]
 
-    tasks = make_generator_tasks(
+    tasks = make_generate_tasks(
         visit=Visit.from_id('raw:broccoli'),
         generators=generators,
     )

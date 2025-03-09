@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 import tqdm
 
-from quicklook.coordinator.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
 from quicklook.types import GeneratorProgress, Progress
 from quicklook.utils.exitstack import exit_stack
 

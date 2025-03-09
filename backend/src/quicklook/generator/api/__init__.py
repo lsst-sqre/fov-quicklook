@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, Response
 from fastapi.responses import StreamingResponse
 
 from quicklook.config import config
-from quicklook.coordinator.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.generator.api.tilegeneratorprocess import TileGeneratorProcess
 from quicklook.generator.tmptile import TmpTile

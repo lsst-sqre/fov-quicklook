@@ -4,7 +4,7 @@ import tempfile
 
 import pytest
 
-from quicklook.coordinator.tasks import GeneratorPod, GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GeneratorPod, GeneratorTask
 from quicklook.generator import progress, tasks
 from quicklook.generator.progress import GeneratorProgressReporter, tqdm_progres_bar
 from quicklook.types import CcdId, GeneratorProgress, Visit

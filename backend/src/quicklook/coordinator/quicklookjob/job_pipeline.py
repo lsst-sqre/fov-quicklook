@@ -10,7 +10,8 @@ from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.api.generators import get_generators
 from quicklook.coordinator.quicklookjob.job import QuicklookJob
-from quicklook.coordinator.tasks import GeneratorTask, make_generator_tasks
+from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
+from quicklook.datasource import get_datasource
 from quicklook.db import db_context
 from quicklook.generator.progress import GeneratorProgress
 from quicklook.models import QuicklookRecord
@@ -20,6 +21,7 @@ from quicklook.utils.event import WatchEvent
 from quicklook.utils.http_request import http_request
 from quicklook.utils.message import message_from_async_reader
 from quicklook.utils.pipeline import Pipeline, Stage
+from quicklook.utils.timeit import timeit
 
 from .job import QuicklookJob, QuicklookJobReport
 
@@ -92,10 +94,36 @@ async def cleanup(job: QuicklookJob):
     pass
 
 
+def make_generate_tasks(visit: Visit, generators: list[GeneratorPod]):
+    ds = get_datasource()
+
+    with timeit(f'Listing CCDs for visit {visit}', loglevel=logging.INFO):
+        # ccds_for_visit = [*s3_list_visit_ccds(visit)]
+        ccd_names_for_visit = [*ds.list_ccds(visit)]
+
+    if config.dev_ccd_limit is not None:  # pragma: no cover
+        ccd_names_for_visit = ccd_names_for_visit[: config.dev_ccd_limit]
+
+    ng = len(generators)
+    nc = len(ccd_names_for_visit)
+
+    tasks: list[GeneratorTask] = []
+    ccd_generator_map: dict[str, GeneratorPod] = {}
+
+    for i, g in enumerate(generators):
+        ccd_names = [ccd_name for ccd_name in ccd_names_for_visit[i * nc // ng : (i + 1) * nc // ng]]
+        task = GeneratorTask(generator=g, visit=visit, ccd_names=ccd_names, ccd_generator_map=ccd_generator_map)
+        tasks.append(task)
+        for ccd_name in ccd_names:
+            ccd_generator_map[ccd_name] = g
+
+    return tasks
+
+
 async def scatter_generate_job(job: QuicklookJob) -> list[CcdMeta]:
     visit = job.visit
     nodes: dict[str, GeneratorProgress] = {}
-    tasks = make_generator_tasks(visit, get_generators())
+    tasks = make_generate_tasks(visit, get_generators())
     assert len(get_generators()) > 0
     job.ccd_generator_map = tasks[0].ccd_generator_map
 
