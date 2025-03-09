@@ -9,7 +9,7 @@ from typing import Any, Callable
 import tqdm
 
 from quicklook.coordinator.quicklookjob.tasks import GenerateTask
-from quicklook.types import GenerateProgress, Progress
+from quicklook.types import GenerateProgress, GenerateTaskResponse, Progress
 from quicklook.utils.exitstack import exit_stack
 
 
@@ -138,7 +138,10 @@ def tqdm_progres_bar(task: GenerateTask):
     for bar in bars:
         stack.enter_context(bar)
 
-    def on_update(progress: GenerateProgress):
+    def on_update(progress: GenerateTaskResponse):
+        if not isinstance(progress, GenerateProgress):
+            return
+
         for bar, p in zip(
             bars,
             [

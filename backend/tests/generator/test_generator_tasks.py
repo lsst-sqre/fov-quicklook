@@ -27,7 +27,7 @@ async def test_phase_raw():
     )
 
     with tqdm_progres_bar(task) as on_update:
-        tilegenerate.run_generator(task, on_update=on_update)
+        tilegenerate.run_generate(task, on_update)
 
 
 # @pytest.mark.focus
@@ -47,7 +47,7 @@ async def test_phase_calexp():
     )
 
     with tqdm_progres_bar(task) as on_update:
-        tilegenerate.run_generator(task, on_update=on_update)
+        tilegenerate.run_generate(task, on_update)
 
 
 # @pytest.mark.focus

@@ -19,7 +19,8 @@ from quicklook.coordinator.quicklookjob.tasks import GenerateTask, TransferTask
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.generator.api.baseprocesshandler import BaseProcessHandler
 from quicklook.generator.progress import GenerateProgress
-from quicklook.generator.tilegenerate import run_generator
+from quicklook.generator.tilegenerate import run_generate
+from quicklook.generator.tiletransfer import run_transfer
 from quicklook.generator.tmptile import TmpTile
 from quicklook.types import CcdId, GenerateTaskResponse, TransferProgress, TransferTaskResponse, Visit
 from quicklook.utils import throttle
@@ -189,18 +190,12 @@ async def kill():  # pragma: no cover
 
 
 def tile_generate_process_target(comm: Connection) -> None:
-    @throttle.throttle(0.1)
-    def on_update(progress: GenerateProgress):
-        comm.send(progress)
-
     while True:
         task: GenerateTask | None = comm.recv()
         if task is None:
             break
         try:
-            for process_ccd_result in run_generator(task, on_update):
-                comm.send(process_ccd_result)
-            throttle.flush(on_update)
+            run_generate(task, comm.send)
         except Exception as e:  # pragma: no cover
             traceback.print_exc()
             comm.send(e)
@@ -209,18 +204,12 @@ def tile_generate_process_target(comm: Connection) -> None:
 
 
 def tile_transfer_process_target(comm: Connection) -> None:
-    @throttle.throttle(0.1)
-    def on_update(progress: TransferProgress):
-        comm.send(progress)
-
     while True:
         task: TransferTask | None = comm.recv()
         if task is None:
             break
         try:
-            # for process_ccd_result in run_generator(task, on_update):
-            #     comm.send(process_ccd_result)
-            throttle.flush(on_update)
+            run_transfer(task, comm.send)
         except Exception as e:  # pragma: no cover
             traceback.print_exc()
             comm.send(e)

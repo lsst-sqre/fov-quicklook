@@ -17,13 +17,18 @@ from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.generator.progress import GenerateProgress, GeneratorProgressReporter
 from quicklook.generator.tmptile import TmpTile
-from quicklook.types import CcdId, PreProcessedCcd, CcdMeta, Progress, Tile, Visit
+from quicklook.types import CcdId, CcdMeta, GenerateTaskResponse, PreProcessedCcd, Progress, Tile, Visit
 from quicklook.utils import multiprocessing_coverage_compatible as mp
+from quicklook.utils import throttle
 from quicklook.utils.dynamicsemaphore import DynamicSemaphore
 from quicklook.utils.timeit import timeit
 
 
-def run_generator(task: GenerateTask, on_update: Callable[[GenerateProgress], None] | None = None) -> Generator[CcdMeta]:
+def run_generate(task: GenerateTask, send: Callable[[GenerateTaskResponse], None]):
+    @throttle.throttle(0.1)
+    def on_update(progress: GenerateProgress):
+        send(progress)
+
     with iterate_downloaded_ccds(task.visit, task.ccd_names) as files:
         with timeit('generator'):
             with mp.Pool(config.tile_ccd_processing_parallel) as pool:
@@ -35,7 +40,9 @@ def run_generator(task: GenerateTask, on_update: Callable[[GenerateProgress], No
                             yield ProcessCcdArgs(ccd_id, file, progress.updator)
 
                     for result in pool.imap_unordered(process_ccd, args()):
-                        yield result
+                        send(result)
+
+    throttle.flush(on_update)
 
 
 @dataclass
@@ -68,6 +75,7 @@ def process_ccd(args: ProcessCcdArgs) -> CcdMeta:
         amps=ppccd.amps,
         bbox=ppccd.bbox,
     )
+
 
 def make_tiles(
     ppccd: PreProcessedCcd,
