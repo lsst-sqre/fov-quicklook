@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 import tqdm
 
-from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask
 from quicklook.types import GeneratorProgress, Progress
 from quicklook.utils.exitstack import exit_stack
 
@@ -16,7 +16,7 @@ from quicklook.utils.exitstack import exit_stack
 class GeneratorProgressReporter:
     def __init__(
         self,
-        task: GeneratorTask,
+        task: GenerateTask,
         *,
         on_update: Callable[[GeneratorProgress], None] | None = None,
     ):
@@ -128,7 +128,7 @@ class ProgressDict:
 
 
 @contextlib.contextmanager
-def tqdm_progres_bar(task: GeneratorTask):
+def tqdm_progres_bar(task: GenerateTask):
     stack = contextlib.ExitStack()
     bars = [
         tqdm.tqdm(desc='Downloads', total=len(task.ccd_names)),

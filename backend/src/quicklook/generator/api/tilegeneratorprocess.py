@@ -5,7 +5,7 @@ import traceback
 from multiprocessing.connection import Connection
 from typing import Callable
 
-from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask
 from quicklook.generator.progress import GeneratorProgress, GeneratorProgressReporter
 from quicklook.generator.tasks import run_generator
 from quicklook.types import MessageFromGeneratorToCoordinator
@@ -34,7 +34,7 @@ class TileGeneratorProcess:
 
     def create_quicklook(
         self,
-        task: GeneratorTask,
+        task: GenerateTask,
         *,
         on_update: Callable[[MessageFromGeneratorToCoordinator], None],
     ):
@@ -59,7 +59,7 @@ def process(comm: Connection):
 
     try:
         while True:
-            task: GeneratorTask | None = comm.recv()
+            task: GenerateTask | None = comm.recv()
             if task is None:
                 break
             try:

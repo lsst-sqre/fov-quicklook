@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, Response
 from fastapi.responses import StreamingResponse
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.generator.api.tilegeneratorprocess import TileGeneratorProcess
 from quicklook.generator.tmptile import TmpTile
@@ -58,7 +58,7 @@ visit_ccd_names = LRUDict[Visit, set[str]](32)
 
 
 @app.post("/quicklooks")
-def create_quicklook(task: GeneratorTask):
+def create_quicklook(task: GenerateTask):
     visit_ccd_names.set(task.visit, set(task.ccd_names))
     q = queue.Queue()
 

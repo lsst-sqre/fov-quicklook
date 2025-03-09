@@ -11,7 +11,7 @@ from typing import Callable, Generator
 import minio
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask
 from quicklook.datasource import get_datasource
 from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import preprocess_ccd
@@ -23,7 +23,7 @@ from quicklook.utils.dynamicsemaphore import DynamicSemaphore
 from quicklook.utils.timeit import timeit
 
 
-def run_generator(task: GeneratorTask, on_update: Callable[[GeneratorProgress], None] | None = None) -> Generator[CcdMeta]:
+def run_generator(task: GenerateTask, on_update: Callable[[GeneratorProgress], None] | None = None) -> Generator[CcdMeta]:
     with iterate_downloaded_ccds(task.visit, task.ccd_names) as files:
         with timeit('generator'):
             with mp.Pool(config.tile_ccd_processing_parallel) as pool:

@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask
 from quicklook.generator.api import GeneratorRuntimeSettings, app
 from quicklook.types import GeneratorPod, GeneratorProgress, CcdMeta, Visit
 from quicklook.utils.message import message_from_stream
@@ -26,11 +26,10 @@ def test_healthz(client: TestClient):
 
 
 def test_create_quicklook(client: TestClient):
-    task = GeneratorTask(
+    task = GenerateTask(
         generator=GeneratorPod(host='localhost', port=8000),
         visit=Visit.from_id('raw:broccoli'),
         ccd_names=['R30_S20'],
-        ccd_generator_map={},
     )
     res = client.post('/quicklooks', json=asdict(task))
     buf = io.BytesIO(res.content)

@@ -4,7 +4,7 @@ import tempfile
 
 import pytest
 
-from quicklook.coordinator.quicklookjob.tasks import GeneratorPod, GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GeneratorPod, GenerateTask
 from quicklook.generator import progress, tasks
 from quicklook.generator.progress import GeneratorProgressReporter, tqdm_progres_bar
 from quicklook.types import CcdId, GeneratorProgress, Visit
@@ -20,11 +20,10 @@ async def test_phase_raw():
     # ]
 
     visit = Visit.from_id('raw:broccoli')
-    task = GeneratorTask(
+    task = GenerateTask(
         visit=visit,
         ccd_names=ccd_names,
         generator=GeneratorPod(host='localhost', port=8000),
-        ccd_generator_map={},
     )
 
     with tqdm_progres_bar(task) as on_update:
@@ -41,11 +40,10 @@ async def test_phase_calexp():
     # ]
 
     visit = Visit.from_id('calexp:192350')
-    task = GeneratorTask(
+    task = GenerateTask(
         visit=visit,
         ccd_names=ccd_names,
         generator=GeneratorPod(host='localhost', port=8000),
-        ccd_generator_map={},
     )
 
     with tqdm_progres_bar(task) as on_update:
@@ -56,11 +54,10 @@ async def test_phase_calexp():
 def test_progress():
     import pickle
 
-    task = GeneratorTask(
+    task = GenerateTask(
         generator=GeneratorPod(host='localhost', port=8000),
         ccd_names=['R23_S00'],
         visit=Visit.from_id('raw:broccoli'),
-        ccd_generator_map={},
     )
 
     progress = tasks.GeneratorProgressReporter(task)
@@ -74,11 +71,10 @@ def test_processccd(broccoli_fits_and_ccd_id: tuple[Path, str]):
         print(progress)
 
     with GeneratorProgressReporter(
-        task=GeneratorTask(
+        task=GenerateTask(
             visit=Visit.from_id('raw:broccoli'),
             ccd_names=[ccd],
             generator=GeneratorPod(host='localhost', port=8000),
-            ccd_generator_map={},
         ),
         on_update=on_update,
     ) as progress_reporter:

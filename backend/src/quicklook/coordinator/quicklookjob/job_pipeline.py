@@ -10,7 +10,7 @@ from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.api.generators import get_generators
 from quicklook.coordinator.quicklookjob.job import QuicklookJob
-from quicklook.coordinator.quicklookjob.tasks import GeneratorTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask
 from quicklook.datasource import get_datasource
 from quicklook.db import db_context
 from quicklook.generator.progress import GeneratorProgress
@@ -94,8 +94,10 @@ async def cleanup(job: QuicklookJob):
     pass
 
 
-def make_generate_tasks(visit: Visit, generators: list[GeneratorPod]):
+def make_generate_tasks(job: QuicklookJob, generators: list[GeneratorPod]):
     ds = get_datasource()
+
+    visit = job.visit
 
     with timeit(f'Listing CCDs for visit {visit}', loglevel=logging.INFO):
         # ccds_for_visit = [*s3_list_visit_ccds(visit)]
@@ -107,27 +109,27 @@ def make_generate_tasks(visit: Visit, generators: list[GeneratorPod]):
     ng = len(generators)
     nc = len(ccd_names_for_visit)
 
-    tasks: list[GeneratorTask] = []
+    tasks: list[GenerateTask] = []
     ccd_generator_map: dict[str, GeneratorPod] = {}
 
     for i, g in enumerate(generators):
         ccd_names = [ccd_name for ccd_name in ccd_names_for_visit[i * nc // ng : (i + 1) * nc // ng]]
-        task = GeneratorTask(generator=g, visit=visit, ccd_names=ccd_names, ccd_generator_map=ccd_generator_map)
+        task = GenerateTask(generator=g, visit=visit, ccd_names=ccd_names)
         tasks.append(task)
         for ccd_name in ccd_names:
             ccd_generator_map[ccd_name] = g
 
-    return tasks
+    return tasks, ccd_generator_map
 
 
 async def scatter_generate_job(job: QuicklookJob) -> list[CcdMeta]:
     visit = job.visit
     nodes: dict[str, GeneratorProgress] = {}
-    tasks = make_generate_tasks(visit, get_generators())
+    tasks, ccd_generator_map = make_generate_tasks(job, get_generators())
     assert len(get_generators()) > 0
-    job.ccd_generator_map = tasks[0].ccd_generator_map
+    job.ccd_generator_map = ccd_generator_map
 
-    async def run_generator(task: GeneratorTask):
+    async def run_generator(task: GenerateTask):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f'http://{task.generator.host}:{task.generator.port}/quicklooks',
