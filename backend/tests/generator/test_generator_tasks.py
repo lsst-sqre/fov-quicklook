@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from quicklook.coordinator.quicklookjob.tasks import GeneratorPod, GenerateTask
-from quicklook.generator import progress, tasks
+from quicklook.generator import progress, tilegenerate
 from quicklook.generator.progress import GeneratorProgressReporter, tqdm_progres_bar
 from quicklook.types import CcdId, GenerateProgress, Visit
 
@@ -27,7 +27,7 @@ async def test_phase_raw():
     )
 
     with tqdm_progres_bar(task) as on_update:
-        tasks.run_generator(task, on_update=on_update)
+        tilegenerate.run_generator(task, on_update=on_update)
 
 
 # @pytest.mark.focus
@@ -47,7 +47,7 @@ async def test_phase_calexp():
     )
 
     with tqdm_progres_bar(task) as on_update:
-        tasks.run_generator(task, on_update=on_update)
+        tilegenerate.run_generator(task, on_update=on_update)
 
 
 # @pytest.mark.focus
@@ -60,7 +60,7 @@ def test_progress():
         visit=Visit.from_id('raw:broccoli'),
     )
 
-    progress = tasks.GeneratorProgressReporter(task)
+    progress = tilegenerate.GeneratorProgressReporter(task)
     pickle.dumps(progress)
 
 
@@ -82,9 +82,9 @@ def test_processccd(broccoli_fits_and_ccd_id: tuple[Path, str]):
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(path.read_bytes())
             tmp.flush()
-            args = tasks.ProcessCcdArgs(
+            args = tilegenerate.ProcessCcdArgs(
                 ccd_id=CcdId(visit=Visit.from_id('raw:broccoli'), ccd_name=ccd),
                 path=Path(tmp.name),
                 progress_updator=progress_reporter.updator,
             )
-            tasks.process_ccd(args)
+            tilegenerate.process_ccd(args)

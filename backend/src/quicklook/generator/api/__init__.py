@@ -19,7 +19,7 @@ from quicklook.coordinator.quicklookjob.tasks import GenerateTask, TransferTask
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.generator.api.baseprocesshandler import BaseProcessHandler
 from quicklook.generator.progress import GenerateProgress
-from quicklook.generator.tasks import run_generator
+from quicklook.generator.tilegenerate import run_generator
 from quicklook.generator.tmptile import TmpTile
 from quicklook.types import CcdId, GenerateTaskResponse, TransferProgress, TransferTaskResponse, Visit
 from quicklook.utils import throttle
