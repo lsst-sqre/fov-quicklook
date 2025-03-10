@@ -16,9 +16,14 @@ from quicklook.frontend.api.quicklooks import QuicklookStatus
 from quicklook.utils.uvicorn import uvicorn_run
 
 
-@pytest.mark.focus
 def test_frontend_ok():
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/healthz')
+    assert res.status_code == 200
+    assert len(res.json()) >= 1
+
+
+def test_frontend_systeminfo():
+    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/system_info')
     assert res.status_code == 200
     assert len(res.json()) >= 1
 
@@ -53,6 +58,7 @@ def one_quicklook_created(quicklooks_cleared):
         while True:
             try:
                 status = json.loads(ws.recv())
+                print(status)
                 if isinstance(status, dict):
                     if status['phase'] in {'ready', 'failed'}:
                         break

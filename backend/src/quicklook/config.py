@@ -58,7 +58,7 @@ class Config(BaseSettings):
     tile_max_level: int = 8
     tile_ccd_processing_parallel: int = 25
     tile_compression_level: int = 9
-    tile_compression_parallel: int = 8
+    tile_transfer_parallel: int = 8
     tile_tmpdir: str = '/dev/shm/quicklook/tile_tmp' # used in generator
     fits_header_tmpdir: str = '/dev/shm/quicklook/fits_header' # used in generator
     fitsio_tmpdir: str = '/dev/shm/quicklook/fitsio' # used in generator

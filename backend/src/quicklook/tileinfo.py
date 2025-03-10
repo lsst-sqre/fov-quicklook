@@ -30,7 +30,7 @@ class TileInfo:
 
 
 @dataclass
-class Ccd:
+class _Ccd:
     name: str
     bbox: BBox
 
@@ -44,13 +44,13 @@ ccd_info_path = Path(__file__).parent / 'ccd-info.json'
 
 
 @cache
-def ccd_list():
-    ccds: list[Ccd] = [Ccd(name=e['name'], bbox=BBox(**e['bbox'])) for e in json.loads(ccd_info_path.read_text())]
+def ccd_list() -> list[_Ccd]:
+    ccds: list[_Ccd] = [_Ccd(name=e['name'], bbox=BBox(**e['bbox'])) for e in json.loads(ccd_info_path.read_text())]
     return ccds
 
 
 @cache
-def ccds_by_name():
+def ccds_by_name() -> dict[str, _Ccd]:
     return {ccd.name: ccd for ccd in ccd_list()}
 
 
@@ -75,7 +75,7 @@ if __name__ == '__main__':  # pragma: no cover
     def _make_ccd_meta(p: Path):
         from .generator.preprocess_ccd import RawAmp
 
-        with afits.open(p, memmap=False) as hdul:
+        with afits.open(p, memmap=False) as hdul:  # type: ignore
             amps = [RawAmp.from_hdu(j, hdu) for j, hdu in enumerate(hdul) if hdu.name.startswith('Segment')]  # type: ignore
             bbox = functools.reduce(lambda a, b: a.union(b.wcs.bbox), amps[1:], amps[0].wcs.bbox)
             header = hdul[0].header  # type: ignore

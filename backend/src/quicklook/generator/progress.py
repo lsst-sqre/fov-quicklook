@@ -14,6 +14,8 @@ from quicklook.utils.exitstack import exit_stack
 
 
 class GeneratorProgressReporter:
+    # これいる？
+    # 大袈裟すぎる気が。
     def __init__(
         self,
         task: GenerateTask,

@@ -25,6 +25,11 @@ def test_healthz(client: TestClient):
     assert res.status_code == 200
 
 
+def test_pod_status(client: TestClient):
+    res = client.get('/pod_status')
+    assert res.status_code == 200
+
+
 def test_create_quicklook(client: TestClient):
     task = GenerateTask(
         generator=GeneratorPod(host='localhost', port=8000),

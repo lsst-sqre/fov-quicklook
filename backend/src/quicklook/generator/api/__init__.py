@@ -2,12 +2,12 @@ import logging
 import os
 import queue
 import threading
+import traceback
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import cache
 from multiprocessing.connection import Connection
 from pathlib import Path
-import traceback
 from typing import Annotated
 
 import numpy
@@ -21,11 +21,9 @@ from quicklook.generator.api.baseprocesshandler import BaseProcessHandler
 from quicklook.generator.progress import GenerateProgress
 from quicklook.generator.tilegenerate import run_generate
 from quicklook.generator.tiletransfer import run_transfer
-from quicklook.generator.tmptile import TmpTile
+from quicklook.generator.tmptile import tmptile
 from quicklook.types import CcdId, GenerateTaskResponse, TransferProgress, TransferTaskResponse, Visit
-from quicklook.utils import throttle
 from quicklook.utils.globalstack import GlobalStack
-from quicklook.utils.lrudict import LRUDict
 from quicklook.utils.message import encode_message
 from quicklook.utils.numpyutils import ndarray2npybytes
 from quicklook.utils.podstatus import pod_status
@@ -61,12 +59,8 @@ async def healthz():
     return {'status': 'ok'}
 
 
-visit_ccd_names = LRUDict[Visit, set[str]](32)
-
-
 @app.post("/quicklooks")
 def create_quicklook(task: GenerateTask):
-    visit_ccd_names.set(task.visit, set(task.ccd_names))
     q = queue.Queue()
 
     def main():
@@ -94,15 +88,15 @@ def tile_generate_process0():
 
 
 def create_tile_generate_process() -> BaseProcessHandler[GenerateTask, GenerateProgress]:
-    return BaseProcessHandler[GenerateTask, GenerateProgress](process_target=tile_transfer_process_target)
+    return BaseProcessHandler[GenerateTask, GenerateProgress](process_target=tile_generate_process_target)
 
 
 @contextmanager
 def tile_generate_process():
     # process0だけは常に使い回す
-    if not tile_generate_process0().available():
+    if tile_generate_process0().available():
         yield tile_generate_process0()
-    else:
+    else:  # pragma: no cover
         with create_tile_generate_process() as p:
             yield p
 
@@ -140,24 +134,10 @@ def get_tile(
     y: int,
     x: int,
 ):
-    ccd_names = visit_ccd_names.get(visit)
-    # ccd_names = visit_ccd_names.get(visit) & set(TileInfo.of(z, y, x).ccd_names)
-    pool: numpy.ndarray | None = None
-    for ccd_name in ccd_names:
-        ccd_id = CcdId(visit, ccd_name)
-        path = TmpTile.path(ccd_id, z, y, x)
-        if not Path(path).exists():
-            # こういうことはまれにある
-            # TileInfo.ofの結果は不安定なので
-            continue
-        arr = numpy.load(path)
-        if pool is None:
-            pool = arr
-        else:  # pragma: no cover
-            pool += arr
-    if pool is None:
-        pool = numpy.zeros((config.tile_size, config.tile_size), dtype=numpy.float32)
-    return Response(ndarray2npybytes(pool), media_type='application/npy')
+    return Response(
+        ndarray2npybytes(tmptile.get_tile_npy(visit, z, y, x)),
+        media_type='application/npy',
+    )
 
 
 @app.get('/quicklooks/{id}/fits_header/{ccd_name}')
@@ -167,11 +147,11 @@ def get_fits_header(
 ):
     ccd_id = CcdId(visit, ccd_name)
     outfile = Path(f'{config.fits_header_tmpdir}/{ccd_id.name}.json')
-    if not outfile.exists():
+    if not outfile.exists():  # pragma: no cover
         return
     # ファイルの内容はjsonであることが保証されている
     # 内容が大きいのでそのまま返す
-    return Response(outfile.read_text(), media_type='application/json')
+    return Response(outfile.read_bytes(), media_type='application/json')
 
 
 @app.get('/pod_status')
@@ -181,7 +161,7 @@ async def get_pod_status():
 
 @app.delete('/quicklooks/*')
 async def delete_all_quicklooks():
-    TmpTile.delete_all_cache()
+    tmptile.delete_all_cache()
 
 
 @app.post('/kill')

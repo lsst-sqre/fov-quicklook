@@ -42,7 +42,7 @@ class Stage(Generic[T]):
                         await self._pipeline.on_task_complete(task)
             except Exception as e:
                 logger.exception(f"Error processing task {task} in {self.name}")
-                if self._pipeline and self._pipeline.on_task_error:
+                if self._pipeline and self._pipeline.on_task_error:  # pragma: no branch
                     await self._pipeline.on_task_error(task, e)
 
             self._queue.task_done()
@@ -65,7 +65,7 @@ class Stage(Generic[T]):
 
 class _Pipeline(Generic[T]):
     def __init__(self, queues: list[Stage[T]], on_task_complete: Callable[[T], Awaitable[None]] | None = None, on_task_error: Callable[[T, Exception], Awaitable[None]] | None = None) -> None:
-        if len(queues) == 0:
+        if len(queues) == 0:  # pragma: no cover
             raise ValueError("Pipeline must have at least one queue")
         self.queues = queues
         self.on_task_complete = on_task_complete

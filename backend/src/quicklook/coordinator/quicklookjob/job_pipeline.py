@@ -100,7 +100,6 @@ def make_generate_tasks(job: QuicklookJob, generators: list[GeneratorPod]):
     visit = job.visit
 
     with timeit(f'Listing CCDs for visit {visit}', loglevel=logging.INFO):
-        # ccds_for_visit = [*s3_list_visit_ccds(visit)]
         ccd_names_for_visit = [*ds.list_ccds(visit)]
 
     if config.dev_ccd_limit is not None:  # pragma: no cover
@@ -178,7 +177,7 @@ async def scatter_transfer_job(job: QuicklookJob):
                     match msg:
                         case None:
                             break
-                        case BaseException():
+                        case BaseException():  # pragma: no cover
                             raise msg
                         case TransferProgress():
                             nodes[g.name] = msg
@@ -206,7 +205,7 @@ class _JobManager:
         async def on_task_complete(job: QuicklookJob):
             await backoff(job)
 
-        async def on_task_error(job: QuicklookJob, e: Exception):
+        async def on_task_error(job: QuicklookJob, e: Exception):  # pragma: no cover
             job.phase = 'failed'
             sync_job(job)
             await backoff(job)
@@ -219,7 +218,7 @@ class _JobManager:
             yield
 
     async def enqueue(self, visit: Visit):
-        if not self._synchronizer.has(visit) and not db_has(visit):
+        if not self._synchronizer.has(visit) and not db_has(visit):  # pragma: no branch
             job = QuicklookJob(visit=visit, phase='generate:queued')
             self._synchronizer.add(job)
             await self._pipeline.push_task(job)

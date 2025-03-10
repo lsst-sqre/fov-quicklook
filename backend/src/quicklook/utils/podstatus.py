@@ -34,25 +34,28 @@ async def get_disk_info() -> list[DiskInfo]:
     proc = await asyncio.create_subprocess_exec('df', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, _ = await proc.communicate()
     lines = stdout.decode().strip().split('\n')
-    
+
     disks = []
     # 最初の行はヘッダーなので2行目から処理
     for line in lines[1:]:
-        if not line.strip():
+        if not line.strip():  # pragma: no cover
             continue
         try:
             parts = line.split()
-            if len(parts) < 6:  # dfの出力は少なくとも6カラムある
+            if len(parts) < 6:  # pragma: no cover
+                # dfの出力は少なくとも6カラムある
                 continue
             if '/secrets/' in parts[5]:
                 continue
-            disks.append(DiskInfo(
-                device=parts[0],
-                mount_point=parts[5],
-                total=int(parts[1]) * 1024,
-                used=int(parts[2]) * 1024
-            ))
-        except (IndexError, ValueError):
+            disks.append(
+                DiskInfo(
+                    device=parts[0],
+                    mount_point=parts[5],
+                    total=int(parts[1]) * 1024,
+                    used=int(parts[2]) * 1024,
+                )
+            )
+        except (IndexError, ValueError):  # pragma: no cover
             continue
     return disks
 
