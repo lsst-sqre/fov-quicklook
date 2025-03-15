@@ -26,7 +26,7 @@ async def test_phase_raw():
         generator=GeneratorPod(host='localhost', port=8000),
     )
 
-    with tqdm_progres_bar(task) as on_update:
+    with tqdm_progres_bar() as on_update:
         tilegenerate.run_generate(task, on_update)
 
 
@@ -46,7 +46,7 @@ async def test_phase_calexp():
         generator=GeneratorPod(host='localhost', port=8000),
     )
 
-    with tqdm_progres_bar(task) as on_update:
+    with tqdm_progres_bar() as on_update:
         tilegenerate.run_generate(task, on_update)
 
 

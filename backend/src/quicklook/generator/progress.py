@@ -130,11 +130,11 @@ class ProgressDict:
 
 
 @contextlib.contextmanager
-def tqdm_progres_bar(task: GenerateTask):
+def tqdm_progres_bar():
     stack = contextlib.ExitStack()
     bars = [
-        tqdm.tqdm(desc='Downloads', total=len(task.ccd_names)),
-        tqdm.tqdm(desc='Preprocess', total=len(task.ccd_names)),
+        tqdm.tqdm(desc='Downloads', total=0),
+        tqdm.tqdm(desc='Preprocess', total=0),
         tqdm.tqdm(desc='Make Tiles', total=0),
     ]
     for bar in bars:
