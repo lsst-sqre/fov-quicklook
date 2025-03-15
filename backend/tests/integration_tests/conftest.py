@@ -1,6 +1,5 @@
 import concurrent.futures
 import contextlib
-import json
 import multiprocessing
 import os
 import signal
@@ -8,99 +7,9 @@ import time
 
 import pytest
 import requests
-import websockets.sync.client as websockets
-from websockets.exceptions import ConnectionClosedOK
 
 from quicklook.config import config
-from quicklook.frontend.api.quicklooks import QuicklookStatus
 from quicklook.utils.uvicorn import uvicorn_run
-
-
-def test_frontend_ok():
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/healthz')
-    assert res.status_code == 200
-    assert len(res.json()) >= 1
-
-
-def test_frontend_systeminfo():
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/system_info')
-    assert res.status_code == 200
-    assert len(res.json()) >= 1
-
-
-def test_coodinator_ok():
-    res = requests.get(f'http://127.0.0.1:{config.coordinator_port}/healthz')
-    assert res.status_code == 200
-    assert len(res.json()) >= 1
-
-
-@pytest.mark.focus
-def test_list_visits():
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/visits')
-    assert res.status_code == 200
-
-
-@pytest.fixture(scope='module')
-def quicklooks_cleared():
-    res = requests.delete(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/*')
-    assert res.status_code == 200
-
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks')
-    assert res.status_code == 200
-    assert len(res.json()) == 0
-
-
-@pytest.fixture(scope='module')
-def one_quicklook_created(quicklooks_cleared):
-    res = requests.post(f'http://127.0.0.1:{config.coordinator_port}/quicklooks', json={'visit': {'id': 'raw:broccoli'}})
-    assert res.status_code == 200
-    with websockets.connect(f'ws://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/status.ws') as ws:
-        while True:
-            try:
-                status = json.loads(ws.recv())
-                print(status)
-                if isinstance(status, dict):
-                    if status['phase'] in {'ready', 'failed'}:
-                        break
-            except ConnectionClosedOK:
-                break
-
-
-def test_create_quicklook(one_quicklook_created):
-    # This only tests the fixture one_quicklook_created
-    pass
-
-
-def test_show_quicklook(one_quicklook_created):
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/status')
-    assert res.status_code == 200
-    QuicklookStatus.model_validate(res.json())
-
-
-def test_list_quicklooks(one_quicklook_created):
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks')
-    assert res.status_code == 200
-    response_json = res.json()
-    assert len(response_json) == 1
-    QuicklookStatus.model_validate(response_json[0])
-
-
-def test_get_tile(one_quicklook_created):
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/tiles/8/0/0')
-    assert res.status_code == 200
-    assert res.headers['Content-Type'] == 'application/npy'
-
-
-def test_get_fits_header(one_quicklook_created):
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/fits_header/R00_SG1')
-    assert res.status_code == 200
-    assert res.headers['Content-Type'] == 'application/json'
-
-
-def test_get_tile_for_blank_region(one_quicklook_created):
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/tiles/0/0/0')
-    assert res.status_code == 200
-    assert res.headers['Content-Type'] == 'application/npy+zstd'
 
 
 @pytest.fixture(scope='module', autouse=True)
@@ -174,3 +83,13 @@ def run_uvicorn_app(app: str, *, port: int, timeout=10, log_prefix='', healthz='
         assert p.pid
         os.kill(p.pid, signal.SIGINT)  # p.terminate() を使うとcoverageがとれないのでSIGINTを送る
         p.join()
+
+
+@pytest.fixture(scope='module')
+def quicklooks_cleared():
+    res = requests.delete(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/*')
+    assert res.status_code == 200
+
+    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks')
+    assert res.status_code == 200
+    assert len(res.json()) == 0

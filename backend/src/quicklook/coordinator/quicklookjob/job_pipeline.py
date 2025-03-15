@@ -67,11 +67,14 @@ async def generate(job: QuicklookJob):
     process_ccd_results = await scatter_generate_job(job)
     storage.put_quicklook_meta(job.visit, QuicklookMeta(ccd_meta=process_ccd_results))
     job.generate_progress = None
-    job.phase = 'transfer:queued'
+    job.phase = 'generate:done'
     sync_job(job)
 
 
 async def transfer(job: QuicklookJob):
+    if job.no_transfer:
+        return
+
     with db_context() as db:
         db.add(QuicklookRecord(id=job.visit.id, phase='in_progress'))
         db.commit()
@@ -82,12 +85,8 @@ async def transfer(job: QuicklookJob):
     sync_job(job)
     await scatter_transfer_job(job)
     job.transfer_progress = None
-    job.phase = 'ready'
+    job.phase = 'transfer:done'
     sync_job(job)
-
-    with db_context() as db:
-        db.query(QuicklookRecord).filter(QuicklookRecord.id == job.visit.id).update({'phase': 'ready'})
-        db.commit()
 
 
 async def cleanup(job: QuicklookJob):
@@ -203,6 +202,11 @@ class _JobManager:
             self._synchronizer.delete(job)
 
         async def on_task_complete(job: QuicklookJob):
+            job.phase = 'ready'
+            sync_job(job)
+            with db_context() as db:
+                db.query(QuicklookRecord).filter(QuicklookRecord.id == job.visit.id).update({'phase': 'ready'})
+                db.commit()
             await backoff(job)
 
         async def on_task_error(job: QuicklookJob, e: Exception):  # pragma: no cover
@@ -217,9 +221,9 @@ class _JobManager:
         ) as self._pipeline:
             yield
 
-    async def enqueue(self, visit: Visit):
+    async def enqueue(self, visit: Visit, *, no_transfer: bool):
         if not self._synchronizer.has(visit) and not db_has(visit):  # pragma: no branch
-            job = QuicklookJob(visit=visit, phase='generate:queued')
+            job = QuicklookJob(visit=visit, phase='queued', no_transfer=no_transfer)
             self._synchronizer.add(job)
             await self._pipeline.push_task(job)
 

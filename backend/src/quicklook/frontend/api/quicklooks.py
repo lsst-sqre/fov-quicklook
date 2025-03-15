@@ -12,6 +12,7 @@ from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
 from quicklook.types import CcdMeta, GenerateProgress, QuicklookMeta, TransferProgress, Visit
 from quicklook.utils.http_request import http_request
 from quicklook.utils.websocket import safe_websocket
+from pydantic import field_validator
 
 router = APIRouter()
 
@@ -93,6 +94,14 @@ async def delete_all_quicklooks():
 
 class QuicklookCreateFrontend(BaseModel):
     id: str
+    no_transfer: bool = False
+
+    @field_validator('no_transfer')
+    @classmethod
+    def validate_no_transfer(cls, value: bool) -> bool:
+        if value and config.environment != 'test':
+            raise ValueError("no_transfer can only be set to True in test environment")
+        return value
 
 
 @router.post('/api/quicklooks', description='Create a quicklook')
@@ -101,5 +110,5 @@ async def create_quicklook(params: QuicklookCreateFrontend):
     return await http_request(
         'post',
         f'{config.coordinator_base_url}/quicklooks',
-        json=QuicklookCreate(visit=Visit.from_id(params.id)).model_dump(),
+        json=QuicklookCreate(visit=Visit.from_id(params.id), no_transfer=params.no_transfer).model_dump(),
     )

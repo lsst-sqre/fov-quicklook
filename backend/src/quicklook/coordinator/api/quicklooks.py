@@ -21,12 +21,13 @@ router = APIRouter()
 
 class QuicklookCreate(BaseModel):
     visit: Visit
+    no_transfer: bool = False
 
 
 @router.post("/quicklooks")
 async def create_quicklook(params: QuicklookCreate):
     visit = params.visit
-    await job_manager.enqueue(visit)
+    await job_manager.enqueue(visit, no_transfer=params.no_transfer)
 
 
 @router.delete("/quicklooks/*")

@@ -15,7 +15,8 @@ def test_make_generator_tasks():
 
     job = QuicklookJob(
         visit=Visit.from_id('raw:broccoli'),
-        phase='generate:queued',
+        phase='queued',
+        no_transfer=False,
     )
 
     tasks, ccd_generator_map = make_generate_tasks(

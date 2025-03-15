@@ -6,12 +6,13 @@ from pydantic import BaseModel, Field
 
 from quicklook.types import GenerateProgress, GeneratorPod, TransferProgress, Visit
 
-QuicklookJobPhase = Literal['generate:queued', 'generate:running', 'transfer:queued', 'transfer:running', 'ready', 'failed']
+QuicklookJobPhase = Literal['queued', 'generate:running', 'generate:done', 'transfer:running', 'transfer:done', 'ready', 'failed']
 
 
 class QuicklookJob(BaseModel):
     visit: Visit
     phase: QuicklookJobPhase
+    no_transfer: bool
     created_at: float = Field(default_factory=time.time)
 
     generate_progress: dict[str, GenerateProgress] | None = None
