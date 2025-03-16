@@ -23,7 +23,7 @@ from quicklook.utils.message import message_from_async_reader
 from quicklook.utils.pipeline import Pipeline, Stage
 from quicklook.utils.timeit import timeit
 
-from .job import QuicklookJob, QuicklookJobReport
+from .job import QuicklookJob, QuicklookJobPhase, QuicklookJobReport
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
 
@@ -62,12 +62,12 @@ async def limit_temporary_quicklooks(job: QuicklookJob):
 
 
 async def generate(job: QuicklookJob):
-    job.phase = 'generate:running'
+    job.phase = QuicklookJobPhase.GENERATE_RUNNING
     sync_job(job)
     process_ccd_results = await scatter_generate_job(job)
     storage.put_quicklook_meta(job.visit, QuicklookMeta(ccd_meta=process_ccd_results))
     job.generate_progress = None
-    job.phase = 'generate:done'
+    job.phase = QuicklookJobPhase.GENERATE_DONE
     sync_job(job)
 
 
@@ -81,11 +81,11 @@ async def transfer(job: QuicklookJob):
 
     storage.put_quicklook_job_config(job)
 
-    job.phase = 'transfer:running'
+    job.phase = QuicklookJobPhase.TRANSFER_RUNNING
     sync_job(job)
     await scatter_transfer_job(job)
     job.transfer_progress = None
-    job.phase = 'transfer:done'
+    job.phase = QuicklookJobPhase.TRANSFER_DONE
     sync_job(job)
 
 
@@ -202,15 +202,17 @@ class _JobManager:
             self._synchronizer.delete(job)
 
         async def on_task_complete(job: QuicklookJob):
-            job.phase = 'ready'
-            sync_job(job)
+            logger.info(f'Job {job.visit} completed')
             with db_context() as db:
                 db.query(QuicklookRecord).filter(QuicklookRecord.id == job.visit.id).update({'phase': 'ready'})
                 db.commit()
+            job.phase = QuicklookJobPhase.READY
+            sync_job(job)
             await backoff(job)
 
         async def on_task_error(job: QuicklookJob, e: Exception):  # pragma: no cover
-            job.phase = 'failed'
+            logger.warning(f'Job {job.visit} failed: {e}')
+            job.phase = QuicklookJobPhase.FAILED
             sync_job(job)
             await backoff(job)
 
@@ -223,7 +225,7 @@ class _JobManager:
 
     async def enqueue(self, visit: Visit, *, no_transfer: bool):
         if not self._synchronizer.has(visit) and not db_has(visit):  # pragma: no branch
-            job = QuicklookJob(visit=visit, phase='queued', no_transfer=no_transfer)
+            job = QuicklookJob(visit=visit, phase=QuicklookJobPhase.QUEUED, no_transfer=no_transfer)
             self._synchronizer.add(job)
             await self._pipeline.push_task(job)
 

@@ -6,6 +6,7 @@ import websockets.sync.client as websockets
 from websockets.exceptions import ConnectionClosedOK
 
 from quicklook.config import config
+from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase
 from quicklook.frontend.api.quicklooks import QuicklookStatus
 
 
@@ -17,6 +18,12 @@ def test_frontend_ok():
 
 def test_frontend_systeminfo():
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/system_info')
+    assert res.status_code == 200
+    assert len(res.json()) >= 1
+
+
+def test_frontend_status():
+    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/status')
     assert res.status_code == 200
     assert len(res.json()) >= 1
 
@@ -34,7 +41,7 @@ def test_list_visits():
 
 @pytest.fixture(scope='module')
 def one_quicklook_created(quicklooks_cleared):
-    res = requests.post(f'http://127.0.0.1:{config.coordinator_port}/quicklooks', json={'visit': {'id': 'raw:broccoli'}})
+    res = requests.post(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks', json={'id': 'raw:broccoli', 'no_transfer': False})
     assert res.status_code == 200
     with websockets.connect(f'ws://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/status.ws') as ws:
         while True:
@@ -42,7 +49,7 @@ def one_quicklook_created(quicklooks_cleared):
                 print('.', end='', flush=True)
                 status = json.loads(ws.recv())
                 if isinstance(status, dict):
-                    if status['phase'] in {'ready', 'failed'}:
+                    if status['phase'] in {QuicklookJobPhase.READY, QuicklookJobPhase.FAILED}:
                         break
             except ConnectionClosedOK:
                 break
@@ -70,7 +77,7 @@ def test_list_quicklooks(one_quicklook_created):
 def test_get_tile(one_quicklook_created):
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/tiles/8/0/0')
     assert res.status_code == 200
-    assert res.headers['Content-Type'] == 'application/npy'
+    assert res.headers['Content-Type'] == 'application/npy+zstd'
 
 
 def test_get_tile_for_blank_region(one_quicklook_created):

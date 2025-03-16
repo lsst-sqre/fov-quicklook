@@ -6,6 +6,7 @@ import websockets.sync.client as websockets
 from websockets.exceptions import ConnectionClosedOK
 
 from quicklook.config import config
+from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase
 from quicklook.frontend.api.quicklooks import QuicklookStatus
 
 
@@ -19,7 +20,7 @@ def one_quicklook_no_transfer_created(quicklooks_cleared):
                 print('.', end='', flush=True)
                 status = json.loads(ws.recv())
                 if isinstance(status, dict):
-                    if status['phase'] in {'ready', 'failed'}:
+                    if status['phase'] in {QuicklookJobPhase.READY, QuicklookJobPhase.FAILED}:
                         break
             except ConnectionClosedOK:
                 break

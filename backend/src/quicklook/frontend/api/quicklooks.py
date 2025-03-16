@@ -55,6 +55,8 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
             except WebSocketDisconnect:
                 break
 
+        return
+
 
 class QuicklookMetadata(BaseModel):
     # QuicklookMetaと紛らわしいがこちらはフロントエンド用
@@ -99,7 +101,7 @@ class QuicklookCreateFrontend(BaseModel):
     @field_validator('no_transfer')
     @classmethod
     def validate_no_transfer(cls, value: bool) -> bool:
-        if value and config.environment != 'test':
+        if value and config.environment != 'test':  # pragma: no cover
             raise ValueError("no_transfer can only be set to True in test environment")
         return value
 

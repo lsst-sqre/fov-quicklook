@@ -1,4 +1,4 @@
-from functools import cache
+from functools import cache, lru_cache
 
 import minio
 
@@ -41,7 +41,9 @@ def put_quicklook_job_config(job: QuicklookJob) -> None:
     put(f'quicklook/{visit.id}/job-config', job.model_dump_json().encode())
 
 
+@lru_cache(maxsize=32)
 def get_quicklook_job_config(visit: Visit) -> QuicklookJob:
+    # putは１度しか行われないのでキャッシュする
     return QuicklookJob.model_validate_json(get(f'quicklook/{visit.id}/job-config'))
 
 

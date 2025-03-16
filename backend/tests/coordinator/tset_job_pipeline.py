@@ -1,6 +1,6 @@
 import pytest
 
-from quicklook.coordinator.quicklookjob.job import QuicklookJob
+from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
 from quicklook.coordinator.quicklookjob.job_pipeline import make_generate_tasks
 from quicklook.types import GeneratorPod, Visit
 
@@ -15,7 +15,7 @@ def test_make_generator_tasks():
 
     job = QuicklookJob(
         visit=Visit.from_id('raw:broccoli'),
-        phase='queued',
+        phase=QuicklookJobPhase.QUEUED,
         no_transfer=False,
     )
 

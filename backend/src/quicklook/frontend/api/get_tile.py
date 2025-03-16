@@ -1,4 +1,4 @@
-from fastapi import status
+import minio.error
 import asyncio
 import logging
 import traceback
@@ -7,17 +7,21 @@ from typing import Annotated
 
 import aiohttp
 import numpy
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 
 from quicklook import storage
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.job import QuicklookJob
+from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
+from quicklook.db import db_context
 from quicklook.deps.visit_from_path import visit_from_path
-from quicklook.frontend.api.remotejobs import remote_quicklook_job
+from quicklook.models import QuicklookRecord
 from quicklook.tileinfo import TileInfo
 from quicklook.types import GeneratorPod, Visit
 from quicklook.utils import zstd
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
+from quicklook.utils.sizelimitedset import SizeLimitedSet
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
 
@@ -31,15 +35,36 @@ async def get_tile(
     y: int,
     x: int,
 ) -> Response:
-    job = storage.get_quicklook_job_config(visit)
-    # if job is None:
-    #     raise HTTPException(status_code=404, detail='Quicklook not found')  # pragma: no cover
-    return await gather_tiles(job, visit, z, y, x)
-    # if ql.phase == 'ready':
-    #     raise NotImplementedError(f'Phase {ql.phase} not implemented')
-    # elif ql.phase == 'processing' and ql.transferreing_progress:
-    #     return await gather_tiles(visit, z, y, x)
-    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Quicklook is not ready')
+    if is_visit_ready(visit):
+        return await get_tile_from_storage(visit, z, y, x)
+    else:
+        job = storage.get_quicklook_job_config(visit)
+        if job:  # pragma: no branch
+            return await gather_tiles(job, visit, z, y, x)
+    raise HTTPException(status_code=404, detail='Quicklook not found')  # pragma: no cover
+
+
+async def get_tile_from_storage(visit: Visit, z: int, y: int, x: int) -> Response:
+    try:
+        data = storage.get_quicklook_tile_bytes(visit, z, y, x)
+    except minio.error.S3Error:
+        return Response(blank_npy_zstd(), media_type='application/npy+zstd')
+    return Response(data, media_type='application/npy+zstd')
+
+
+ready_visits = SizeLimitedSet[Visit](32)
+
+
+def is_visit_ready(visit: Visit):
+    if visit in ready_visits:
+        ready_visits.add(visit)
+        return True
+    with db_context() as db:
+        record = db.execute(select(QuicklookRecord).where(QuicklookRecord.id == visit.id)).scalar_one_or_none()
+        if record and record.phase == 'ready':
+            ready_visits.add(visit)
+            return True
+    return False
 
 
 async def gather_tiles(

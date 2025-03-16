@@ -1,13 +1,11 @@
 import logging
 from typing import Annotated
 
-import aiohttp
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, Response
 
 from quicklook.datasource import get_datasource
 from quicklook.deps.visit_from_path import visit_from_path
-from quicklook.frontend.api.remotejobs import remote_quicklook_job
-from quicklook.types import CcdId, Visit, HeaderType
+from quicklook.types import CcdId, Visit
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
 

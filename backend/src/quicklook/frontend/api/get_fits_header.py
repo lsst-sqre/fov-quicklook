@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from quicklook import storage
 from quicklook.deps.visit_from_path import visit_from_path
-from quicklook.frontend.api.remotejobs import remote_quicklook_job
 from quicklook.types import Visit, HeaderType
 
 logger = logging.getLogger(f'uvicorn.{__name__}')

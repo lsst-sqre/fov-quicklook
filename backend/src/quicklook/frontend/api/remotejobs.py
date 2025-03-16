@@ -50,10 +50,12 @@ class _RemoteQuicklookJobsWatcher:
                                     self._jobs.pop(event.value.visit, None)
                                 case 'modified':
                                     self._jobs[event.value.visit] = event.value
+                                case _:  # pragma: no cover
+                                    raise ValueError(f'unknown event type {event.type}')
                         self._q.put(self._jobs)
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception:  # pragma: no cover
                 traceback.print_exc()
                 logger.warning('retrying in 5 seconds')
                 await asyncio.sleep(5)
@@ -80,7 +82,3 @@ class _RemoteQuicklookJobsWatcher:
 @cache
 def RemoteQuicklookJobsWather():
     return _RemoteQuicklookJobsWatcher()
-
-
-def remote_quicklook_job(visit: Visit) -> QuicklookJobReport | None:
-    return RemoteQuicklookJobsWather().jobs.get(visit)

@@ -1,3 +1,8 @@
+## hot
+
+* 転送後cleanup
+* エラーのcleanup
+
 # FoV Quicklook
 
 このシステムはRubinの1視野のデータを高速にプレビューするためのものである。

@@ -11,7 +11,7 @@ def is_x86_v2() -> bool:
 
     # Extract the flags line
     flags_line = next((line for line in cpuinfo.splitlines() if line.startswith("flags")), None)
-    if not flags_line:
+    if not flags_line:  # pragma: no cover
         return False
 
     # Extract flags as a list

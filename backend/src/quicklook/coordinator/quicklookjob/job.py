@@ -1,12 +1,20 @@
+from enum import Enum
 import time
 from dataclasses import dataclass
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from quicklook.types import GenerateProgress, GeneratorPod, TransferProgress, Visit
 
-QuicklookJobPhase = Literal['queued', 'generate:running', 'generate:done', 'transfer:running', 'transfer:done', 'ready', 'failed']
+
+class QuicklookJobPhase(int, Enum):
+    QUEUED = 0
+    GENERATE_RUNNING = 1
+    GENERATE_DONE = 2
+    TRANSFER_RUNNING = 3
+    TRANSFER_DONE = 4
+    READY = 5
+    FAILED = 6
 
 
 class QuicklookJob(BaseModel):

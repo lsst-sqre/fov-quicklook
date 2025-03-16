@@ -22,3 +22,4 @@ def delete_all_quicklooks(client: TestClient):
 def test_healthz(client: TestClient):
     res = client.get('/healthz')
     assert res.status_code == 200
+
