@@ -7,9 +7,9 @@ from starlette.websockets import WebSocketDisconnect
 from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
-from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase, QuicklookJobReport
+from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase, QuicklookJobReport
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
-from quicklook.types import CcdMeta, GenerateProgress, QuicklookMeta, TransferProgress, Visit
+from quicklook.types import CcdMeta, GenerateProgress, TransferProgress, Visit
 from quicklook.utils.http_request import http_request
 from quicklook.utils.websocket import safe_websocket
 from pydantic import field_validator
@@ -48,7 +48,7 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
         def pick(qls: dict[Visit, QuicklookJobReport]) -> QuicklookJobReport | None:
             return qls.get(visit)
 
-        async for job in RemoteQuicklookJobsWather().watch(pick):
+        async for job in RemoteQuicklookJobsWather().watch(pick):  # pragma: no branch
             try:
                 model = QuicklookStatus.model_validate(job).model_dump() if job else None
                 await client_ws.send_json(model)
