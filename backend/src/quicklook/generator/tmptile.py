@@ -1,14 +1,12 @@
+import logging
 import shutil
 from pathlib import Path
-import subprocess
 
 import numpy
 
 from quicklook.config import config
 from quicklook.types import CcdId, Tile, Visit
 from quicklook.utils.numpyutils import ndarray2npybytes
-import logging
-
 
 logger = logging.getLogger(f'uviorn.{__name__}')
 
@@ -39,6 +37,12 @@ class TmpTile:
         if pool is None:  # pragma: no cover
             pool = numpy.zeros((config.tile_size, config.tile_size), dtype=numpy.float32)
         return pool
+
+    def delete_cache(self, visit: Visit):
+        try:
+            shutil.rmtree(Path(f'{config.tile_tmpdir}/{visit.id}'))
+        except FileNotFoundError:
+            pass
 
     def delete_all_cache(self):
         try:

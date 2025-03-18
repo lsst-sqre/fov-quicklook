@@ -163,6 +163,13 @@ async def delete_all_quicklooks():
     tmptile.delete_all_cache()
 
 
+@app.delete('/quicklooks/{id}')
+async def delete_quicklooks(
+    visit: Annotated[Visit, Depends(visit_from_path)],
+):
+    tmptile.delete_cache(visit)
+
+
 @app.post('/kill')
 async def kill():  # pragma: no cover
     os._exit(0)

@@ -14,7 +14,7 @@ class QuicklookJobPhase(int, Enum):
     TRANSFER_RUNNING = 3
     TRANSFER_DONE = 4
     READY = 5
-    FAILED = 6
+    FAILED = -1
 
 
 class QuicklookJob(BaseModel):

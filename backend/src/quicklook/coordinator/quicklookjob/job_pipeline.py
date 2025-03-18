@@ -5,6 +5,7 @@ from dataclasses import asdict
 from typing import AsyncGenerator
 
 import aiohttp
+from sqlalchemy import delete
 
 from quicklook import storage
 from quicklook.config import config
@@ -15,7 +16,7 @@ from quicklook.datasource import get_datasource
 from quicklook.db import db_context
 from quicklook.generator.progress import GenerateProgress
 from quicklook.models import QuicklookRecord
-from quicklook.types import CcdMeta, GeneratorPod, GenerateTaskResponse, QuicklookMeta, TransferProgress, TransferTaskResponse, Visit
+from quicklook.types import CcdMeta, GenerateTaskResponse, GeneratorPod, QuicklookMeta, TransferProgress, TransferTaskResponse, Visit
 from quicklook.utils.broadcastqueue import BroadcastQueue
 from quicklook.utils.event import WatchEvent
 from quicklook.utils.http_request import http_request
@@ -48,6 +49,11 @@ def job_stages() -> list[Stage[QuicklookJob]]:
             name='transfer',
             concurrency=config.max_transfer_jobs,
             process_func=transfer,
+        ),
+        Stage(
+            name='finalize',
+            concurrency=1,
+            process_func=finalize,
         ),
     ]
 
@@ -87,10 +93,6 @@ async def transfer(job: QuicklookJob):
     job.transfer_progress = None
     job.phase = QuicklookJobPhase.TRANSFER_DONE
     sync_job(job)
-
-
-async def cleanup(job: QuicklookJob):
-    pass
 
 
 def make_generate_tasks(job: QuicklookJob, generators: list[GeneratorPod]):
@@ -189,37 +191,58 @@ async def scatter_transfer_job(job: QuicklookJob):
     await asyncio.gather(*(run_1_task(g) for g in generators))
 
 
+async def finalize(job: QuicklookJob):
+    logger.info(f'Job {job.visit} completed')
+    with db_context() as db:
+        db.query(QuicklookRecord).filter(QuicklookRecord.id == job.visit.id).update({'phase': 'ready'})
+        db.commit()
+    job.phase = QuicklookJobPhase.READY
+    sync_job(job)
+
+
+async def remove_tmptiles(job: QuicklookJob):
+    async def run_1_task(g: GeneratorPod):
+        async with aiohttp.ClientSession() as session:
+            async with session.delete(
+                f'http://{g.host}:{g.port}/quicklooks/{job.visit.id}',
+                raise_for_status=True,
+            ) as _:
+                pass
+
+    assert job.ccd_generator_map
+    generators = [*set(job.ccd_generator_map.values())]
+    await asyncio.gather(*(run_1_task(g) for g in generators))
+
+
 class _JobManager:
     def __init__(self):
         self._synchronizer = _JobSynchronizer()
 
     @asynccontextmanager
     async def activate(self):
-        async def backoff(job: QuicklookJob):
-            await cleanup(job)
-            await asyncio.sleep(backoff_time)
+        async def cleanup(job: QuicklookJob):
+            await remove_tmptiles(job)
             temporary_quicklooks_queue.get_nowait()
+            await asyncio.sleep(backoff_time)
             self._synchronizer.delete(job)
 
-        async def on_task_complete(job: QuicklookJob):
-            logger.info(f'Job {job.visit} completed')
-            with db_context() as db:
-                db.query(QuicklookRecord).filter(QuicklookRecord.id == job.visit.id).update({'phase': 'ready'})
-                db.commit()
-            job.phase = QuicklookJobPhase.READY
-            sync_job(job)
-            await backoff(job)
+        async def on_complete(job: QuicklookJob):
+            await cleanup(job)
 
-        async def on_task_error(job: QuicklookJob, e: Exception):  # pragma: no cover
+        async def on_error(job: QuicklookJob, e: Exception):  # pragma: no cover
             logger.warning(f'Job {job.visit} failed: {e}')
             job.phase = QuicklookJobPhase.FAILED
             sync_job(job)
-            await backoff(job)
+            with db_context() as db:
+                stmt = delete(QuicklookRecord).where(QuicklookRecord.id == job.visit.id)
+                db.execute(stmt)
+                db.commit()
+            await cleanup(job)
 
         async with Pipeline(
             job_stages(),
-            on_task_complete=on_task_complete,
-            on_task_error=on_task_error,
+            on_task_complete=on_complete,
+            on_task_error=on_error,
         ) as self._pipeline:
             yield
 
