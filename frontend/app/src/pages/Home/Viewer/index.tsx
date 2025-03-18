@@ -60,13 +60,13 @@ export const Viewer = memo(({ style }: ViewerProps) => {
       </Globe$>
       <CursorLine />
       <Info />
-      {(currentQuicklook.status?.phase === 'processing' || currentQuicklook.metadata === undefined) && (
+      {/* {(currentQuicklook.status?.phase === 'generating' || currentQuicklook.metadata === undefined) && (
         <div className={styles.viewerBlock}>
-          {currentQuicklook.status?.phase === 'processing' &&
+          {currentQuicklook.status?.phase === 'generating' &&
             <QuicklookProgress status={currentQuicklook.status} />
           }
         </div>
-      )}
+      )} */}
     </div>
   )
 })

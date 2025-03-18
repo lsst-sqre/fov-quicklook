@@ -14,7 +14,7 @@ export function HeaderViewer() {
 
 function HeaderViewerOfCcd({ ccd }: { ccd: CcdMeta }) {
   const { ccd_name, visit } = ccd.ccd_id
-  const { data } = useGetFitsHeaderQuery({ ccdName: ccd_name, id: `${visit.data_type}:${visit.name}` })
+  const { data } = useGetFitsHeaderQuery({ ccdName: ccd_name, id: `${visit.id}` })
   const focusedAmp = useFocusedAmp()
   const headerNumber = useMemo(() => focusedAmp?.amp_id ?? 0, [focusedAmp])
 
@@ -22,7 +22,7 @@ function HeaderViewerOfCcd({ ccd }: { ccd: CcdMeta }) {
     <div>
       {headerNumber}
       {data && (
-        <table style={{tableLayout: 'fixed', }}>
+        <table style={{ tableLayout: 'fixed', }}>
           <thead>
           </thead>
           <tbody>

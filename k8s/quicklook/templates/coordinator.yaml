@@ -36,7 +36,7 @@ spec:
             - name: QUICKLOOK_data_source
               value: {{ .Values.data_source | quote }}
             {{- include "fov-quicklook.env.s3_tile" . | nindent 12 }}
-            {{- include "fov-quicklook.env.s3_repository" . | nindent 12 }}
+            {{- include "fov-quicklook.env.s3_test_data" . | nindent 12 }}
           ports:
             - containerPort: 9501
           securityContext:

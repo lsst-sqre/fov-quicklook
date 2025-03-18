@@ -395,6 +395,53 @@
                 }
             }
         },
+        "/api/quicklooks/{id}/fits/{ccd_name}": {
+            "get": {
+                "summary": "Get Fits File",
+                "operationId": "get_fits_file",
+                "parameters": [
+                    {
+                        "name": "ccd_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Ccd Name"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/status": {
             "get": {
                 "summary": "Get Pod Status",
@@ -569,7 +616,7 @@
                 ],
                 "title": "DiskInfo"
             },
-            "GeneratorProgress": {
+            "GenerateProgress": {
                 "properties": {
                     "download": {
                         "$ref": "#/components/schemas/Progress"
@@ -587,7 +634,7 @@
                     "preprocess",
                     "maketile"
                 ],
-                "title": "GeneratorProgress"
+                "title": "GenerateProgress"
             },
             "HTTPValidationError": {
                 "properties": {
@@ -688,6 +735,11 @@
                     "id": {
                         "type": "string",
                         "title": "Id"
+                    },
+                    "no_transfer": {
+                        "type": "boolean",
+                        "title": "No Transfer",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -696,21 +748,18 @@
                 ],
                 "title": "QuicklookCreateFrontend"
             },
-            "QuicklookMeta": {
-                "properties": {
-                    "ccd_meta": {
-                        "items": {
-                            "$ref": "#/components/schemas/CcdMeta"
-                        },
-                        "type": "array",
-                        "title": "Ccd Meta"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "ccd_meta"
+            "QuicklookJobPhase": {
+                "type": "integer",
+                "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    -1
                 ],
-                "title": "QuicklookMeta"
+                "title": "QuicklookJobPhase"
             },
             "QuicklookMetadata": {
                 "properties": {
@@ -752,20 +801,13 @@
                         "title": "Id"
                     },
                     "phase": {
-                        "type": "string",
-                        "enum": [
-                            "queued",
-                            "processing",
-                            "ready",
-                            "deleting"
-                        ],
-                        "title": "Phase"
+                        "$ref": "#/components/schemas/QuicklookJobPhase"
                     },
-                    "generating_progress": {
+                    "generate_progress": {
                         "anyOf": [
                             {
                                 "additionalProperties": {
-                                    "$ref": "#/components/schemas/GeneratorProgress"
+                                    "$ref": "#/components/schemas/GenerateProgress"
                                 },
                                 "type": "object"
                             },
@@ -773,25 +815,29 @@
                                 "type": "null"
                             }
                         ],
-                        "title": "Generating Progress"
+                        "title": "Generate Progress"
                     },
-                    "meta": {
+                    "transfer_progress": {
                         "anyOf": [
                             {
-                                "$ref": "#/components/schemas/QuicklookMeta"
+                                "additionalProperties": {
+                                    "$ref": "#/components/schemas/TransferProgress"
+                                },
+                                "type": "object"
                             },
                             {
                                 "type": "null"
                             }
-                        ]
+                        ],
+                        "title": "Transfer Progress"
                     }
                 },
                 "type": "object",
                 "required": [
                     "id",
                     "phase",
-                    "generating_progress",
-                    "meta"
+                    "generate_progress",
+                    "transfer_progress"
                 ],
                 "title": "QuicklookStatus"
             },
@@ -830,6 +876,18 @@
                 "type": "object",
                 "title": "SystemInfo"
             },
+            "TransferProgress": {
+                "properties": {
+                    "transfer": {
+                        "$ref": "#/components/schemas/Progress"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "transfer"
+                ],
+                "title": "TransferProgress"
+            },
             "ValidationError": {
                 "properties": {
                     "loc": {
@@ -865,36 +923,27 @@
             },
             "Visit": {
                 "properties": {
-                    "data_type": {
+                    "id": {
                         "type": "string",
-                        "enum": [
-                            "raw",
-                            "calexp"
-                        ],
-                        "title": "Data Type"
-                    },
-                    "name": {
-                        "type": "string",
-                        "title": "Name"
+                        "title": "Id"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "data_type",
-                    "name"
+                    "id"
                 ],
                 "title": "Visit"
             },
             "VisitListEntry": {
                 "properties": {
-                    "name": {
+                    "id": {
                         "type": "string",
-                        "title": "Name"
+                        "title": "Id"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "name"
+                    "id"
                 ],
                 "title": "VisitListEntry"
             }

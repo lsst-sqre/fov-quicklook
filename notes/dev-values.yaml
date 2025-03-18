@@ -22,14 +22,16 @@ config:
   pathPrefix: /fov-quicklook
 
 # -- S3 configuration for the repository
-s3_repository:
+s3_test_data:
   endpoint: "192.168.13.201:9000"
+  bucket: fov-quicklook-repository
   secure: false
 
 # -- S3 configuration for the tile storage
 s3_tile:
   endpoint: "192.168.13.201:9000"
-  secure: true
+  secure: false
+  bucket: fov-quicklook-tile
 
 # -- Storage class to use for the database
 db_storage_class: null

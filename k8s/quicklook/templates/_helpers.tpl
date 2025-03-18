@@ -5,27 +5,23 @@
   valueFrom:
     secretKeyRef:
       name: fov-quicklook
-      key: s3_tile_access_key
+      key: s3_repository_access_key
 - name: QUICKLOOK_s3_tile__secret_key
   valueFrom:
     secretKeyRef:
       name: fov-quicklook
-      key: s3_tile_secret_key
+      key: s3_repository_secret_key
 {{- end }}
 
-{{- define "fov-quicklook.env.s3_repository" -}}
-- name: QUICKLOOK_s3_repository
-  value: {{ .Values.s3_repository | toJson | quote }}
-- name: QUICKLOOK_s3_repository__access_key
-  valueFrom:
-    secretKeyRef:
-      name: fov-quicklook
-      key: s3_repository_access_key
-- name: QUICKLOOK_s3_repository__secret_key
-  valueFrom:
-    secretKeyRef:
-      name: fov-quicklook
-      key: s3_repository_secret_key
+{{- define "fov-quicklook.env.s3_test_data" -}}
+{{ if .Values.s3_test_data }}
+- name: QUICKLOOK_s3_test_data
+  value: {{ .Values.s3_test_data | toJson | quote }}
+- name: QUICKLOOK_s3_test_data__access_key
+  value: quicklook
+- name: QUICKLOOK_s3_test_data__secret_key
+  value: password
+{{ end }}
 {{- end }}
 
 {{- define "quicklook.ingress.spec" -}}

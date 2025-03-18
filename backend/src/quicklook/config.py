@@ -43,7 +43,7 @@ class Config(BaseSettings):
         access_key='???',
         secret_key='???',
         secure=False,
-        bucket='quicklook-repository',
+        bucket='quicklook-test-data',
     )
 
     s3_tile: S3Config = S3Config(

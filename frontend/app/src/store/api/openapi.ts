@@ -61,6 +61,11 @@ const injectedRtkApi = api.injectEndpoints({
         },
       }),
     }),
+    getFitsFile: build.query<GetFitsFileApiResponse, GetFitsFileApiArg>({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.id}/fits/${queryArg.ccdName}`,
+      }),
+    }),
     getPodStatus: build.query<GetPodStatusApiResponse, GetPodStatusApiArg>({
       query: () => ({ url: `/api/status` }),
     }),
@@ -117,6 +122,11 @@ export type ListVisitsApiArg = {
   dayObs?: number | null;
   limit?: number;
 };
+export type GetFitsFileApiResponse = /** status 200 Successful Response */ any;
+export type GetFitsFileApiArg = {
+  ccdName: string;
+  id: string;
+};
 export type GetPodStatusApiResponse =
   /** status 200 Successful Response */ StatusResponse;
 export type GetPodStatusApiArg = void;
@@ -135,18 +145,35 @@ export type HttpValidationError = {
 };
 export type CardType = [string, string, string, string];
 export type HeaderType = CardType[];
+export type QuicklookJobPhase = 0 | 1 | 2 | 3 | 4 | 5 | -1;
 export type Progress = {
   count: number;
   total: number;
 };
-export type GeneratorProgress = {
+export type GenerateProgress = {
   download: Progress;
   preprocess: Progress;
   maketile: Progress;
 };
+export type TransferProgress = {
+  transfer: Progress;
+};
+export type QuicklookStatus = {
+  id: string;
+  phase: QuicklookJobPhase;
+  generate_progress: {
+    [key: string]: GenerateProgress;
+  } | null;
+  transfer_progress: {
+    [key: string]: TransferProgress;
+  } | null;
+};
+export type QuicklookCreateFrontend = {
+  id: string;
+  no_transfer?: boolean;
+};
 export type Visit = {
-  data_type: "raw" | "calexp";
-  name: string;
+  id: string;
 };
 export type CcdId = {
   visit: Visit;
@@ -173,27 +200,13 @@ export type CcdMeta = {
   amps: AmpMeta[];
   bbox: BBox;
 };
-export type QuicklookMeta = {
-  ccd_meta: CcdMeta[];
-};
-export type QuicklookStatus = {
-  id: string;
-  phase: "queued" | "processing" | "ready" | "deleting";
-  generating_progress: {
-    [key: string]: GeneratorProgress;
-  } | null;
-  meta: QuicklookMeta | null;
-};
-export type QuicklookCreateFrontend = {
-  id: string;
-};
 export type QuicklookMetadata = {
   id: string;
   wcs: object;
   ccd_meta: CcdMeta[] | null;
 };
 export type VisitListEntry = {
-  name: string;
+  id: string;
 };
 export type DiskInfo = {
   mount_point: string;
@@ -223,6 +236,7 @@ export const {
   useShowQuicklookMetadataQuery,
   useDeleteAllQuicklooksMutation,
   useListVisitsQuery,
+  useGetFitsFileQuery,
   useGetPodStatusQuery,
   useKillMutation,
 } = injectedRtkApi;

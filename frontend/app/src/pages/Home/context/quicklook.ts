@@ -9,7 +9,8 @@ import { websocketUrl } from "../../../utils/websocket"
 export function useQuicklookStatus() {
   const id = useAppSelector(state => state.home.currentQuicklook)
   const [status, setStatus] = useState<{ [id: string]: QuicklookStatus | null }>({})
-  const ready = id !== undefined ? (status[id]?.phase === 'ready') : false
+  const ready = false
+  // const ready = id !== undefined ? (status[id]?.phase === 'ready') : false
   const { data: metadata } = useShowQuicklookMetadataQuery({ id: id ?? '' }, { skip: !ready })
   const wsUrl = useMemo(() => websocketUrl(`./api/quicklooks/${id}/status.ws`), [id])
 

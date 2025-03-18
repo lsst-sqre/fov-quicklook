@@ -5,7 +5,7 @@ import { QuicklookStatus } from "../../../store/api/openapi"
 export function QuicklookProgress({ status }: { status: QuicklookStatus} ) {
   return (
     <div>
-      {status && status.generating_progress && (
+      {/* {status && status.generating_progress && (
         Object.entries(status.generating_progress).map(([pod, progress]) => (
           <div key={pod}>
             <div>{pod}</div>
@@ -16,7 +16,7 @@ export function QuicklookProgress({ status }: { status: QuicklookStatus} ) {
             </RoundedFrame>
           </div>
         ))
-      )}
+      )} */}
     </div>
   )
 }

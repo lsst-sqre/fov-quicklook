@@ -29,16 +29,16 @@ function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMe
   const openHeaerPage = useCallback(() => {
     if (ccdMeta) {
       const visit = ccdMeta.ccd_id.visit
-      const visitId = `${visit.data_type}:${visit.name}`
+      const visitId = `${visit.id}`
       window.open(`#/header/${visitId}/${ccdMeta.ccd_id.ccd_name}`)
     }
   }, [ccdMeta])
 
   const downloadThisFitsFile = useCallback(() => {
     if (ccdMeta) {
-      const { data_type, name } = ccdMeta.ccd_id.visit
-      const fitsUrl = `./api/quicklooks/${data_type}:${name}/fits/${ccdMeta.ccd_id.ccd_name}`
-      download(fitsUrl, `${data_type}-${name}-${ccdMeta.ccd_id.ccd_name}.fits`)
+      const { id } = ccdMeta.ccd_id.visit
+      const fitsUrl = `./api/quicklooks/${id}/fits/${ccdMeta.ccd_id.ccd_name}`
+      download(fitsUrl, `${id}-${ccdMeta.ccd_id.ccd_name}.fits`)
     }
   }, [ccdMeta])
 

@@ -37,7 +37,7 @@ export const VisitList = memo(({ style }: VisitListProps) => {
 
   useEffect(() => {
     if (currentQuicklook === undefined && list?.length) {
-      dispatch(homeSlice.actions.setCurrentQuicklook(list[0].name))
+      dispatch(homeSlice.actions.setCurrentQuicklook(list[0].id))
     }
   }, [dispatch, list, currentQuicklook])
 
@@ -46,7 +46,7 @@ export const VisitList = memo(({ style }: VisitListProps) => {
       <SearchBox />
       <div className={styles.list} style={style}>
         {list?.map((entry) => (
-          <VisitListEntry key={entry.name} entry={entry} />
+          <VisitListEntry key={entry.id} entry={entry} />
         ))}
       </div>
     </div>
@@ -59,10 +59,10 @@ type VisitListEntryType = ListVisitsApiResponse[number]
 
 function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-  const selected = currentQuicklook === entry.name
+  const selected = currentQuicklook === entry.id
   const dispatch = useAppDispatch()
   const select = () => {
-    dispatch(homeSlice.actions.setCurrentQuicklook(entry.name))
+    dispatch(homeSlice.actions.setCurrentQuicklook(entry.id))
   }
 
   return (
@@ -70,7 +70,7 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
       className={classNames(styles.entry, selected && styles.selected)}
       onClick={select}
     >
-      {entry.name}
+      {entry.id}
     </div>
   )
 }

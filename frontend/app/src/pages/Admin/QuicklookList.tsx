@@ -13,21 +13,21 @@ export function QuicklookList() {
   }
 
   return (
-      <table className={styles.quicklookList}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Phase</th>
+    <table className={styles.quicklookList}>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Phase</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data?.map(quicklook => (
+          <tr key={quicklook.id}>
+            <td>{quicklook.id}</td>
+            <td>{quicklook.phase}</td>
           </tr>
-        </thead>
-        <tbody>
-          {data?.map(quicklook => (
-            <tr key={quicklook.id}>
-              <td>{quicklook.id}</td>
-              <td>{quicklook.phase}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+        ))}
+      </tbody>
+    </table>
   )
 }
