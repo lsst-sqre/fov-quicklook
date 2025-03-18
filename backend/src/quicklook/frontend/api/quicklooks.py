@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, WebSocket
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 
 from quicklook import storage
@@ -20,23 +20,32 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 
 
 class QuicklookStatus(BaseModel):
+    id: str
     phase: QuicklookJobPhase
     generate_progress: dict[str, GenerateProgress] | None
     transfer_progress: dict[str, TransferProgress] | None
 
-    model_config = ConfigDict(
-        from_attributes=True,
-    )
+    @classmethod
+    def from_report(cls, report: QuicklookJobReport) -> 'QuicklookStatus':
+        return cls(
+            id=report.visit.id,
+            phase=report.phase,
+            generate_progress=report.generate_progress,
+            transfer_progress=report.transfer_progress,
+        )
 
 
 @router.get('/api/quicklooks', response_model=list[QuicklookStatus])
 async def list_quicklooks():
-    return [*RemoteQuicklookJobsWather().jobs.values()]
+    return [QuicklookStatus.from_report(job) for job in RemoteQuicklookJobsWather().jobs.values()]
 
 
 @router.get('/api/quicklooks/{id}/status', response_model=QuicklookStatus | None)
 async def show_quicklook_status(id: str):
-    return RemoteQuicklookJobsWather().jobs.get(Visit.from_id(id))
+    report = RemoteQuicklookJobsWather().jobs.get(Visit.from_id(id))
+    if report is None:
+        return None
+    return QuicklookStatus.from_report(report)
 
 
 @router.websocket('/api/quicklooks/{id}/status.ws')
@@ -50,7 +59,7 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
 
         async for job in RemoteQuicklookJobsWather().watch(pick):  # pragma: no branch
             try:
-                model = QuicklookStatus.model_validate(job).model_dump() if job else None
+                model = QuicklookStatus.from_report(job).model_dump() if job else None
                 await client_ws.send_json(model)
             except WebSocketDisconnect:
                 break
