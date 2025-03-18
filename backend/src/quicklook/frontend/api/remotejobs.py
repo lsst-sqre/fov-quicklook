@@ -70,7 +70,7 @@ class _RemoteQuicklookJobsWatcher:
         with self.subscribe() as sub:
             while True:
                 v1: T = pick(await sub.get())
-                if v0 is not v1:
+                if v0 is not v1:  # pragma: no branch
                     yield v1
                     v0 = v1
 
