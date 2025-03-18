@@ -16,7 +16,7 @@ ccd_id = 'R01_S12'
 def broccoli_fits_and_ccd_id():
     cache_path = Path('./tmp/broccoli.fits')
     if not cache_path.exists():
-        s3_config = config.s3_repository
+        s3_config = config.s3_test_data
         client = minio.Minio(
             s3_config.endpoint,
             access_key=s3_config.access_key,

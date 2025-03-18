@@ -38,7 +38,7 @@ class Config(BaseSettings):
 
     frontend_assets_dir: str = './frontend-assets'
 
-    s3_repository: S3Config = S3Config(
+    s3_test_data: S3Config = S3Config(
         endpoint='localhost:9000',
         access_key='???',
         secret_key='???',

@@ -24,7 +24,7 @@ class DummyDataSource(DataSourceBase):
         return _s3_get_visit_ccd_fits(ref.visit, ref.ccd_name)
 
     def list_ccds(self, visit: Visit) -> list[str]:
-        bucket = config.s3_repository.bucket
+        bucket = config.s3_test_data.bucket
         prefix = f'{visit.data_type}/{visit.name}/'
         return [Path(obj.object_name).stem for obj in _s3_client().list_objects(bucket, prefix=prefix)]  # type: ignore
 
@@ -37,14 +37,14 @@ def _s3_get_visit_ccd_fits(visit: Visit, ccd_name: str) -> bytes:
 
 
 def _s3_get_visit_ccd_fits_raw(visit: Visit, ccd_name: str) -> bytes:
-    bucket = config.s3_repository.bucket
+    bucket = config.s3_test_data.bucket
     key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
     return download_object_from_s3(_s3_client(), bucket, key)
 
 
 def _s3_get_visit_ccd_fits_calexp(visit: Visit, ccd_name: str) -> bytes:
     def read(start: int, end: int) -> bytes:
-        bucket = config.s3_repository.bucket
+        bucket = config.s3_test_data.bucket
         key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
         return download_object_from_s3(_s3_client(), bucket, key, offset=start, length=end - start)
 
@@ -52,7 +52,7 @@ def _s3_get_visit_ccd_fits_calexp(visit: Visit, ccd_name: str) -> bytes:
 
 
 def _s3_client():
-    s3_config = config.s3_repository
+    s3_config = config.s3_test_data
     return minio.Minio(
         s3_config.endpoint,
         access_key=s3_config.access_key,

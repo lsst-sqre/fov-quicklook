@@ -14,7 +14,7 @@ def test_s3_partial_load():
     ccd_name = 'R11_S21'
 
     def read(start: int, end: int) -> bytes:
-        bucket = config.s3_repository.bucket
+        bucket = config.s3_test_data.bucket
         key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
         return download_object_from_s3(s3_client(), bucket, key, offset=start, length=end - start)
 
@@ -27,7 +27,7 @@ def test_s3_partial_load():
 
 
 def s3_client():
-    s3_config = config.s3_repository
+    s3_config = config.s3_test_data
     return minio.Minio(
         s3_config.endpoint,
         access_key=s3_config.access_key,
