@@ -20,6 +20,7 @@ setup(
         'rtree',
         'zstandard',
         'aiohttp',
+        'requests',
         'SQLAlchemy==2.*',
         'alembic==1.12.*',
         'tqdm',
@@ -31,7 +32,6 @@ setup(
         'dev': [
             'httpx',
             'pdbpp',
-            'requests',
             'pytest-watch',
             'pytest-cov',
             'pytest-env',
