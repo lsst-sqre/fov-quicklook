@@ -9,5 +9,8 @@ class _CustomFilter(logging.Filter):
         return not any(pattern in record.getMessage() for pattern in self.ignore_patterns)
 
 
-def filter_logs(ignore_patterns: list[str]):  # pragma: no cover
+def initialize_logger(ignore_patterns: list[str]):  # pragma: no cover
     logging.getLogger('uvicorn.access').addFilter(_CustomFilter(ignore_patterns))
+
+    # 時刻も表示する
+    logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)

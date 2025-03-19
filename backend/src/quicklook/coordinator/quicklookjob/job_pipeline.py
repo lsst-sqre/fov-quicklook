@@ -172,9 +172,13 @@ async def scatter_transfer_job(job: QuicklookJob):
                 f'http://{g.host}:{g.port}/quicklooks/transfer',
                 json=asdict(task),
                 raise_for_status=True,
+                timeout=aiohttp.ClientTimeout(total=3600),
             ) as res:
                 while True:
-                    msg: TransferTaskResponse = await message_from_async_reader(res.content.readexactly)
+                    try:
+                        msg: TransferTaskResponse = await message_from_async_reader(res.content.readexactly)
+                    except Exception as e:
+                        raise RuntimeError(f'Error while reading transfer task response from {g.host}:{g.port}') from e
                     match msg:
                         case None:
                             break

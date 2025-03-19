@@ -17,7 +17,7 @@ from quicklook.utils import multiprocessing_coverage_compatible, throttle
 from quicklook.utils.numpyutils import npybytes2ndarray
 from quicklook.utils.timeit import timeit
 
-logger = getLogger(f'uviorn.{__name__}')
+logger = getLogger(f'uvicorn.{__name__}')
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class TileId:
 
 
 @dataclass
-class Context:
+class TileParams:
     visit: Visit
     tile_id: TileId
     generators: list[GeneratorPod]
@@ -41,7 +41,7 @@ def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None
             primary, all_generators = get_generators_info(task, tile_id)
             if primary == task.generator:
                 non_primary_generators = [g for g in all_generators if g != primary]
-                yield Context(
+                yield TileParams(
                     visit=task.visit,
                     tile_id=tile_id,
                     generators=non_primary_generators,
@@ -49,13 +49,16 @@ def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None
 
     @throttle.throttle(0.1)
     def on_update(progress: TransferProgress):
+        logger.info(f'{progress.transfer.count}/{progress.transfer.total}')
         send(progress)
 
-    total = count_total_tiles(task)
+    with timeit(f'transfer enumerate {task.visit.id}'):
+        params_list = list(iter_tiles())
+        total = len(params_list)
 
     with multiprocessing_coverage_compatible.Pool(config.tile_transfer_parallel) as pool:
         done = 0
-        for _ in pool.imap_unordered(process_tile, iter_tiles(), chunksize=32):
+        for _ in pool.imap_unordered(process_tile, params_list, chunksize=1):
             done += 1
             progress = TransferProgress(
                 transfer=Progress(
@@ -67,24 +70,17 @@ def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None
     throttle.flush(on_update)
 
 
-def count_total_tiles(task: TransferTask) -> int:
-    count = 0
-    for level, i, j in tmptile.iter_tiles(task.visit):
-        tile_id = TileId(level, i, j)
-        primary, all_generators = get_generators_info(task, tile_id)
-        if primary == task.generator:
-            count += 1
-    return count
-
-
-def process_tile(ctx: Context) -> None:
-    tile_id = ctx.tile_id
-    visit = ctx.visit
-    npy = tmptile.get_tile_npy(visit, tile_id.level, tile_id.i, tile_id.j)
-    if len(ctx.generators) > 0:
-        for tile in gather_tiles(ctx.generators, visit, tile_id.level, tile_id.i, tile_id.j):
-            npy += tile
-    storage.put_quicklook_tile(Tile(visit=visit, level=tile_id.level, i=tile_id.i, j=tile_id.j, data=npy))
+def process_tile(params: TileParams) -> None:
+    with timeit(f'process_tile {params.visit.id} {params.tile_id.level} {params.tile_id.i} {params.tile_id.j}'):
+        tile_id = params.tile_id
+        visit = params.visit
+        npy = tmptile.get_tile_npy(visit, tile_id.level, tile_id.i, tile_id.j)
+        with timeit(f'gather {visit.id} {tile_id.level} {tile_id.i} {tile_id.j}'):
+            if len(params.generators) > 0:
+                for tile in gather_tiles(params.generators, visit, tile_id.level, tile_id.i, tile_id.j):
+                    npy += tile
+        with timeit(f'put_quicklook_tile {visit.id} {tile_id.level} {tile_id.i} {tile_id.j}'):
+            storage.put_quicklook_tile(Tile(visit=visit, level=tile_id.level, i=tile_id.i, j=tile_id.j, data=npy))
 
 
 def gather_tiles(

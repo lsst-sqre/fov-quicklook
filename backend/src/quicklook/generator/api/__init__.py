@@ -103,6 +103,8 @@ def tile_generate_process():
 
 @app.post('/quicklooks/transfer')
 def transfer_quicklook(task: TransferTask):
+    logger.info(f'Transfer quicklook for {task}')
+    
     q = queue.Queue()
 
     def main():

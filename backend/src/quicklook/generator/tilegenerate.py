@@ -23,6 +23,8 @@ from quicklook.utils import throttle
 from quicklook.utils.dynamicsemaphore import DynamicSemaphore
 from quicklook.utils.timeit import timeit
 
+logger = logging.getLogger(f'uvicorn.{__name__}')
+
 
 def run_generate(task: GenerateTask, send: Callable[[GenerateTaskResponse], None]):
     @throttle.throttle(0.1)
