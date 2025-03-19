@@ -1,7 +1,6 @@
 import pickle
 from pathlib import Path
 
-import minio
 import pytest
 
 from quicklook.config import config

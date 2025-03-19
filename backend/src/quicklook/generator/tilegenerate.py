@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Generator
 
-import minio
-
 from quicklook.config import config
 from quicklook.coordinator.quicklookjob.tasks import GenerateTask
 from quicklook.datasource import get_datasource
@@ -122,8 +120,6 @@ def iterate_downloaded_ccds(
                     update_progress(Progress(i + 1, len(ccd_names)))
                     try:
                         yield f.result()
-                    except minio.error.S3Error as e:  # pragma: no cover
-                        logging.warning(e)
                     except Exception as e:  # pragma: no cover
                         traceback.print_exc()
 

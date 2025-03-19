@@ -1,7 +1,6 @@
 import tempfile
 
 import astropy.io.fits as pyfits
-import minio
 
 from quicklook.config import config
 from quicklook.types import Visit

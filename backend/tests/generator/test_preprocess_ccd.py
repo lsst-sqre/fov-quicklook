@@ -1,9 +1,5 @@
 import tempfile
-import io
-import pickle
 from pathlib import Path
-
-import minio
 
 from quicklook.config import config
 from quicklook.generator.preprocess_ccd import preprocess_ccd

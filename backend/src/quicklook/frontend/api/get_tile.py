@@ -1,4 +1,3 @@
-import minio.error
 import asyncio
 import logging
 import traceback
@@ -21,6 +20,7 @@ from quicklook.tileinfo import TileInfo
 from quicklook.types import GeneratorPod, Visit
 from quicklook.utils import zstd
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
+from quicklook.utils.s3 import NoSuchKey
 from quicklook.utils.sizelimitedset import SizeLimitedSet
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
@@ -47,7 +47,7 @@ async def get_tile(
 async def get_tile_from_storage(visit: Visit, z: int, y: int, x: int) -> Response:
     try:
         data = storage.get_quicklook_tile_bytes(visit, z, y, x)
-    except minio.error.S3Error:
+    except NoSuchKey:
         return Response(blank_npy_zstd(), media_type='application/npy+zstd')
     return Response(data, media_type='application/npy+zstd')
 
