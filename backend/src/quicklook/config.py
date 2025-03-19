@@ -4,18 +4,12 @@ import re
 from functools import cached_property
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import  field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from quicklook.utils.s3 import S3Config
+
 os.environ['http_proxy'] = ''
-
-
-class S3Config(BaseModel):
-    endpoint: str
-    access_key: str
-    secret_key: str
-    secure: bool
-    bucket: str
 
 
 class Config(BaseSettings):

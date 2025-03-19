@@ -14,9 +14,8 @@ def test_s3_partial_load():
     ccd_name = 'R11_S21'
 
     def read(start: int, end: int) -> bytes:
-        bucket = config.s3_test_data.bucket
         key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
-        return download_object_from_s3(s3_client(), bucket, key, offset=start, length=end - start)
+        return download_object_from_s3(config.s3_test_data, key, offset=start, length=end - start)
 
     data = fits_partial_load(read, [0, 1])
     with tempfile.NamedTemporaryFile(suffix='.fits') as f:
@@ -24,13 +23,3 @@ def test_s3_partial_load():
         f.flush()
         with pyfits.open(f.name) as hdul:  # type: ignore
             hdul[1].data[-1]  # type: ignore
-
-
-def s3_client():
-    s3_config = config.s3_test_data
-    return minio.Minio(
-        s3_config.endpoint,
-        access_key=s3_config.access_key,
-        secret_key=s3_config.secret_key,
-        secure=s3_config.secure,
-    )

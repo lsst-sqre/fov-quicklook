@@ -1,7 +1,4 @@
-from dataclasses import dataclass
 from pathlib import Path
-
-import minio
 
 from quicklook.config import config
 from quicklook.types import CcdId, Visit
@@ -37,25 +34,13 @@ def _s3_get_visit_ccd_fits(visit: Visit, ccd_name: str) -> bytes:
 
 
 def _s3_get_visit_ccd_fits_raw(visit: Visit, ccd_name: str) -> bytes:
-    bucket = config.s3_test_data.bucket
     key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
-    return download_object_from_s3(_s3_client(), bucket, key)
+    return download_object_from_s3(config.s3_test_data, key)
 
 
 def _s3_get_visit_ccd_fits_calexp(visit: Visit, ccd_name: str) -> bytes:
     def read(start: int, end: int) -> bytes:
-        bucket = config.s3_test_data.bucket
         key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
-        return download_object_from_s3(_s3_client(), bucket, key, offset=start, length=end - start)
+        return download_object_from_s3(config.s3_test_data, key, offset=start, length=end - start)
 
     return fits_partial_load(read, [0, 1])
-
-
-def _s3_client():
-    s3_config = config.s3_test_data
-    return minio.Minio(
-        s3_config.endpoint,
-        access_key=s3_config.access_key,
-        secret_key=s3_config.secret_key,
-        secure=s3_config.secure,
-    )
