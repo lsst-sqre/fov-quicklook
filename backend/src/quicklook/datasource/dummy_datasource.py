@@ -3,7 +3,7 @@ from pathlib import Path
 from quicklook.config import config
 from quicklook.types import CcdId, Visit
 from quicklook.utils.fits import fits_partial_load
-from quicklook.utils.s3 import download_object_from_s3
+from quicklook.utils.s3 import s33_download_object, s3_list_object_name, s3_list_objects
 
 from .types import DataSourceBase, Query, Visit
 
@@ -21,9 +21,8 @@ class DummyDataSource(DataSourceBase):
         return _s3_get_visit_ccd_fits(ref.visit, ref.ccd_name)
 
     def list_ccds(self, visit: Visit) -> list[str]:
-        bucket = config.s3_test_data.bucket
         prefix = f'{visit.data_type}/{visit.name}/'
-        return [Path(obj.object_name).stem for obj in _s3_client().list_objects(bucket, prefix=prefix)]  # type: ignore
+        return [Path(obj_name).stem for obj_name in s3_list_object_name(config.s3_test_data, prefix=prefix)]
 
 
 def _s3_get_visit_ccd_fits(visit: Visit, ccd_name: str) -> bytes:
@@ -35,12 +34,12 @@ def _s3_get_visit_ccd_fits(visit: Visit, ccd_name: str) -> bytes:
 
 def _s3_get_visit_ccd_fits_raw(visit: Visit, ccd_name: str) -> bytes:
     key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
-    return download_object_from_s3(config.s3_test_data, key)
+    return s33_download_object(config.s3_test_data, key)
 
 
 def _s3_get_visit_ccd_fits_calexp(visit: Visit, ccd_name: str) -> bytes:
     def read(start: int, end: int) -> bytes:
         key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
-        return download_object_from_s3(config.s3_test_data, key, offset=start, length=end - start)
+        return s33_download_object(config.s3_test_data, key, offset=start, length=end - start)
 
     return fits_partial_load(read, [0, 1])

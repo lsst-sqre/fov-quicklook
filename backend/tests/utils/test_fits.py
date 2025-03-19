@@ -6,7 +6,7 @@ import minio
 from quicklook.config import config
 from quicklook.types import Visit
 from quicklook.utils.fits import fits_partial_load
-from quicklook.utils.s3 import download_object_from_s3
+from quicklook.utils.s3 import s33_download_object
 
 
 def test_s3_partial_load():
@@ -15,7 +15,7 @@ def test_s3_partial_load():
 
     def read(start: int, end: int) -> bytes:
         key = f'{visit.data_type}/{visit.name}/{ccd_name}.fits'
-        return download_object_from_s3(config.s3_test_data, key, offset=start, length=end - start)
+        return s33_download_object(config.s3_test_data, key, offset=start, length=end - start)
 
     data = fits_partial_load(read, [0, 1])
     with tempfile.NamedTemporaryFile(suffix='.fits') as f:

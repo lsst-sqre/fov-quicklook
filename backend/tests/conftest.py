@@ -7,7 +7,7 @@ import pytest
 from quicklook.config import config
 from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.types import CcdId, PreProcessedCcd, Visit
-from quicklook.utils.s3 import download_object_from_s3
+from quicklook.utils.s3 import s33_download_object
 
 ccd_id = 'R01_S12'
 
@@ -16,7 +16,7 @@ ccd_id = 'R01_S12'
 def broccoli_fits_and_ccd_id():
     cache_path = Path('./tmp/broccoli.fits')
     if not cache_path.exists():
-        file_contents = download_object_from_s3(config.s3_test_data, f'raw/broccoli/{ccd_id}.fits')
+        file_contents = s33_download_object(config.s3_test_data, f'raw/broccoli/{ccd_id}.fits')
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         with cache_path.open('wb') as f:
             f.write(file_contents)

@@ -9,14 +9,14 @@ from quicklook.config import config
 from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.types import CcdId, Visit
 from quicklook.utils.fits import preload_pyfits_compression_code
-from quicklook.utils.s3 import download_object_from_s3
+from quicklook.utils.s3 import s33_download_object
 from quicklook.utils.timeit import timeit
 
 
 def test_preprocess_ccd_raw():
     visit = Visit.from_id('raw:20230511PH')
     with timeit('load-fits'):
-        file_contents = download_object_from_s3(config.s3_test_data, f'raw/broccoli/R00_SG0.fits')
+        file_contents = s33_download_object(config.s3_test_data, f'raw/broccoli/R00_SG0.fits')
 
         with timeit('preprocess'):
             with tempfile.NamedTemporaryFile() as f:
@@ -27,7 +27,7 @@ def test_preprocess_ccd_raw():
 def test_preprocess_ccd_calexp():
     visit = Visit.from_id('calexp:192350')
     with timeit('load-fits'):
-        file_contents = download_object_from_s3(config.s3_test_data, f'calexp/192350/R01_S00.fits')
+        file_contents = s33_download_object(config.s3_test_data, f'calexp/192350/R01_S00.fits')
 
         with timeit('preprocess'):
             with tempfile.NamedTemporaryFile() as f:

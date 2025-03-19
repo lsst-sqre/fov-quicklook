@@ -4,15 +4,15 @@ from quicklook.config import config
 from quicklook.coordinator.quicklookjob.job import QuicklookJob
 from quicklook.types import QuicklookMeta, Tile, Visit
 from quicklook.utils import zstd
-from quicklook.utils.s3 import download_object_from_s3, upload_object_to_s3
+from quicklook.utils.s3 import s33_download_object, s3_upload_object
 
 
 def put(key: str, value: bytes) -> None:
-    upload_object_to_s3(config.s3_tile, key, value, 'application/octet-stream')
+    s3_upload_object(config.s3_tile, key, value, 'application/octet-stream')
 
 
 def get(key: str) -> bytes:
-    return download_object_from_s3(config.s3_tile, key)
+    return s33_download_object(config.s3_tile, key)
 
 
 def put_quicklook_meta(visit: Visit, meta: QuicklookMeta) -> None:

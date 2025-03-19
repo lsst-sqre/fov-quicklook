@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import io
+from typing import Iterable
 import minio
+from minio.datatypes import Object as MinioObject
 
 
 @dataclass(frozen=True)
@@ -12,7 +14,7 @@ class S3Config:
     bucket: str
 
 
-def download_object_from_s3(
+def s33_download_object(
     settings: S3Config,
     key: str,
     *,
@@ -41,7 +43,7 @@ def download_object_from_s3(
             response.release_conn()
 
 
-def upload_object_to_s3(
+def s3_upload_object(
     s3_config: S3Config,
     key: str,
     data: bytes,
@@ -61,3 +63,25 @@ def upload_object_to_s3(
         len(data),
         content_type=content_type,
     )
+
+
+def s3_list_objects(s3_config: S3Config, prefix: str) -> Iterable[MinioObject]:
+    client = minio.Minio(
+        s3_config.endpoint,
+        access_key=s3_config.access_key,
+        secret_key=s3_config.secret_key,
+        secure=s3_config.secure,
+    )
+    return client.list_objects(s3_config.bucket, prefix=prefix)
+
+
+def s3_list_object_name(s3_config: S3Config, prefix: str) -> Iterable[str]:
+    client = minio.Minio(
+        s3_config.endpoint,
+        access_key=s3_config.access_key,
+        secret_key=s3_config.secret_key,
+        secure=s3_config.secure,
+    )
+    for obj in client.list_objects(s3_config.bucket, prefix=prefix):
+        assert obj.object_name
+        yield obj.object_name
