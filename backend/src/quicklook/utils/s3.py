@@ -14,7 +14,7 @@ class S3Config:
     bucket: str
 
 
-def s33_download_object(
+def s3_download_object(
     settings: S3Config,
     key: str,
     *,
