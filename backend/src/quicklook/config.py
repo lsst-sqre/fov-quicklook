@@ -54,7 +54,7 @@ class Config(BaseSettings):
     tile_ccd_processing_parallel: int = 32
     tile_compression_level: int = 9
     tile_merge_parallel: int = 8
-    tile_pack: int = 2 # tile_packed**2個のタイルがまとまってobject storageに保存される
+    tile_pack: int = 2  # tile_packed**2個のタイルがまとまってobject storageに保存される
 
     tile_tmpdir: str = '/dev/shm/quicklook/tile_tmp'  # used in generator
     tile_merged_dir: str = '/tmp/quicklook/merged'  # used in generator

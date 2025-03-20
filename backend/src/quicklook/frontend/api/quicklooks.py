@@ -12,7 +12,6 @@ from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWatcher
 from quicklook.types import CcdMeta, GenerateProgress, MergeProgress, TransferProgress, Visit
 from quicklook.utils.http_request import http_request
 from quicklook.utils.websocket import safe_websocket
-from pydantic import field_validator
 
 router = APIRouter()
 
@@ -44,9 +43,13 @@ async def list_quicklooks():
 
 @router.get('/api/quicklooks/{id}/status', response_model=QuicklookStatus | None)
 async def show_quicklook_status(id: str):
-    report = RemoteQuicklookJobsWatcher().jobs.get(Visit.from_id(id))
+    visit = Visit.from_id(id)
+    report = RemoteQuicklookJobsWatcher().jobs.get(visit)
     if report is None:
-        return None
+        job = storage.load_quicklook_job(visit)
+        if job:
+            return QuicklookStatus.from_report(QuicklookJobReport.from_job(job))
+        return
     return QuicklookStatus.from_report(report)
 
 
@@ -62,6 +65,10 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
         async for job in RemoteQuicklookJobsWatcher().watch(pick):  # pragma: no branch
             try:
                 model = QuicklookStatus.from_report(job).model_dump() if job else None
+                if model is None:
+                    job = storage.load_quicklook_job(visit)
+                    if job:
+                        model = QuicklookStatus.from_report(QuicklookJobReport.from_job(job)).model_dump()
                 await client_ws.send_json(model)
             except WebSocketDisconnect:
                 break

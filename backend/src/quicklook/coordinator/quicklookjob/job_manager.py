@@ -65,7 +65,7 @@ class _JobSynchronizer:
         self._q.put(WatchEvent(report, 'added'))
 
     def delete(self, job: QuicklookJob):
-        del self._entries[job.visit]
+        self._entries.pop(job.visit)
         self._q.put(WatchEvent(QuicklookJobReport.from_job(job), 'deleted'))
 
     def delete_all(self):

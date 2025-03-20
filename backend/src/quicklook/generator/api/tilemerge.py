@@ -9,18 +9,18 @@ import requests
 
 from quicklook.config import config
 from quicklook.coordinator.quicklookjob.tasks import MergeTask
-from quicklook.select_primary_generator import select_primary_generator
 from quicklook.generator.generatorstorage import mergedtile_storage, tmptile_storage
+from quicklook.select_primary_generator import select_primary_generator
 from quicklook.types import GeneratorPod, MergeProgress, MergeTaskResponse, Progress, TileId, Visit
 from quicklook.utils import multiprocessing_coverage_compatible, throttle, zstd
-from quicklook.utils.numpyutils import npybytes2ndarray
+from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
 from quicklook.utils.timeit import timeit
 
 logger = getLogger(f'uvicorn.{__name__}')
 
 
 @dataclass
-class TileParams:
+class Args:
     visit: Visit
     tile_id: TileId
     generators: list[GeneratorPod]
@@ -33,7 +33,7 @@ def run_merge(task: MergeTask, send: Callable[[MergeTaskResponse], None]) -> Non
             primary, all_generators = select_primary_generator(task.ccd_generator_map, tile_id)
             if primary == task.generator:
                 non_primary_generators = [g for g in all_generators if g != primary]
-                yield TileParams(
+                yield Args(
                     visit=task.visit,
                     tile_id=tile_id,
                     generators=non_primary_generators,
@@ -49,27 +49,24 @@ def run_merge(task: MergeTask, send: Callable[[MergeTaskResponse], None]) -> Non
 
     on_update(MergeProgress(merge=Progress(count=0, total=total)))
 
-    try:
-        with timeit(f'merge {task.visit.id}'):
-            with multiprocessing_coverage_compatible.Pool(config.tile_merge_parallel) as pool:
-                for done, _ in enumerate(pool.imap_unordered(process_tile, params_list)):
-                    progress = MergeProgress(merge=Progress(count=done + 1, total=total))
-                    on_update(progress)
-    finally:
-        tmptile_storage.delete(visit=task.visit)
+    with timeit(f'merge {task.visit.id}'):
+        with multiprocessing_coverage_compatible.Pool(config.tile_merge_parallel) as pool:
+            for done, _ in enumerate(pool.imap_unordered(process_tile, params_list)):
+                progress = MergeProgress(merge=Progress(count=done + 1, total=total))
+                on_update(progress)
 
     throttle.flush(on_update)
 
 
-def process_tile(params: TileParams) -> None:
+def process_tile(params: Args) -> None:
     tile_id = params.tile_id
     visit = params.visit
     npy = tmptile_storage.get_tile_npy(visit, tile_id.level, tile_id.i, tile_id.j)
     if len(params.generators) > 0:
         for tile in gather_tiles(params.generators, visit, tile_id.level, tile_id.i, tile_id.j):
             npy += tile
-    compressed = zstd.compress(npy.tobytes())
-    mergedtile_storage.put_tile_data(visit, tile_id.level, tile_id.i, tile_id.j, compressed)
+    compressed = zstd.compress(ndarray2npybytes(npy))
+    mergedtile_storage.put_compressed_tile_data(visit, tile_id.level, tile_id.i, tile_id.j, compressed)
 
 
 def gather_tiles(

@@ -15,3 +15,16 @@ def compressor():
 @cache
 def thread_local_compressor(thread_id: int):
     return zstd.ZstdCompressor()
+
+
+def decompress(data: bytes) -> bytes:
+    return decompressor().decompress(data)
+
+
+def decompressor():
+    return thread_local_decompressor(threading.get_ident())
+
+
+@cache
+def thread_local_decompressor(thread_id: int):
+    return zstd.ZstdDecompressor()

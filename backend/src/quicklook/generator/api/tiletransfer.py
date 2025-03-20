@@ -1,25 +1,20 @@
-from quicklook.config import config
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from logging import getLogger
 from typing import Callable
 
+import requests
+
 from quicklook import storage
+from quicklook.config import config
 from quicklook.coordinator.quicklookjob.tasks import TransferTask
 from quicklook.generator.generatorstorage import mergedtile_storage
-from quicklook.types import TileId, TransferProgress, Progress, TransferTaskResponse, Visit
+from quicklook.select_primary_generator import NoOverlappingGenerators, select_primary_generator
+from quicklook.types import GeneratorPod, PackedTileId, Progress, TileId, TransferProgress, TransferTaskResponse
 from quicklook.utils import throttle
 from quicklook.utils.timeit import timeit
 
 logger = getLogger(f'uvicorn.{__name__}')
-
-
-@dataclass(frozen=True)
-class Args:
-    visit: Visit
-    level: int
-    i: int
-    j: int
 
 
 def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None]) -> None:
@@ -28,11 +23,9 @@ def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None
         send(progress)
 
     def iter_tiles():
-        # pack = config.tile_pack
-        pack = 0
-        distinct_tiles: set[Args] = set()
+        distinct_tiles: set[PackedTileId] = set()
         for level, i, j in mergedtile_storage.iter_tiles(task.visit):
-            tile_id = Args(task.visit, level, i << pack, j << pack)
+            tile_id = PackedTileId.from_unpacked(level, i, j)
             if tile_id in distinct_tiles:
                 continue
             distinct_tiles.add(tile_id)
@@ -40,23 +33,46 @@ def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None
         yield from distinct_tiles
 
     with timeit(f'transfer enumerate {task.visit.id}'):
-        params_list = list(iter_tiles())
-        total = len(params_list)
+        args_list = list(iter_tiles())
+        total = len(args_list)
 
     on_update(TransferProgress(transfer=Progress(count=0, total=total)))
 
     with timeit(f'transfer {task.visit.id}'):
         with ThreadPoolExecutor(2) as executor:
-            futures = [executor.submit(process_tile, params) for params in params_list]
+            futures = [executor.submit(transfer_packed_tile, task, args) for args in args_list]
             for done, _ in enumerate(as_completed(futures)):
                 progress = TransferProgress(transfer=Progress(count=done + 1, total=total))
                 on_update(progress)
     throttle.flush(on_update)
 
 
-def process_tile(args: Args) -> None:
-    visit = args.visit
-    level = args.level
-    i = args.i
-    j = args.j
-    storage.put_quicklook_tile_bytes(visit, level, i, j, mergedtile_storage.get_tile_data(visit, level, i, j))
+def transfer_packed_tile(task: TransferTask, packed_id: PackedTileId) -> None:
+    level = packed_id.level
+
+    def get_zstd(tile_id: TileId) -> bytes | None:
+        try:
+            generator, _ = select_primary_generator(task.ccd_generator_map, tile_id)
+        except NoOverlappingGenerators:
+            return None
+
+        if generator == task.generator:
+            try:
+                return mergedtile_storage.get_compressed_tile_data(task.visit, tile_id.level, tile_id.i, tile_id.j)
+            except FileNotFoundError:
+                return None
+
+        try:
+            response = requests.get(f'http://{generator.name}/quicklooks/{task.visit.id}/merged-tiles/{level}/{tile_id.i}/{tile_id.j}', timeout=30)
+            response.raise_for_status()
+            return response.content
+        except Exception:  # pragma: no cover
+            traceback.print_exc()
+            return None
+
+    with ThreadPoolExecutor((1 << config.tile_pack) ** 2) as executor:
+        zstds = executor.map(
+            get_zstd,
+            packed_id.unpackeds(),
+        )
+        storage.put_quicklook_packed_tile_array(task.visit, packed_id, list(zstds))

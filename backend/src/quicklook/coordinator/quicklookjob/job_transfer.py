@@ -26,7 +26,7 @@ async def _scatter_transfer_job(job: QuicklookJob, sync_job: Callable[[Quicklook
     nodes: dict[str, TransferProgress] = {}
 
     async def run_1_task(g: GeneratorPod):
-        task = TransferTask(visit=job.visit)
+        task = TransferTask(visit=job.visit, generator=g, ccd_generator_map=ccd_generator_map)
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f'http://{g.host}:{g.port}/quicklooks/transfer',

@@ -1,5 +1,7 @@
 import json
+import time
 
+import numpy
 import pytest
 import requests
 import websockets.sync.client as websockets
@@ -9,6 +11,7 @@ from quicklook.config import config
 from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase
 from quicklook.frontend.api.quicklooks import QuicklookStatus
 from quicklook.mutableconfig import MutableConfig
+from quicklook.utils import zstd
 
 
 def test_frontend_ok():
@@ -67,7 +70,8 @@ def one_quicklook_created(request):
                         break
             except ConnectionClosedOK:
                 break
-    return job_stop_at
+    yield job_stop_at
+    time.sleep(1.5)  # テスト時にはjob_runnerが処理完了の1秒後にもう１度通知を行うため。
 
 
 def test_create_quicklook(one_quicklook_created):
@@ -96,12 +100,17 @@ def test_get_tile(one_quicklook_created):
         case 'READY':
             assert res.headers['x-quicklook-phase'] == 'READY'
             assert res.headers['Content-Type'] == 'application/npy+zstd'
+            assert res.content[:4] == b'\x28\xb5\x2f\xfd'
+            assert is_valid_compressed_numpy_bytes(res.content)
         case 'GENERATE_DONE':
             assert res.headers['x-quicklook-phase'] == 'GENERATE_DONE'
             assert res.headers['Content-Type'] == 'application/npy'
+            assert is_valid_numpy_bytes(res.content)
         case 'MERGE_DONE':
             assert res.headers['x-quicklook-phase'] == 'MERGE_DONE'
             assert res.headers['Content-Type'] == 'application/npy+zstd'
+            assert res.content[:4] == b'\x28\xb5\x2f\xfd'
+            assert is_valid_compressed_numpy_bytes(res.content)
         case _:
             assert False, f'Unexpected one_quicklook_created: {one_quicklook_created}'
 
@@ -114,14 +123,26 @@ def test_get_tile_for_blank_region(one_quicklook_created):
         case 'READY':
             assert res.headers['Content-Type'] == 'application/npy+zstd'
             assert res.headers['x-quicklook-phase'] == 'READY'
+            assert is_valid_compressed_numpy_bytes(res.content)
         case 'GENERATE_DONE':
             assert res.headers['Content-Type'] == 'application/npy+zstd'
             assert res.headers['x-quicklook-phase'] == 'GENERATE_DONE'
+            assert is_valid_compressed_numpy_bytes(res.content)
         case 'MERGE_DONE':
             assert res.headers['Content-Type'] == 'application/npy+zstd'
             assert res.headers['x-quicklook-phase'] == 'MERGE_DONE'
+            assert is_valid_compressed_numpy_bytes(res.content)
         case _:
             assert False, f'Unexpected one_quicklook_created: {one_quicklook_created}'
+
+
+def is_valid_numpy_bytes(data: bytes) -> bool:
+    return data[:6] == b'\x93NUMPY'
+
+
+def is_valid_compressed_numpy_bytes(data: bytes) -> bool:
+    raw = zstd.decompress(data)
+    return is_valid_numpy_bytes(raw)
 
 
 def test_get_fits_header(one_quicklook_created):

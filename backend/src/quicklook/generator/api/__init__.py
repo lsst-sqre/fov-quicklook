@@ -181,7 +181,7 @@ def get_merged_tile(
 ):
     try:
         return Response(
-            mergedtile_storage.get_tile_data(visit, z, y, x),
+            mergedtile_storage.get_compressed_tile_data(visit, z, y, x),
             media_type='application/npy+zstd',
         )
     except FileNotFoundError:
@@ -212,11 +212,19 @@ async def delete_all_quicklooks():
     tmptile_storage.delete_all()
 
 
+class DeleteQuicklookParams(BaseModel):
+    tmp_tile: bool = True
+    merged_tile: bool = True
+
 @app.delete('/quicklooks/{id}')
 async def delete_quicklooks(
     visit: Annotated[Visit, Depends(visit_from_path)],
+    params: DeleteQuicklookParams,
 ):
-    tmptile_storage.delete(visit)
+    if params.tmp_tile:
+        tmptile_storage.delete(visit)
+    if params.merged_tile:
+        mergedtile_storage.delete(visit)
 
 
 

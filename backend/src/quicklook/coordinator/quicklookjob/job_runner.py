@@ -55,13 +55,15 @@ class QuicklookJobRunner:
                         raise JobSkipForTest
 
                     await job_merge(job, self._job_sync.sync)
+                    await cleanup(job, tmp_tile=True, merged_tile=False)
                     if mutable_config.job_stop_at == 'MERGE_DONE':
                         self._update_job_phase(job, QuicklookJobPhase.MERGE_DONE)
                         raise JobSkipForTest
 
-                # await job_transfer(job, self._job_sync.sync)
+                await job_transfer(job, self._job_sync.sync)
 
                 job.phase = QuicklookJobPhase.READY
+                storage.save_quicklook_job(job)
                 self._update_job_phase(job, QuicklookJobPhase.READY)
                 _update_job_record_phase(job, 'ready')
             except JobSkipForTest:
@@ -82,7 +84,7 @@ class QuicklookJobRunner:
                     await asyncio.sleep(cleanup_delay)
                     self._job_sync.unlink(job)
 
-                await asyncio.gather(delay_unlink_job(), cleanup(job))
+                await asyncio.gather(delay_unlink_job(), cleanup(job, tmp_tile=True, merged_tile=True))
 
     def _update_job_phase(self, job: QuicklookJob, phase: QuicklookJobPhase):
         job.phase = phase
@@ -98,11 +100,12 @@ class JobSynchronizer:
     unlink: Callable[[QuicklookJob], None]
 
 
-async def cleanup(job: QuicklookJob):
+async def cleanup(job: QuicklookJob, *, tmp_tile: bool, merged_tile: bool):
     async def run_1_task(g: GeneratorPod):
         async with aiohttp.ClientSession() as session:
             async with session.delete(
                 f'http://{g.host}:{g.port}/quicklooks/{job.visit.id}',
+                json={'tmp_tile': tmp_tile, 'merged_tile': merged_tile},
                 raise_for_status=True,
             ) as _:
                 pass

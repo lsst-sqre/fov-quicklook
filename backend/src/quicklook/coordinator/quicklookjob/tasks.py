@@ -20,3 +20,5 @@ class MergeTask:
 @dataclass
 class TransferTask:
     visit: Visit
+    generator: GeneratorPod
+    ccd_generator_map: dict[str, GeneratorPod]

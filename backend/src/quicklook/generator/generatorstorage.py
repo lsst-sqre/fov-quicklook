@@ -56,13 +56,13 @@ class _GeneratorTmpTile:
 
 
 class _GeneratorMergedTile:
-    def put_tile_data(self, visit: Visit, level: int, i: int, j: int, data: bytes):
+    def put_compressed_tile_data(self, visit: Visit, level: int, i: int, j: int, data: bytes):
         outfile = Path(f'{config.tile_merged_dir}/{visit.id}/{level}/{i}/{j}.npy.zstd')
         outfile.parent.mkdir(parents=True, exist_ok=True)
         with open(outfile, 'wb') as f:
             f.write(data)
 
-    def get_tile_data(self, visit: Visit, level: int, i: int, j: int) -> bytes:
+    def get_compressed_tile_data(self, visit: Visit, level: int, i: int, j: int) -> bytes:
         infile = Path(f'{config.tile_merged_dir}/{visit.id}/{level}/{i}/{j}.npy.zstd')
         if not infile.exists():
             raise FileNotFoundError(f'{infile} not found')
@@ -78,6 +78,11 @@ class _GeneratorMergedTile:
                                 # r は 3.npy.zstd のようなファイル名
                                 yield int(p.name), int(q.name), int(r.name.split('.')[0])
 
+    def delete(self, visit: Visit):
+        try:
+            shutil.rmtree(Path(f'{config.tile_merged_dir}/{visit.id}'))
+        except FileNotFoundError:
+            pass
 
 tmptile_storage = _GeneratorTmpTile()
 mergedtile_storage = _GeneratorMergedTile()
