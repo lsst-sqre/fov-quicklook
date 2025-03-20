@@ -9,7 +9,7 @@ from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
 from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase, QuicklookJobReport
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
-from quicklook.types import CcdMeta, GenerateProgress, TransferProgress, Visit
+from quicklook.types import CcdMeta, GenerateProgress, MergeProgress, TransferProgress, Visit
 from quicklook.utils.http_request import http_request
 from quicklook.utils.websocket import safe_websocket
 from pydantic import field_validator
@@ -24,6 +24,7 @@ class QuicklookStatus(BaseModel):
     phase: QuicklookJobPhase
     generate_progress: dict[str, GenerateProgress] | None
     transfer_progress: dict[str, TransferProgress] | None
+    merge_progress: dict[str, MergeProgress] | None
 
     @classmethod
     def from_report(cls, report: QuicklookJobReport) -> 'QuicklookStatus':
@@ -32,6 +33,7 @@ class QuicklookStatus(BaseModel):
             phase=report.phase,
             generate_progress=report.generate_progress,
             transfer_progress=report.transfer_progress,
+            merge_progress=report.merge_progress,
         )
 
 

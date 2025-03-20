@@ -61,9 +61,8 @@ class Config(BaseSettings):
     fitsio_tmpdir: str = '/dev/shm/quicklook/fitsio'  # used in generator
     fitsio_decompress_parallel: int = 4
 
-    max_generate_jobs: int = 2
-    max_transfer_jobs: int = 4
-    max_temporary_quicklooks: int = 20
+    job_max_ram_limit_stage: int = 4
+    job_max_disk_limit_stage: int = 20
 
     timeit_log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO'
 

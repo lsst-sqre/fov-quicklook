@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.job_pipeline import job_manager
+from quicklook.coordinator.quicklookjob.job_pipeline.job_manager import job_manager
 
 from .admin_page import router as admin_page_router
 from .generators import active_context

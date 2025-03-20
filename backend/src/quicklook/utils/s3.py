@@ -102,5 +102,9 @@ def _create_s3_client_thread_local(settings: S3Config, thread_id: int):
         endpoint_url=f"{'https' if settings.secure else 'http'}://{settings.endpoint}",
         aws_access_key_id=settings.access_key,
         aws_secret_access_key=settings.secret_key,
-        config=Config(signature_version='s3v4', tcp_keepalive=True),
+        config=Config(
+            signature_version='s3v4',
+            tcp_keepalive=True,
+            response_checksum_validation='when_required',
+        ),
     )

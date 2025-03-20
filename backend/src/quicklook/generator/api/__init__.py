@@ -8,21 +8,22 @@ from dataclasses import dataclass
 from functools import cache
 from multiprocessing.connection import Connection
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Callable, TypeVar
 
 import numpy
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.responses import StreamingResponse
 
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.tasks import GenerateTask, TransferTask
+from quicklook.coordinator.quicklookjob.tasks import GenerateTask, MergeTask, TransferTask
 from quicklook.deps.visit_from_path import visit_from_path
 from quicklook.generator.api.baseprocesshandler import BaseProcessHandler
+from quicklook.generator.api.tilegenerate import run_generate
+from quicklook.generator.api.tilemerge import run_merge
+from quicklook.generator.api.tiletransfer import run_transfer
+from quicklook.generator.generatorstorage import mergedtile_storage, tmptile_storage
 from quicklook.generator.progress import GenerateProgress
-from quicklook.generator.tilegenerate import run_generate
-from quicklook.generator.tiletransfer import run_transfer
-from quicklook.generator.generatorlocaldisk import generator_local_disk
-from quicklook.types import CcdId, GenerateTaskResponse, TransferProgress, TransferTaskResponse, Visit
+from quicklook.types import CcdId, GenerateTaskResponse, MergeProgress, MergeTaskResponse, TransferProgress, Visit
 from quicklook.utils.globalstack import GlobalStack
 from quicklook.utils.message import encode_message
 from quicklook.utils.numpyutils import ndarray2npybytes
@@ -94,6 +95,7 @@ def create_tile_generate_process() -> BaseProcessHandler[GenerateTask, GenerateP
 @contextmanager
 def tile_generate_process():
     # process0だけは常に使い回す
+    # multiprocessing.Poolの生成に時間がかかるので
     if tile_generate_process0().available():
         yield tile_generate_process0()
     else:  # pragma: no cover
@@ -101,10 +103,37 @@ def tile_generate_process():
             yield p
 
 
+@app.post('/quicklooks/merge')
+def merge_quicklook(task: MergeTask):
+    logger.info(f'Merge quicklook for {task}')
+
+    q = queue.Queue()
+
+    def main():
+        with tile_merge_process() as p:
+            p.execute_task(task, on_update=q.put)
+
+    def stream_task_updates():
+        t = threading.Thread(target=main)
+        t.start()
+        while True:
+            msg: MergeTaskResponse = q.get()
+            yield encode_message(msg)
+            if msg is None:
+                break
+        t.join()
+
+    return StreamingResponse(stream_task_updates())
+
+
+def tile_merge_process():
+    return BaseProcessHandler[MergeTask, MergeProgress](process_target=tile_merge_process_target)
+
+
 @app.post('/quicklooks/transfer')
 def transfer_quicklook(task: TransferTask):
     logger.info(f'Transfer quicklook for {task}')
-    
+
     q = queue.Queue()
 
     def main():
@@ -115,7 +144,7 @@ def transfer_quicklook(task: TransferTask):
         t = threading.Thread(target=main)
         t.start()
         while True:
-            msg: TransferTaskResponse = q.get()
+            msg: MergeTaskResponse = q.get()
             yield encode_message(msg)
             if msg is None:
                 break
@@ -136,9 +165,25 @@ def get_tile(
     x: int,
 ):
     return Response(
-        ndarray2npybytes(generator_local_disk.get_tile_npy(visit, z, y, x)),
+        ndarray2npybytes(tmptile_storage.get_tile_npy(visit, z, y, x)),
         media_type='application/npy',
     )
+
+
+@app.get('/quicklooks/{id}/merged-tiles/{z}/{y}/{x}')
+def get_merged_tile(
+    visit: Annotated[Visit, Depends(visit_from_path)],
+    z: int,
+    y: int,
+    x: int,
+):
+    try:
+        return Response(
+            mergedtile_storage.get_tile_data(visit, z, y, x),
+            media_type='application/npy+zstd',
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail='Tile not found')
 
 
 @app.get('/quicklooks/{id}/fits_header/{ccd_name}')
@@ -162,14 +207,14 @@ async def get_pod_status():
 
 @app.delete('/quicklooks/*')
 async def delete_all_quicklooks():
-    generator_local_disk.delete_all_cache()
+    tmptile_storage.delete_all()
 
 
 @app.delete('/quicklooks/{id}')
 async def delete_quicklooks(
     visit: Annotated[Visit, Depends(visit_from_path)],
 ):
-    generator_local_disk.delete_cache(visit)
+    tmptile_storage.delete(visit)
 
 
 @app.post('/kill')
@@ -177,29 +222,27 @@ async def kill():  # pragma: no cover
     os._exit(0)
 
 
-def tile_generate_process_target(comm: Connection) -> None:
-    while True:
-        task: GenerateTask | None = comm.recv()
-        if task is None:
-            break
-        try:
-            run_generate(task, comm.send)
-        except Exception as e:  # pragma: no cover
-            traceback.print_exc()
-            comm.send(e)
-        finally:
-            comm.send(None)
+T = TypeVar('T')
+P = TypeVar('P')
 
 
-def tile_transfer_process_target(comm: Connection) -> None:
-    while True:
-        task: TransferTask | None = comm.recv()
-        if task is None:
-            break
-        try:
-            run_transfer(task, comm.send)
-        except Exception as e:  # pragma: no cover
-            traceback.print_exc()
-            comm.send(e)
-        finally:
-            comm.send(None)
+def create_process_target(runner_func: Callable[[T, Callable[[P | Exception | None], None]], None]) -> Callable[[Connection], None]:
+    def process_target(comm: Connection) -> None:
+        while True:
+            task: T | None = comm.recv()
+            if task is None:
+                break
+            try:
+                runner_func(task, comm.send)
+            except Exception as e:  # pragma: no cover
+                traceback.print_exc()
+                comm.send(e)
+            finally:
+                comm.send(None)
+
+    return process_target
+
+
+tile_generate_process_target = create_process_target(run_generate)
+tile_merge_process_target = create_process_target(run_merge)
+tile_transfer_process_target = create_process_target(run_transfer)

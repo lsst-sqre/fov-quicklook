@@ -5,6 +5,7 @@ from quicklook.coordinator.quicklookjob.job import QuicklookJob
 from quicklook.types import QuicklookMeta, Tile, Visit
 from quicklook.utils import zstd
 from quicklook.utils.s3 import s3_download_object, s3_upload_object
+from quicklook.utils.timeit import timeit
 
 
 def put(key: str, value: bytes) -> None:
@@ -35,7 +36,8 @@ def get_quicklook_job_config(visit: Visit) -> QuicklookJob:
 
 
 def put_quicklook_tile_bytes(visit: Visit, level: int, i: int, j: int, value: bytes) -> None:
-    put(f'quicklook/{visit.id}/tile/{level}/{i}/{j}.npy.zstd', value)
+    with timeit(f'put_quicklook_tile_bytes {visit.id} {level} {i} {j}'):
+        put(f'quicklook/{visit.id}/tile/{level}/{i}/{j}.npy.zstd', value)
 
 
 def get_quicklook_tile_bytes(visit: Visit, level: int, i: int, j: int) -> bytes:

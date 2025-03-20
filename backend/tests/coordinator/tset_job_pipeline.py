@@ -1,7 +1,7 @@
 import pytest
 
 from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
-from quicklook.coordinator.quicklookjob.job_pipeline import make_generate_tasks
+from quicklook.coordinator.quicklookjob.job_pipeline.job_generate import _make_generate_tasks
 from quicklook.types import GeneratorPod, Visit
 
 pytestmark = pytest.mark.focus
@@ -19,7 +19,7 @@ def test_make_generator_tasks():
         no_transfer=False,
     )
 
-    tasks, ccd_generator_map = make_generate_tasks(
+    tasks, ccd_generator_map = _make_generate_tasks(
         job,
         generators=generators,
     )

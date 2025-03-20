@@ -129,6 +129,10 @@ class GenerateProgress:
 
 
 @dataclass
+class MergeProgress:
+    merge: Progress
+    
+@dataclass
 class TransferProgress:
     transfer: Progress
 
@@ -146,4 +150,12 @@ class QuicklookMeta(BaseModel):
 
 
 GenerateTaskResponse = None | GenerateProgress | BaseException | CcdMeta
+MergeTaskResponse = None | MergeProgress | BaseException
 TransferTaskResponse = None | TransferProgress | BaseException
+
+
+@dataclass(frozen=True)
+class TileId:
+    level: int
+    i: int
+    j: int

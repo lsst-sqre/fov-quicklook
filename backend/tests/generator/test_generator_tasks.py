@@ -1,11 +1,10 @@
-import multiprocessing
 from pathlib import Path
 import tempfile
 
 import pytest
 
 from quicklook.coordinator.quicklookjob.tasks import GeneratorPod, GenerateTask
-from quicklook.generator import progress, tilegenerate
+from quicklook.generator.api import tilegenerate
 from quicklook.generator.progress import GeneratorProgressReporter, tqdm_progres_bar
 from quicklook.types import CcdId, GenerateProgress, Visit
 

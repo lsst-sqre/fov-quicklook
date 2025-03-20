@@ -13,7 +13,7 @@ from quicklook.models import QuicklookRecord
 from quicklook.types import Visit
 from quicklook.utils.websocket import safe_websocket
 
-from ..quicklookjob.job_pipeline import job_manager
+from ..quicklookjob.job_pipeline.job_manager import job_manager
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
 router = APIRouter()
@@ -25,9 +25,9 @@ class QuicklookCreate(BaseModel):
 
 
 @router.post("/quicklooks")
-async def create_quicklook(params: QuicklookCreate):
+async def create_quicklook(params: QuicklookCreate, background_tasks: BackgroundTasks):
     visit = params.visit
-    await job_manager.enqueue(visit, no_transfer=params.no_transfer)
+    background_tasks.add_task(job_manager.enqueue, visit, no_transfer=params.no_transfer)
 
 
 @router.delete("/quicklooks/*")

@@ -40,12 +40,15 @@ def test_show_quicklook_no_transfer(one_quicklook_no_transfer_created):
 def test_get_tile_no_transfer(one_quicklook_no_transfer_created):
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/tiles/8/0/0')
     assert res.status_code == 200
+    assert res.headers.get('x-quicklook-phase') in {'MERGE_DONE', 'GENERATE_DONE'}
     assert res.headers['Content-Type'] == 'application/npy'
 
 
 def test_get_tile_for_blank_region_no_transfer(one_quicklook_no_transfer_created):
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/tiles/0/0/0')
     assert res.status_code == 200
+    assert res.headers.get('x-quicklook-phase') in {'MERGE_DONE', 'GENERATE_DONE'}
+    assert res.headers.get('x-quicklook-error') == 'Tile not found'
     assert res.headers['Content-Type'] == 'application/npy+zstd'
 
 

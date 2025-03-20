@@ -1,10 +1,10 @@
-from enum import Enum
 import time
 from dataclasses import dataclass
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from quicklook.types import GenerateProgress, GeneratorPod, TransferProgress, Visit
+from quicklook.types import GenerateProgress, GeneratorPod, MergeProgress, TransferProgress, Visit
 
 
 class QuicklookJobPhase(int, Enum):
@@ -26,6 +26,7 @@ class QuicklookJob(BaseModel):
     created_at: float = Field(default_factory=time.time)
 
     generate_progress: dict[str, GenerateProgress] | None = None
+    merge_progress: dict[str, MergeProgress] | None = None
     transfer_progress: dict[str, TransferProgress] | None = None
 
     ccd_generator_map: dict[str, GeneratorPod] | None = None
@@ -42,6 +43,7 @@ class QuicklookJobReport:
     phase: QuicklookJobPhase
     created_at: float
     generate_progress: dict[str, GenerateProgress] | None
+    merge_progress: dict[str, MergeProgress] | None
     transfer_progress: dict[str, TransferProgress] | None
 
     @classmethod
@@ -52,4 +54,6 @@ class QuicklookJobReport:
             created_at=job.created_at,
             generate_progress=job.generate_progress,
             transfer_progress=job.transfer_progress,
+            merge_progress=job.merge_progress,
         )
+    

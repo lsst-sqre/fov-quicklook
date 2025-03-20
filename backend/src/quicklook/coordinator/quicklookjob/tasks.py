@@ -11,7 +11,12 @@ class GenerateTask:
 
 
 @dataclass
-class TransferTask:
+class MergeTask:
     visit: Visit
     generator: GeneratorPod
     ccd_generator_map: dict[str, GeneratorPod]
+
+
+@dataclass
+class TransferTask:
+    visit: Visit
