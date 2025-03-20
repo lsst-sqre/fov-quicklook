@@ -1,3 +1,4 @@
+from quicklook.config import config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from logging import getLogger
@@ -6,7 +7,7 @@ from typing import Callable
 from quicklook import storage
 from quicklook.coordinator.quicklookjob.tasks import TransferTask
 from quicklook.generator.generatorstorage import mergedtile_storage
-from quicklook.types import TransferProgress, Progress, TransferTaskResponse, Visit
+from quicklook.types import TileId, TransferProgress, Progress, TransferTaskResponse, Visit
 from quicklook.utils import throttle
 from quicklook.utils.timeit import timeit
 
@@ -22,13 +23,21 @@ class Args:
 
 
 def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None]) -> None:
-    def iter_tiles():
-        for level, i, j in mergedtile_storage.iter_tiles(task.visit):
-            yield Args(visit=task.visit, level=level, i=i, j=j)
-
     @throttle.throttle(0.1)
     def on_update(progress: TransferProgress):
         send(progress)
+
+    def iter_tiles():
+        # pack = config.tile_pack
+        pack = 0
+        distinct_tiles: set[Args] = set()
+        for level, i, j in mergedtile_storage.iter_tiles(task.visit):
+            tile_id = Args(task.visit, level, i << pack, j << pack)
+            if tile_id in distinct_tiles:
+                continue
+            distinct_tiles.add(tile_id)
+
+        yield from distinct_tiles
 
     with timeit(f'transfer enumerate {task.visit.id}'):
         params_list = list(iter_tiles())

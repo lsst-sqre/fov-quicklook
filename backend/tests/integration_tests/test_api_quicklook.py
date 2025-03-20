@@ -8,6 +8,7 @@ from websockets.exceptions import ConnectionClosedOK
 from quicklook.config import config
 from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase
 from quicklook.frontend.api.quicklooks import QuicklookStatus
+from quicklook.mutableconfig import MutableConfig
 
 
 def test_frontend_ok():
@@ -39,9 +40,22 @@ def test_list_visits():
     assert res.status_code == 200
 
 
-@pytest.fixture(scope='module')
-def one_quicklook_created(quicklooks_cleared):
-    res = requests.post(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks', json={'id': 'raw:broccoli', 'no_transfer': False})
+def update_mutable_config(new: dict):
+    res = requests.post(
+        f'http://127.0.0.1:{config.coordinator_port}/mutable-config',
+        json=new,
+    )
+    assert res.status_code == 200
+
+
+@pytest.fixture(scope='module', params=['GENERATE_DONE', 'MERGE_DONE', 'READY'])
+def one_quicklook_created(request):
+    job_stop_at = request.param
+    update_mutable_config({'new': {'job_stop_at': job_stop_at}})
+
+    clear_quicklooks()
+
+    res = requests.post(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks', json={'id': 'raw:broccoli'})
     assert res.status_code == 200
     with websockets.connect(f'ws://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/status.ws') as ws:
         while True:
@@ -49,10 +63,11 @@ def one_quicklook_created(quicklooks_cleared):
                 print('.', end='', flush=True)
                 status = json.loads(ws.recv())
                 if isinstance(status, dict):
-                    if status['phase'] in {QuicklookJobPhase.READY, QuicklookJobPhase.FAILED}:
+                    if status['phase'] in {QuicklookJobPhase.READY, QuicklookJobPhase.FAILED, QuicklookJobPhase[job_stop_at]}:
                         break
             except ConnectionClosedOK:
                 break
+    return job_stop_at
 
 
 def test_create_quicklook(one_quicklook_created):
@@ -77,16 +92,48 @@ def test_list_quicklooks(one_quicklook_created):
 def test_get_tile(one_quicklook_created):
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/tiles/8/0/0')
     assert res.status_code == 200
-    assert res.headers['Content-Type'] == 'application/npy+zstd'
+    match one_quicklook_created:
+        case 'READY':
+            assert res.headers['x-quicklook-phase'] == 'READY'
+            assert res.headers['Content-Type'] == 'application/npy+zstd'
+        case 'GENERATE_DONE':
+            assert res.headers['x-quicklook-phase'] == 'GENERATE_DONE'
+            assert res.headers['Content-Type'] == 'application/npy'
+        case 'MERGE_DONE':
+            assert res.headers['x-quicklook-phase'] == 'MERGE_DONE'
+            assert res.headers['Content-Type'] == 'application/npy+zstd'
+        case _:
+            assert False, f'Unexpected one_quicklook_created: {one_quicklook_created}'
 
 
 def test_get_tile_for_blank_region(one_quicklook_created):
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/tiles/0/0/0')
     assert res.status_code == 200
-    assert res.headers['Content-Type'] == 'application/npy+zstd'
+    assert res.headers['x-quicklook-error'] == 'Tile not found'
+    match one_quicklook_created:
+        case 'READY':
+            assert res.headers['Content-Type'] == 'application/npy+zstd'
+            assert res.headers['x-quicklook-phase'] == 'READY'
+        case 'GENERATE_DONE':
+            assert res.headers['Content-Type'] == 'application/npy+zstd'
+            assert res.headers['x-quicklook-phase'] == 'GENERATE_DONE'
+        case 'MERGE_DONE':
+            assert res.headers['Content-Type'] == 'application/npy+zstd'
+            assert res.headers['x-quicklook-phase'] == 'MERGE_DONE'
+        case _:
+            assert False, f'Unexpected one_quicklook_created: {one_quicklook_created}'
 
 
 def test_get_fits_header(one_quicklook_created):
     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/raw:broccoli/fits_header/R00_SG1')
     assert res.status_code == 200
     assert res.headers['Content-Type'] == 'application/json'
+
+
+def clear_quicklooks():
+    res = requests.delete(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/*')
+    assert res.status_code == 200
+
+    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks')
+    assert res.status_code == 200
+    assert len(res.json()) == 0

@@ -13,6 +13,7 @@ from typing import Annotated, Callable, TypeVar
 import numpy
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from quicklook.config import config
 from quicklook.coordinator.quicklookjob.tasks import GenerateTask, MergeTask, TransferTask
@@ -23,6 +24,7 @@ from quicklook.generator.api.tilemerge import run_merge
 from quicklook.generator.api.tiletransfer import run_transfer
 from quicklook.generator.generatorstorage import mergedtile_storage, tmptile_storage
 from quicklook.generator.progress import GenerateProgress
+from quicklook.mutableconfig import update_mutable_config
 from quicklook.types import CcdId, GenerateTaskResponse, MergeProgress, MergeTaskResponse, TransferProgress, Visit
 from quicklook.utils.globalstack import GlobalStack
 from quicklook.utils.message import encode_message
@@ -215,6 +217,16 @@ async def delete_quicklooks(
     visit: Annotated[Visit, Depends(visit_from_path)],
 ):
     tmptile_storage.delete(visit)
+
+
+
+if config.environment == 'test':
+    class MutableConfigUpdate(BaseModel):
+        new: dict
+
+    @app.post(f"/mutable-config")
+    async def config_endpoint(params: MutableConfigUpdate):
+        update_mutable_config(params.new)
 
 
 @app.post('/kill')

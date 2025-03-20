@@ -8,7 +8,7 @@ from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
 from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase, QuicklookJobReport
-from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
+from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWatcher
 from quicklook.types import CcdMeta, GenerateProgress, MergeProgress, TransferProgress, Visit
 from quicklook.utils.http_request import http_request
 from quicklook.utils.websocket import safe_websocket
@@ -39,12 +39,12 @@ class QuicklookStatus(BaseModel):
 
 @router.get('/api/quicklooks', response_model=list[QuicklookStatus])
 async def list_quicklooks():
-    return [QuicklookStatus.from_report(job) for job in RemoteQuicklookJobsWather().jobs.values()]
+    return [QuicklookStatus.from_report(job) for job in RemoteQuicklookJobsWatcher().jobs.values()]
 
 
 @router.get('/api/quicklooks/{id}/status', response_model=QuicklookStatus | None)
 async def show_quicklook_status(id: str):
-    report = RemoteQuicklookJobsWather().jobs.get(Visit.from_id(id))
+    report = RemoteQuicklookJobsWatcher().jobs.get(Visit.from_id(id))
     if report is None:
         return None
     return QuicklookStatus.from_report(report)
@@ -59,7 +59,7 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
         def pick(qls: dict[Visit, QuicklookJobReport]) -> QuicklookJobReport | None:
             return qls.get(visit)
 
-        async for job in RemoteQuicklookJobsWather().watch(pick):  # pragma: no branch
+        async for job in RemoteQuicklookJobsWatcher().watch(pick):  # pragma: no branch
             try:
                 model = QuicklookStatus.from_report(job).model_dump() if job else None
                 await client_ws.send_json(model)
@@ -107,14 +107,6 @@ async def delete_all_quicklooks():
 
 class QuicklookCreateFrontend(BaseModel):
     id: str
-    no_transfer: bool = False
-
-    @field_validator('no_transfer')
-    @classmethod
-    def validate_no_transfer(cls, value: bool) -> bool:
-        if value and config.environment != 'test':  # pragma: no cover
-            raise ValueError("no_transfer can only be set to True in test environment")
-        return value
 
 
 @router.post('/api/quicklooks', description='Create a quicklook')
@@ -123,5 +115,5 @@ async def create_quicklook(params: QuicklookCreateFrontend):
     return await http_request(
         'post',
         f'{config.coordinator_base_url}/quicklooks',
-        json=QuicklookCreate(visit=Visit.from_id(params.id), no_transfer=params.no_transfer).model_dump(),
+        json=QuicklookCreate(visit=Visit.from_id(params.id)).model_dump(),
     )

@@ -80,5 +80,5 @@ class _RemoteQuicklookJobsWatcher:
 
 
 @cache
-def RemoteQuicklookJobsWather():
+def RemoteQuicklookJobsWatcher():
     return _RemoteQuicklookJobsWatcher()

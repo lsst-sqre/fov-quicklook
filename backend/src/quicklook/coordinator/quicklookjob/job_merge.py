@@ -15,7 +15,6 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 
 
 async def job_merge(job: QuicklookJob, sync_job: Callable[[QuicklookJob], None]):
-    storage.put_quicklook_job_config(job)
     job.phase = QuicklookJobPhase.MERGE_RUNNING
     sync_job(job)
     await _scatter_merge_job(job, sync_job)

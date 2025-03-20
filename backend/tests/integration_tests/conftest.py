@@ -83,13 +83,3 @@ def run_uvicorn_app(app: str, *, port: int, timeout=10, log_prefix='', healthz='
         assert p.pid
         os.kill(p.pid, signal.SIGINT)  # p.terminate() を使うとcoverageがとれないのでSIGINTを送る
         p.join()
-
-
-@pytest.fixture(scope='module')
-def quicklooks_cleared():
-    res = requests.delete(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/*')
-    assert res.status_code == 200
-
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks')
-    assert res.status_code == 200
-    assert len(res.json()) == 0

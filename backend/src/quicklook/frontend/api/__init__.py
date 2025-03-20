@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
 from quicklook.config import config
-from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWather
+from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWatcher
 from quicklook.frontend.api.staticassets import setup_static_assets
 from quicklook.utils.http_request import http_request
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(f'uvicorn.{__name__}')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with RemoteQuicklookJobsWather().activate():
+    async with RemoteQuicklookJobsWatcher().activate():
         yield
 
 

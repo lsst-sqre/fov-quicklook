@@ -1,3 +1,5 @@
+from quicklook import storage
+from quicklook.mutableconfig import mutable_config
 import asyncio
 import logging
 from dataclasses import dataclass
@@ -7,6 +9,7 @@ import aiohttp
 from sqlalchemy import select, update
 
 from quicklook.config import config
+from quicklook.coordinator.api import mutable_config_route
 from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
 from quicklook.db import db_context
 from quicklook.models import QuicklookRecord
@@ -38,33 +41,55 @@ class QuicklookJobRunner:
         await self.run(job)
 
     async def run(self, job: QuicklookJob):
+        test_skip = False
         async with self._disk_limit:
             try:
                 async with self._ram_limit:
                     await job_generate(job, self._job_sync.sync)
-                    _update_job_record(job, 'in_progress')
+
+                    _update_job_record_phase(job, 'in_progress')
+                    storage.put_quicklook_job_config(job)
+
+                    if mutable_config.job_stop_at == 'GENERATE_DONE':
+                        self._update_job_phase(job, QuicklookJobPhase.GENERATE_DONE)
+                        raise JobSkipForTest
+
                     await job_merge(job, self._job_sync.sync)
-                if not job.no_transfer: # デバッグ用
-                    await job_transfer(job, self._job_sync.sync)
-                    job.phase = QuicklookJobPhase.READY
-                    self._job_sync.sync(job)
-                    _update_job_record(job, 'ready')
+                    if mutable_config.job_stop_at == 'MERGE_DONE':
+                        self._update_job_phase(job, QuicklookJobPhase.MERGE_DONE)
+                        raise JobSkipForTest
+
+                # await job_transfer(job, self._job_sync.sync)
+
+                job.phase = QuicklookJobPhase.READY
+                self._update_job_phase(job, QuicklookJobPhase.READY)
+                _update_job_record_phase(job, 'ready')
+            except JobSkipForTest:
+                # This is a special exception for testing purposes
+                test_skip = True
             except Exception:
-                job.phase = QuicklookJobPhase.FAILED
+                self._update_job_phase(job, QuicklookJobPhase.FAILED)
                 raise
             else:
-                job.phase = QuicklookJobPhase.READY
+                self._update_job_phase(job, QuicklookJobPhase.READY)
             finally:
-                self._job_sync.sync(job)
+                if test_skip:
+                    await asyncio.sleep(1)
+                    self._job_sync.sync(job)  # この２行はテストが終わるために必要。理由はよくわからない
+                    return
 
-                async def a():
+                async def delay_unlink_job():
                     await asyncio.sleep(cleanup_delay)
                     self._job_sync.unlink(job)
 
-                async def b():
-                    await cleanup(job)
+                await asyncio.gather(delay_unlink_job(), cleanup(job))
 
-                await asyncio.gather(a(), b())
+    def _update_job_phase(self, job: QuicklookJob, phase: QuicklookJobPhase):
+        job.phase = phase
+        self._job_sync.sync(job)
+
+
+class JobSkipForTest(RuntimeError): ...
 
 
 @dataclass
@@ -88,7 +113,7 @@ async def cleanup(job: QuicklookJob):
     await asyncio.gather(*(run_1_task(g) for g in generators))
 
 
-def _update_job_record(job: QuicklookJob, phase: QuicklookRecord.Phase):
+def _update_job_record_phase(job: QuicklookJob, phase: QuicklookRecord.Phase):
     with db_context() as db:
         with db.begin():
             stmt = select(QuicklookRecord).where(QuicklookRecord.id == job.visit.id)

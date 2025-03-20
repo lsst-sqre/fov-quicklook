@@ -14,8 +14,9 @@ from quicklook.config import config
 from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
 from quicklook.db import db_context
 from quicklook.deps.visit_from_path import visit_from_path
+from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWatcher
 from quicklook.models import QuicklookRecord
-from quicklook.select_primary_generator import select_primary_generator
+from quicklook.select_primary_generator import NoOverlappingGenerators, select_primary_generator
 from quicklook.tileinfo import TileInfo
 from quicklook.types import GeneratorPod, TileId, Visit
 from quicklook.utils import zstd
@@ -38,10 +39,17 @@ async def get_tile(
     if is_visit_ready(visit):
         return await get_tile_from_storage(visit, z, y, x)
     else:
+        report = RemoteQuicklookJobsWatcher().jobs.get(visit)
         job = storage.get_quicklook_job_config(visit)
-        if job:  # pragma: no branch
-            return await get_tile_from_generator(job, visit, z, y, x)
-    raise HTTPException(status_code=404, detail='Quicklook not found')  # pragma: no cover
+        assert report and job
+        if report and job:
+            assert job.ccd_generator_map
+            if report.phase >= QuicklookJobPhase.MERGE_DONE:
+                return await fetch_merged_tile(visit, z, y, x, job.ccd_generator_map)
+            if report.phase >= QuicklookJobPhase.GENERATE_DONE:
+                return await gather_tile(visit, z, y, x, job.ccd_generator_map)
+
+    raise HTTPException(status_code=404, detail='Tile not found')
 
 
 async def get_tile_from_storage(visit: Visit, z: int, y: int, x: int) -> Response:
@@ -53,28 +61,7 @@ async def get_tile_from_storage(visit: Visit, z: int, y: int, x: int) -> Respons
     return Response(data, media_type='application/npy+zstd', headers=headers)
 
 
-async def get_tile_from_generator(
-    job: QuicklookJob,
-    visit: Visit,
-    z: int,
-    y: int,
-    x: int,
-) -> Response:
-    ccd_generator_map = job.ccd_generator_map
-
-    if ccd_generator_map is None:  # pragma: no cover
-        logger.error('ccd_generator_map is None')
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Quicklook is not ready')
-
-    if job.phase >= QuicklookJobPhase.MERGE_DONE:
-        return await fetch_merged_tile(job, visit, z, y, x, ccd_generator_map)
-    if job.phase >= QuicklookJobPhase.GENERATE_DONE:
-        return await gather_tile(job, visit, z, y, x, ccd_generator_map)
-
-    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Quicklook is not ready')  # pragma: no cover
-
-
-async def gather_tile(job: QuicklookJob, visit: Visit, z: int, y: int, x: int, ccd_generator_map: dict[str, GeneratorPod]) -> Response:
+async def gather_tile(visit: Visit, z: int, y: int, x: int, ccd_generator_map: dict[str, GeneratorPod]) -> Response:
     ccd_names = TileInfo.of(z, y, x).ccd_names
     generators = set(ccd_generator_map[ccd_name] for ccd_name in ccd_names if ccd_name in ccd_generator_map)
 
@@ -88,7 +75,7 @@ async def gather_tile(job: QuicklookJob, visit: Visit, z: int, y: int, x: int, c
                 return npybytes2ndarray(await response.read())
 
     headers = {
-        'x-quicklook-phase': job.phase.name,
+        'x-quicklook-phase': QuicklookJobPhase.GENERATE_DONE.name,
     }
     pool: numpy.ndarray | None = None
     for fut in asyncio.as_completed([get_npy(g) for g in generators]):
@@ -107,20 +94,22 @@ async def gather_tile(job: QuicklookJob, visit: Visit, z: int, y: int, x: int, c
     return Response(ndarray2npybytes(pool), media_type='application/npy', headers=headers)
 
 
-async def fetch_merged_tile(job: QuicklookJob, visit: Visit, z: int, y: int, x: int, ccd_generator_map: dict[str, GeneratorPod]) -> Response:
-    generator, _ = select_primary_generator(ccd_generator_map, TileId(z, y, x))
+async def fetch_merged_tile(visit: Visit, z: int, y: int, x: int, ccd_generator_map: dict[str, GeneratorPod]) -> Response:
     headers = {
-        'x-quicklook-phase': job.phase.name,
+        'x-quicklook-phase': QuicklookJobPhase.MERGE_DONE.name,
     }
+    try:
+        generator, _ = select_primary_generator(ccd_generator_map, TileId(z, y, x))
+    except NoOverlappingGenerators:
+        return Response(blank_npy_zstd(), media_type='application/npy+zstd', headers={**headers, 'x-quicklook-error': 'Tile not found'})
+        
     async with aiohttp.ClientSession() as session:
         async with session.get(
             f'http://{generator.name}/quicklooks/{visit.id}/merged-tiles/{z}/{y}/{x}',
+            raise_for_status=True,
         ) as response:
-            if response.ok:
-                assert response.headers['Content-Type'] == 'application/npy+zstd'
-                return Response(await response.read(), media_type='application/npy+zstd', headers=headers)
-            else:
-                return Response(blank_npy_zstd(), media_type='application/npy+zstd', headers={**headers, 'x-quicklook-error': 'Tile not found'})
+            assert response.headers['Content-Type'] == 'application/npy+zstd'
+            return Response(await response.read(), media_type='application/npy+zstd', headers=headers)
 
 
 ready_visits = SizeLimitedSet[Visit](32)

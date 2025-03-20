@@ -11,7 +11,7 @@ from quicklook.utils.broadcastqueue import BroadcastQueue
 from quicklook.utils.event import WatchEvent
 from quicklook.utils.http_request import http_request
 
-from ..job import QuicklookJob, QuicklookJobPhase, QuicklookJobReport
+from .job import QuicklookJob, QuicklookJobPhase, QuicklookJobReport
 from .job_runner import JobSynchronizer, QuicklookJobRunner
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
@@ -22,7 +22,7 @@ class _JobManager:
     # こっちはFrontendとの同期が主目的
     #
     # JobRunnerにsynchronizerを持たせて統合するかも。
-    
+
     def __init__(self):
         self._synchronizer = _JobSynchronizer()
 
@@ -32,9 +32,9 @@ class _JobManager:
         self._runner = QuicklookJobRunner(job_sync=sync)
         yield
 
-    async def enqueue(self, visit: Visit, *, no_transfer: bool):
+    async def enqueue(self, visit: Visit):
         if not self._synchronizer.has(visit) and not _db_has(visit):  # pragma: no branch
-            job = QuicklookJob(visit=visit, phase=QuicklookJobPhase.QUEUED, no_transfer=no_transfer)
+            job = QuicklookJob(visit=visit, phase=QuicklookJobPhase.QUEUED)
             self._synchronizer.add(job)
             await self._runner.enqueue(job)
 
@@ -48,6 +48,7 @@ class _JobManager:
             await http_request('delete', f'http://{g.host}:{g.port}/quicklooks/*')
 
         await asyncio.gather(*(delete_generator(g) for g in ctx().generators))
+        self._synchronizer.delete_all()
 
     def _sync_job(self, job: QuicklookJob):
         self._synchronizer.modify(job)
@@ -66,6 +67,10 @@ class _JobSynchronizer:
     def delete(self, job: QuicklookJob):
         del self._entries[job.visit]
         self._q.put(WatchEvent(QuicklookJobReport.from_job(job), 'deleted'))
+
+    def delete_all(self):
+        for visit in list(self._entries):
+            self.delete(QuicklookJob(visit=visit, phase=QuicklookJobPhase.QUEUED))
 
     def modify(self, job: QuicklookJob):
         report = QuicklookJobReport.from_job(job)

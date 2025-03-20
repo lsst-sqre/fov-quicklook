@@ -22,7 +22,6 @@ class QuicklookJobPhase(int, Enum):
 class QuicklookJob(BaseModel):
     visit: Visit
     phase: QuicklookJobPhase
-    no_transfer: bool
     created_at: float = Field(default_factory=time.time)
 
     generate_progress: dict[str, GenerateProgress] | None = None
