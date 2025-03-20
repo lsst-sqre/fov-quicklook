@@ -4,7 +4,7 @@ import re
 from functools import cached_property
 from typing import Literal
 
-from pydantic import  field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from quicklook.utils.s3 import S3Config
@@ -50,12 +50,15 @@ class Config(BaseSettings):
 
     tile_size: int = 256
     tile_max_level: int = 8
-    tile_ccd_processing_parallel: int = 25
+    tile_ccd_processing_parallel: int = 32
     tile_compression_level: int = 9
-    tile_transfer_parallel: int = 8
-    tile_tmpdir: str = '/dev/shm/quicklook/tile_tmp' # used in generator
-    fits_header_tmpdir: str = '/dev/shm/quicklook/fits_header' # used in generator
-    fitsio_tmpdir: str = '/dev/shm/quicklook/fitsio' # used in generator
+    tile_merge_parallel: int = 8
+
+    tile_tmpdir: str = '/dev/shm/quicklook/tile_tmp'  # used in generator
+    tile_merged_dir: str = '/tmp/quicklook/merged'  # used in generator
+    fits_header_tmpdir: str = '/dev/shm/quicklook/fits_header'  # used in generator
+
+    fitsio_tmpdir: str = '/dev/shm/quicklook/fitsio'  # used in generator
     fitsio_decompress_parallel: int = 4
 
     max_generate_jobs: int = 2

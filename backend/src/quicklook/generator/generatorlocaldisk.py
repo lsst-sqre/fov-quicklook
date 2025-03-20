@@ -1,6 +1,7 @@
 import logging
 import shutil
 from pathlib import Path
+from typing import Generator
 
 import numpy
 
@@ -11,13 +12,13 @@ from quicklook.utils.numpyutils import ndarray2npybytes
 logger = logging.getLogger(f'uviorn.{__name__}')
 
 
-class TmpTile:
+class GeneratorLocalDisk:
     def put_tile(self, ccd_id: CcdId, tile: Tile):
-        outfile = Path(f'{config.tile_tmpdir}/{tile.visit.id}/tiles/{tile.level}/{tile.i}/{tile.j}/{ccd_id.ccd_name}.npy')
+        outfile = Path(f'{self.visit_dir(tile.visit)}/tiles/{tile.level}/{tile.i}/{tile.j}/{ccd_id.ccd_name}.npy')
         outfile.parent.mkdir(parents=True, exist_ok=True)
         outfile.write_bytes(ndarray2npybytes(tile.data))
 
-    def iter_tiles(self, visit: Visit):
+    def iter_tiles(self, visit: Visit) -> Generator[tuple[int, int, int], None, None]:
         for p in Path(f'{config.tile_tmpdir}/{visit.id}/tiles').iterdir():
             if p.is_dir():  # pragma: no branch
                 for q in p.iterdir():
@@ -26,9 +27,12 @@ class TmpTile:
                             if r.is_dir():  # pragma: no branch
                                 yield int(p.name), int(q.name), int(r.name)
 
+    def visit_dir(self, visit: Visit):
+        return Path(f'{config.tile_tmpdir}/{visit.id}')
+
     def get_tile_npy(self, visit: Visit, level: int, i: int, j: int) -> numpy.ndarray:
         pool: numpy.ndarray | None = None
-        for path in Path(f'{config.tile_tmpdir}/{visit.id}/tiles/{level}/{i}/{j}').glob('*.npy'):
+        for path in Path(f'{self.visit_dir(visit)}/tiles/{level}/{i}/{j}').glob('*.npy'):
             arr = numpy.load(path)
             if pool is None:
                 pool = arr
@@ -51,4 +55,4 @@ class TmpTile:
             pass
 
 
-tmptile = TmpTile()
+generator_local_disk = GeneratorLocalDisk()

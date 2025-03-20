@@ -1,7 +1,11 @@
+import queue
+import shutil
+import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from logging import getLogger
+from pathlib import Path
 from typing import Callable, Generator
 
 import numpy
@@ -10,11 +14,12 @@ import requests
 from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.quicklookjob.tasks import TransferTask
-from quicklook.generator.tmptile import tmptile
+from quicklook.generator.generatorlocaldisk import generator_local_disk
 from quicklook.tileinfo import TileInfo
 from quicklook.types import GeneratorPod, Progress, Tile, TransferProgress, TransferTaskResponse, Visit
-from quicklook.utils import multiprocessing_coverage_compatible, throttle
+from quicklook.utils import multiprocessing_coverage_compatible, throttle, zstd
 from quicklook.utils.numpyutils import npybytes2ndarray
+from quicklook.utils.thread import run_thread
 from quicklook.utils.timeit import timeit
 
 logger = getLogger(f'uvicorn.{__name__}')
@@ -36,7 +41,7 @@ class TileParams:
 
 def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None]) -> None:
     def iter_tiles():
-        for level, i, j in tmptile.iter_tiles(task.visit):
+        for level, i, j in generator_local_disk.iter_tiles(task.visit):
             tile_id = TileId(level, i, j)
             primary, all_generators = get_generators_info(task, tile_id)
             if primary == task.generator:
@@ -56,31 +61,29 @@ def run_transfer(task: TransferTask, send: Callable[[TransferTaskResponse], None
         params_list = list(iter_tiles())
         total = len(params_list)
 
-    with multiprocessing_coverage_compatible.Pool(config.tile_transfer_parallel) as pool:
-        done = 0
-        for _ in pool.imap_unordered(process_tile, params_list, chunksize=1):
-            done += 1
-            progress = TransferProgress(
-                transfer=Progress(
-                    count=done,
-                    total=total,
-                ),
-            )
-            on_update(progress)
+    on_update(TransferProgress(transfer=Progress(count=0, total=total)))
+
+    with timeit(f'transfer {task.visit.id}'):
+        with multiprocessing_coverage_compatible.Pool(config.tile_merge_parallel) as pool:
+            for done, _ in enumerate(pool.imap_unordered(process_tile, params_list)):
+                progress = TransferProgress(transfer=Progress(count=done + 1, total=total))
+                on_update(progress)
+
     throttle.flush(on_update)
 
 
 def process_tile(params: TileParams) -> None:
-    with timeit(f'process_tile {params.visit.id} {params.tile_id.level} {params.tile_id.i} {params.tile_id.j}'):
-        tile_id = params.tile_id
-        visit = params.visit
-        npy = tmptile.get_tile_npy(visit, tile_id.level, tile_id.i, tile_id.j)
-        with timeit(f'gather {visit.id} {tile_id.level} {tile_id.i} {tile_id.j}'):
-            if len(params.generators) > 0:
-                for tile in gather_tiles(params.generators, visit, tile_id.level, tile_id.i, tile_id.j):
-                    npy += tile
-        with timeit(f'put_quicklook_tile {visit.id} {tile_id.level} {tile_id.i} {tile_id.j}'):
-            storage.put_quicklook_tile(Tile(visit=visit, level=tile_id.level, i=tile_id.i, j=tile_id.j, data=npy))
+    tile_id = params.tile_id
+    visit = params.visit
+    npy = generator_local_disk.get_tile_npy(visit, tile_id.level, tile_id.i, tile_id.j)
+    if len(params.generators) > 0:
+        for tile in gather_tiles(params.generators, visit, tile_id.level, tile_id.i, tile_id.j):
+            npy += tile
+    compressed = zstd.compress(npy.tobytes())
+    outfile = Path(f'{config.tile_merged_dir}/{visit.id}/{tile_id.level}/{tile_id.i}/{tile_id.j}.npy.zstd')
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    with open(outfile, 'wb') as f:
+        f.write(compressed)
 
 
 def gather_tiles(

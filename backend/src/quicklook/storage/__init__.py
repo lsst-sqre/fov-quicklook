@@ -34,27 +34,9 @@ def get_quicklook_job_config(visit: Visit) -> QuicklookJob:
     return QuicklookJob.model_validate_json(get(f'quicklook/{visit.id}/job-config'))
 
 
-def put_quicklook_tile(tile: Tile):
-    put(
-        f'quicklook/{tile.visit.id}/tile/{tile.level}/{tile.i}/{tile.j}.npy.zstd',
-        zstd.compress(tile.data.tobytes()),
-    )
+def put_quicklook_tile_bytes(visit: Visit, level: int, i: int, j: int, value: bytes) -> None:
+    put(f'quicklook/{visit.id}/tile/{level}/{i}/{j}.npy.zstd', value)
 
 
 def get_quicklook_tile_bytes(visit: Visit, level: int, i: int, j: int) -> bytes:
     return get(f'quicklook/{visit.id}/tile/{level}/{i}/{j}.npy.zstd')
-
-
-# from minio import Minio
-# import os
-
-
-# client = Minio(
-#     endpoint='sdfembs3.sdf.slac.stanford.edu:443',
-#     access_key=os.environ['QUICKLOOK_s3_repository__access_key'],
-#     secret_key=os.environ['QUICKLOOK_s3_repository__secret_key'],
-#     secure=True,
-# )
-
-# bucket_name = 'fov-quicklook-tile'
-# print(client.bucket_exists(bucket_name))

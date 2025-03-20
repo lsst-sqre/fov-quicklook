@@ -21,7 +21,7 @@ from quicklook.generator.api.baseprocesshandler import BaseProcessHandler
 from quicklook.generator.progress import GenerateProgress
 from quicklook.generator.tilegenerate import run_generate
 from quicklook.generator.tiletransfer import run_transfer
-from quicklook.generator.tmptile import tmptile
+from quicklook.generator.generatorlocaldisk import generator_local_disk
 from quicklook.types import CcdId, GenerateTaskResponse, TransferProgress, TransferTaskResponse, Visit
 from quicklook.utils.globalstack import GlobalStack
 from quicklook.utils.message import encode_message
@@ -136,7 +136,7 @@ def get_tile(
     x: int,
 ):
     return Response(
-        ndarray2npybytes(tmptile.get_tile_npy(visit, z, y, x)),
+        ndarray2npybytes(generator_local_disk.get_tile_npy(visit, z, y, x)),
         media_type='application/npy',
     )
 
@@ -162,14 +162,14 @@ async def get_pod_status():
 
 @app.delete('/quicklooks/*')
 async def delete_all_quicklooks():
-    tmptile.delete_all_cache()
+    generator_local_disk.delete_all_cache()
 
 
 @app.delete('/quicklooks/{id}')
 async def delete_quicklooks(
     visit: Annotated[Visit, Depends(visit_from_path)],
 ):
-    tmptile.delete_cache(visit)
+    generator_local_disk.delete_cache(visit)
 
 
 @app.post('/kill')

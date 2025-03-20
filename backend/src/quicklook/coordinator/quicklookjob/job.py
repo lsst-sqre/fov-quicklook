@@ -11,9 +11,11 @@ class QuicklookJobPhase(int, Enum):
     QUEUED = 0
     GENERATE_RUNNING = 1
     GENERATE_DONE = 2
-    TRANSFER_RUNNING = 3
-    TRANSFER_DONE = 4
-    READY = 5
+    MERGE_RUNNING = 3
+    MERGE_DONE = 4
+    TRANSFER_RUNNING = 5
+    TRANSFER_DONE = 6
+    READY = 7
     FAILED = -1
 
 

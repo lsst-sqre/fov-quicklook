@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-import io
-from typing import Iterable, Dict, Any
+from functools import cache
+from typing import Any, Iterable
+
 import boto3
 from botocore.client import Config
 
@@ -32,13 +33,7 @@ def s3_download_object(
     offset: int = 0,
     length: int = 0,
 ) -> bytes:
-    client = boto3.client(
-        's3',
-        endpoint_url=f"{'https' if settings.secure else 'http'}://{settings.endpoint}",
-        aws_access_key_id=settings.access_key,
-        aws_secret_access_key=settings.secret_key,
-        config=Config(signature_version='s3v4'),
-    )
+    client = _create_s3_client(settings)
 
     kwargs: dict[str, Any] = {"Bucket": settings.bucket, "Key": key}
     if offset > 0 or length > 0:
@@ -60,13 +55,7 @@ def s3_upload_object(
     data: bytes,
     content_type: str,
 ) -> None:
-    client = boto3.client(
-        's3',
-        endpoint_url=f"{'https' if s3_config.secure else 'http'}://{s3_config.endpoint}",
-        aws_access_key_id=s3_config.access_key,
-        aws_secret_access_key=s3_config.secret_key,
-        config=Config(signature_version='s3v4'),
-    )
+    client = _create_s3_client(s3_config)
 
     client.put_object(
         Bucket=s3_config.bucket,
@@ -77,13 +66,7 @@ def s3_upload_object(
 
 
 def s3_list_objects(s3_config: S3Config, prefix: str) -> Iterable[S3Object]:
-    client = boto3.client(
-        's3',
-        endpoint_url=f"{'https' if s3_config.secure else 'http'}://{s3_config.endpoint}",
-        aws_access_key_id=s3_config.access_key,
-        aws_secret_access_key=s3_config.secret_key,
-        config=Config(signature_version='s3v4'),
-    )
+    client = _create_s3_client(s3_config)
 
     paginator = client.get_paginator('list_objects_v2')
     for page in paginator.paginate(Bucket=s3_config.bucket, Prefix=prefix):
@@ -93,16 +76,31 @@ def s3_list_objects(s3_config: S3Config, prefix: str) -> Iterable[S3Object]:
 
 
 def s3_list_object_name(s3_config: S3Config, prefix: str) -> Iterable[str]:
-    client = boto3.client(
-        's3',
-        endpoint_url=f"{'https' if s3_config.secure else 'http'}://{s3_config.endpoint}",
-        aws_access_key_id=s3_config.access_key,
-        aws_secret_access_key=s3_config.secret_key,
-        config=Config(signature_version='s3v4'),
-    )
+    client = _create_s3_client(s3_config)
 
     paginator = client.get_paginator('list_objects_v2')
     for page in paginator.paginate(Bucket=s3_config.bucket, Prefix=prefix):
         if 'Contents' in page:
             for obj in page['Contents']:
                 yield obj['Key']
+
+
+def _create_s3_client(settings: S3Config):
+    import threading
+
+    thread_id = threading.get_ident()
+    return _create_s3_client_thread_local(settings, thread_id)
+
+
+@cache
+def _create_s3_client_thread_local(settings: S3Config, thread_id: int):
+    """
+    Create a boto3 S3 client with TCP keepalive enabled
+    """
+    return boto3.client(
+        's3',
+        endpoint_url=f"{'https' if settings.secure else 'http'}://{settings.endpoint}",
+        aws_access_key_id=settings.access_key,
+        aws_secret_access_key=settings.secret_key,
+        config=Config(signature_version='s3v4', tcp_keepalive=True),
+    )

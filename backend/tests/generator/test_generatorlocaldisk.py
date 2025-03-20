@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from quicklook.config import config
-from quicklook.generator.tmptile import tmptile
+from quicklook.generator.generatorlocaldisk import generator_local_disk
 from quicklook.types import CcdId, Tile, Visit
 
 
@@ -55,7 +55,7 @@ def test_delete_all_cache(test_tmpdir: Path) -> None:
     assert test_tmpdir.exists()
     
     # Delete cache
-    tmptile.delete_all_cache()
+    generator_local_disk.delete_all_cache()
     
     # Verify directory was deleted
     assert not test_tmpdir.exists()
@@ -67,7 +67,7 @@ def test_delete_all_cache_not_found(test_tmpdir: Path) -> None:
     shutil.rmtree(test_tmpdir)
     
     # This should not raise an exception
-    tmptile.delete_all_cache()
+    generator_local_disk.delete_all_cache()
 
 
 def test_iter_tiles(test_tmpdir: Path, sample_visit: Visit, sample_ccd_id: CcdId) -> None:
@@ -85,10 +85,10 @@ def test_iter_tiles(test_tmpdir: Path, sample_visit: Visit, sample_ccd_id: CcdId
         # Create a sample tile with the current level, i, j coordinates
         tile = Tile(visit=sample_visit, level=level, i=i, j=j, data=np.zeros((10, 10), dtype=np.float32))
         # Use TmpTile.put to save it
-        tmptile.put_tile(sample_ccd_id, tile)
+        generator_local_disk.put_tile(sample_ccd_id, tile)
     
     # Collect results from iter_tiles
-    result_tiles = list(tmptile.iter_tiles(sample_visit))
+    result_tiles = list(generator_local_disk.iter_tiles(sample_visit))
     
     # Verify all expected structures are found
     assert len(result_tiles) == len(test_structures)

@@ -14,7 +14,7 @@ from quicklook.datasource import get_datasource
 from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.generator.progress import GenerateProgress, GeneratorProgressReporter
-from quicklook.generator.tmptile import tmptile
+from quicklook.generator.generatorlocaldisk import generator_local_disk
 from quicklook.types import CcdId, CcdMeta, GenerateTaskResponse, PreProcessedCcd, Progress, Tile, Visit
 from quicklook.utils import multiprocessing_coverage_compatible as mp
 from quicklook.utils import throttle
@@ -83,7 +83,7 @@ def make_tiles(
     update_progress: Callable[[Progress], None],
 ):
     def cb(tile: Tile, progress: Progress):
-        tmptile.put_tile(ppccd.ccd_id, tile)
+        generator_local_disk.put_tile(ppccd.ccd_id, tile)
         update_progress(progress)
 
     iterate_tiles(ppccd, cb)

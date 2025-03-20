@@ -39,7 +39,7 @@ graph TD
 
 * Generator
 
-  Tile生成を行う。
+  Tile生成を行う。Generatorは複数あり、1visitに対して200ほどあるCCDを分担してタイル生成を行う。１つのタイルに含まれる幾つかのCCDが別々のGeneratorに割り当てられた時、そのタイルはクライアントに送る前にマージされなければならない。
 
 * Data Source
 
@@ -79,7 +79,7 @@ graph TD
 
 ## タイル化の流れ
 
-### タイル生成まで
+### タイル生成
 
 ```mermaid
 sequenceDiagram
@@ -98,23 +98,22 @@ sequenceDiagram
   C-->>F: タイル化完了
 ```
 
+### タイルマージ
+
+通常の設定ではここまでのタイル生成の結果は `/dev/shm` 上にある。
+この状態でクライアントからのアクセスに応答できるようになるが、
+`/dev/shm`にデータがあるとRAMを大量に消費してしまうので、
+これを早く`/dev/shm`から移動する必要がある。
+最終的にはオブジェクトストレージに移動するが、オブジェクトストレージに多数の小さいファイルをアップロードするのは時間がかかる。
+そのためまずはGeneratorのローカルディスクに移動する。
+その際に1つのタイルに複数のCCDがまたがっていたり、複数のGeneratorが同じ場所のタイルを分担している場合にはそれらをマージし、その結果をzstd圧縮してローカルディスクに書き込む。
+`/dev/shm`から一刻も早くデータを逃すためには何も考えずにコピーした方が良いようにも思えるが、ローカルディスクも容量に限りがあるので、マージして圧縮することでデータ量を減らす。
+
+
 ### タイル転送
 
-```mermaid
-sequenceDiagram
-  participant C as Coordinator
-  participant G1 as Generator1
-  participant G2 as Generator2
-  participant T as Tile Storage
-  C->>G1: タイル転送依頼
-  C->>G2: タイル転送依頼
-  G1->>T: タイル転送
-  note over G1: タイルをTile Storageに転送<br />まずはGenerator内で完結したタイルだけ転送
-  G1->>+G2: タイル問い合わせ
-  G2->>-G1: タイル返却
-  note over G1: Generator内で完結しないタイルをマージ<br />マージを行うのはそのタイルのPrimary generator
-  G1->>T: タイル転送
-```
+マージされたタイルは各Generatorが持つローカルディスクに保存される。
+これをオブジェクトストレージにアップロードする。
 
 ## ジョブ
 
@@ -127,7 +126,7 @@ let queue: QuicklookJob[]
 
 type QuicklookJob = {
   visit_id: string
-  status: 'generate:queued' | 'generate:running' | 'transfer:queued' | 'transfer:running' | 'ready' | 'failed'
+  status: 'QUEUED' | 'GENERATE' | 'MERGE' | 'TRANSFER' |  'READY' | 'FAILED'
   processing_progress: ProcessingProgress
   transfer_progress: number
 }
@@ -139,20 +138,30 @@ type QuicklookJob = {
 
 ### ジョブの実行
 
-ジョブの実行には次のような条件がある
+* ジョブには次のステージがある
+  * QUEUED
+    * キューに登録された状態
+  * GENERATE
+    * タイルをRAM内に生成している状態
+    * これが終わるとクライアントからの受付ができる
+  * MERGE
+    * タイルをGeneratorマージしてGeneratorのローカルディスクに保存
+    * これはRAMの内容を単純にディスクにコピーするより速かった
+  * TRANSFER
+    * マージ済みのデータをObject Storageへ移動
+  * READY
+  * FAILED
 
-* generating状態のジョブの上限
-  * `config.max_generate_jobs`で設定
-* タイル転送の並列度
-  * `config.max_transfer_jobs`で設定
-* 一時保存領域場のquicklookの上限
-  * `config.max_temporary_quicklooks`で設定
+* RAMに関する条件は次のとおり
+  * RAMを消費するのはGENERATE〜MERGEの間
+    * 全ノード合わせて20GB程度
+  * TRANSFERでは全ノード合わせて10GB程度のローカルストレージ
 
-### 実装
+## 容量
 
-generate_queueとtransfer_queueの２つのキューが。
-ジョブが終わったタイミングでキューの情報を更新し、完了したジョブを削除する。
-
+* タイル1つ分 ~256kB
+* タイル数 ~80000
+* トータルで ~20GB
 
 ## Database
 
