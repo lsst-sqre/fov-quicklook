@@ -10,9 +10,9 @@ push: build
 	docker push $(image_ref)
 
 restart:
-	kubectl -n quicklook rollout restart deployment fov-quicklook-coordinator
-	kubectl -n quicklook rollout restart deployment fov-quicklook-frontend
-	kubectl -n quicklook rollout restart deployment fov-quicklook-generator
+	kubectl -n quicklook delete pod -l app=fov-quicklook-coordinator --grace-period=0 --force
+	kubectl -n quicklook delete pod -l app=fov-quicklook-frontend --grace-period=0 --force
+	kubectl -n quicklook delete pod -l app=fov-quicklook-generator --grace-period=0 --force
 
 deploy: push restart
 
