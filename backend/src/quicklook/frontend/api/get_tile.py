@@ -70,6 +70,7 @@ async def gather_tile(visit: Visit, z: int, y: int, x: int, ccd_generator_map: d
             async with session.get(
                 f'http://{generator.name}/quicklooks/{visit.id}/tiles/{z}/{y}/{x}',
                 raise_for_status=True,
+                timeout=aiohttp.ClientTimeout(total=1),
             ) as response:
                 assert response.headers['Content-Type'] == 'application/npy'
                 return npybytes2ndarray(await response.read())
@@ -112,7 +113,7 @@ async def fetch_merged_tile(visit: Visit, z: int, y: int, x: int, ccd_generator_
             return Response(await response.read(), media_type='application/npy+zstd', headers=headers)
 
 
-ready_visits = SizeLimitedSet[Visit](32)
+ready_visits = SizeLimitedSet[Visit](config.max_storage_entries, ttl=30)
 
 
 def is_visit_ready(visit: Visit):

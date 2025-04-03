@@ -1,5 +1,5 @@
-import { DiskInfo, PodStatus, useGetPodStatusQuery } from "../../store/api/openapi"
-import { Progress } from "../../components/Progress"
+import { DiskInfo, PodStatus, useGetPodStatusQuery } from "../../../store/api/openapi"
+import { Progress } from "../../../components/Progress"
 import styles from './styles.module.scss'
 
 
@@ -14,14 +14,9 @@ export function PodsStatus() {
     <div className={styles.podStatus}>
       <PodStatusView status={podStatus.frontend} title="Frontend" />
       <PodStatusView status={podStatus.coordinator} title="Coordinator" />
-      <details>
-        <summary>Generators ({podStatus.generators.length})</summary>
-        <div className={styles.indent}>
-          {podStatus.generators.map((generator, i) => (
-            <PodStatusView key={i} status={generator} title={`Generator ${i + 1}`} />
-          ))}
-        </div>
-      </details>
+      {podStatus.generators.map((generator, i) => (
+        <PodStatusView key={i} status={generator} title={`Generator ${i + 1}`} />
+      ))}
     </div>
   )
 }
@@ -58,7 +53,7 @@ function PodStatusView({ status, title }: { status: PodStatus, title: string }) 
         Memory: {formatBytes(status.memory_used)} / {formatBytes(status.memory_total)}
         <Progress count={status.memory_used} total={status.memory_total} width="200px" />
       </div>
-      <details>
+      <details open>
         <summary>Disks ({status.disks.length})</summary>
         <div>
           {status.disks.map((disk, i) => (

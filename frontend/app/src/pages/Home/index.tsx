@@ -1,8 +1,10 @@
-import { memo } from "react"
-import { useAppSelector } from "../../store/hooks"
+import { memo, useEffect } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { homeSlice } from "../../store/features/homeSlice"
+import { useAppDispatch, useAppSelector } from "../../store/hooks"
 import { wrapByHomeContext } from "./context"
-import { Header } from "./Header"
 import { LineProfiler } from "./LineProfiler"
+import { MainMenu } from "./MainMenu"
 import styles from './styles.module.scss'
 import { Viewer } from "./Viewer"
 import { ViewerSettings } from "./ViewerSettings"
@@ -13,9 +15,10 @@ import { VisitList } from "./VisitList"
 export const Home = wrapByHomeContext(memo(() => {
   const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)
 
+  useSyncQuicklookWithUrl()
+
   return (
     <div className={styles.home}>
-      <Header />
       <div style={{ flexGrow: 1, display: 'flex' }}>
         <div style={{ width: 'min(30%, 300px)', display: 'flex', flexDirection: 'column' }}>
           <VisitList style={{ flexGrow: 1 }} />
@@ -26,9 +29,33 @@ export const Home = wrapByHomeContext(memo(() => {
           <Viewer style={{ flexGrow: 1 }} />
           <Colorbar />
           {lineProfilerEnabled && <LineProfiler />}
+          <div style={{ position: 'absolute', right: 0 }}>
+            <MainMenu />
+          </div>
         </div>
       </div>
       {/* <Example /> */}
     </div>
   )
 }))
+
+
+
+const useSyncQuicklookWithUrl = () => {
+  const { visitId } = useParams()
+  const dispatch = useAppDispatch()
+  const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (visitId) {
+      dispatch(homeSlice.actions.setCurrentQuicklook(visitId))
+    }
+  }, [dispatch, visitId])
+
+  useEffect(() => {
+    if (currentQuicklook) {
+      navigate(`/visits/${currentQuicklook}`, { replace: true })
+    }
+  }, [currentQuicklook, navigate])
+}

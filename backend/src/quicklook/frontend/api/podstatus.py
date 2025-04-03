@@ -29,7 +29,7 @@ async def fetch_coordinator_status() -> CoordinatorPodStatus:
 @router.get('/api/status', response_model=StatusResponse)
 async def get_pod_status() -> StatusResponse:
     coordinator_task = fetch_coordinator_status()
-    pod_status_task = pod_status()
+    pod_status_task = pod_status(storage_dirs=[])
     coordinator_response, frontend = await asyncio.gather(
         coordinator_task,
         pod_status_task,

@@ -5,9 +5,9 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
 from quicklook.config import config
+from quicklook.frontend.api.compression import setup_compression
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWatcher
 from quicklook.frontend.api.staticassets import setup_static_assets
-from quicklook.utils.http_request import http_request
 
 from .get_fits_header import router as get_fits_header_router
 from .get_tile import router as gettile_router
@@ -17,6 +17,8 @@ from .quicklooks import router as quicklooks_router
 from .systeminfo import router as systeminfo_router
 from .visits import router as visits_router
 from .get_fits_file import router as get_fits_file_router
+from .cache_entries import router as cache_entries_router
+from .storage_explorer import router as storage_explorer_router
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
 
@@ -40,11 +42,8 @@ app.include_router(get_fits_file_router, prefix=config.frontend_app_prefix)
 
 if config.admin_page:  # pragma: no cover
     app.include_router(pod_status_router, prefix=config.frontend_app_prefix)
-
-    @app.post(f"{config.frontend_app_prefix}/api/kill")
-    async def kill():
-        await http_request('post', f'{config.coordinator_base_url}/kill')
-
+    app.include_router(cache_entries_router, prefix=config.frontend_app_prefix)
+    app.include_router(storage_explorer_router, prefix=config.frontend_app_prefix)
 
 setup_static_assets(app)
 
@@ -64,3 +63,4 @@ def use_route_names_as_operation_ids(app: FastAPI) -> None:
 
 
 use_route_names_as_operation_ids(app)
+setup_compression(app, f'{config.frontend_app_prefix}/assets')

@@ -1,11 +1,12 @@
 from pathlib import Path
 
 from quicklook.config import config
+from quicklook.datasource.butler_datasource.instrument import Instrument
 from quicklook.types import CcdId, Visit
 from quicklook.utils.fits import fits_partial_load
-from quicklook.utils.s3 import s3_download_object, s3_list_object_name, s3_list_objects
+from quicklook.utils.s3 import s3_download_object, s3_list_objects
 
-from .types import DataSourceBase, Query, Visit
+from .types import DataSourceBase, DataSourceCcdMetadata, Query, Visit
 
 
 class DummyDataSource(DataSourceBase):
@@ -22,7 +23,17 @@ class DummyDataSource(DataSourceBase):
 
     def list_ccds(self, visit: Visit) -> list[str]:
         prefix = f'{visit.data_type}/{visit.name}/'
-        return [Path(obj_name).stem for obj_name in s3_list_object_name(config.s3_test_data, prefix=prefix)]
+        return [Path(obj.key).stem for obj in s3_list_objects(config.s3_test_data, prefix=prefix)]
+
+    def get_metadata(self, ref: CcdId) -> DataSourceCcdMetadata:
+        i = Instrument.get('LSSTCam')
+        return DataSourceCcdMetadata(
+            detector=i.ccd_2_detector[ref.ccd_name],
+            ccd_name=ref.ccd_name,
+            day_obs=-1,
+            exposure=-1,
+            visit=ref.visit,
+        )
 
 
 def _s3_get_visit_ccd_fits(visit: Visit, ccd_name: str) -> bytes:

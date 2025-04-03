@@ -45,11 +45,11 @@ frontend:
     # -- Resource requests for the frontend
     requests:
       cpu: 100m
-      memory: 256Mi
+      memory: 1024Mi
     # -- Resource limits for the frontend
     limits:
       cpu: 8000m
-      memory: 256Mi
+      memory: 1024Mi
 
 db:
   resources:

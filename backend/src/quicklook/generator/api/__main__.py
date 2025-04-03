@@ -18,4 +18,5 @@ uvicorn.run(
     port=GeneratorRuntimeSettings.stack.top.port,
     access_log=False,
     reload=config.dev_reload,
+    log_level=config.log_level,
 )

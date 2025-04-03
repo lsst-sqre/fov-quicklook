@@ -26,7 +26,8 @@ export default tseslint.config(
       // 'react-refresh/only-export-components': 'warn',
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': 'off'
+      '@typescript-eslint/no-unused-vars': 'off',
+      'eslint-disable-next-line no-debugger': 'off',
     },
   },
 )

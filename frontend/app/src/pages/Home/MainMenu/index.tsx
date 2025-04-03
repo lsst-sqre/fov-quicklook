@@ -1,10 +1,11 @@
 import { Menu, MenuButton, MenuDivider, MenuItem } from "@szhsin/react-menu"
-import { MaterialSymbol } from "../../../../components/MaterialSymbol"
-import { useGlobe, useResetView } from "../../context"
 import { useCallback } from "react"
-import { useAppDispatch, useAppSelector } from "../../../../store/hooks"
-import { homeSlice } from "../../../../store/features/homeSlice"
 import { angle } from "@stellar-globe/stellar-globe"
+import { useNavigate } from "react-router-dom"
+import { useAppDispatch, useAppSelector } from "../../../store/hooks"
+import { useGlobe, useResetView } from "../context"
+import { homeSlice } from "../../../store/features/homeSlice"
+import { MaterialSymbol } from "../../../components/MaterialSymbol"
 
 export function MainMenu() {
   const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)

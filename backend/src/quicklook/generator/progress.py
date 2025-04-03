@@ -1,5 +1,5 @@
 import contextlib
-import multiprocessing.pool
+import multiprocessing
 import queue
 import threading
 from dataclasses import dataclass

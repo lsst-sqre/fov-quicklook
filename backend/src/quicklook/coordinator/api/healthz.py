@@ -17,14 +17,19 @@ class GeneratorHealth(BaseModel):
 router = APIRouter()
 
 
-@router.get('/healthz', response_model=list[GeneratorHealth])
+@router.get('/healthz')
 async def healthz():
-    async def generator_health(g: GeneratorPod):
-        with timeit(f'healthz {g.host}:{g.port}'):
+    return {'status': 'ok'}
+
+
+@router.get('/ready', response_model=list[GeneratorHealth])
+async def ready():
+    async def generator_health(g: GeneratorPod) -> GeneratorHealth:
+        with timeit(f'ready {g.host}:{g.port}'):
             async with aiohttp.ClientSession() as session:
                 try:
                     async with session.get(
-                        f'http://{g.host}:{g.port}/healthz',
+                        f'http://{g.host}:{g.port}/ready',
                         raise_for_status=True,
                         timeout=aiohttp.ClientTimeout(total=1),
                     ) as response:
@@ -33,5 +38,5 @@ async def healthz():
                 except Exception as e:  # pragma: no cover
                     return GeneratorHealth(pod=g, status='ng')
 
-    with timeit('healthz'):
+    with timeit('ready'):
         return await asyncio.gather(*[generator_health(g) for g in ctx().generators])

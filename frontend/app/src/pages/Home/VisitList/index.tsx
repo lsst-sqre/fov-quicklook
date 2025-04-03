@@ -13,7 +13,7 @@ type VisitListProps = {
 
 function isValidSearchString(s: string) {
   // 20241021 or 2024102100002
-  return /^\d{8}(\d{4})?$/.test(s)
+  return /^\d{8}(\d{5})?$/.test(s)
 }
 
 
@@ -24,13 +24,13 @@ export const VisitList = memo(({ style }: VisitListProps) => {
       switch (searchString.length) {
         case 8:
           return { dayObs: Number(searchString) }
-        case 12:
-          return { exposure: searchString }
+        case 1:
+          return { exposure: Number.parseInt(searchString) }
       }
     }
     return {}
   }, [searchString])
-  
+
   const { data: list } = useListVisitsQuery(query)
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const dispatch = useAppDispatch()

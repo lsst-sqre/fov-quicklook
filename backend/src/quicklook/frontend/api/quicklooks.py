@@ -1,6 +1,7 @@
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, HTTPException, WebSocket, status
 from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 
@@ -41,16 +42,22 @@ async def list_quicklooks():
     return [QuicklookStatus.from_report(job) for job in RemoteQuicklookJobsWatcher().jobs.values()]
 
 
+@router.websocket('/api/quicklooks.ws')
+async def list_quicklooks_ws(client_ws: WebSocket):
+    await client_ws.accept()
+    async with safe_websocket(client_ws):
+        async for jobs in RemoteQuicklookJobsWatcher().watch(lambda _: _.values()):
+            try:
+                await client_ws.send_json([QuicklookStatus.from_report(job).model_dump() for job in jobs])
+            except WebSocketDisconnect:
+                break
+
+
 @router.get('/api/quicklooks/{id}/status', response_model=QuicklookStatus | None)
 async def show_quicklook_status(id: str):
     visit = Visit.from_id(id)
     report = RemoteQuicklookJobsWatcher().jobs.get(visit)
-    if report is None:
-        job = storage.load_quicklook_job(visit)
-        if job:
-            return QuicklookStatus.from_report(QuicklookJobReport.from_job(job))
-        return
-    return QuicklookStatus.from_report(report)
+    return quicklook_status(visit, report)
 
 
 @router.websocket('/api/quicklooks/{id}/status.ws')
@@ -62,18 +69,24 @@ async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
         def pick(qls: dict[Visit, QuicklookJobReport]) -> QuicklookJobReport | None:
             return qls.get(visit)
 
-        async for job in RemoteQuicklookJobsWatcher().watch(pick):  # pragma: no branch
+        async for report in RemoteQuicklookJobsWatcher().watch(pick):  # pragma: no branch
+            status = quicklook_status(visit, report)
             try:
-                model = QuicklookStatus.from_report(job).model_dump() if job else None
-                if model is None:
-                    job = storage.load_quicklook_job(visit)
-                    if job:
-                        model = QuicklookStatus.from_report(QuicklookJobReport.from_job(job)).model_dump()
-                await client_ws.send_json(model)
+                await client_ws.send_json(status.model_dump() if status else None)
             except WebSocketDisconnect:
                 break
 
-        return
+
+def quicklook_status(visit: Visit, report: QuicklookJobReport | None) -> QuicklookStatus | None:
+    if report:
+        status = QuicklookStatus.from_report(report)
+    else:
+        job = storage.load_quicklook_job(visit)
+        if job:
+            status = QuicklookStatus.from_report(QuicklookJobReport.from_job(job))
+        else:
+            status = None
+    return status
 
 
 class QuicklookMetadata(BaseModel):
@@ -84,27 +97,33 @@ class QuicklookMetadata(BaseModel):
 
 
 @router.get('/api/quicklooks/{id}/metadata', response_model=QuicklookMetadata)
-async def show_quicklook_metadata(
-    id: str,
-):
-    scale = 0.2 / 3600.0  # pixel size in degree
-    meta = storage.get_quicklook_meta(Visit.from_id(id))
-    return QuicklookMetadata(
-        id=id,
-        wcs={
-            "NAXIS1": 63424,
-            "NAXIS2": 63376,
-            "CRVAL1": 0,
-            "CRVAL2": 0,
-            "CRPIX1": 31750.5,
-            "CRPIX2": 31750.5,
-            "CD1_1": -scale,
-            "CD1_2": 0,
-            "CD2_1": 0,
-            "CD2_2": scale,
-        },
-        ccd_meta=meta.ccd_meta,
-    )
+async def show_quicklook_metadata(id: str):
+    metadata = quicklook_metadata(visit=Visit.from_id(id))
+    if metadata:
+        return metadata
+    raise HTTPException(status.HTTP_404_NOT_FOUND)
+
+
+def quicklook_metadata(visit: Visit) -> QuicklookMetadata | None:
+    meta = storage.get_quicklook_meta(visit)
+    if meta:
+        scale = 0.2 / 3600.0  # pixel size in degree
+        return QuicklookMetadata(
+            id=visit.id,
+            wcs={
+                "NAXIS1": 63424,
+                "NAXIS2": 63376,
+                "CRVAL1": 0,
+                "CRVAL2": 0,
+                "CRPIX1": 31750.5,
+                "CRPIX2": 31750.5,
+                "CD1_1": -scale,
+                "CD1_2": 0,
+                "CD2_1": 0,
+                "CD2_2": scale,
+            },
+            ccd_meta=meta.ccd_meta,
+        )
 
 
 @router.delete('/api/quicklooks/*', description='Delete all quicklooks')

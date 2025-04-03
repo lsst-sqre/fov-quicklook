@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 
 type LinkButtonProps = {
   to: string
@@ -6,11 +6,15 @@ type LinkButtonProps = {
 }
 
 export function LinkButton({ to, children }: LinkButtonProps) {
+  const navigate = useNavigate()
+  const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    navigate(to)
+  }
+
   return (
-    <button>
-      <Link to={to}>
-        {children}
-      </Link>
+    <button onClick={onClick}>
+      {children}
     </button>
   )
 }

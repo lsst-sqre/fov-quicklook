@@ -2,6 +2,7 @@ import { Cache, Globe, ReleaseCallbacks, Tract, V2, angle, tile } from "@stellar
 import npyjs from 'npyjs'
 import { QuicklookMetadata } from "../../../store/api/openapi"
 import { RubinImageFilter, RubinImageFilterParams } from "./ImaegFilter"
+import { zstdDecompress } from "./zstd"
 
 
 const TILE_SIZE = 256
@@ -103,9 +104,8 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
       return npy
     }
     const tileId = Tract.encodeTileId(this.tracts[0], level, p, q)
-    const n = new npyjs()
     const url = `./api/quicklooks/${this.metadata.id}/tiles/${level}/${p}/${q}`
-    const fresh = await n.load(url)
+    const fresh = await loadRemoteNpy(url)
     this.npyCache.set(tileId, fresh)
     return fresh
   }
@@ -189,5 +189,28 @@ class TileTexture extends tile.TileTexture {
 
   beforeRender(): void {
     this.beforeRenderCallback?.()
+  }
+}
+
+
+async function loadRemoteNpy(url: string) {
+  // urlで取得したレスポンスのcontent-typeによってzstd解答をする
+  const response = await fetch(url)
+  const contentType = response.headers.get('content-type')
+
+  switch (contentType) {
+    case 'application/npy': {
+      const n = new npyjs()
+      return n.load(await response.arrayBuffer())
+    }
+    case 'application/npy+zstd': {
+      const raw = await response.arrayBuffer()
+      const array = await zstdDecompress(new Uint8Array(raw))
+      // console.info(`${url}: compression rate: ${(100 * raw.byteLength / array.byteLength).toFixed(0)}%`)
+      const n = new npyjs()
+      return n.parse(array.buffer)
+    }
+    default:
+      throw new Error(`Unexpected content-type: ${contentType}`)
   }
 }

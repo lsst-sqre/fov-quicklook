@@ -1,4 +1,4 @@
-import { useListQuicklooksQuery } from "../../store/api/openapi"
+import { useListQuicklooksQuery } from "../../../store/api/openapi"
 import styles from './styles.module.scss'
 
 export function QuicklookList() {

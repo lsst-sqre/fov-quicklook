@@ -9,10 +9,9 @@ import { websocketUrl } from "../../../utils/websocket"
 export function useQuicklookStatus() {
   const id = useAppSelector(state => state.home.currentQuicklook)
   const [status, setStatus] = useState<{ [id: string]: QuicklookStatus | null }>({})
-  const ready = false
-  // const ready = id !== undefined ? (status[id]?.phase === 'ready') : false
-  const { data: metadata } = useShowQuicklookMetadataQuery({ id: id ?? '' }, { skip: !ready })
+  const ready = id !== undefined ? ((status[id]?.phase ?? 0) >= 2) : false
   const wsUrl = useMemo(() => websocketUrl(`./api/quicklooks/${id}/status.ws`), [id])
+  const { data: metadata, isFetching: metadataIsFeatching } = useShowQuicklookMetadataQuery({ id: id ?? '-' }, { skip: !ready })
 
   const { reconnect } = useWebsocket({
     url: wsUrl,
@@ -22,7 +21,7 @@ export function useQuicklookStatus() {
         setStatus({ [id]: msg })
       }
     }, [id]),
-    skip: id === undefined,
+    skip: id === undefined || ready,
   })
 
   const [callCreateQuicklookApi,] = useCreateQuicklookMutation()
@@ -41,7 +40,7 @@ export function useQuicklookStatus() {
   return {
     id,
     status: id ? status[id] : null,
-    metadata: ready ? metadata : undefined,
+    metadata: ready && !metadataIsFeatching && metadata || undefined,
     ready,
   }
 }

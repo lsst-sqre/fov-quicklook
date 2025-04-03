@@ -7,6 +7,9 @@ const injectedRtkApi = api.injectEndpoints({
     healthz: build.query<HealthzApiResponse, HealthzApiArg>({
       query: () => ({ url: `/api/healthz` }),
     }),
+    ready: build.query<ReadyApiResponse, ReadyApiArg>({
+      query: () => ({ url: `/api/ready` }),
+    }),
     getTile: build.query<GetTileApiResponse, GetTileApiArg>({
       query: (queryArg) => ({
         url: `/api/quicklooks/${queryArg.id}/tiles/${queryArg.z}/${queryArg.y}/${queryArg.x}`,
@@ -61,6 +64,14 @@ const injectedRtkApi = api.injectEndpoints({
         },
       }),
     }),
+    getVisitMetadata: build.query<
+      GetVisitMetadataApiResponse,
+      GetVisitMetadataApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/visits/${queryArg.id}/ccds/${queryArg.ccdName}`,
+      }),
+    }),
     getFitsFile: build.query<GetFitsFileApiResponse, GetFitsFileApiArg>({
       query: (queryArg) => ({
         url: `/api/quicklooks/${queryArg.id}/fits/${queryArg.ccdName}`,
@@ -69,8 +80,52 @@ const injectedRtkApi = api.injectEndpoints({
     getPodStatus: build.query<GetPodStatusApiResponse, GetPodStatusApiArg>({
       query: () => ({ url: `/api/status` }),
     }),
-    kill: build.mutation<KillApiResponse, KillApiArg>({
-      query: () => ({ url: `/api/kill`, method: "POST" }),
+    listCacheEntries: build.query<
+      ListCacheEntriesApiResponse,
+      ListCacheEntriesApiArg
+    >({
+      query: () => ({ url: `/api/cache_entries` }),
+    }),
+    cleanupCacheEntries: build.mutation<
+      CleanupCacheEntriesApiResponse,
+      CleanupCacheEntriesApiArg
+    >({
+      query: () => ({ url: `/api/cache_entries:cleanup`, method: "POST" }),
+    }),
+    listStorageEntries: build.query<
+      ListStorageEntriesApiResponse,
+      ListStorageEntriesApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/storage`,
+        params: {
+          path: queryArg.path,
+        },
+      }),
+    }),
+    deleteStorageEntry: build.mutation<
+      DeleteStorageEntryApiResponse,
+      DeleteStorageEntryApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/storage`,
+        method: "DELETE",
+        params: {
+          path: queryArg.path,
+        },
+      }),
+    }),
+    deleteStorageEntriesByPrefix: build.mutation<
+      DeleteStorageEntriesByPrefixApiResponse,
+      DeleteStorageEntriesByPrefixApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/storage/by-prefix`,
+        method: "DELETE",
+        params: {
+          prefix: queryArg.prefix,
+        },
+      }),
     }),
   }),
   overrideExisting: false,
@@ -81,6 +136,8 @@ export type GetSystemInfoApiResponse =
 export type GetSystemInfoApiArg = void;
 export type HealthzApiResponse = /** status 200 Successful Response */ any;
 export type HealthzApiArg = void;
+export type ReadyApiResponse = /** status 200 Successful Response */ any;
+export type ReadyApiArg = void;
 export type GetTileApiResponse = /** status 200 Successful Response */ any;
 export type GetTileApiArg = {
   z: number;
@@ -118,9 +175,15 @@ export type DeleteAllQuicklooksApiArg = void;
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitListEntry[];
 export type ListVisitsApiArg = {
-  exposure?: string | null;
+  exposure?: number | null;
   dayObs?: number | null;
   limit?: number;
+};
+export type GetVisitMetadataApiResponse =
+  /** status 200 Successful Response */ DataSourceCcdMetadata | null;
+export type GetVisitMetadataApiArg = {
+  id: string;
+  ccdName: string;
 };
 export type GetFitsFileApiResponse = /** status 200 Successful Response */ any;
 export type GetFitsFileApiArg = {
@@ -130,8 +193,27 @@ export type GetFitsFileApiArg = {
 export type GetPodStatusApiResponse =
   /** status 200 Successful Response */ StatusResponse;
 export type GetPodStatusApiArg = void;
-export type KillApiResponse = /** status 200 Successful Response */ any;
-export type KillApiArg = void;
+export type ListCacheEntriesApiResponse =
+  /** status 200 Successful Response */ CacheEntry[];
+export type ListCacheEntriesApiArg = void;
+export type CleanupCacheEntriesApiResponse =
+  /** status 200 Successful Response */ any;
+export type CleanupCacheEntriesApiArg = void;
+export type ListStorageEntriesApiResponse =
+  /** status 200 Successful Response */ Entry[];
+export type ListStorageEntriesApiArg = {
+  path: string;
+};
+export type DeleteStorageEntryApiResponse =
+  /** status 200 Successful Response */ any;
+export type DeleteStorageEntryApiArg = {
+  path: string;
+};
+export type DeleteStorageEntriesByPrefixApiResponse =
+  /** status 200 Successful Response */ any;
+export type DeleteStorageEntriesByPrefixApiArg = {
+  prefix: string;
+};
 export type SystemInfo = {
   admin_page?: boolean;
 };
@@ -145,7 +227,7 @@ export type HttpValidationError = {
 };
 export type CardType = [string, string, string, string];
 export type HeaderType = CardType[];
-export type QuicklookJobPhase = 0 | 1 | 2 | 3 | 4 | 5 | -1;
+export type QuicklookJobPhase = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | -1;
 export type Progress = {
   count: number;
   total: number;
@@ -158,6 +240,9 @@ export type GenerateProgress = {
 export type TransferProgress = {
   transfer: Progress;
 };
+export type MergeProgress = {
+  merge: Progress;
+};
 export type QuicklookStatus = {
   id: string;
   phase: QuicklookJobPhase;
@@ -167,10 +252,12 @@ export type QuicklookStatus = {
   transfer_progress: {
     [key: string]: TransferProgress;
   } | null;
+  merge_progress: {
+    [key: string]: MergeProgress;
+  } | null;
 };
 export type QuicklookCreateFrontend = {
   id: string;
-  no_transfer?: boolean;
 };
 export type Visit = {
   id: string;
@@ -208,6 +295,13 @@ export type QuicklookMetadata = {
 export type VisitListEntry = {
   id: string;
 };
+export type DataSourceCcdMetadata = {
+  visit: Visit;
+  ccd_name: string;
+  detector: number;
+  exposure: number;
+  day_obs: number;
+};
 export type DiskInfo = {
   mount_point: string;
   total: number;
@@ -225,9 +319,21 @@ export type StatusResponse = {
   coordinator: PodStatus;
   generators: PodStatus[];
 };
+export type CacheEntry = {
+  id: string;
+  phase: "ready" | "in_progress" | "deleting";
+  created_at: string;
+  updated_at: string;
+};
+export type Entry = {
+  name: string;
+  type: "directory" | "file";
+  size: number | null;
+};
 export const {
   useGetSystemInfoQuery,
   useHealthzQuery,
+  useReadyQuery,
   useGetTileQuery,
   useGetFitsHeaderQuery,
   useListQuicklooksQuery,
@@ -236,7 +342,12 @@ export const {
   useShowQuicklookMetadataQuery,
   useDeleteAllQuicklooksMutation,
   useListVisitsQuery,
+  useGetVisitMetadataQuery,
   useGetFitsFileQuery,
   useGetPodStatusQuery,
-  useKillMutation,
+  useListCacheEntriesQuery,
+  useCleanupCacheEntriesMutation,
+  useListStorageEntriesQuery,
+  useDeleteStorageEntryMutation,
+  useDeleteStorageEntriesByPrefixMutation,
 } = injectedRtkApi;

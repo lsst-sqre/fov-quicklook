@@ -1,6 +1,7 @@
 import { Globe$, GlobeEventLayer$, GridLayer$, PanLayer$, RollLayer$, TouchLayer$, ZoomLayer$ } from '@stellar-globe/react-stellar-globe'
 import { GlobePointerEvent, V2 } from "@stellar-globe/stellar-globe"
 import { memo, useCallback, useEffect } from "react"
+import { GenerateProgress } from '../../../appComponents/JobProgress'
 import { Quicklook$ } from '../../../StellarGlobe/Quicklook/QuicklookLayer'
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
@@ -8,7 +9,6 @@ import { useHomeContext, useResetView } from "../context"
 import { CcdFrames } from './CcdFrames/CcdFrames'
 import { CursorLine } from './CursorLine'
 import { Info } from './Info'
-import { QuicklookProgress } from './QuicklookProgress'
 import styles from './styles.module.scss'
 import { ViewerContextMenu } from './ViewerContextMenu'
 
@@ -60,13 +60,11 @@ export const Viewer = memo(({ style }: ViewerProps) => {
       </Globe$>
       <CursorLine />
       <Info />
-      {/* {(currentQuicklook.status?.phase === 'generating' || currentQuicklook.metadata === undefined) && (
+      {!!currentQuicklook.metadata || (
         <div className={styles.viewerBlock}>
-          {currentQuicklook.status?.phase === 'generating' &&
-            <QuicklookProgress status={currentQuicklook.status} />
-          }
+          <GenerateProgress s={currentQuicklook.status} />
         </div>
-      )} */}
+      )}
     </div>
   )
 })

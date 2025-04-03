@@ -18,7 +18,7 @@ class CoordinatorPodStatus(BaseModel):
 @router.get('/pod_status')
 async def get_pod_status() -> CoordinatorPodStatus:
     return CoordinatorPodStatus(
-        coordinator=await pod_status(),
+        coordinator=await pod_status(storage_dirs=[]),
         generators=await asyncio.gather(
             *[
                 http_request(

@@ -26,8 +26,23 @@
         "/api/healthz": {
             "get": {
                 "summary": "Healthz",
-                "description": "Health check",
                 "operationId": "healthz",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ready": {
+            "get": {
+                "summary": "Ready",
+                "operationId": "ready",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
@@ -330,7 +345,7 @@
                         "schema": {
                             "anyOf": [
                                 {
-                                    "type": "string"
+                                    "type": "integer"
                                 },
                                 {
                                     "type": "null"
@@ -378,6 +393,62 @@
                                         "$ref": "#/components/schemas/VisitListEntry"
                                     },
                                     "title": "Response List Visits Api Visits Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/visits/{id}/ccds/{ccd_name}": {
+            "get": {
+                "summary": "Get Visit Metadata",
+                "operationId": "get_visit_metadata",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Id"
+                        }
+                    },
+                    {
+                        "name": "ccd_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Ccd Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/DataSourceCcdMetadata"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ],
+                                    "title": "Response Get Visit Metadata Api Visits  Id  Ccds  Ccd Name  Get"
                                 }
                             }
                         }
@@ -460,16 +531,153 @@
                 }
             }
         },
-        "/api/kill": {
+        "/api/cache_entries": {
+            "get": {
+                "summary": "List Cache Entries",
+                "operationId": "list_cache_entries",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/CacheEntry"
+                                    },
+                                    "type": "array",
+                                    "title": "Response List Cache Entries Api Cache Entries Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/cache_entries:cleanup": {
             "post": {
-                "summary": "Kill",
-                "operationId": "kill",
+                "summary": "Cleanup Cache Entries",
+                "operationId": "cleanup_cache_entries",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
                         "content": {
                             "application/json": {
                                 "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/storage": {
+            "get": {
+                "summary": "List Storage Entries",
+                "operationId": "list_storage_entries",
+                "parameters": [
+                    {
+                        "name": "path",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Path"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Entry"
+                                    },
+                                    "title": "Response List Storage Entries Api Storage Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Storage Entry",
+                "operationId": "delete_storage_entry",
+                "parameters": [
+                    {
+                        "name": "path",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Path"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/storage/by-prefix": {
+            "delete": {
+                "summary": "Delete Storage Entries By Prefix",
+                "operationId": "delete_storage_entries_by_prefix",
+                "parameters": [
+                    {
+                        "name": "prefix",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Prefix"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
                             }
                         }
                     }
@@ -523,6 +731,41 @@
                     "maxx"
                 ],
                 "title": "BBox"
+            },
+            "CacheEntry": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "phase": {
+                        "type": "string",
+                        "enum": [
+                            "ready",
+                            "in_progress",
+                            "deleting"
+                        ],
+                        "title": "Phase"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Created At"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Updated At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "phase",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "CacheEntry"
             },
             "CardType": {
                 "prefixItems": [
@@ -588,6 +831,38 @@
                 ],
                 "title": "CcdMeta"
             },
+            "DataSourceCcdMetadata": {
+                "properties": {
+                    "visit": {
+                        "$ref": "#/components/schemas/Visit"
+                    },
+                    "ccd_name": {
+                        "type": "string",
+                        "title": "Ccd Name"
+                    },
+                    "detector": {
+                        "type": "integer",
+                        "title": "Detector"
+                    },
+                    "exposure": {
+                        "type": "integer",
+                        "title": "Exposure"
+                    },
+                    "day_obs": {
+                        "type": "integer",
+                        "title": "Day Obs"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit",
+                    "ccd_name",
+                    "detector",
+                    "exposure",
+                    "day_obs"
+                ],
+                "title": "DataSourceCcdMetadata"
+            },
             "DiskInfo": {
                 "properties": {
                     "mount_point": {
@@ -615,6 +890,40 @@
                     "device"
                 ],
                 "title": "DiskInfo"
+            },
+            "Entry": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "directory",
+                            "file"
+                        ],
+                        "title": "Type"
+                    },
+                    "size": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Size"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "type",
+                    "size"
+                ],
+                "title": "Entry"
             },
             "GenerateProgress": {
                 "properties": {
@@ -681,6 +990,18 @@
                 ],
                 "title": "ImageStat"
             },
+            "MergeProgress": {
+                "properties": {
+                    "merge": {
+                        "$ref": "#/components/schemas/Progress"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "merge"
+                ],
+                "title": "MergeProgress"
+            },
             "PodStatus": {
                 "properties": {
                     "hostname": {
@@ -735,11 +1056,6 @@
                     "id": {
                         "type": "string",
                         "title": "Id"
-                    },
-                    "no_transfer": {
-                        "type": "boolean",
-                        "title": "No Transfer",
-                        "default": false
                     }
                 },
                 "type": "object",
@@ -757,6 +1073,8 @@
                     3,
                     4,
                     5,
+                    6,
+                    7,
                     -1
                 ],
                 "title": "QuicklookJobPhase"
@@ -830,6 +1148,20 @@
                             }
                         ],
                         "title": "Transfer Progress"
+                    },
+                    "merge_progress": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": {
+                                    "$ref": "#/components/schemas/MergeProgress"
+                                },
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Merge Progress"
                     }
                 },
                 "type": "object",
@@ -837,7 +1169,8 @@
                     "id",
                     "phase",
                     "generate_progress",
-                    "transfer_progress"
+                    "transfer_progress",
+                    "merge_progress"
                 ],
                 "title": "QuicklookStatus"
             },

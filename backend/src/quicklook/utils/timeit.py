@@ -7,7 +7,7 @@ from quicklook.config import config
 
 class settings:
     logger = logging.getLogger(f'uvicorn.{__name__}')
-    loglevel = logging._nameToLevel[config.timeit_log_level]
+    loglevel = logging._nameToLevel[config.timeit_log_level.upper()]
 
 
 @contextlib.contextmanager
@@ -21,9 +21,10 @@ def timeit(
         loglevel = settings.loglevel
     if logger is None:  # pragma: no branch
         logger = settings.logger
+    logger.log(loglevel, f"Starting {label}")
     start = time.time()
     try:
         yield
     finally:
         elapsed = time.time() - start
-        settings.logger.log(loglevel, f"{label}: {elapsed:.3f}s")
+        logger.log(loglevel, f"Completed {label}: {elapsed:.3f}s")

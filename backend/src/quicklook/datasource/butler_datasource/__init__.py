@@ -5,7 +5,7 @@ from lsst.resources import ResourcePath
 
 from quicklook.types import CcdId
 
-from ..types import DataSourceBase, Query, Visit
+from ..types import DataSourceBase, DataSourceCcdMetadata, Query, Visit
 from .instrument import Instrument
 from .retrieve_data import retrieve_data
 
@@ -33,10 +33,10 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             conds.append(f"day_obs={q.day_obs}")
         where = " and ".join(conds)
         try:
-            refs = self._butler.query_datasets(q.data_type, where=where, limit=q.limit)
+            refs = self._butler.query_datasets(q.data_type, where=where, limit=q.limit, order_by='-exposure')
         except EmptyQueryResultError:
             refs = []
-        return [Visit.from_id(f'embargo:LSSTCam:LSSTCam/{q.data_type}/all:raw:{ref.dataId["exposure"]}') for ref in refs]
+        return [Visit.from_id(f'raw:{ref.dataId["exposure"]}') for ref in refs]
 
     def list_ccds(self, visit: Visit) -> list[str]:
         b = self._butler
@@ -58,3 +58,12 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         b = self._butler
         refs = b.query_datasets(visit.data_type, where=f"exposure={visit.name}")
         return {ref.dataId['detector']: ref for ref in refs}
+
+    def get_metadata(self, ref: CcdId) -> DataSourceCcdMetadata:
+        return DataSourceCcdMetadata(
+            detector=0,
+            ccd_name='X',
+            day_obs=0,
+            exposure=0,
+            visit=Visit.from_id('raw:Dummy'),
+        )

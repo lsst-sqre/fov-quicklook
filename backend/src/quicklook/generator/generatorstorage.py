@@ -84,5 +84,14 @@ class _GeneratorMergedTile:
         except FileNotFoundError:
             pass
 
+    def delete_all(self):
+        try:
+            for p in Path(config.tile_merged_dir).iterdir():
+                if p.is_dir():
+                    shutil.rmtree(p)
+        except FileNotFoundError:
+            pass
+
+
 tmptile_storage = _GeneratorTmpTile()
 mergedtile_storage = _GeneratorMergedTile()

@@ -5,6 +5,7 @@ body {
   font-family: sans-serif;
   color: $font-color;
   margin: 0;
+  overflow: hidden;
   // font-size: 18px;
   // overflow: hidden;
 }
@@ -28,12 +29,15 @@ button {
   }
 }
 
-input[type="search"] {
+input[type="search"],
+input[type="text"],
+textarea {
   background-color: rgba(white, 0.1);
   color: white;
   border-radius: 4px;
   border: solid 2px rgba(white, 0.25);
 }
+
 
 select {
   background-color: rgba(white, 0.1);

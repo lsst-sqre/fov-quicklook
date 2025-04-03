@@ -14,6 +14,7 @@
     "api:rtk-query": "npm run refresh-api-schema && rtk-query-codegen-openapi ./openapi-config.json"
   },
   "dependencies": {
+    "@hpcc-js/wasm-zstd": "^1.2.1",
     "@reduxjs/toolkit": "^2.3.0",
     "@stellar-globe/react-draggable-dialog": "file:../lib/stellar-globe/react-draggable-dialog",
     "@stellar-globe/react-stellar-globe": "file:../lib/stellar-globe/react-stellar-globe",
