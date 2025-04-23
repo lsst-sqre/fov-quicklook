@@ -1,7 +1,7 @@
-import styles from './styles.module.scss'
+import { LoadingSpinner } from '../components/Loading'
 import { Progress } from "../components/Progress"
 import { QuicklookStatus } from "../store/api/openapi"
-import { LoadingSpinner } from '../components/Loading'
+import styles from './styles.module.scss'
 
 type ProgressItem = {
   count: number
@@ -15,34 +15,25 @@ function createPhaseComponent<P1 extends PhaseName>(
   pName: P1,
   enumProgress: (p: PhaseProgressType<P1>) => ProgressItem[]
 ) {
-  return function PhaseProgress({ s }: { s: QuicklookStatus | null }) {
-    if (!s) {
-      return <LoadingSpinner />
-    }
-    if (!s[pName]) {
-      return null
+  return function PhaseProgress({ s, compact = false }: { s: QuicklookStatus | null, compact?: boolean }) {
+    if (!s || !s[pName] || Object.keys(s[pName]).length === 0) {
+      return compact ? null : <LoadingSpinner />
     }
     return (
-      <>
-        {Object.keys(s[pName]).length === 0 ? (
-          <LoadingSpinner />
-        ) : (
-          <table className={styles.progressTable}>
-            <tbody>
-              {Object.entries(s[pName]).map(([nodeName, ps]) => (
-                <tr key={nodeName}>
-                  <th>{nodeName}</th>
-                  <td>
-                    <NodeProgress
-                      nodeName={nodeName}
-                      ps={enumProgress(ps)} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table >
-        )}
-      </>
+      <table className={styles.progressTable}>
+        <tbody>
+          {Object.entries(s[pName]).map(([nodeName, ps]) => (
+            <tr key={nodeName}>
+              <th>{nodeName}</th>
+              <td>
+                <NodeProgress
+                  nodeName={nodeName}
+                  ps={enumProgress(ps)} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table >
     )
   }
 }

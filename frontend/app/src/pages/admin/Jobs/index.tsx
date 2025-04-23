@@ -1,13 +1,23 @@
+import { useState } from "react"
 import { GenerateProgress, MergeProgress, TransferProgress } from "../../../appComponents/JobProgress"
-import { QuicklookJobPhase, QuicklookStatus } from "../../../store/api/openapi"
+import { QuicklookJobPhase, QuicklookStatus, useListQuicklooksQuery } from "../../../store/api/openapi"
 import { useJobs } from "./useJobs"
 
 
 export function Jobs() {
-  const jobs = useJobs()
+  const [ws, setWs] = useState(true)
+  const { data: syncJob } = useListQuicklooksQuery()
+  const asyncJobs = useJobs()
+
+  const jobs = ws ? asyncJobs : syncJob
 
   return (
     <div>
+      <div>
+        <button onClick={() => setWs(!ws)}>
+          {ws ? 'Switch to sync' : 'Switch to async'}
+        </button>
+      </div>
       {jobs?.map((job) => (
         <Job key={job.id} status={job} />
       ))}
@@ -21,9 +31,9 @@ function Job({ status }: { status: QuicklookStatus }) {
     <div>
       <h2>{status.id}</h2>
       <p>Phase: {phaseName(status.phase)}</p>
-      <GenerateProgress s={status} />
-      <MergeProgress s={status} />
-      <TransferProgress s={status} />
+      <GenerateProgress compact s={status} />
+      <MergeProgress compact s={status} />
+      <TransferProgress compact s={status} />
     </div>
   )
 }

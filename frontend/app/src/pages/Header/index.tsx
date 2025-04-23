@@ -12,6 +12,9 @@ export const Header = memo(() => {
   const [deleteAll,] = useDeleteAllQuicklooksMutation()
 
   const deleteAllAndRefresh = useCallback(async () => {
+    if (!confirm('Are you sure you want to delete all quicklooks?')) {
+      return
+    }
     await deleteAll()
     await refetch()
   }, [deleteAll, refetch])
@@ -23,7 +26,8 @@ export const Header = memo(() => {
     )
   }, [])
 
-  const adminPageEnabled = useAdminPageEnabled()
+  const queryIncludesAdminParam = window.location.search.includes('admin')
+  const adminPageEnabled = useAdminPageEnabled() && queryIncludesAdminParam
 
   return (
     <div className={styles.header}>
@@ -32,7 +36,7 @@ export const Header = memo(() => {
         <>
           <button onClick={openIssues}>Issues</button>
           <button onClick={deleteAllAndRefresh}>Clear Cache</button>
-          &nbsp;
+          <div style={{ width: '1em' }} />
           <LinkButton to="/admin/pod_status">PodStatus</LinkButton>
           <LinkButton to="/admin/jobs">Jobs</LinkButton>
           <LinkButton to="/admin/cache-entries">Cache Entries</LinkButton>
