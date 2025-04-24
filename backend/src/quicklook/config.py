@@ -1,3 +1,4 @@
+from aiohttp import ClientTimeout
 from pprint import pprint
 import os
 import re
@@ -63,14 +64,25 @@ class Config(BaseSettings):
     fitsio_tmpdir: str = '/dev/shm/quicklook/fitsio'  # used in generator
     fitsio_decompress_parallel: int = 4
 
-    job_max_ram_limit_stage: int = 8
+    job_max_ram_limit_stage: int = 4
     job_max_disk_limit_stage: int = 50
-    max_storage_entries: int = 30
+    max_storage_entries: int = 40
 
-    transfer_timeout: float = 120.
+    generate_timeout: ClientTimeout = ClientTimeout(
+        total=20.0,
+        sock_read=5.0,
+    )
+    merge_timeout: ClientTimeout = ClientTimeout(
+        total=20.0,
+        sock_read=5.0,
+    )
+    transfer_timeout: ClientTimeout = ClientTimeout(
+        total=120.0,
+        sock_read=5.0,
+    )
 
     log_level: Literal['debug', 'info', 'warning', 'error', 'critical'] = 'info'
-    timeit_log_level: Literal['debug', 'info', 'warning', 'error', 'critical'] = 'info'
+    timeit_log_level: Literal['debug', 'info', 'warning', 'error', 'critical'] = 'debug'
 
     db_url: str = 'postgresql://quicklook:quicklook@localhost:5432/quicklook'
 

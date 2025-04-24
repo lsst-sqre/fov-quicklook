@@ -1,13 +1,17 @@
 import asyncio
+import logging
 from dataclasses import asdict
 from typing import Callable
 
 import aiohttp
 
+from quicklook.config import config
 from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
 from quicklook.coordinator.quicklookjob.tasks import TransferTask
 from quicklook.types import GeneratorPod, TransferProgress, TransferTaskResponse
 from quicklook.utils.message import message_from_async_reader
+
+logger = logging.getLogger(f'uvicorn.{__name__}')
 
 
 async def job_transfer(job: QuicklookJob, sync_job: Callable[[QuicklookJob], None]):
@@ -26,19 +30,25 @@ async def _scatter_transfer_job(job: QuicklookJob, sync_job: Callable[[Quicklook
     nodes: dict[str, TransferProgress] = {}
 
     async def run_1_task(g: GeneratorPod):
+        for _ in range(5):
+            try:
+                return await run_1_task_noretry(g)
+            except aiohttp.ServerTimeoutError:
+                logger.warning(f'ClientTimeout for {g}')
+
+        raise RuntimeError(f'ClientTimeout for {g} after 5 retries')
+
+    async def run_1_task_noretry(g: GeneratorPod):
         task = TransferTask(visit=job.visit, generator=g, ccd_generator_map=ccd_generator_map)
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f'http://{g.host}:{g.port}/quicklooks/transfer',
                 json=asdict(task),
                 raise_for_status=True,
-                timeout=aiohttp.ClientTimeout(total=3600),
+                timeout=config.transfer_timeout,
             ) as res:
                 while True:
-                    try:
-                        msg: TransferTaskResponse = await message_from_async_reader(res.content.readexactly)
-                    except Exception as e:
-                        raise RuntimeError(f'Error while reading transfer task response from {g.host}:{g.port}') from e
+                    msg: TransferTaskResponse = await message_from_async_reader(res.content.readexactly)
                     match msg:
                         case None:
                             break

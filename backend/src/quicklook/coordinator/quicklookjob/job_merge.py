@@ -8,7 +8,7 @@ import aiohttp
 from quicklook import storage
 from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
 from quicklook.coordinator.quicklookjob.tasks import MergeTask
-from quicklook.types import GeneratorPod, MergeTaskResponse, MergeProgress
+from quicklook.types import GeneratorPod, MergeProgress, MergeTaskResponse
 from quicklook.utils.message import message_from_async_reader
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
@@ -30,6 +30,15 @@ async def _scatter_merge_job(job: QuicklookJob, sync_job: Callable[[QuicklookJob
     nodes: dict[str, MergeProgress] = {}
 
     async def run_1_task(g: GeneratorPod):
+        for _ in range(5):
+            try:
+                return await run_1_task_noretry(g)
+            except aiohttp.ServerTimeoutError:
+                logger.warning(f'ClientTimeout for {g}')
+
+        raise RuntimeError(f'ClientTimeout for {g} after 5 retries')
+
+    async def run_1_task_noretry(g: GeneratorPod):
         task = MergeTask(generator=g, visit=job.visit, ccd_generator_map=ccd_generator_map)
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -39,10 +48,7 @@ async def _scatter_merge_job(job: QuicklookJob, sync_job: Callable[[QuicklookJob
                 timeout=aiohttp.ClientTimeout(total=3600),
             ) as res:
                 while True:
-                    try:
-                        msg: MergeTaskResponse = await message_from_async_reader(res.content.readexactly)
-                    except Exception as e:
-                        raise RuntimeError(f'Error while reading merge task response from {g.host}:{g.port}') from e
+                    msg: MergeTaskResponse = await message_from_async_reader(res.content.readexactly)
                     match msg:
                         case None:
                             break

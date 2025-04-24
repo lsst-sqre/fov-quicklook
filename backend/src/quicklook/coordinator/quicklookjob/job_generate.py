@@ -63,11 +63,21 @@ async def _scatter_generate_job(job: QuicklookJob, sync_job: Callable[[Quicklook
     job.ccd_generator_map = ccd_generator_map
 
     async def run_1_task(task: GenerateTask):
+        for _ in range(5):
+            try:
+                return await run_1_task_noretry(task)
+            except aiohttp.ServerTimeoutError:
+                logger.warning(f'ClientTimeout for {task}')
+
+        raise RuntimeError(f'ClientTimeout for {task} after 5 retries')
+
+    async def run_1_task_noretry(task: GenerateTask):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f'http://{task.generator.host}:{task.generator.port}/quicklooks',
                 json=asdict(task),
                 raise_for_status=True,
+                timeout=config.generate_timeout,
             ) as res:
                 process_ccd_results: list[CcdMeta] = []
                 while True:
