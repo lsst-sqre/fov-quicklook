@@ -20,8 +20,10 @@ from quicklook.utils.timeit import timeit
 logger = logging.getLogger(f'uvicorn.{__name__}')
 
 
-async def housekeep():
-    for visit in _iter_expired_records():
+async def housekeep(expiration_threshold: datetime | None = None):
+    if expiration_threshold is None:
+        expiration_threshold = datetime.now() - timedelta(hours=1)
+    for visit in _iter_expired_records(expiration_threshold):
         await _delete_visit(visit)
 
 
@@ -40,33 +42,37 @@ async def _delete_visit(visit: Visit):
             db.commit()
 
 
-def _iter_expired_records() -> Iterable[Visit]:
+def _iter_expired_records(expiration_threshold: datetime) -> Iterable[Visit]:
     with db_context() as db:
-        # 1. phaseがreadyでconfig.max_storage_entries番目より古いものを取得
-        ready_subquery = (
-            # this comment prevents automatic formatting
+        # 1. phaseがreadyのレコードを新しい順に取得し、config.max_storage_entries以降を削除対象にする
+        # 新しいものを保持するために、作成日時の降順でソート
+        recent_ready_subquery = (
             select(QuicklookRecord.id)
             .where(QuicklookRecord.phase == 'ready')
-            .order_by(QuicklookRecord.created_at)
+            .order_by(QuicklookRecord.created_at.desc())  # 降順ソートで新しいものを先頭に
             .limit(config.max_storage_entries)
             .subquery()
         )
 
+        # ready状態だが、保持する最新のconfig.max_storage_entries件には含まれないもの
         ready_records = (
             db.execute(
                 select(QuicklookRecord).where(
-                    # this comment prevents automatic formatting
-                    (QuicklookRecord.phase == 'ready')
-                    & (~QuicklookRecord.id.in_(select(ready_subquery.c.id)))
+                    (QuicklookRecord.phase == 'ready') 
+                    & (~QuicklookRecord.id.in_(select(recent_ready_subquery.c.id)))
                 )
             )
             .scalars()
             .all()
         )
 
-        # 2. phaseがreadyでなくupdated_atが1時間以上前のものを取得
-        cutoff = datetime.now() - timedelta(hours=1)
-        not_ready_records = db.execute(select(QuicklookRecord).where((QuicklookRecord.phase != 'ready') & (QuicklookRecord.updated_at <= cutoff))).scalars().all()
+        # 2. phaseがreadyでなくupdated_atがexpiration_thresholdより前のものを取得
+        not_ready_records = db.execute(
+            select(QuicklookRecord).where(
+                (QuicklookRecord.phase != 'ready') 
+                & (QuicklookRecord.updated_at <= expiration_threshold)
+            )
+        ).scalars().all()
 
         # 両方の結果を結合
         all_expired_records: Iterable[QuicklookRecord] = ready_records + not_ready_records  # type: ignore
