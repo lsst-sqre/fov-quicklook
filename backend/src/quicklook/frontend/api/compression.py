@@ -69,14 +69,9 @@ async def compress_response(request: Request, response: Response, static_prefix:
     if not response_body:
         return response
 
-    original_size = len(response_body)
-
     # Compress content based on type
     is_static_path = request.url.path.startswith(static_prefix)
     compressed_body = compress_content(request.url.path, response_body, is_static_path)
-
-    # Log compression stats
-    log_compression_stats(original_size, len(compressed_body))
 
     # Create new response with compressed content
     return create_compressed_response(response, compressed_body)
@@ -148,17 +143,6 @@ def create_compressed_response(original_response: Response, compressed_body: byt
     return new_response
 
 
-def log_compression_stats(original_size: int, compressed_size: int) -> None:
-    """
-    Log compression statistics.
-
-    Args:
-        original_size: Original content size in bytes
-        compressed_size: Compressed content size in bytes
-    """
-    compression_ratio = (1 - compressed_size / original_size) * 100 if original_size > 0 else 0
-
-
 def get_compressed_content(file_path: str, content: bytes) -> bytes:
     """
     Compress content and cache the result using file path as the cache key.
@@ -174,9 +158,9 @@ def get_compressed_content(file_path: str, content: bytes) -> bytes:
     cache_hit = file_path in _compressed_content_cache
 
     if not cache_hit:
-        original_size = len(content)
+        # original_size = len(content)
         compressed_content = gzip.compress(content)
-        compressed_size = len(compressed_content)
+        # compressed_size = len(compressed_content)
         # compression_ratio = (1 - compressed_size / original_size) * 100 if original_size > 0 else 0
         _compressed_content_cache[file_path] = compressed_content
 
