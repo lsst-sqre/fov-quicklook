@@ -153,3 +153,54 @@ def _create_s3_client_thread_local(settings: S3Config, thread_id: int):
             s3={'addressing_style': 'path'},
         ),
     )
+
+
+'''
+# debug用jupyterで実行
+
+
+import boto3
+import os
+from botocore.client import Config
+from typing import Iterable, Literal
+from dataclasses import dataclass
+
+
+secret_key = os.environ['QUICKLOOK_s3_tile__secret_key']
+access_key = os.environ['QUICKLOOK_s3_tile__access_key']
+bucket = 'fov-quicklook-tile'
+
+client = boto3.client(
+    's3',
+    endpoint_url="https://sdfembs3.sdf.slac.stanford.edu:443",
+    aws_access_key_id=access_key,
+    aws_secret_access_key=secret_key,
+    config=Config(
+        signature_version='s3v4',
+        tcp_keepalive=True,
+        request_checksum_calculation='when_required',
+        response_checksum_validation='when_required',
+        s3={'addressing_style': 'path'},
+    ),
+)
+
+
+@dataclass
+class S3Object:
+    key: str
+    type: Literal['file', 'directory']
+    size: int | None
+
+def s3_list_objects(prefix: str, delimiter: str = '/') -> Iterable[S3Object]:
+    paginator = client.get_paginator('list_objects_v2')
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix, Delimiter=delimiter):
+        if 'Contents' in page:
+            for obj in page['Contents']:
+                yield S3Object(key=obj['Key'], type='file', size=obj['Size'])
+        if 'CommonPrefixes' in page:
+            for obj in page['CommonPrefixes']:
+                yield S3Object(key=obj['Prefix'], type='directory', size=None)
+
+
+[*s3_list_objects('/quicklook/')]
+'''
