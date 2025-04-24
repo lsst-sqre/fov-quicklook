@@ -28,7 +28,7 @@ class CacheEntry(BaseModel):
 @router.get('/api/cache_entries')
 async def list_cache_entries() -> list[CacheEntry]:
     with db_context() as db:
-        q = db.execute(select(QuicklookRecord))
+        q = db.execute(select(QuicklookRecord).order_by(QuicklookRecord.created_at.desc()))
         records = q.scalars().all()
         return [CacheEntry.model_validate(record) for record in records]
 
