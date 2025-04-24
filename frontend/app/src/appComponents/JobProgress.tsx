@@ -45,11 +45,11 @@ function NodeProgress({
   ps: ProgressItem[]
 }) {
   return (
-    <>
+    <div className={styles.progressGroup}>
       {ps.map((p, index) => (
         <Progress key={index} count={p.count} total={p.total} />
       ))}
-    </>
+    </div>
   )
 }
 
