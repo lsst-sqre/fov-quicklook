@@ -1,11 +1,47 @@
 .filterParams {
-
+  
   dt,
   dd {
     margin: 0;
   }
-
+  
   input[type="range"] {
+    $slider-thumb-color: #377;
+    $slider-track-color: #777;
+
     width: 100%;
+    appearance: none;
+    background: transparent;
+
+    &::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      background: $slider-track-color;
+      border-radius: 2px;
+    }
+
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: $slider-thumb-color;
+      margin-top: -6px;
+    }
+
+    &::-moz-range-track {
+      width: 100%;
+      height: 4px;
+      background: $slider-track-color;
+      border-radius: 2px;
+    }
+
+    &::-moz-range-thumb {
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: $slider-thumb-color;
+      border: none;
+    }
   }
 }

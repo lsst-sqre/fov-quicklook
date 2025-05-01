@@ -6,7 +6,7 @@ from typing import Any, Literal, TypeAlias
 import numpy
 
 
-CcdDataType: TypeAlias = Literal['raw', 'calexp']
+CcdDataType: TypeAlias = Literal['raw', 'post_isr_image', 'preliminary_visit_image']
 
 
 @dataclass
@@ -85,8 +85,8 @@ class Tile:
 
 @dataclass
 class ImageStat:
-    median: float
-    mad: float
+    median: float | None  # post_isr_image には NaN が含まれることがありこれがjsonになるとnullになる
+    mad: float | None  # post_isr_image には NaN が含まれることがありこれがjsonになるとnullになる
     shape: tuple[int, ...]
 
 
@@ -178,6 +178,7 @@ class PackedTileId:
 
     def unpackeds(self):
         from quicklook.config import config
+
         for i in range(1 << config.tile_pack):
             for j in range(1 << config.tile_pack):
                 yield TileId(self.level, self.i << config.tile_pack | i, self.j << config.tile_pack | j)
@@ -185,20 +186,21 @@ class PackedTileId:
     def index(self, i: int, j: int) -> int:
         """
         Compute a unique index for a tile within this packed tile.
-        
+
         Parameters:
         - i: Unpacked i-coordinate, range: [self.i << config.tile_pack, (self.i + 1) << config.tile_pack - 1]
         - j: Unpacked j-coordinate, range: [self.j << config.tile_pack, (self.j + 1) << config.tile_pack - 1]
-        
+
         Returns:
         - A unique index in range [0, (1 << (2 * config.tile_pack)) - 1]
         """
         from quicklook.config import config
+
         local_i = i - (self.i << config.tile_pack)
         local_j = j - (self.j << config.tile_pack)
-        
+
         # Ensure coordinates are within valid range
         if not (0 <= local_i < (1 << config.tile_pack) and 0 <= local_j < (1 << config.tile_pack)):
             raise ValueError(f"Coordinates (i={i}, j={j}) outside range of packed tile (level={self.level}, i={self.i}, j={self.j})")
-        
+
         return (local_i << config.tile_pack) | local_j

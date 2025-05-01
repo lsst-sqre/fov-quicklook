@@ -1,5 +1,4 @@
 import functools
-import io
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -25,7 +24,7 @@ def preprocess_ccd(
     match ccd_id.visit.data_type:
         case 'raw':
             return preprocess_ccd_raw(ccd_id, path)
-        case 'calexp':
+        case 'post_isr_image' | 'calexp' | 'preliminary_visit_image':
             return preprocess_ccd_calexp(ccd_id, path)
         case _:  # pragma: no cover
             raise ValueError(f'Unknown data_type: {ccd_id.visit.data_type}')
@@ -38,10 +37,10 @@ def preprocess_ccd_calexp(
     ccd_name = ccd_id.ccd_name
     with timeit(f'preprocess-{ccd_id.name}'):
         hdul = fast_open_comressed_fits(path)
-        header = hdul[0].header  # type: ignore
-        assert ccd_name == f'{header["RAFTNAME"]}_{header["SENSNAME"]}'
+        # header = hdul[0].header  # type: ignore
+        # assert ccd_name == f'{header["RAFTNAME"]}_{header["SENSNAME"]}'
         bbox = ccds_by_name()[ccd_name].bbox
-        pool: numpy.ndarray = hdul[1].data  # type: ignore
+        pool: numpy.ndarray = numpy.array(hdul[1].data, dtype='<f4')  # type: ignore
         with timeit(f'image-stat-{ccd_id.name}'):
             stat = image_stat(pool)
         return PreProcessedCcd(

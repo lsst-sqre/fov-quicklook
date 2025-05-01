@@ -39,12 +39,20 @@ export const copyTemplateSlice = createSlice({
         CopyTemplateLocalStorage.set(state.templates)
       }
     },
+    resetToDefault: (state) => {
+      state.templates = defaultCopyTemplates()
+      CopyTemplateLocalStorage.set(state.templates)
+    },
   },
 })
 
 
 function defaultCopyTemplates(): CopyTemplate[] {
   return [
+    {
+      name: 'UUID',
+      template: "%(uuid)",
+    },
     {
       name: 'dataId',
       template: "{'exposure': %(exposure), 'detector': %(detector)}",

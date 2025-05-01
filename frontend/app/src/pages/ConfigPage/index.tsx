@@ -82,6 +82,9 @@ function CopyTemplateEditor({ selected }: { selected?: string }) {
           dispatch(copyTemplateSlice.actions.removeTemplate(templates[idx]))
         }
       }}>Delete</button>
+      <button onClick={() => {
+        dispatch(copyTemplateSlice.actions.resetToDefault())
+      }}>Reset to Default</button>
     </div>
   )
 }

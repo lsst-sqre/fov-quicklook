@@ -68,7 +68,7 @@ def get_generators():
 
 
 @contextlib.asynccontextmanager
-async def active_context():
+async def activate_context():
     async with ctx().activate():
         yield ctx()
 

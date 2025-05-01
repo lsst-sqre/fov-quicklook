@@ -1,6 +1,9 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { V2 } from "@stellar-globe/stellar-globe"
 import { RubinImageFilter, RubinImageFilterParams } from "../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter"
+import { ListVisitsApiArg } from "../api/openapi"
+
+type CcdDataType = NonNullable<ListVisitsApiArg["dataType"]>
 
 type State = {
   currentQuicklook: string | undefined
@@ -9,6 +12,8 @@ type State = {
   lineProfiler: LineProfilerState
   filterParams: RubinImageFilterParams
   searchString: string
+  dataSource: CcdDataType
+  showFrame: boolean
 }
 
 type ViewerCamera = object
@@ -28,6 +33,8 @@ function initialState(): State {
     },
     filterParams: RubinImageFilter.defaultParams(),
     searchString: '',
+    dataSource: 'raw',
+    showFrame: true,
   }
 }
 
@@ -52,6 +59,12 @@ export const homeSlice = createSlice({
     },
     setSearchString: (state, action: PayloadAction<string>) => {
       state.searchString = action.payload
+    },
+    setDataSource: (state, action: PayloadAction<'raw' | 'post_isr_image' | 'preliminary_visit_image'>) => {
+      state.dataSource = action.payload
+    },
+    setShowFrame: (state, action: PayloadAction<boolean>) => {
+      state.showFrame = action.payload
     },
   },
 })

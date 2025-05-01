@@ -12,7 +12,7 @@ export const Progress = memo(({ count, total, width: boxWidth = '600px' }: Propg
   const width = total === 0 ? '0' : `${(count / total) * 100}%`
   return (
     <div className={styles.background} style={{ width: boxWidth }} >
-      <div className={classNames(styles.bar, count === total && styles.completed)} style={{ width }} />
+      <div className={classNames(styles.bar, count > 0 && count === total && styles.completed)} style={{ width }} />
     </div>
   )
 })

@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, WebSocket, status
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 
 from quicklook import storage
@@ -34,13 +34,6 @@ class QuicklookStatus(BaseModel):
             transfer_progress=report.transfer_progress,
             merge_progress=report.merge_progress,
         )
-
-
-@router.get('/api/quicklooks', response_model=list[QuicklookStatus])
-async def list_quicklooks():
-    a = TypeAdapter(list[QuicklookJobReport])
-    reports: list[QuicklookJobReport] = a.validate_python(await http_request('get', f'{config.coordinator_base_url}/quicklook-jobs'))
-    return [QuicklookStatus.from_report(r) for r in reports]
 
 
 @router.websocket('/api/quicklooks.ws')

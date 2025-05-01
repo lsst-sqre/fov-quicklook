@@ -3,8 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from quicklook.config import config
+from quicklook.coordinator.housekeep import clear_imcomplete_quicklooks
 
-from .generators import active_context
+from .generators import activate_context
 from .generators import router as context_router
 from .healthz import router as healthz_router
 from .podstatus import router as podstatus_router
@@ -13,7 +14,8 @@ from .quicklooks import router as quicklooks_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with active_context():
+    await clear_imcomplete_quicklooks()
+    async with activate_context():
         yield
 
 

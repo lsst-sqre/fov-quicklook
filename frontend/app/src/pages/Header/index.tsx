@@ -3,7 +3,7 @@ import { FlexiblePadding } from "../../components/layout"
 import { LinkButton } from "../../components/LinkButton"
 import { MaterialSymbol } from "../../components/MaterialSymbol"
 import { useAdminPageEnabled } from "../../hooks/useAdminPageEnabled"
-import { useDeleteAllQuicklooksMutation, useListQuicklooksQuery } from "../../store/api/openapi"
+import { useDeleteAllQuicklooksMutation } from "../../store/api/openapi"
 import styles from './styles.module.scss'
 
 
@@ -22,7 +22,6 @@ const ExternalLinkButton = ({ url, windowName, children }: ExternalLinkButtonPro
 }
 
 export const Header = memo(() => {
-  const { refetch } = useListQuicklooksQuery()
   const [deleteAll,] = useDeleteAllQuicklooksMutation()
 
   const deleteAllAndRefresh = useCallback(async () => {
@@ -30,8 +29,7 @@ export const Header = memo(() => {
       return
     }
     await deleteAll()
-    await refetch()
-  }, [deleteAll, refetch])
+  }, [deleteAll])
 
   const queryIncludesAdminParam = window.location.search.includes('admin')
   const adminPageEnabled = useAdminPageEnabled() && queryIncludesAdminParam

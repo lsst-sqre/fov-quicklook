@@ -19,17 +19,19 @@ def preload_pyfits_compression_code():
 def fits_partial_load(
     read: Callable[[int, int], bytes],
     hdu_index: list[int],
-):
+) -> bytes:
+    '''
+    FITSファイルの一部を読み込む
+    '''
     assert hdu_index == [0, 1]
     size = -1
     probe_pos = 1440 * 20
     while probe_pos < 500_000:
         f = io.BytesIO(read(0, probe_pos))
-        print(probe_pos)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=AstropyUserWarning)
             try:
-                with pyfits.open(f) as hdul:
+                with pyfits.open(f) as hdul:  # type: ignore
                     # ここは内部実装によるのでastropyのバージョンが変わると動かなくなるかもしれない
                     # ローカルでは動くがk8sでは動かないなどの場合、ローカルでも `pip install -U -e .` などしてライブラリをアップデートすること
                     hdu = hdul[1]

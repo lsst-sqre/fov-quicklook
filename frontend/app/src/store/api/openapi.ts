@@ -20,22 +20,6 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/quicklooks/${queryArg.id}/fits_header/${queryArg.ccdName}`,
       }),
     }),
-    listQuicklooks: build.query<
-      ListQuicklooksApiResponse,
-      ListQuicklooksApiArg
-    >({
-      query: () => ({ url: `/api/quicklooks` }),
-    }),
-    createQuicklook: build.mutation<
-      CreateQuicklookApiResponse,
-      CreateQuicklookApiArg
-    >({
-      query: (queryArg) => ({
-        url: `/api/quicklooks`,
-        method: "POST",
-        body: queryArg.quicklookCreateFrontend,
-      }),
-    }),
     showQuicklookStatus: build.query<
       ShowQuicklookStatusApiResponse,
       ShowQuicklookStatusApiArg
@@ -54,6 +38,16 @@ const injectedRtkApi = api.injectEndpoints({
     >({
       query: () => ({ url: `/api/quicklooks/*`, method: "DELETE" }),
     }),
+    createQuicklook: build.mutation<
+      CreateQuicklookApiResponse,
+      CreateQuicklookApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks`,
+        method: "POST",
+        body: queryArg.quicklookCreateFrontend,
+      }),
+    }),
     listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
       query: (queryArg) => ({
         url: `/api/visits`,
@@ -61,6 +55,7 @@ const injectedRtkApi = api.injectEndpoints({
           exposure: queryArg.exposure,
           day_obs: queryArg.dayObs,
           limit: queryArg.limit,
+          data_type: queryArg.dataType,
         },
       }),
     }),
@@ -151,14 +146,6 @@ export type GetFitsHeaderApiArg = {
   ccdName: string;
   id: string;
 };
-export type ListQuicklooksApiResponse =
-  /** status 200 Successful Response */ QuicklookStatus[];
-export type ListQuicklooksApiArg = void;
-export type CreateQuicklookApiResponse =
-  /** status 200 Successful Response */ any;
-export type CreateQuicklookApiArg = {
-  quicklookCreateFrontend: QuicklookCreateFrontend;
-};
 export type ShowQuicklookStatusApiResponse =
   /** status 200 Successful Response */ QuicklookStatus | null;
 export type ShowQuicklookStatusApiArg = {
@@ -172,15 +159,21 @@ export type ShowQuicklookMetadataApiArg = {
 export type DeleteAllQuicklooksApiResponse =
   /** status 200 Successful Response */ any;
 export type DeleteAllQuicklooksApiArg = void;
+export type CreateQuicklookApiResponse =
+  /** status 200 Successful Response */ any;
+export type CreateQuicklookApiArg = {
+  quicklookCreateFrontend: QuicklookCreateFrontend;
+};
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitListEntry[];
 export type ListVisitsApiArg = {
   exposure?: number | null;
   dayObs?: number | null;
   limit?: number;
+  dataType?: "raw" | "post_isr_image" | "preliminary_visit_image";
 };
 export type GetVisitMetadataApiResponse =
-  /** status 200 Successful Response */ DataSourceCcdMetadata | null;
+  /** status 200 Successful Response */ DataSourceCcdMetadata;
 export type GetVisitMetadataApiArg = {
   id: string;
   ccdName: string;
@@ -256,9 +249,6 @@ export type QuicklookStatus = {
     [key: string]: MergeProgress;
   } | null;
 };
-export type QuicklookCreateFrontend = {
-  id: string;
-};
 export type Visit = {
   id: string;
 };
@@ -267,8 +257,8 @@ export type CcdId = {
   ccd_name: string;
 };
 export type ImageStat = {
-  median: number;
-  mad: number;
+  median: number | null;
+  mad: number | null;
   shape: number[];
 };
 export type BBox = {
@@ -292,6 +282,9 @@ export type QuicklookMetadata = {
   wcs: object;
   ccd_meta: CcdMeta[] | null;
 };
+export type QuicklookCreateFrontend = {
+  id: string;
+};
 export type VisitListEntry = {
   id: string;
 };
@@ -301,6 +294,7 @@ export type DataSourceCcdMetadata = {
   detector: number;
   exposure: number;
   day_obs: number;
+  uuid: string;
 };
 export type DiskInfo = {
   mount_point: string;
@@ -336,11 +330,10 @@ export const {
   useReadyQuery,
   useGetTileQuery,
   useGetFitsHeaderQuery,
-  useListQuicklooksQuery,
-  useCreateQuicklookMutation,
   useShowQuicklookStatusQuery,
   useShowQuicklookMetadataQuery,
   useDeleteAllQuicklooksMutation,
+  useCreateQuicklookMutation,
   useListVisitsQuery,
   useGetVisitMetadataQuery,
   useGetFitsFileQuery,

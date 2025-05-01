@@ -1,13 +1,14 @@
 import { SkyCoord } from "@stellar-globe/stellar-globe"
 import { MenuDivider, MenuItem } from "@szhsin/react-menu"
 import { Fragment, useCallback, useRef } from "react"
-import { CcdMeta, DataSourceCcdMetadata, api, useGetVisitMetadataQuery } from "../../../../store/api/openapi"
+import { MaterialSymbol } from "../../../../components/MaterialSymbol"
+import { CcdMeta, DataSourceCcdMetadata, useGetVisitMetadataQuery } from "../../../../store/api/openapi"
+import { CopyTemplate } from "../../../../store/features/copyTemplateSlice"
+import { useAppSelector } from "../../../../store/hooks"
 import { copyTextToClipboard } from "../../../../utils/copyTextToClipboard"
 import { download } from "../../../../utils/download"
 import { useFocusedCcd } from "../../hooks"
 import { ContextMenuWithClickedCoord } from "./ContextMenuWithClickedCoord"
-import { useAppSelector } from "../../../../store/hooks"
-import { CopyTemplate } from "../../../../store/features/copyTemplateSlice"
 
 
 export function ViewerContextMenu() {
@@ -50,13 +51,28 @@ function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMe
         <CopyMenus ccdMeta={ccdMeta} />
       }
       <MenuDivider />
-      <MenuItem disabled={!ccdMeta} onClick={copyId}>Copy ID to Clipboard</MenuItem>
-      <MenuItem disabled={!ccdMeta} onClick={openHeaerPage}>Show FITS Header</MenuItem>
-      <MenuDivider />
-      <MenuItem disabled={!ccdMeta} onClick={downloadThisFitsFile}>Download this FITS File</MenuItem>
-      {/* <MenuItem disabled={!ccdMeta} onClick={showHeader}>Show Headers</MenuItem> */}
-      {/* <MenuItem onClick={donwload}>Download Raw FITS</MenuItem> */}
+      <MenuItem disabled={!ccdMeta} onClick={copyId}>
+        <MenuIcon symbol="content_copy" />
+        Copy ID to Clipboard
+      </MenuItem>
+      <MenuItem disabled={!ccdMeta} onClick={openHeaerPage}>
+        <MenuIcon symbol="open_in_new" />
+        Show FITS Header
+      </MenuItem> <MenuDivider />
+      <MenuItem disabled={!ccdMeta} onClick={downloadThisFitsFile}>
+        <MenuIcon symbol="download" />
+        Download this FITS File
+      </MenuItem>
     </Fragment>
+  )
+}
+
+
+function MenuIcon({ symbol }: { symbol: Parameters<typeof MaterialSymbol>[0]['symbol'] }) {
+  return (
+    <div style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '1em' }}>
+      <MaterialSymbol symbol={symbol} />
+    </div>
   )
 }
 
@@ -88,6 +104,7 @@ function CopyTemplateMenuItem({ template, ccdMeta }: { template: CopyTemplate, c
       onClick={runCopyTemplate}
       disabled={!metadata}
     >
+      <MenuIcon symbol="content_copy" />
       {template.name}
     </MenuItem>
   )

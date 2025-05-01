@@ -7,9 +7,9 @@ from quicklook.types import CcdDataType, CcdId, Visit
 @dataclass
 class Query:
     data_type: CcdDataType
+    limit: int
     exposure: int | None = None
     day_obs: int | None = None
-    limit: int = 1000
 
 
 class DataSourceBase(abc.ABC):
@@ -38,3 +38,4 @@ class DataSourceCcdMetadata:
     detector: int
     exposure: int
     day_obs: int
+    uuid: str

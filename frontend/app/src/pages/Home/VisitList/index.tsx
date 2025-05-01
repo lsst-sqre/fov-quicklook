@@ -1,9 +1,11 @@
-import styles from './styles.module.scss'
-import { memo, useEffect, useMemo } from "react"
-import { ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
-import { useAppDispatch, useAppSelector } from '../../../store/hooks'
 import classNames from 'classnames'
+import { memo, useEffect, useMemo } from "react"
+import { MaterialSymbol } from '../../../components/MaterialSymbol'
+import { ListVisitsApiArg, ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
 import { homeSlice } from '../../../store/features/homeSlice'
+import { useAppDispatch, useAppSelector } from '../../../store/hooks'
+import styles from './styles.module.scss'
+import { LoadingSpinner } from '../../../components/Loading'
 
 
 type VisitListProps = {
@@ -16,22 +18,30 @@ function isValidSearchString(s: string) {
   return /^\d{8}(\d{5})?$/.test(s)
 }
 
-
-export const VisitList = memo(({ style }: VisitListProps) => {
+function useVisitList() {
   const searchString = useAppSelector(state => state.home.searchString)
+  const dataSource = useAppSelector(state => state.home.dataSource)
   const query = useMemo(() => {
+    
     if (isValidSearchString(searchString)) {
       switch (searchString.length) {
         case 8:
-          return { dayObs: Number(searchString) }
-        case 1:
-          return { exposure: Number.parseInt(searchString) }
+          return { dayObs: Number(searchString), dataType: dataSource }
+        case 13:
+          return { exposure: Number.parseInt(searchString), dataType: dataSource }
       }
     }
-    return {}
-  }, [searchString])
+    return {
+      dataType: dataSource,
+    } as ListVisitsApiArg
+  }, [dataSource, searchString])
+  const { data: list, refetch, isFetching } = useListVisitsQuery(query)
+  return { list, refetch, isFetching }
+}
 
-  const { data: list } = useListVisitsQuery(query)
+
+export const VisitList = memo(({ style }: VisitListProps) => {
+  const { list, isFetching } = useVisitList()
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const dispatch = useAppDispatch()
 
@@ -44,10 +54,13 @@ export const VisitList = memo(({ style }: VisitListProps) => {
   return (
     <div className={styles.listWrapper}>
       <SearchBox />
-      <div className={styles.list} style={style}>
-        {list?.map((entry) => (
-          <VisitListEntry key={entry.id} entry={entry} />
-        ))}
+      <div className={styles.listContainer}>
+        <div className={styles.list} style={style}>
+          {list?.map((entry) => (
+            <VisitListEntry key={entry.id} entry={entry} />
+          ))}
+        </div>
+        {isFetching && <div className={styles.loadingOverlay}><LoadingSpinner /></div>}
       </div>
     </div>
   )
@@ -70,7 +83,7 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
       className={classNames(styles.entry, selected && styles.selected)}
       onClick={select}
     >
-      {entry.id}
+      {entry.id.split(':').slice(-1)[0]}
     </div>
   )
 }
@@ -79,9 +92,27 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
 function SearchBox() {
   const dispatch = useAppDispatch()
   const searchString = useAppSelector(state => state.home.searchString)
+  const dataSource = useAppSelector(state => state.home.dataSource)
+  const { refetch } = useVisitList()
 
   return (
     <div className={styles.searchBox}>
+      <div style={{ display: 'flex' }} >
+        <select
+          value={dataSource}
+          onChange={e => dispatch(homeSlice.actions.setDataSource(e.target.value as typeof dataSource))}
+          style={{
+            flexGrow: 1,
+          }}
+        >
+          <option value="raw">Raw</option>
+          <option value="post_isr_image">Post-ISR (recent)</option>
+          <option value="preliminary_visit_image">Preliminary PVI (recent)</option>
+        </select>
+        <button onClick={refetch}>
+          <MaterialSymbol symbol='refresh' />
+        </button>
+      </div>
       <input
         type="search"
         placeholder='Date or Exposure ex. 20241204 or 2024120400003'

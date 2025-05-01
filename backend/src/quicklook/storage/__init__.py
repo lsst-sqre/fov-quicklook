@@ -99,3 +99,9 @@ def remove_visit_data(visit: Visit) -> None:
 
 def clear_all():
     delete_objects_by_prefix('quicklook/')
+
+
+def list_quicklooks() -> Iterable[Visit]:
+    for e in list_entries('quicklook/'):
+        if e.type == 'directory':
+            yield Visit.from_id(e.name.split('/')[0])

@@ -58,16 +58,23 @@ def process_ccd(args: ProcessCcdArgs) -> CcdMeta:
             args.progress_updator.update_maketile_progress(args.ccd_id.ccd_name, progress)
 
     with timeit(f'process-{args.ccd_id.name}'):
-        ppccd = preprocess_ccd(args.ccd_id, args.path)
-        args.progress_updator.preprocess_done()
-        args.path.unlink()
+        try:
+            try:
+                ppccd = preprocess_ccd(args.ccd_id, args.path)
+                args.progress_updator.preprocess_done()
+            finally:
+                args.path.unlink()
 
-        save_headers(ppccd)
+            save_headers(ppccd)
 
-        make_tiles(
-            ppccd,
-            update_progress=update_maketile_progress,
-        )
+            make_tiles(
+                ppccd,
+                update_progress=update_maketile_progress,
+            )
+        except Exception:
+            # 明示的にエラーを書き出さないとエラーログがどこかへ消えてしまう
+            logger.exception(f'Failed to process {args.ccd_id.name}')
+            raise
 
     return CcdMeta(
         ccd_id=args.ccd_id,

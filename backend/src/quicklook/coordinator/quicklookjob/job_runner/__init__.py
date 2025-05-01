@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
-from quicklook.coordinator.quicklookjob.job_runner.housekeep import cleanup_job
+from quicklook.coordinator.housekeep import cleanup_job
 from quicklook.db import db_context
 from quicklook.models import QuicklookRecord
 from quicklook.mutableconfig import mutable_config
@@ -20,7 +20,7 @@ from ..job import QuicklookJob, QuicklookJobPhase, QuicklookJobReport
 from ..job_generate import job_generate
 from ..job_merge import job_merge
 from ..job_transfer import job_transfer
-from .housekeep import housekeep
+from ...housekeep import housekeep
 from .JobSynchronizer import JobSynchronizer
 
 logger = logging.getLogger(f'uvicorn.{__name__}')

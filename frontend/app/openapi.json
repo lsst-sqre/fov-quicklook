@@ -173,63 +173,6 @@
                 }
             }
         },
-        "/api/quicklooks": {
-            "get": {
-                "summary": "List Quicklooks",
-                "operationId": "list_quicklooks",
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "items": {
-                                        "$ref": "#/components/schemas/QuicklookStatus"
-                                    },
-                                    "type": "array",
-                                    "title": "Response List Quicklooks Api Quicklooks Get"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "summary": "Create Quicklook",
-                "description": "Create a quicklook",
-                "operationId": "create_quicklook",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/QuicklookCreateFrontend"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/quicklooks/{id}/status": {
             "get": {
                 "summary": "Show Quicklook Status",
@@ -333,6 +276,43 @@
                 }
             }
         },
+        "/api/quicklooks": {
+            "post": {
+                "summary": "Create Quicklook",
+                "description": "Create a quicklook",
+                "operationId": "create_quicklook",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QuicklookCreateFrontend"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/visits": {
             "get": {
                 "summary": "List Visits",
@@ -379,6 +359,21 @@
                             "maximum": 10000,
                             "default": 1000,
                             "title": "Limit"
+                        }
+                    },
+                    {
+                        "name": "data_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "enum": [
+                                "raw",
+                                "post_isr_image",
+                                "preliminary_visit_image"
+                            ],
+                            "type": "string",
+                            "default": "raw",
+                            "title": "Data Type"
                         }
                     }
                 ],
@@ -440,15 +435,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "anyOf": [
-                                        {
-                                            "$ref": "#/components/schemas/DataSourceCcdMetadata"
-                                        },
-                                        {
-                                            "type": "null"
-                                        }
-                                    ],
-                                    "title": "Response Get Visit Metadata Api Visits  Id  Ccds  Ccd Name  Get"
+                                    "$ref": "#/components/schemas/DataSourceCcdMetadata"
                                 }
                             }
                         }
@@ -851,6 +838,10 @@
                     "day_obs": {
                         "type": "integer",
                         "title": "Day Obs"
+                    },
+                    "uuid": {
+                        "type": "string",
+                        "title": "Uuid"
                     }
                 },
                 "type": "object",
@@ -859,7 +850,8 @@
                     "ccd_name",
                     "detector",
                     "exposure",
-                    "day_obs"
+                    "day_obs",
+                    "uuid"
                 ],
                 "title": "DataSourceCcdMetadata"
             },
@@ -967,11 +959,25 @@
             "ImageStat": {
                 "properties": {
                     "median": {
-                        "type": "number",
+                        "anyOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
                         "title": "Median"
                     },
                     "mad": {
-                        "type": "number",
+                        "anyOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
                         "title": "Mad"
                     },
                     "shape": {

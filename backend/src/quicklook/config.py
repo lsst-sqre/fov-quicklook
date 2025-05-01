@@ -69,7 +69,7 @@ class Config(BaseSettings):
     max_storage_entries: int = 40
 
     generate_timeout: ClientTimeout = ClientTimeout(
-        total=20.0,
+        total=40.0,
         sock_read=5.0,
     )
     merge_timeout: ClientTimeout = ClientTimeout(

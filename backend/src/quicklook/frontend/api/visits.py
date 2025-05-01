@@ -1,9 +1,12 @@
+import logging
+
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
+
 from quicklook.datasource import get_datasource
-from quicklook.datasource.types import DataSourceCcdMetadata, Query as DataSourceQuery
-from quicklook.tileinfo import ccds_by_name
-from quicklook.types import CcdId, Visit
+from quicklook.datasource.types import DataSourceCcdMetadata
+from quicklook.datasource.types import Query as DataSourceQuery
+from quicklook.types import CcdDataType, CcdId, Visit
 
 router = APIRouter()
 
@@ -17,11 +20,12 @@ def list_visits(
     exposure: int | None = Query(None),
     day_obs: int | None = Query(None),
     limit: int = Query(default=1000, le=10000),
+    data_type: CcdDataType = Query(default='raw'),
 ):
     ds = get_datasource()
     visits = ds.query_visits(
         DataSourceQuery(
-            data_type='raw',
+            data_type=data_type,
             exposure=exposure,
             day_obs=day_obs,
             limit=limit,
@@ -30,8 +34,9 @@ def list_visits(
     return [VisitListEntry(id=visit.id) for visit in visits]
 
 
-@router.get('/api/visits/{id}/ccds/{ccd_name}', response_model=DataSourceCcdMetadata | None)
+@router.get('/api/visits/{id}/ccds/{ccd_name}', response_model=DataSourceCcdMetadata)
 def get_visit_metadata(id: str, ccd_name: str):
     ds = get_datasource()
     ref = CcdId(visit=Visit.from_id(id), ccd_name=ccd_name)
-    return ds.get_metadata(ref)
+    metadata = ds.get_metadata(ref)
+    return metadata

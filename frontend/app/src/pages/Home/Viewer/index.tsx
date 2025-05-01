@@ -34,6 +34,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
   }, [dispatch])
 
   const filterParams = useAppSelector(state => state.home.filterParams)
+  const showFrame = useAppSelector(state => state.home.showFrame)
 
   return (
     <div style={{ ...style, position: 'relative', height: 0 }}>
@@ -56,7 +57,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
           />
         }
         <GridLayer$ />
-        <CcdFrames />
+        {showFrame && <CcdFrames />}
       </Globe$>
       <CursorLine />
       <Info />
