@@ -165,7 +165,7 @@ export type CreateQuicklookApiArg = {
   quicklookCreateFrontend: QuicklookCreateFrontend;
 };
 export type ListVisitsApiResponse =
-  /** status 200 Successful Response */ VisitListEntry[];
+  /** status 200 Successful Response */ VisitEntry[];
 export type ListVisitsApiArg = {
   exposure?: number | null;
   dayObs?: number | null;
@@ -285,8 +285,16 @@ export type QuicklookMetadata = {
 export type QuicklookCreateFrontend = {
   id: string;
 };
-export type VisitListEntry = {
+export type VisitEntry = {
   id: string;
+  day_obs: number;
+  physical_filter: string;
+  obs_id: string;
+  exposure_time: number;
+  science_program: string;
+  observation_type: string;
+  observation_reason: string;
+  target_name: string;
 };
 export type DataSourceCcdMetadata = {
   visit: Visit;
@@ -304,6 +312,7 @@ export type DiskInfo = {
 };
 export type PodStatus = {
   hostname: string;
+  ip_addr: string;
   memory_total: number;
   memory_used: number;
   disks: DiskInfo[];

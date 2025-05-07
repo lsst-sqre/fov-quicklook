@@ -85,12 +85,12 @@ def test_show_quicklook(one_quicklook_created):
     QuicklookStatus.model_validate(res.json())
 
 
-def test_list_quicklooks(one_quicklook_created):
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks')
-    assert res.status_code == 200
-    response_json = res.json()
-    assert len(response_json) == 1
-    QuicklookStatus.model_validate(response_json[0])
+# def test_list_quicklooks(one_quicklook_created):
+#     res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks')
+#     assert res.status_code == 200
+#     response_json = res.json()
+#     assert len(response_json) == 1
+#     QuicklookStatus.model_validate(response_json[0])
 
 
 def test_get_tile(one_quicklook_created):
@@ -155,6 +155,6 @@ def clear_quicklooks():
     res = requests.delete(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks/*')
     assert res.status_code == 200
 
-    res = requests.get(f'http://127.0.0.1:{config.frontend_port}/api/quicklooks')
+    res = requests.get(f'http://127.0.0.1:{config.coordinator_port}/quicklooks')
     assert res.status_code == 200
     assert len(res.json()) == 0

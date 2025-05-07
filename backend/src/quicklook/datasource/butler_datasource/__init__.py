@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from venv import logger
 
 from lsst.resources import ResourcePath
+from numpy import record
 
 from quicklook.types import CcdDataType, CcdId
 
@@ -14,9 +15,11 @@ from .retrieve_data import retrieve_data
 if TYPE_CHECKING:
     from lsst.daf.butler import Butler as ButlerType
     from lsst.daf.butler import DatasetRef as ButlerDatasetRef
+    from lsst.daf.butler import DimensionRecord as ButlerDimensionRecord
 else:
     ButlerType = Any
     ButlerDatasetRef = Any
+    ButlerDimensionRecord = Any
 
 
 default_instrument = 'LSSTCam'
@@ -29,9 +32,11 @@ class VisitEntry:
     day_obs: int
     physical_filter: str
     obs_id: str
-    exposure_type: float
+    exposure_time: float
+    science_program: str
     observation_type: str
-    
+    observation_reason: str
+    target_name: str
 
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
@@ -40,7 +45,7 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
 
         chown_pgpassfile()
 
-    def query_visits(self, q: Query) -> list[Visit]:
+    def query_visits(self, q: Query) -> list[VisitEntry]:
         return get_datasource(q.data_type).query_visits(q)
 
     def list_ccds(self, visit: Visit) -> list[str]:
@@ -70,11 +75,11 @@ class DataTypeSpecificDataSource:
             collections=self.collections,
         )  # type: ignore
 
-    def query_visits(self, q: Query) -> list[Visit]:
+    def query_visits(self, q: Query) -> list[VisitEntry]:
         '''
         もしday_obsが指定されていない場合は、day_obsを最新の1日分に指定して実行する
         '''
-        
+
         from lsst.daf.butler import EmptyQueryResultError
 
         if q.day_obs is None:
@@ -87,12 +92,26 @@ class DataTypeSpecificDataSource:
             conds.append(f"day_obs={q.day_obs}")
         where = " and ".join(conds)
         try:
-            # records = self._butler.registry.queryDimensionRecords('exposure', where=where)
-            # records.sort(key=lambda r: r.)
             refs = self._butler.query_datasets(q.data_type, where=where, limit=q.limit, order_by=self.order_by)
         except EmptyQueryResultError:
-            refs = []
-        return [Visit.from_id(f'{self.data_type}:{ref.dataId[self.data_id_key]}') for ref in refs]
+            return []
+
+        exposures = self._get_exposure_info(q.day_obs or -1)  # q.day_obsはNoneではありえない
+
+        return [
+            VisitEntry(
+                id=f'{self.data_type}:{ref.dataId[self.data_id_key]}',
+                obs_id=exp.obs_id,
+                day_obs=exp.day_obs,
+                physical_filter=exp.physical_filter,
+                exposure_time=exp.exposure_time,
+                science_program=exp.science_program,
+                observation_type=exp.observation_type,
+                observation_reason=exp.observation_reason,
+                target_name=exp.target_name,
+            )
+            for ref, exp in [(ref, exposures[cast(int, ref.dataId[self.data_id_key])]) for ref in refs]
+        ]
 
     def list_ccds(self, visit: Visit) -> list[str]:
         b = self._butler
@@ -140,7 +159,11 @@ class DataTypeSpecificDataSource:
         refs = b.query_datasets(self.data_type, where="detector=0", order_by=["-day_obs"], limit=1)
         if len(refs) == 0:
             return None
-        return refs[0].dataId['day_obs'] # type: ignore
+        return refs[0].dataId['day_obs']  # type: ignore
+
+    def _get_exposure_info(self, day_obs: int) -> dict[int, ButlerDimensionRecord]:
+        records = self._butler.registry.queryDimensionRecords('exposure', where=f"day_obs={day_obs}")
+        return {record.id: record for record in records}
 
 
 class RawDataSource(DataTypeSpecificDataSource):

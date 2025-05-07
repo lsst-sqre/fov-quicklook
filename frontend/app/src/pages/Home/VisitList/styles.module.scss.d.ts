@@ -1,4 +1,8 @@
 export declare const entry: string;
+export declare const group: string;
+export declare const groupEntries: string;
+export declare const groupHeader: string;
+export declare const headerItem: string;
 export declare const list: string;
 export declare const listContainer: string;
 export declare const listWrapper: string;

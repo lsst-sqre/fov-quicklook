@@ -24,10 +24,18 @@
 
 .entry {
   padding: 0.5em;
+
+  &:hover {
+    background-color: rgba(white, 0.05);
+  }
 }
 
 .selected {
   background-color: rgba(white, 0.2);
+
+  &:hover {
+    background-color: rgba(white, 0.25);
+  }
 }
 
 .loading {
@@ -60,4 +68,43 @@
   align-items: center;
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 10;
+}
+
+// グループスタイル
+.group {
+  margin-bottom: 1rem;
+}
+
+.groupHeader {
+  background-color: #111;
+  padding: 0.1rem;
+  color: rgba(255, 255, 255, 0.8);
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem;
+  align-items: center;
+}
+
+.headerItem {
+  position: relative;
+  cursor: default;
+
+  span {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    font-size: small;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+}
+
+.groupEntries {
+  display: block;
 }

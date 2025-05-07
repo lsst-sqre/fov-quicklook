@@ -1,15 +1,8 @@
-import { SkyCoord, Tract, V2, angle } from "@stellar-globe/stellar-globe"
-import { useCallback, useMemo } from "react"
+import { SkyCoord, Tract, V2 } from "@stellar-globe/stellar-globe"
+import { useMemo } from "react"
 import { useAppSelector } from "../../store/hooks"
 import { includedInPolygon } from "../../utils/geometry"
 import { useGlobe, useHomeContext } from "./context"
-
-export function useResetView() {
-  const { globeHandle } = useHomeContext()
-  return useCallback((duration: number = 400) => {
-    globeHandle.current?.().camera.jumpTo({ fovy: angle.deg2rad(3.6) }, { coord: SkyCoord.fromDeg(0, 0), duration })
-  }, [globeHandle])
-}
 
 function useQuicklookMetadata() {
   const { currentQuicklook } = useHomeContext()
@@ -26,16 +19,16 @@ export function useWcs() {
 }
 
 function useMouseCursorSkyCoord(): SkyCoord | undefined {
-  const _camera = useAppSelector(state => state.home.viewerCamera) // viewerCameraの変更のたびに再計算される必要がある
+  const cameraRevision = useAppSelector(state => state.home.cameraRevision) // viewerCameraの変更のたびに再計算される必要がある
   const clientCoord = useAppSelector(state => state.home.mouseCursorClientCoord)
   const globe = useGlobe()
   return useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    _camera
+    cameraRevision
     if (globe) {
       return globe.canvas.coordFromClientCoord({ clientX: clientCoord[0], clientY: clientCoord[1] })
     }
-  }, [_camera, clientCoord, globe])
+  }, [cameraRevision, clientCoord, globe])
 }
 
 export function useMouseCursorFocalPlaneCoord(): V2 {
@@ -91,10 +84,3 @@ export function useFocusedAmp() {
     }
   }, [focusedCcd, x, y])
 }
-
-// export function useFocusCcdFitsHeader() {
-//   const shotId = useAppSelector(state => state.home.shotId)
-//   const ccdMeta = useFocusCcd()
-//   const { data, isFetching } = useShowFitsHeaderQuery({ shotId, ccdName: ccdMeta?.ccd_name ?? '' }, { skip: !ccdMeta })
-//   return !isFetching ? data : undefined
-// }

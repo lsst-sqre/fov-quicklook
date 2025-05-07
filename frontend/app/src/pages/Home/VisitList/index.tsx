@@ -22,7 +22,7 @@ function useVisitList() {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
   const query = useMemo(() => {
-    
+
     if (isValidSearchString(searchString)) {
       switch (searchString.length) {
         case 8:
@@ -39,11 +39,44 @@ function useVisitList() {
   return { list, refetch, isFetching }
 }
 
+// グループが同じかどうかを判定する関数
+function isSameGroup(a: VisitListEntryType, b: VisitListEntryType): boolean {
+  return a.day_obs === b.day_obs &&
+    a.physical_filter === b.physical_filter &&
+    a.exposure_time === b.exposure_time &&
+    a.observation_type === b.observation_type
+}
+
+// リストをグループに分割する関数
+function groupVisitList(list: VisitListEntryType[] | undefined): VisitListEntryType[][] {
+  if (!list || list.length === 0) return []
+
+  const result: VisitListEntryType[][] = []
+  let currentGroup: VisitListEntryType[] = [list[0]]
+
+  for (let i = 1; i < list.length; i++) {
+    if (isSameGroup(list[i - 1], list[i])) {
+      currentGroup.push(list[i])
+    } else {
+      result.push(currentGroup)
+      currentGroup = [list[i]]
+    }
+  }
+
+  if (currentGroup.length > 0) {
+    result.push(currentGroup)
+  }
+
+  return result
+}
 
 export const VisitList = memo(({ style }: VisitListProps) => {
   const { list, isFetching } = useVisitList()
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const dispatch = useAppDispatch()
+
+  // リストをグループ化
+  const groupedList = useMemo(() => groupVisitList(list), [list])
 
   useEffect(() => {
     if (currentQuicklook === undefined && list?.length) {
@@ -56,8 +89,8 @@ export const VisitList = memo(({ style }: VisitListProps) => {
       <SearchBox />
       <div className={styles.listContainer}>
         <div className={styles.list} style={style}>
-          {list?.map((entry) => (
-            <VisitListEntry key={entry.id} entry={entry} />
+          {groupedList.map((group, index) => (
+            <VisitGroup key={index} group={group} />
           ))}
         </div>
         {isFetching && <div className={styles.loadingOverlay}><LoadingSpinner /></div>}
@@ -66,6 +99,42 @@ export const VisitList = memo(({ style }: VisitListProps) => {
   )
 })
 
+// グループを表示するコンポーネント
+function VisitGroup({ group }: { group: VisitListEntryType[] }) {
+  if (!group.length) return null
+
+  const firstEntry = group[0]
+
+  return (
+    <div className={styles.group}>
+      <div className={styles.groupHeader}>
+        <div className={styles.headerItem} title="Filter">
+          <span>{firstEntry.physical_filter}</span>
+        </div>
+        <div className={styles.headerItem} title="Exp Time">
+          <span>{firstEntry.exposure_time}</span>
+        </div>
+        <div className={styles.headerItem} title="Type">
+          <span>{firstEntry.observation_type}</span>
+        </div>
+        <div className={styles.headerItem} title="Program">
+          <span>{firstEntry.science_program}</span>
+        </div>
+        <div className={styles.headerItem} title="Reason">
+          <span>{firstEntry.observation_reason}</span>
+        </div>
+        <div className={styles.headerItem} title="Target">
+          <span>{firstEntry.target_name}</span>
+        </div>
+      </div>
+      <div className={styles.groupEntries}>
+        {group.map((entry) => (
+          <VisitListEntry key={entry.id} entry={entry} />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 type VisitListEntryType = ListVisitsApiResponse[number]
 
@@ -82,6 +151,7 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
     <div
       className={classNames(styles.entry, selected && styles.selected)}
       onClick={select}
+      title={entry.obs_id}
     >
       {entry.id.split(':').slice(-1)[0]}
     </div>

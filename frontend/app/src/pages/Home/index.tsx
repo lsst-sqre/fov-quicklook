@@ -11,10 +11,8 @@ import { ViewerSettings } from "./ViewerSettings"
 import { Colorbar } from "./ViewerSettings/Colorbar"
 import { VisitList } from "./VisitList"
 
-
 export const Home = wrapByHomeContext(memo(() => {
   const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)
-
   useSyncQuicklookWithUrl()
 
   return (
@@ -23,7 +21,6 @@ export const Home = wrapByHomeContext(memo(() => {
         <div style={{ width: 'min(30%, 300px)', display: 'flex', flexDirection: 'column' }}>
           <VisitList style={{ flexGrow: 1 }} />
           <ViewerSettings />
-          {/* <HeaderViewer /> */}
         </div>
         <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <Viewer style={{ flexGrow: 1 }} />
@@ -34,11 +31,9 @@ export const Home = wrapByHomeContext(memo(() => {
           </div>
         </div>
       </div>
-      {/* <Example /> */}
     </div>
   )
 }))
-
 
 
 const useSyncQuicklookWithUrl = () => {

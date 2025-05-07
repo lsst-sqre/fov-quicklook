@@ -1,14 +1,14 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager, contextmanager
-from typing import AsyncGenerator, Callable
+from typing import AsyncGenerator, Callable, Iterable
 
 from sqlalchemy import select, update
 
 from quicklook import storage
 from quicklook.config import config
-from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
 from quicklook.coordinator.housekeep import cleanup_job
+from quicklook.coordinator.quicklookjob.job import QuicklookJob, QuicklookJobPhase
 from quicklook.db import db_context
 from quicklook.models import QuicklookRecord
 from quicklook.mutableconfig import mutable_config
@@ -16,11 +16,11 @@ from quicklook.types import Visit
 from quicklook.utils.event import WatchEvent
 from quicklook.utils.orderedsemaphore import OrderedSemaphore
 
+from ...housekeep import housekeep
 from ..job import QuicklookJob, QuicklookJobPhase, QuicklookJobReport
 from ..job_generate import job_generate
 from ..job_merge import job_merge
 from ..job_transfer import job_transfer
-from ...housekeep import housekeep
 from .JobSynchronizer import JobSynchronizer
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
@@ -105,6 +105,9 @@ class JobRunner:
 
     def clear(self):
         self._synchronizer.delete_all()
+
+    def entries(self) -> Iterable[QuicklookJobReport]:
+        return self._synchronizer._entries.values()
 
 
 def _update_job_record_phase(job: QuicklookJob, phase: QuicklookRecord.Phase):

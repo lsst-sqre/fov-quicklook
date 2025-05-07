@@ -17,6 +17,7 @@ class DiskInfo:
 @dataclass
 class PodStatus:
     hostname: str
+    ip_addr: str
     memory_total: int
     memory_used: int
     disks: list[DiskInfo]
@@ -65,8 +66,24 @@ async def get_disk_info(dirs: list[str]) -> list[DiskInfo]:
     return disks
 
 
+async def get_ip_address() -> str:
+    try:
+        proc = await asyncio.create_subprocess_exec('hostname', '-I', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        stdout, _ = await proc.communicate()
+        ip_addr = stdout.decode().strip().split()[0]
+        return ip_addr
+    except:
+        return 'N/A'
+
+
 async def pod_status(storage_dirs: list[str] = []) -> PodStatus:
     memory_info, disk_info = await asyncio.gather(get_memory_info(), get_disk_info(storage_dirs))
     hostname = socket.gethostname()
-
-    return PodStatus(hostname=hostname, memory_total=memory_info[0], memory_used=memory_info[1], disks=disk_info)
+    ip_addr = await get_ip_address()
+    return PodStatus(
+        hostname=hostname,
+        memory_total=memory_info[0],
+        memory_used=memory_info[1],
+        disks=disk_info,
+        ip_addr=ip_addr,
+    )

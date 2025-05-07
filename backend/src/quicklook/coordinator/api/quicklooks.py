@@ -10,6 +10,7 @@ from sqlalchemy import delete
 
 from quicklook import storage
 from quicklook.coordinator.api.generators import ctx
+from quicklook.coordinator.quicklookjob.job import QuicklookJobReport
 from quicklook.db import db_context
 from quicklook.models import QuicklookRecord
 from quicklook.types import GeneratorPod, Visit
@@ -32,10 +33,15 @@ async def create_quicklook(params: QuicklookCreate, background_tasks: Background
     background_tasks.add_task(job_runner.enqueue, visit)
 
 
+@router.get("/quicklooks", response_model=list[QuicklookJobReport])
+async def list_quicklooks():
+    return [*job_runner.entries()]
+
+
 @router.delete("/quicklooks/*")
 async def delete_all_quicklooks():
     job_runner.clear()
-    
+
     with db_context() as db:
         db.execute(delete(QuicklookRecord))
         db.commit()
@@ -45,7 +51,6 @@ async def delete_all_quicklooks():
 
     await asyncio.gather(*(delete_generator(g) for g in ctx().generators))
     await asyncio.to_thread(storage.clear_all)
-    
 
 
 @router.websocket("/quicklook-jobs/events.ws")

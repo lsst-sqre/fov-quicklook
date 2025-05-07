@@ -12,13 +12,13 @@ export const LineProfiler = memo(() => {
   const { quicklookHandle } = useHomeContext()
   const globe = useGlobe()
   const [, mouseY] = useAppSelector(state => state.home.mouseCursorClientCoord)
-  const camera = useAppSelector(state => state.home.viewerCamera)
+  const cameraRevision = useAppSelector(state => state.home.cameraRevision)
   const wcs = useWcs()
   const quicklookLayer = quicklookHandle.current?.layer()
 
   const chartData: WebglPlotProps | undefined = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    camera // cameraの移動でも再計算される必要がある
+    cameraRevision // cameraの移動でも再計算される必要がある
     if (globe && wcs && quicklookLayer) {
       const { x: minX, width } = globe.containerElement.getBoundingClientRect()
       const n = width << 0
@@ -41,7 +41,7 @@ export const LineProfiler = memo(() => {
       }
       return { xy, min, max }
     }
-  }, [camera, globe, wcs, quicklookLayer, mouseY])
+  }, [cameraRevision, globe, wcs, quicklookLayer, mouseY])
 
   const containerRef = useRef<HTMLDivElement>(null)
   const chartSize = useRef<{ width: number; height: number }>()

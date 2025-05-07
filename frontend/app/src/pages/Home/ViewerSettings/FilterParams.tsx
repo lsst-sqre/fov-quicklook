@@ -6,17 +6,11 @@ import { useAppDispatch, useAppSelector } from "../../../store/hooks"
 import { useHomeContext } from "../context"
 import styles from './styles.module.scss'
 import { LogScaleRange } from "../../../components/LogScaleRange"
+import { initialSearchParams } from "../../../hooks/useHashSync"
 
 const defaultContrastBias: [number, number] = [0.5, 0]
 
 export const FilterParams = memo(() => {
-  // contrast値が大きいほど範囲が狭くなる
-  // (max - min)/mad == 1/contrast
-  // (origin - (min + max)/2) / mad == bias
-  //
-  // min = origin - bias * mad - mad / (2 * contrast)
-  // max = origin - bias * mad + mad / (2 * contrast)
-
   const dispatch = useAppDispatch()
   const params = useAppSelector(state => state.home.filterParams)
   const { currentQuicklook } = useHomeContext()
@@ -26,6 +20,7 @@ export const FilterParams = memo(() => {
   const origin = useMemo(() => metadata ? getImageMedian(metadata) : 0, [metadata])
   const mad = useMemo(() => metadata ? getImageSigma(metadata) : 1, [metadata])
   const [[contrast, bias], setContrastBias] = useState<[number, number]>(defaultContrastBias)
+  const [showTextInputs, setShowTextInputs] = useState(false)
 
   const setParams = useCallback((params: RubinImageFilterParams) => {
     dispatch(homeSlice.actions.setFilterParams(params))
@@ -35,7 +30,10 @@ export const FilterParams = memo(() => {
     if (metadata) {
       const [min, max] = autoBarMinMax(metadata)
       setBarMinMax([min, max])
-      setParams({ ...params, ...autoMinMax(metadata, contrast, bias) })
+      const shouldDoAutoMinMax = currentQuicklook.changeCount() > 1 || initialSearchParams.filterParams === undefined
+      if (shouldDoAutoMinMax) {
+        setParams({ ...params, ...autoMinMax(metadata, contrast, bias) })
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metadata])
@@ -85,59 +83,196 @@ export const FilterParams = memo(() => {
             }
           </select>
         </dd>
-        <dt>gamma = {gamma.toFixed(2)}</dt>
-        <dd>
-          <LogScaleRange
-            value={gamma}
-            min={-10}
-            max={20}
-            onInput={v => setParams({ ...params, gamma: v })} />
-        </dd>
-        <dt>min = {min.toFixed(2)}</dt>
-        <dd>
-          <LogScaleRange
-            value={min}
-            min={barMinMax[0]}
-            max={barMinMax[1]}
-            origin={origin}
-            a={100 / mad}
-            onInput={v => handleMinMaxChange(v, max)} />
-        </dd>
-        <dt>max = {max.toFixed(2)}</dt>
-        <dd>
-          <LogScaleRange
-            value={max}
-            min={barMinMax[0]}
-            max={barMinMax[1]}
-            origin={origin}
-            a={100 / mad}
-            onInput={v => handleMinMaxChange(min, v)} />
-        </dd>
-        <dt>Contrast = {contrast.toFixed(2)}</dt>
-        <dd>
-          <LogScaleRange
-            value={contrast}
-            min={0}
-            max={10}
-            onInput={v => handleParamChange(v, bias)} />
-        </dd>
-        <dt>Bias = {bias.toFixed(2)}</dt>
-        <dd>
-          <LogScaleRange
-            value={bias}
-            min={-2}
-            max={2}
-            onInput={v => handleParamChange(contrast, v)} />
-        </dd>
       </dl>
+
+      <FilterParamSliders
+        params={params}
+        min={min}
+        max={max}
+        gamma={gamma}
+        contrast={contrast}
+        bias={bias}
+        barMinMax={barMinMax}
+        origin={origin}
+        mad={mad}
+        onGammaChange={v => setParams({ ...params, gamma: v })}
+        onMinMaxChange={handleMinMaxChange}
+        onContrastBiasChange={handleParamChange}
+      />
+
+      {showTextInputs && (
+        <FilterParamTextInputs
+          gamma={gamma}
+          min={min}
+          max={max}
+          contrast={contrast}
+          bias={bias}
+          onGammaChange={v => setParams({ ...params, gamma: v })}
+          onMinMaxChange={handleMinMaxChange}
+          onContrastBiasChange={handleParamChange}
+        />
+      )}
+
       <button onClick={reset}>Reset</button>
+      <button onClick={() => setShowTextInputs(prev => !prev)}>{showTextInputs ? 'Hide' : 'Show'} Text Inputs</button>
     </div>
   )
 })
 
+type FilterParamSlidersProps = {
+  params: RubinImageFilterParams
+  min: number
+  max: number
+  gamma: number
+  contrast: number
+  bias: number
+  barMinMax: [number, number]
+  origin: number
+  mad: number
+  onGammaChange: (v: number) => void
+  onMinMaxChange: (min: number, max: number) => void
+  onContrastBiasChange: (contrast: number, bias: number) => void
+}
+
+const FilterParamSliders = memo(({
+  min,
+  max,
+  gamma,
+  contrast,
+  bias,
+  barMinMax,
+  origin,
+  mad,
+  onGammaChange,
+  onMinMaxChange,
+  onContrastBiasChange
+}: FilterParamSlidersProps) => {
+  return (
+    <dl>
+      <dt>gamma = {gamma.toFixed(2)}</dt>
+      <dd>
+        <LogScaleRange
+          value={gamma}
+          min={-10}
+          max={20}
+          onInput={onGammaChange} />
+      </dd>
+      <dt>min = {min.toFixed(2)}</dt>
+      <dd>
+        <LogScaleRange
+          value={min}
+          min={barMinMax[0]}
+          max={barMinMax[1]}
+          origin={origin}
+          a={100 / mad}
+          onInput={v => onMinMaxChange(v, max)} />
+      </dd>
+      <dt>max = {max.toFixed(2)}</dt>
+      <dd>
+        <LogScaleRange
+          value={max}
+          min={barMinMax[0]}
+          max={barMinMax[1]}
+          origin={origin}
+          a={100 / mad}
+          onInput={v => onMinMaxChange(min, v)} />
+      </dd>
+      <dt>Contrast = {contrast.toFixed(2)}</dt>
+      <dd>
+        <LogScaleRange
+          value={contrast}
+          min={0}
+          max={10}
+          onInput={v => onContrastBiasChange(v, bias)} />
+      </dd>
+      <dt>Bias = {bias.toFixed(2)}</dt>
+      <dd>
+        <LogScaleRange
+          value={bias}
+          min={-2}
+          max={2}
+          onInput={v => onContrastBiasChange(contrast, v)} />
+      </dd>
+    </dl>
+  )
+})
+
+type FilterParamTextInputsProps = {
+  gamma: number
+  min: number
+  max: number
+  contrast: number
+  bias: number
+  onGammaChange: (v: number) => void
+  onMinMaxChange: (min: number, max: number) => void
+  onContrastBiasChange: (contrast: number, bias: number) => void
+}
+
+const FilterParamTextInputs = memo(({
+  gamma,
+  min,
+  max,
+  contrast,
+  bias,
+  onGammaChange,
+  onMinMaxChange,
+  onContrastBiasChange
+}: FilterParamTextInputsProps) => {
+  return (
+    <div className={styles.textInputs}>
+      <dl>
+        <dt>Gamma</dt>
+        <dd>
+          <input
+            type="number"
+            value={gamma}
+            step="0.1"
+            onChange={e => onGammaChange(Number(e.target.value))}
+          />
+        </dd>
+        <dt>Min</dt>
+        <dd>
+          <input
+            type="number"
+            value={min}
+            step="0.1"
+            onChange={e => onMinMaxChange(Number(e.target.value), max)}
+          />
+        </dd>
+        <dt>Max</dt>
+        <dd>
+          <input
+            type="number"
+            value={max}
+            step="0.1"
+            onChange={e => onMinMaxChange(min, Number(e.target.value))}
+          />
+        </dd>
+        <dt>Contrast</dt>
+        <dd>
+          <input
+            type="number"
+            value={contrast}
+            step="0.1"
+            min="0"
+            onChange={e => onContrastBiasChange(Number(e.target.value), bias)}
+          />
+        </dd>
+        <dt>Bias</dt>
+        <dd>
+          <input
+            type="number"
+            value={bias}
+            step="0.1"
+            onChange={e => onContrastBiasChange(contrast, Number(e.target.value))}
+          />
+        </dd>
+      </dl>
+    </div>
+  )
+})
 
 const MAD2STDDEV = Math.sqrt(2 / Math.PI)
-
 
 function autoBarMinMax(tileMeta: QuicklookMetadata) {
   const n = 5000
@@ -147,7 +282,6 @@ function autoBarMinMax(tileMeta: QuicklookMetadata) {
   const maxSigma = Math.max(-Infinity, ...ccds.map(ccd => ccd.image_stat.mad!)) * MAD2STDDEV
   return [min - n * maxSigma, max + n * maxSigma]
 }
-
 
 function autoMinMax(tileMeta: QuicklookMetadata, contrast: number, bias: number) {
   const sigma = getImageSigma(tileMeta)

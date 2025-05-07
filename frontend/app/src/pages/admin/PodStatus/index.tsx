@@ -50,6 +50,9 @@ function PodStatusView({ status, title }: { status: PodStatus, title: string }) 
       <span>{title}</span>
       <div>Hostname: {status.hostname}</div>
       <div>
+        IP Address: {status.ip_addr}
+      </div>
+      <div>
         Memory: {formatBytes(status.memory_used)} / {formatBytes(status.memory_total)}
         <Progress count={status.memory_used} total={status.memory_total} width="200px" />
       </div>

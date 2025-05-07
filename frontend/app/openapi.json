@@ -385,7 +385,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/VisitListEntry"
+                                        "$ref": "#/components/schemas/VisitEntry"
                                     },
                                     "title": "Response List Visits Api Visits Get"
                                 }
@@ -1014,6 +1014,10 @@
                         "type": "string",
                         "title": "Hostname"
                     },
+                    "ip_addr": {
+                        "type": "string",
+                        "title": "Ip Addr"
+                    },
                     "memory_total": {
                         "type": "integer",
                         "title": "Memory Total"
@@ -1033,6 +1037,7 @@
                 "type": "object",
                 "required": [
                     "hostname",
+                    "ip_addr",
                     "memory_total",
                     "memory_used",
                     "disks"
@@ -1273,18 +1278,58 @@
                 ],
                 "title": "Visit"
             },
-            "VisitListEntry": {
+            "VisitEntry": {
                 "properties": {
                     "id": {
                         "type": "string",
                         "title": "Id"
+                    },
+                    "day_obs": {
+                        "type": "integer",
+                        "title": "Day Obs"
+                    },
+                    "physical_filter": {
+                        "type": "string",
+                        "title": "Physical Filter"
+                    },
+                    "obs_id": {
+                        "type": "string",
+                        "title": "Obs Id"
+                    },
+                    "exposure_time": {
+                        "type": "number",
+                        "title": "Exposure Time"
+                    },
+                    "science_program": {
+                        "type": "string",
+                        "title": "Science Program"
+                    },
+                    "observation_type": {
+                        "type": "string",
+                        "title": "Observation Type"
+                    },
+                    "observation_reason": {
+                        "type": "string",
+                        "title": "Observation Reason"
+                    },
+                    "target_name": {
+                        "type": "string",
+                        "title": "Target Name"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "id"
+                    "id",
+                    "day_obs",
+                    "physical_filter",
+                    "obs_id",
+                    "exposure_time",
+                    "science_program",
+                    "observation_type",
+                    "observation_reason",
+                    "target_name"
                 ],
-                "title": "VisitListEntry"
+                "title": "VisitEntry"
             }
         }
     }

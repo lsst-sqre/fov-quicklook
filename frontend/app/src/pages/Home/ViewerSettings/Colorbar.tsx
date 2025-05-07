@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from "react"
-import { RootState } from "../../../store"
+import { AppState } from "../../../store"
 import { useAppSelector } from "../../../store/hooks"
 
 // 'optionA.csv': 'magma',
@@ -34,7 +34,7 @@ const colormaps = {
 }
 
 
-type Colormap = RootState['home']['filterParams']['colormap']
+type Colormap = AppState['home']['filterParams']['colormap']
 
 
 export function Colorbar() {

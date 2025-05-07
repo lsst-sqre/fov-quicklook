@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useWebsocket } from "../../../hooks/useWebsocket"
 import { QuicklookStatus, useCreateQuicklookMutation, useShowQuicklookMetadataQuery } from "../../../store/api/openapi"
 import { useAppSelector } from "../../../store/hooks"
@@ -12,6 +12,7 @@ export function useQuicklookStatus() {
   const ready = id !== undefined ? ((status[id]?.phase ?? 0) >= 2) : false
   const wsUrl = useMemo(() => websocketUrl(`./api/quicklooks/${id}/status.ws`), [id])
   const { data: metadata, isFetching: metadataIsFeatching } = useShowQuicklookMetadataQuery({ id: id ?? '-' }, { skip: !ready })
+  const changeCount = useRef(0)
 
   const { reconnect } = useWebsocket({
     url: wsUrl,
@@ -37,10 +38,17 @@ export function useQuicklookStatus() {
     createQuicklook()
   }, [createQuicklook])
 
+  useEffect(() => {
+    if (id !== undefined) {
+      changeCount.current += 1
+    }
+  }, [id])
+
   return {
     id,
     status: id ? status[id] : null,
     metadata: ready && !metadataIsFeatching && metadata || undefined,
     ready,
+    changeCount: () => changeCount.current,
   }
 }

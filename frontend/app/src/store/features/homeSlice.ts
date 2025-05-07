@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
-import { V2 } from "@stellar-globe/stellar-globe"
+import { angle, V2 } from "@stellar-globe/stellar-globe"
+import { initialSearchParams } from "../../hooks/useHashSync"
 import { RubinImageFilter, RubinImageFilterParams } from "../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter"
 import { ListVisitsApiArg } from "../api/openapi"
 
@@ -7,7 +8,8 @@ type CcdDataType = NonNullable<ListVisitsApiArg["dataType"]>
 
 type State = {
   currentQuicklook: string | undefined
-  viewerCamera: ViewerCamera
+  cameraRevision: number
+  cameraParams: CameraParams
   mouseCursorClientCoord: V2
   lineProfiler: LineProfilerState
   filterParams: RubinImageFilterParams
@@ -16,25 +18,36 @@ type State = {
   showFrame: boolean
 }
 
-type ViewerCamera = object
+export type CameraParams = Record<'theta' | 'phi' | 'roll' | 'za' | 'zd' | 'zp' | 'fovy', number>
+
+
+const initialCameraParams: CameraParams = {
+  fovy: angle.deg2rad(3.6),
+  theta: 0,
+  phi: 0,
+  roll: 0,
+  za: 0,
+  zd: Math.PI / 2,
+  zp: 0,
+}
 
 type LineProfilerState = {
   enabled: boolean
 }
 
-
 function initialState(): State {
   return {
     currentQuicklook: undefined,
-    viewerCamera: {},
+    cameraRevision: 0,
     mouseCursorClientCoord: [0, -1],
     lineProfiler: {
       enabled: true,
     },
-    filterParams: RubinImageFilter.defaultParams(),
+    filterParams: initialSearchParams.filterParams ?? RubinImageFilter.defaultParams(),
     searchString: '',
     dataSource: 'raw',
     showFrame: true,
+    cameraParams: initialSearchParams.cameraParams ?? initialCameraParams,
   }
 }
 
@@ -45,8 +58,12 @@ export const homeSlice = createSlice({
     setCurrentQuicklook: (state, action: PayloadAction<string>) => {
       state.currentQuicklook = action.payload
     },
-    setViewerCamera: (state, action: PayloadAction<ViewerCamera>) => {
-      state.viewerCamera = action.payload
+    cameraUpdated: (state, action: PayloadAction<void>) => {
+      state.cameraRevision += 1
+    },
+    cameraParamsUpdated: (state, action: PayloadAction<CameraParams>) => {
+      state.cameraParams = action.payload
+      state.cameraRevision += 1
     },
     setMouseCursorClientCoord: (state, action: PayloadAction<V2>) => {
       state.mouseCursorClientCoord = action.payload
