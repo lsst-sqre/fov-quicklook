@@ -5,7 +5,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 
-from quicklook.coordinator.quicklookjob.job_runner import housekeep
 from quicklook.db import db_context
 from quicklook.models import QuicklookRecord
 
@@ -35,4 +34,5 @@ async def list_cache_entries() -> list[CacheEntry]:
 
 @router.post('/api/cache_entries:cleanup')
 async def cleanup_cache_entries() -> None:
+    from quicklook.coordinator.quicklookjob.job_runner import housekeep
     await housekeep()

@@ -69,7 +69,7 @@ class Config(BaseSettings):
     max_storage_entries: int = 40
 
     generate_timeout: ClientTimeout = ClientTimeout(
-        total=40.0,
+        total=120.0,
         sock_read=5.0,
     )
     merge_timeout: ClientTimeout = ClientTimeout(
@@ -95,6 +95,8 @@ class Config(BaseSettings):
     @cached_property
     def coordinator_ws_base_url(self) -> str:
         return re.sub(r'^http://', 'ws://', self.coordinator_base_url)
+
+    enable_hips: bool = True
 
     model_config = SettingsConfigDict(
         env_prefix='QUICKLOOK_',

@@ -9,16 +9,17 @@ from quicklook.frontend.api.compression import setup_compression
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWatcher
 from quicklook.frontend.api.staticassets import setup_static_assets
 
+from .cache_entries import router as cache_entries_router
+from .get_fits_file import router as get_fits_file_router
 from .get_fits_header import router as get_fits_header_router
 from .get_tile import router as gettile_router
 from .health import router as health_router
+from .hips.router import router as hips_router
 from .podstatus import router as pod_status_router
 from .quicklooks import router as quicklooks_router
+from .storage_explorer import router as storage_explorer_router
 from .systeminfo import router as systeminfo_router
 from .visits import router as visits_router
-from .get_fits_file import router as get_fits_file_router
-from .cache_entries import router as cache_entries_router
-from .storage_explorer import router as storage_explorer_router
 
 logger = logging.getLogger(f'uvicorn.{__name__}')
 
@@ -44,6 +45,10 @@ if config.admin_page:  # pragma: no cover
     app.include_router(pod_status_router, prefix=config.frontend_app_prefix)
     app.include_router(cache_entries_router, prefix=config.frontend_app_prefix)
     app.include_router(storage_explorer_router, prefix=config.frontend_app_prefix)
+
+
+if config.enable_hips:
+    app.include_router(hips_router, prefix=config.frontend_app_prefix)
 
 setup_static_assets(app)
 

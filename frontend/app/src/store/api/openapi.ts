@@ -67,6 +67,12 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/visits/${queryArg.id}/ccds/${queryArg.ccdName}`,
       }),
     }),
+    getExposureDataTypes: build.query<
+      GetExposureDataTypesApiResponse,
+      GetExposureDataTypesApiArg
+    >({
+      query: (queryArg) => ({ url: `/api/exposures/${queryArg.id}/types` }),
+    }),
     getFitsFile: build.query<GetFitsFileApiResponse, GetFitsFileApiArg>({
       query: (queryArg) => ({
         url: `/api/quicklooks/${queryArg.id}/fits/${queryArg.ccdName}`,
@@ -121,6 +127,15 @@ const injectedRtkApi = api.injectEndpoints({
           prefix: queryArg.prefix,
         },
       }),
+    }),
+    listHipsRepositories: build.query<
+      ListHipsRepositoriesApiResponse,
+      ListHipsRepositoriesApiArg
+    >({
+      query: () => ({ url: `/api/hips` }),
+    }),
+    getHipsFile: build.query<GetHipsFileApiResponse, GetHipsFileApiArg>({
+      query: (queryArg) => ({ url: `/api/hips/${queryArg.path}` }),
     }),
   }),
   overrideExisting: false,
@@ -178,6 +193,15 @@ export type GetVisitMetadataApiArg = {
   id: string;
   ccdName: string;
 };
+export type GetExposureDataTypesApiResponse =
+  /** status 200 Successful Response */ (
+    | "raw"
+    | "post_isr_image"
+    | "preliminary_visit_image"
+  )[];
+export type GetExposureDataTypesApiArg = {
+  id: number;
+};
 export type GetFitsFileApiResponse = /** status 200 Successful Response */ any;
 export type GetFitsFileApiArg = {
   ccdName: string;
@@ -206,6 +230,13 @@ export type DeleteStorageEntriesByPrefixApiResponse =
   /** status 200 Successful Response */ any;
 export type DeleteStorageEntriesByPrefixApiArg = {
   prefix: string;
+};
+export type ListHipsRepositoriesApiResponse =
+  /** status 200 Successful Response */ HipsRepository[];
+export type ListHipsRepositoriesApiArg = void;
+export type GetHipsFileApiResponse = /** status 200 Successful Response */ any;
+export type GetHipsFileApiArg = {
+  path: string;
 };
 export type SystemInfo = {
   admin_page?: boolean;
@@ -333,6 +364,9 @@ export type Entry = {
   type: "directory" | "file";
   size: number | null;
 };
+export type HipsRepository = {
+  name: string;
+};
 export const {
   useGetSystemInfoQuery,
   useHealthzQuery,
@@ -345,6 +379,7 @@ export const {
   useCreateQuicklookMutation,
   useListVisitsQuery,
   useGetVisitMetadataQuery,
+  useGetExposureDataTypesQuery,
   useGetFitsFileQuery,
   useGetPodStatusQuery,
   useListCacheEntriesQuery,
@@ -352,4 +387,6 @@ export const {
   useListStorageEntriesQuery,
   useDeleteStorageEntryMutation,
   useDeleteStorageEntriesByPrefixMutation,
+  useListHipsRepositoriesQuery,
+  useGetHipsFileQuery,
 } = injectedRtkApi;

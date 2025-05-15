@@ -1,5 +1,4 @@
 import classNames from "classnames"
-import { useAppSelector } from "../../../store/hooks"
 import { useHomeContext } from "../context"
 import { useFocusedAmp, useFocusedCcd, useMouseCursorFocalPlaneCoord } from "../hooks"
 import styles from './styles.module.scss'

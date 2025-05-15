@@ -19,9 +19,9 @@ export function useQuicklookStatus() {
     onMessage: useCallback(e => {
       if (id !== undefined) {
         const msg: QuicklookStatus | null = JSON.parse(e.data)
-        setStatus({ [id]: msg })
+        setStatus({ ...status, [id]: msg })
       }
-    }, [id]),
+    }, [id, status]),
     skip: id === undefined || ready,
   })
 

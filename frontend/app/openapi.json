@@ -453,6 +453,54 @@
                 }
             }
         },
+        "/api/exposures/{id}/types": {
+            "get": {
+                "summary": "Get Exposure Data Types",
+                "operationId": "get_exposure_data_types",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "enum": [
+                                            "raw",
+                                            "post_isr_image",
+                                            "preliminary_visit_image"
+                                        ],
+                                        "type": "string"
+                                    },
+                                    "title": "Response Get Exposure Data Types Api Exposures  Id  Types Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/quicklooks/{id}/fits/{ccd_name}": {
             "get": {
                 "summary": "Get Fits File",
@@ -646,6 +694,65 @@
                         "schema": {
                             "type": "string",
                             "title": "Prefix"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/hips": {
+            "get": {
+                "summary": "List Hips Repositories",
+                "operationId": "list_hips_repositories",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/HipsRepository"
+                                    },
+                                    "type": "array",
+                                    "title": "Response List Hips Repositories Api Hips Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/hips/{path}": {
+            "get": {
+                "summary": "Get Hips File",
+                "operationId": "get_hips_file",
+                "parameters": [
+                    {
+                        "name": "path",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Path"
                         }
                     }
                 ],
@@ -955,6 +1062,19 @@
                     "$ref": "#/components/schemas/CardType"
                 },
                 "type": "array"
+            },
+            "HipsRepository": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "HipsRepository"
             },
             "ImageStat": {
                 "properties": {

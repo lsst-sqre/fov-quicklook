@@ -10,6 +10,7 @@ import { Viewer } from "./Viewer"
 import { ViewerSettings } from "./ViewerSettings"
 import { Colorbar } from "./ViewerSettings/Colorbar"
 import { VisitList } from "./VisitList"
+import { DataTypeSwitch } from "./DataTypeSwitch"
 
 export const Home = wrapByHomeContext(memo(() => {
   const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)
@@ -26,7 +27,8 @@ export const Home = wrapByHomeContext(memo(() => {
           <Viewer style={{ flexGrow: 1 }} />
           <Colorbar />
           {lineProfilerEnabled && <LineProfiler />}
-          <div style={{ position: 'absolute', right: 0 }}>
+          <div className={styles.buttons}>
+            <DataTypeSwitch />
             <MainMenu />
           </div>
         </div>
@@ -46,7 +48,8 @@ const useSyncQuicklookWithUrl = () => {
     if (visitId) {
       dispatch(homeSlice.actions.setCurrentQuicklook(visitId))
     }
-  }, [dispatch, visitId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (currentQuicklook) {

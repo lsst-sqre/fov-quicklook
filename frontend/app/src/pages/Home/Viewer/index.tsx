@@ -62,8 +62,11 @@ export const Viewer = memo(({ style }: ViewerProps) => {
             filterParams={filterParams}
           />
         }
-        <GridLayer$ />
-        {showFrame && <CcdFrames />}
+        {showFrame && (<>
+          <GridLayer$ />
+          <CcdFrames />
+        </>)
+        }
       </Globe$>
       <CursorLine />
       <Info />

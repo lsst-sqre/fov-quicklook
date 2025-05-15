@@ -141,7 +141,7 @@ type VisitListEntryType = ListVisitsApiResponse[number]
 
 function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-  const selected = currentQuicklook === entry.id
+  const selected = currentQuicklook?.split(':')[1] === entry.id.split(':')[1]
   const dispatch = useAppDispatch()
   const select = () => {
     dispatch(homeSlice.actions.setCurrentQuicklook(entry.id))

@@ -3,7 +3,7 @@ from pathlib import Path
 from quicklook.config import config
 from quicklook.datasource.butler_datasource import VisitEntry
 from quicklook.datasource.butler_datasource.instrument import Instrument
-from quicklook.types import CcdId, Visit
+from quicklook.types import CcdDataType, CcdId, Visit
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import s3_download_object, s3_list_objects
 
@@ -37,6 +37,9 @@ class DummyDataSource(DataSourceBase):
             visit=ref.visit,
             uuid=f"dummy-uuid-{ref.visit.name}-{ref.ccd_name}",
         )
+
+    def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]:
+        return ['raw', 'post_isr_image']
 
 
 def _s3_get_visit_ccd_fits_raw(visit: Visit, ccd_name: str) -> bytes:

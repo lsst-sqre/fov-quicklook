@@ -57,6 +57,14 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def get_metadata(self, ccd_id: CcdId) -> DataSourceCcdMetadata:
         return get_datasource(ccd_id.visit.data_type).get_metadata(ccd_id)
 
+    def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]:
+        types: list[CcdDataType] = []
+        for data_type in cast(list[CcdDataType], ['raw', 'post_isr_image', 'preliminary_visit_image']):
+            datasource = get_datasource(data_type)
+            if datasource.exposure_exists(exposure_id):
+                types.append(data_type)
+        return types
+
 
 class DataTypeSpecificDataSource:
     # データタイプ固有の属性
@@ -118,6 +126,16 @@ class DataTypeSpecificDataSource:
         refs = b.query_datasets(visit.data_type, where=f"{self.data_id_key}={visit.name}")
         i = Instrument.get(default_instrument)
         return [i.detector_2_ccd[ref.dataId['detector']] for ref in refs]  # type: ignore
+
+    def exposure_exists(self, exposure_id: int) -> bool:
+        from lsst.daf.butler._exceptions import EmptyQueryResultError
+
+        b = self._butler
+        try:
+            refs = b.query_datasets(self.data_type, where=f"{self.data_id_key}={exposure_id}", limit=1)
+        except EmptyQueryResultError:
+            return False
+        return len(refs) > 0
 
     def get_data(self, ccd_id: CcdId) -> bytes:
         return retrieve_data(self._getUri(ccd_id), partial=self.partial)

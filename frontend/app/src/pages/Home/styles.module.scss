@@ -4,3 +4,13 @@
   height: 100%;
   overflow: hidden;
 }
+
+.buttons {
+  position: absolute;
+  right: 0;
+  display: flex;
+}
+
+.selectedType {
+  color: lightgreen;
+}

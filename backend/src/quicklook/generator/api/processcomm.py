@@ -1,10 +1,13 @@
-from contextlib import contextmanager
+import logging
 import multiprocessing
 import os
 import signal
+from contextlib import contextmanager
 from dataclasses import dataclass
 from multiprocessing.connection import Connection
 from typing import Callable
+
+logger = logging.getLogger(f'uvicorn.{__name__}')
 
 # Cannot use multiprocessing.Pool directly within Uvicorn.
 # A child process is launched using multiprocessing.Process,
@@ -32,4 +35,9 @@ def spawn_process_with_comm(process_target: Callable[[Connection], None]):
         yield ProcessHandle(comm, worker_process)
     finally:
         comm.close()
-        worker_process.join()
+        try:
+            worker_process.join()
+        except:
+            # この行はデバッグ用
+            # 本当はこのtry/exceptは必要ない・・はず・・
+            logger.exception('Failed to join process')

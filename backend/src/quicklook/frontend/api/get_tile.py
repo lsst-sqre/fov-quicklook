@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import traceback
 from functools import cache
@@ -54,6 +55,7 @@ async def get_tile(
 
 async def get_tile_from_storage(visit: Visit, z: int, y: int, x: int) -> Response:
     headers = {'x-quicklook-phase': QuicklookJobPhase.READY.name}
+    headers.update(get_cache_headers())
     try:
         data = storage.get_quicklook_tile_bytes(visit, z, y, x)
     except NoSuchKey:
@@ -78,6 +80,7 @@ async def gather_tile(visit: Visit, z: int, y: int, x: int, ccd_generator_map: d
     headers = {
         'x-quicklook-phase': QuicklookJobPhase.GENERATE_DONE.name,
     }
+    headers.update(get_cache_headers())
     pool: numpy.ndarray | None = None
     for fut in asyncio.as_completed([get_npy(g) for g in generators]):
         try:
@@ -99,11 +102,12 @@ async def fetch_merged_tile(visit: Visit, z: int, y: int, x: int, ccd_generator_
     headers = {
         'x-quicklook-phase': QuicklookJobPhase.MERGE_DONE.name,
     }
+    headers.update(get_cache_headers())
     try:
         generator, _ = select_primary_generator(ccd_generator_map, TileId(z, y, x))
     except NoOverlappingGenerators:
         return Response(blank_npy_zstd(), media_type='application/npy+zstd', headers={**headers, 'x-quicklook-error': 'Tile not found'})
-        
+
     async with aiohttp.ClientSession() as session:
         async with session.get(
             f'http://{generator.name}/quicklooks/{visit.id}/merged-tiles/{z}/{y}/{x}',
@@ -132,3 +136,7 @@ def is_visit_ready(visit: Visit):
 def blank_npy_zstd():
     arr = numpy.zeros((config.tile_size, config.tile_size), dtype=numpy.float32)
     return zstd.compress(ndarray2npybytes(arr))
+
+
+def get_cache_headers() -> dict[str, str]:
+    return {"Cache-Control": "public, max-age=86400", "Expires": (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)).strftime("%a, %d %b %Y %H:%M:%S GMT")}

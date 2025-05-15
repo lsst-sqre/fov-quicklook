@@ -29,12 +29,15 @@ class DataSourceBase(abc.ABC):
     def get_metadata(self, ref: CcdId) -> 'DataSourceCcdMetadata':  # pragma: no cover
         ...
 
+    @abc.abstractmethod
+    def get_exposure_data_types(self, exposure: int) -> list[CcdDataType]: ...
+
 
 @dataclass
 class DataSourceCcdMetadata:
     visit: Visit
     ccd_name: str
-    
+
     detector: int
     exposure: int
     day_obs: int

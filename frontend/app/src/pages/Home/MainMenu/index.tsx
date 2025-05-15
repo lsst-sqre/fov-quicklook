@@ -5,7 +5,6 @@ import { MaterialSymbol } from "../../../components/MaterialSymbol"
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
 import { useGlobe, useResetView } from "../context"
-import styles from './styles.module.scss'
 
 export function MainMenu() {
   const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)
@@ -27,7 +26,7 @@ export function MainMenu() {
 
   return (
     <div>
-      <Menu menuButton={<MenuButton className={styles.menuButton} ><MaterialSymbol symbol="menu" /></MenuButton>} theming="dark"  >
+      <Menu menuButton={<MenuButton><MaterialSymbol symbol="menu" /></MenuButton>} theming="dark"  >
         <MenuItem onClick={() => resetVeiw()}>Re-Center</MenuItem>
         <MenuItem onClick={() => rorate90()} >Rotate 90&deg;</MenuItem>
         <MenuDivider />

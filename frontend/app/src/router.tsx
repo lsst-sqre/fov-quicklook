@@ -7,6 +7,7 @@ import { PodsStatus } from './pages/admin/PodStatus'
 import { StorageExplorer } from './pages/admin/StorageExplorer'
 import { ConfigPage } from './pages/ConfigPage'
 import { FItsHeaderPage } from './pages/FitsHeader'
+import { HipsPage } from './pages/hips'
 import { Home } from './pages/Home'
 import { Layout } from './pages/Layout'
 import { AppStore } from './store'
@@ -24,6 +25,7 @@ export const AppRouter = () => {
           <Route path=":visitId" element={<Home />} />
         </Route>
         <Route path="header/:visitId/:ccdName" element={<FItsHeaderPage />} />
+        <Route path="hips" element={<HipsPage />} />
         <Route path="config" element={<ConfigPage />} />
         <Route path="admin">
           <Route path="pod_status" element={<PodsStatus />} />

@@ -2,6 +2,7 @@ import contextlib
 import multiprocessing
 import queue
 import threading
+import time
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Callable
@@ -14,8 +15,6 @@ from quicklook.utils.exitstack import exit_stack
 
 
 class GeneratorProgressReporter:
-    # これいる？
-    # 大袈裟すぎる気が。
     def __init__(
         self,
         task: GenerateTask,
@@ -29,6 +28,7 @@ class GeneratorProgressReporter:
             preprocess=Progress(0, len(task.ccd_names)),
             maketile=Progress(0, 0),
         )
+        self._stop_event = threading.Event()
         self._refresh()
 
     def __enter__(self):
@@ -38,10 +38,32 @@ class GeneratorProgressReporter:
             self._exit_stack.enter_context(manager)
             self._q = manager.Queue()
             self._exit_stack.enter_context(self._watch())
+            self._exit_stack.enter_context(self._periodic_refresh())
             return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         self._exit_stack.close()
+
+    @contextlib.contextmanager
+    def _periodic_refresh(self):
+        self._stop_event.clear()
+        t = threading.Thread(target=self._refresh_periodically)
+        t.daemon = True
+        t.start()
+        try:
+            yield
+        finally:
+            self._stop_event.set()
+            t.join()
+
+    def _refresh_periodically(self):
+        while not self._stop_event.is_set():
+            # 3秒間待機するか、stopイベントがセットされるまで待機
+            if self._stop_event.wait(3):
+                break
+            # イベントがセットされていなければ更新を実行
+            if not self._stop_event.is_set():
+                self._refresh()
 
     @contextlib.contextmanager
     def _watch(self):

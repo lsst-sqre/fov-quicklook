@@ -1,6 +1,7 @@
+import { useMemo } from 'react'
 import { LoadingSpinner } from '../components/Loading'
 import { Progress } from "../components/Progress"
-import { QuicklookStatus } from "../store/api/openapi"
+import { QuicklookStatus, useGetPodStatusQuery } from "../store/api/openapi"
 import styles from './styles.module.scss'
 
 type ProgressItem = {
@@ -10,6 +11,7 @@ type ProgressItem = {
 
 type PhaseName = "generate_progress" | "merge_progress" | "transfer_progress"
 type PhaseProgressType<P extends PhaseName> = NonNullable<QuicklookStatus[P]>[string]
+
 
 function createPhaseComponent<P1 extends PhaseName>(
   pName: P1,
@@ -23,14 +25,12 @@ function createPhaseComponent<P1 extends PhaseName>(
       <table className={styles.progressTable}>
         <tbody>
           {Object.entries(s[pName]).map(([nodeName, ps]) => (
-            <tr key={nodeName}>
-              <th>{nodeName}</th>
-              <td>
-                <NodeProgress
-                  nodeName={nodeName}
-                  ps={enumProgress(ps)} />
-              </td>
-            </tr>
+            <ProgressRow
+              key={nodeName}
+              nodeName={nodeName}
+              progress={ps}
+              enumProgress={enumProgress}
+            />
           ))}
         </tbody>
       </table >
@@ -38,10 +38,39 @@ function createPhaseComponent<P1 extends PhaseName>(
   }
 }
 
-function NodeProgress({
-  nodeName, ps,
+
+function ProgressRow<P extends PhaseName>({
+  nodeName,
+  progress,
+  enumProgress,
 }: {
   nodeName: string
+  progress: PhaseProgressType<P>
+  enumProgress: (p: PhaseProgressType<P>) => ProgressItem[]
+}) {
+  // const { data: podStatus } = useGetPodStatusQuery()
+  // const podName = useMemo(() => {
+  //   const nodeIp = nodeName.split(':')[0]
+  //   const pod = podStatus?.generators.find(p => p.ip_addr === nodeIp)
+  //   return pod?.hostname ?? nodeName
+  // }, [nodeName, podStatus])
+  const podName = nodeName
+
+  return (
+    <tr key={nodeName}>
+      <th>{podName}</th>
+      <td>
+        <NodeProgress
+          ps={enumProgress(progress)} />
+      </td>
+    </tr>
+  )
+}
+
+
+function NodeProgress({
+  ps,
+}: {
   ps: ProgressItem[]
 }) {
   return (

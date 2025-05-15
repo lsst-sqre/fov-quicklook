@@ -33,3 +33,9 @@ def get_visit_metadata(id: str, ccd_name: str):
     ref = CcdId(visit=Visit.from_id(id), ccd_name=ccd_name)
     metadata = ds.get_metadata(ref)
     return metadata
+
+
+@router.get('/api/exposures/{id}/types', response_model=list[CcdDataType])
+def get_exposure_data_types(id: int):
+    ds = get_datasource()
+    return ds.get_exposure_data_types(id)
