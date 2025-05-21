@@ -7,6 +7,7 @@ from starlette.websockets import WebSocketDisconnect
 from quicklook import storage
 from quicklook.config import config
 from quicklook.coordinator.api.quicklooks import QuicklookCreate
+from quicklook.coordinator.housekeep import touch_quicklook
 from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase, QuicklookJobReport
 from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWatcher
 from quicklook.types import CcdMeta, GenerateProgress, MergeProgress, TransferProgress, Visit
@@ -94,6 +95,7 @@ class QuicklookMetadata(BaseModel):
 async def show_quicklook_metadata(id: str):
     metadata = quicklook_metadata(visit=Visit.from_id(id))
     if metadata:
+        touch_quicklook(visit=Visit.from_id(id))
         return metadata
     raise HTTPException(status.HTTP_404_NOT_FOUND)
 

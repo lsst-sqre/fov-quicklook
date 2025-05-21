@@ -66,8 +66,8 @@ async def clear_imcomplete_quicklooks():
 def _iter_expired_records(expiration_threshold: datetime) -> Iterable[Visit]:
     with db_context() as db:
         # 1. phaseがreadyのレコードを新しい順に取得し、config.max_storage_entries以降を削除対象にする
-        # 新しいものを保持するために、作成日時の降順でソート
-        recent_ready_subquery = select(QuicklookRecord.id).where(QuicklookRecord.phase == 'ready').order_by(QuicklookRecord.created_at.desc()).limit(config.max_storage_entries).subquery()  # 降順ソートで新しいものを先頭に
+        # 新しいものを保持するために、更新日時の降順でソート
+        recent_ready_subquery = select(QuicklookRecord.id).where(QuicklookRecord.phase == 'ready').order_by(QuicklookRecord.updated_at.desc()).limit(config.max_storage_entries).subquery()  # 降順ソートで新しいものを先頭に
 
         # ready状態だが、保持する最新のconfig.max_storage_entries件には含まれないもの
         ready_records = db.execute(select(QuicklookRecord).where((QuicklookRecord.phase == 'ready') & (~QuicklookRecord.id.in_(select(recent_ready_subquery.c.id))))).scalars().all()
@@ -81,6 +81,20 @@ def _iter_expired_records(expiration_threshold: datetime) -> Iterable[Visit]:
     # 結果をyield
     for record in all_expired_records:
         yield Visit.from_id(record.id)
+
+
+def touch_quicklook(visit: Visit):
+    """
+    QuicklookRecordのupdated_atを更新する
+    """
+    with db_context() as db:
+        stmt = (
+            update(QuicklookRecord)
+            .where(QuicklookRecord.id == visit.id)
+            .values(updated_at=datetime.now())
+        )
+        db.execute(stmt)
+        db.commit()
 
 
 async def cleanup_job(
