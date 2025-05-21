@@ -5,6 +5,7 @@ import { homeSlice } from "../../store/features/homeSlice"
 import { useAppDispatch } from "../../store/hooks"
 import { useHomeContext } from "./context"
 import classNames from 'classnames'
+import { useChangeCurrentQuicklook } from '../../hooks/useChangeCurrentQuicklook'
 
 export function DataTypeSwitch() {
   type DataType = typeof types[number]
@@ -18,10 +19,12 @@ export function DataTypeSwitch() {
   })
   const types = (isFetching ? [] : data!) ?? []
   const dispatch = useAppDispatch()
+  const changeCurrentQuicklook = useChangeCurrentQuicklook()
 
   const changeType = useCallback((type: DataType) => {
-    dispatch(homeSlice.actions.setCurrentQuicklook(`${type}:${exposureId}`))
-  }, [dispatch, exposureId])
+    changeCurrentQuicklook(`${type}:${exposureId}`)
+    dispatch(homeSlice.actions.setDataSource(type))
+  }, [changeCurrentQuicklook, dispatch, exposureId])
 
   const buttonConfigs = [
     { type: 'raw', label: 'Raw' },

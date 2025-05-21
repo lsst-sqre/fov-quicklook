@@ -39,6 +39,7 @@ function CopyTemplateList({ setSelected, selected }: {
 function CopyTemplateEditor({ selected }: { selected?: string }) {
   const [name, setName] = useState('')
   const [template, setTemplate] = useState('')
+  const [isUrl, setIsUrl] = useState(false)
   const templates = useAppSelector(state => state.copyTemplate.templates)
   const dispatch = useAppDispatch()
 
@@ -47,6 +48,7 @@ function CopyTemplateEditor({ selected }: { selected?: string }) {
     if (selectedTemplate) {
       setName(selectedTemplate.name)
       setTemplate(selectedTemplate.template)
+      setIsUrl(selectedTemplate.isUrl)
     }
   }, [selected, templates])
 
@@ -71,9 +73,19 @@ function CopyTemplateEditor({ selected }: { selected?: string }) {
             onChange={(e) => setTemplate(e.target.value)}
           />
         </dd>
+        <dt>is URL:</dt>
+        <dd>
+          <input
+            type="checkbox"
+            checked={isUrl}
+            onChange={(e) => {
+              setIsUrl(e.target.checked)
+            }}
+          />
+        </dd>
       </dl>
       <button onClick={() => {
-        const updatedTemplate = { name, template }
+        const updatedTemplate = { name, template, isUrl }
         dispatch(copyTemplateSlice.actions.updateTemplate(updatedTemplate))
       }}>Save</button>
       <button onClick={() => {

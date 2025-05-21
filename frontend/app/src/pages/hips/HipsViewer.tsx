@@ -3,6 +3,7 @@ import { useAppSelector } from "../../store/hooks"
 import { useGetHipsFileQuery } from "../../store/api/openapi"
 import { useEffect, useRef } from "react"
 import { angle, hips } from "@stellar-globe/stellar-globe"
+import { env } from "../../env"
 
 
 export function HipsViewer() {
@@ -13,7 +14,7 @@ export function HipsViewer() {
   useEffect(() => {
     (async () => {
       if (repository) {
-        const properties = await hips.fetchHiPSProperties(`./api/hips/${repository}`)
+        const properties = await hips.fetchHiPSProperties(`${env.baseUrl}/api/hips/${repository}`)
         const dec = Number(properties['hips_initial_dec'])
         const ra = Number(properties['hips_initial_ra'])
         const fov = Number(properties['hips_initial_fov'])
@@ -28,7 +29,7 @@ export function HipsViewer() {
     <Globe$ ref={globeHandle}>
       <GridLayer$ />
       {repository && (
-        <HipsSimpleLayer$ baseUrl={`./api/hips/${repository}`} />
+        <HipsSimpleLayer$ baseUrl={`${env.baseUrl}/api/hips/${repository}`} />
       )}
     </Globe$>
   )

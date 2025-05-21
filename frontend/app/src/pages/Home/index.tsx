@@ -1,6 +1,6 @@
 import { memo, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { homeSlice } from "../../store/features/homeSlice"
+import { CcdDataType, homeSlice } from "../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../store/hooks"
 import { wrapByHomeContext } from "./context"
 import { LineProfiler } from "./LineProfiler"
@@ -14,7 +14,8 @@ import { DataTypeSwitch } from "./DataTypeSwitch"
 
 export const Home = wrapByHomeContext(memo(() => {
   const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)
-  useSyncQuicklookWithUrl()
+  // useSyncQuicklookWithUrl()
+  useSetInitialSearchConditions()
 
   return (
     <div className={styles.home}>
@@ -38,22 +39,72 @@ export const Home = wrapByHomeContext(memo(() => {
 }))
 
 
-const useSyncQuicklookWithUrl = () => {
+// const useSyncQuicklookWithUrl = () => {
+//   const { visitId } = useParams()
+//   const dispatch = useAppDispatch()
+//   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
+//   const navigate = useNavigate()
+
+//   useEffect(() => {
+//     if (visitId) {
+//       dispatch(homeSlice.actions.setCurrentQuicklook(visitId))
+//     }
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [])
+
+//   useEffect(() => {
+//     if (currentQuicklook) {
+//       navigate(`/visits/${currentQuicklook}`, { replace: true })
+//     }
+//   }, [currentQuicklook, navigate])
+// }
+
+
+const useSetInitialSearchConditions = () => {
+  const searchString = useAppSelector(state => state.home.searchString)
   const { visitId } = useParams()
   const dispatch = useAppDispatch()
-  const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-  const navigate = useNavigate()
 
   useEffect(() => {
-    if (visitId) {
-      dispatch(homeSlice.actions.setCurrentQuicklook(visitId))
+    if (searchString === '' && visitId) {
+      dispatch(homeSlice.actions.setSearchString(extractDateFromVisitId(visitId)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    if (currentQuicklook) {
-      navigate(`/visits/${currentQuicklook}`, { replace: true })
+    if (visitId) {
+      const dataSource = extractDataSourceFromVisitId(visitId)
+      if (dataSource) {
+        dispatch(homeSlice.actions.setDataSource(dataSource))
+      }
     }
-  }, [currentQuicklook, navigate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+}
+
+
+function extractDateFromVisitId(visitId: string) {
+  /*
+   * post_isr_image:2025051900437 のようなテキストから20250519を抽出する
+   * 形式がマッチしなければ '' を返す
+   */
+  if (!visitId.match(/^.+:\d{13}$/)) {
+    return ''
+  }
+  const date = visitId.split(':')[1]
+  return date.slice(0, 8)
+}
+
+
+function extractDataSourceFromVisitId(visitId: string): CcdDataType | undefined {
+  /*
+   * post_isr_image:2025051900437 のようなテキストから post_isr_image を抽出する
+   * 形式がマッチしなければ undefined を返す
+   */
+  if (!visitId.match(/^(.+):\d{13}$/)) {
+    return undefined
+  }
+  const dataSource = visitId.split(':')[0]
+  return dataSource as CcdDataType
 }

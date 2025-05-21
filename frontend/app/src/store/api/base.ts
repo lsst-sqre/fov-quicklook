@@ -1,8 +1,9 @@
 import { FetchBaseQueryError, createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { env } from '../../env'
 // import { paths } from '../../../openapi.json'
 
 export const baseApi = createApi({
-  baseQuery: fetchBaseQuery({ baseUrl: '.' }),
+  baseQuery: fetchBaseQuery({ baseUrl: env.baseUrl }),
   endpoints: () => ({}),
 })
 

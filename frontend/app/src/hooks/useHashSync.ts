@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useSearchParams } from "react-router-dom"
 import { AppState, AppStore } from "../store"
 import { debounce } from "../utils/debounce"
@@ -25,6 +25,7 @@ function hashState(state: AppState): HashState {
   }
 }
 
+
 export function useHashSync({
   store,
   enabled,
@@ -32,13 +33,13 @@ export function useHashSync({
   store: AppStore
   enabled: boolean
 }) {
-  const [, setSearchParams] = useSearchParams()
+  const searchParams = useAsyncSearchParams()
 
   useEffect(() => {
     if (enabled) {
       const sync = debounce(200, () => {
         const serialized = serialize(hashState(store.getState()))
-        setSearchParams({ _: serialized }, { replace: true })
+        searchParams()[1](() => ({ _: serialized }), { replace: true })
       })
       const cleanup: (() => void)[] = [
         appOnChange(store, state => state.home.cameraParams, sync),
@@ -50,17 +51,17 @@ export function useHashSync({
         }
       }
     }
-  }, [enabled, setSearchParams, store])
+  }, [enabled, store, searchParams])
 }
 
 export const initialSearchParams = ((): Partial<HashState> => {
-  const hash = window.location.hash
-  if (!hash) return {}
+  // const hash = window.location.hash
+  // if (!hash) return {}
 
-  const hashParts = hash.slice(1).split('?')
-  if (hashParts.length < 2) return {}
-
-  const searchParams = new URLSearchParams(hashParts[1])
+  // const hashParts = hash.slice(1).split('?')
+  // if (hashParts.length < 2) return {}
+  // const searchParams = new URLSearchParams(hashParts[1])
+  const searchParams = new URLSearchParams(window.location.search)
   const serialized = searchParams.get('_')
 
   if (!serialized) return {}
@@ -86,4 +87,15 @@ function appOnChange<T>(store: AppStore, select: (state: AppState) => T, onChang
     }
   }
   return store.subscribe(onStoreChange)
+}
+
+function useAsyncSearchParams() {
+  const searchParamsRef = useRef<ReturnType<typeof useSearchParams>>()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    searchParamsRef.current = searchParams
+  }, [searchParams])
+
+  return () => searchParamsRef.current!
 }

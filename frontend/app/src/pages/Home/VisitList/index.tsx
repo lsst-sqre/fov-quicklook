@@ -1,11 +1,12 @@
 import classNames from 'classnames'
-import { memo, useEffect, useMemo } from "react"
+import { memo, useEffect, useMemo, useRef } from "react"
 import { MaterialSymbol } from '../../../components/MaterialSymbol'
 import { ListVisitsApiArg, ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
 import { homeSlice } from '../../../store/features/homeSlice'
 import { useAppDispatch, useAppSelector } from '../../../store/hooks'
 import styles from './styles.module.scss'
 import { LoadingSpinner } from '../../../components/Loading'
+import { useChangeCurrentQuicklook } from '../../../hooks/useChangeCurrentQuicklook'
 
 
 type VisitListProps = {
@@ -39,11 +40,17 @@ function useVisitList() {
   return { list, refetch, isFetching }
 }
 
+// exposure_timeが同等かどうかを判定する関数
+function isEquivalentExposureTime(a: number, b: number): boolean {
+  // 小数点第2位で四捨五入して比較
+  return Math.round(a * 100) / 100 === Math.round(b * 100) / 100
+}
+
 // グループが同じかどうかを判定する関数
 function isSameGroup(a: VisitListEntryType, b: VisitListEntryType): boolean {
   return a.day_obs === b.day_obs &&
     a.physical_filter === b.physical_filter &&
-    a.exposure_time === b.exposure_time &&
+    isEquivalentExposureTime(a.exposure_time, b.exposure_time) &&
     a.observation_type === b.observation_type
 }
 
@@ -74,15 +81,16 @@ export const VisitList = memo(({ style }: VisitListProps) => {
   const { list, isFetching } = useVisitList()
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const dispatch = useAppDispatch()
+  const changeCurrentQuicklook = useChangeCurrentQuicklook()
 
   // リストをグループ化
   const groupedList = useMemo(() => groupVisitList(list), [list])
 
   useEffect(() => {
     if (currentQuicklook === undefined && list?.length) {
-      dispatch(homeSlice.actions.setCurrentQuicklook(list[0].id))
+      changeCurrentQuicklook(list[0].id)
     }
-  }, [dispatch, list, currentQuicklook])
+  }, [changeCurrentQuicklook, currentQuicklook, list])
 
   return (
     <div className={styles.listWrapper}>
@@ -104,6 +112,10 @@ function VisitGroup({ group }: { group: VisitListEntryType[] }) {
   if (!group.length) return null
 
   const firstEntry = group[0]
+  const roundedExposureTime = Math.round(firstEntry.exposure_time * 100) / 100
+  const isRounded = roundedExposureTime !== firstEntry.exposure_time
+  // 丸めた値を文字列で表示（小数点以下の不要な0は表示しない）
+  const exposureTimeDisplay = `${isRounded ? '~' : ''}${roundedExposureTime}`
 
   return (
     <div className={styles.group}>
@@ -111,8 +123,8 @@ function VisitGroup({ group }: { group: VisitListEntryType[] }) {
         <div className={styles.headerItem} title="Filter">
           <span>{firstEntry.physical_filter}</span>
         </div>
-        <div className={styles.headerItem} title="Exp Time">
-          <span>{firstEntry.exposure_time}</span>
+        <div className={styles.headerItem} title="Exposure Time">
+          <span>{exposureTimeDisplay}</span>
         </div>
         <div className={styles.headerItem} title="Type">
           <span>{firstEntry.observation_type}</span>
@@ -142,16 +154,28 @@ type VisitListEntryType = ListVisitsApiResponse[number]
 function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const selected = currentQuicklook?.split(':')[1] === entry.id.split(':')[1]
-  const dispatch = useAppDispatch()
+  const entryRef = useRef<HTMLDivElement>(null)
+  const changeCurrentQuicklook = useChangeCurrentQuicklook()
+
   const select = () => {
-    dispatch(homeSlice.actions.setCurrentQuicklook(entry.id))
+    changeCurrentQuicklook(entry.id)
   }
+
+  useEffect(() => {
+    if (selected && entryRef.current) {
+      entryRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      })
+    }
+  }, [selected])
 
   return (
     <div
+      ref={entryRef}
       className={classNames(styles.entry, selected && styles.selected)}
       onClick={select}
-      title={entry.obs_id}
+      title={`obs_id: ${entry.obs_id};\nexposure_time: ${entry.exposure_time}s`}
     >
       {entry.id.split(':').slice(-1)[0]}
     </div>

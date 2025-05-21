@@ -10,6 +10,7 @@ const CopyTemplateLocalStorage = makeLocalStorageAccessor<CopyTemplate[]>('copyT
 export type CopyTemplate = {
   name: string
   template: string
+  isUrl: boolean
 }
 
 
@@ -52,10 +53,12 @@ function defaultCopyTemplates(): CopyTemplate[] {
     {
       name: 'UUID',
       template: "%(uuid)",
+      isUrl: false,
     },
     {
       name: 'dataId',
       template: "{'exposure': %(exposure), 'detector': %(detector)}",
+      isUrl: false,
     },
     {
       name: 'butler',
@@ -63,7 +66,14 @@ function defaultCopyTemplates(): CopyTemplate[] {
 butler = Butler('/path/to/butler/repo')
 dataId = {'exposure': %(exposure), 'detector': %(detector)}
 data = butler.get('%(dataType)', dataId)
-`
+`,
+      isUrl: false,
     },
+    {
+      name: 'LSSTCam/Calexp mosaic',
+      // https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?key=lsstcam/2025-05-15/calexp_mosaic/000086/lsstcam_calexp_mosaic_2025-05-15_000086.jpg
+      template: 'https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?key=lsstcam/%(day_obs|iso8601)/calexp_mosaic/%(exposure|sequence|zeropadding(6))/lsstcam_calexp_mosaic_%(day_obs|iso8601)_%(exposure|sequence|zeropadding(6)).jpg',
+      isUrl: true,
+    }
   ]
 }

@@ -4,7 +4,7 @@ import { initialSearchParams } from "../../hooks/useHashSync"
 import { RubinImageFilter, RubinImageFilterParams } from "../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter"
 import { ListVisitsApiArg } from "../api/openapi"
 
-type CcdDataType = NonNullable<ListVisitsApiArg["dataType"]>
+export type CcdDataType = NonNullable<ListVisitsApiArg["dataType"]>
 
 type State = {
   currentQuicklook: string | undefined

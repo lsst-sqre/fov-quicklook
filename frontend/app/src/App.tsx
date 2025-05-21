@@ -1,16 +1,17 @@
 import { Provider } from 'react-redux'
-import { HashRouter } from 'react-router-dom'
+import { BrowserRouter } from 'react-router-dom'
 import { AppRouter } from './router'
 import { makeStore } from './store'
+import { env } from './env'
 
 
 export function App() {
   const store = makeStore()
   return (
     <Provider store={store}>
-      <HashRouter>
+      <BrowserRouter basename={env.baseUrl}>
         <AppRouter />
-      </HashRouter>
+      </BrowserRouter>
     </Provider>
   )
 }

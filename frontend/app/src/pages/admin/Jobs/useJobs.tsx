@@ -1,15 +1,14 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useState } from "react"
+import { env } from "../../../env"
 import { useWebsocket } from "../../../hooks/useWebsocket"
 import { QuicklookStatus } from "../../../store/api/openapi"
-import { websocketUrl } from "../../../utils/websocket"
 
 
 export function useJobs() {
   const [jobs, setJobs] = useState<QuicklookStatus[]>([])
-  const wsUrl = useMemo(() => websocketUrl(`./api/quicklooks.ws`), [])
 
   useWebsocket({
-    url: wsUrl,
+    path: `${env.baseUrl}/api/quicklooks.ws`,
     onMessage: useCallback(e => {
       const msg: QuicklookStatus[] = JSON.parse(e.data)
       setJobs(msg)

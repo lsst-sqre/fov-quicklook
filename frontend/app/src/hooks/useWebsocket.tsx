@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { websocketUrl } from "../utils/websocket"
 
 type UseWebsocketProps = {
-  url: string
+  path: string
   onMessage: (e: MessageEvent) => void
   onClose?: (e: CloseEvent) => void
   skip?: boolean
@@ -9,17 +10,17 @@ type UseWebsocketProps = {
 
 
 export function useWebsocket({
-  url,
+  path,
   onMessage,
   onClose,
   skip = false,
 }: UseWebsocketProps) {
   const [connected, setConnected] = useState(false)
   const [reconnectCount, setReconnectCount] = useState(0)
+  const url = useMemo(() => websocketUrl(path), [path])
 
   useEffect(() => {
     if (!skip) {
-      console.log(`connecting to ${url}`)
       const ws = new WebSocket(url)
       ws.onopen = () => {
         setConnected(true)
@@ -35,7 +36,7 @@ export function useWebsocket({
         ws.close()
       }
     }
-  }, [onClose, onMessage, url, reconnectCount, skip])
+  }, [onClose, onMessage, reconnectCount, skip, url])
 
   const reconnect = useCallback(() => {
     setReconnectCount(_ => _ + 1)

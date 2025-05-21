@@ -1,7 +1,6 @@
-import { useMemo } from 'react'
 import { LoadingSpinner } from '../components/Loading'
 import { Progress } from "../components/Progress"
-import { QuicklookStatus, useGetPodStatusQuery } from "../store/api/openapi"
+import { QuicklookStatus } from "../store/api/openapi"
 import styles from './styles.module.scss'
 
 type ProgressItem = {

@@ -2,6 +2,11 @@ export function websocketUrl(path: string) {
   const currentScheme = window.location.protocol // 現在のページのスキームを取得
   const webSocketScheme = currentScheme === 'https:' ? 'wss:' : 'ws:' // スキームに応じたWebSocketのスキームを選択
 
+  // pathが/から始まる場合は絶対パスとして扱う
+  if (path.startsWith('/')) {
+    return `${webSocketScheme}//${window.location.host}${path}`
+  }
+
   // 現在のページの絶対パスを取得
   const currentPath = window.location.pathname
   const absolutePath = currentPath.substring(0, currentPath.lastIndexOf('/'))

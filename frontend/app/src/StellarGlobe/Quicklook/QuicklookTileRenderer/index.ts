@@ -3,6 +3,7 @@ import npyjs from 'npyjs'
 import { QuicklookMetadata } from "../../../store/api/openapi"
 import { RubinImageFilter, RubinImageFilterParams } from "./ImaegFilter"
 import { zstdDecompress } from "./zstd"
+import { env } from "../../../env"
 
 
 const TILE_SIZE = 256
@@ -104,7 +105,7 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
       return npy
     }
     const tileId = Tract.encodeTileId(this.tracts[0], level, p, q)
-    const url = `./api/quicklooks/${this.metadata.id}/tiles/${level}/${p}/${q}`
+    const url = `${env.baseUrl}/api/quicklooks/${this.metadata.id}/tiles/${level}/${p}/${q}`
     const fresh = await loadRemoteNpy(url)
     this.npyCache.set(tileId, fresh)
     return fresh
