@@ -9,7 +9,7 @@ Here are the current configuration values.
   * RAM: 32GB
   * CPU: 8 ~ 16 cores
 * frontend
-  * replicas: 8
+  * replicas: 4
   * RAM: 512MB
   * CPU: 0.1 ~ 2 cores
 * db:
