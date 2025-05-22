@@ -1,5 +1,5 @@
 import classNames from 'classnames'
-import { memo, useEffect, useMemo, useRef } from "react"
+import React, { memo, useEffect, useMemo, useRef } from "react"
 import { MaterialSymbol } from '../../../components/MaterialSymbol'
 import { ListVisitsApiArg, ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
 import { homeSlice } from '../../../store/features/homeSlice'
@@ -77,11 +77,15 @@ function groupVisitList(list: VisitListEntryType[] | undefined): VisitListEntryT
   return result
 }
 
+// スクロールコンテナを管理するためのコンテキスト
+const ListScrollContainerContext = React.createContext<React.RefObject<HTMLDivElement> | null>(null)
+
 export const VisitList = memo(({ style }: VisitListProps) => {
   const { list, isFetching } = useVisitList()
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const dispatch = useAppDispatch()
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
+  const listContainerRef = useRef<HTMLDivElement>(null)
 
   // リストをグループ化
   const groupedList = useMemo(() => groupVisitList(list), [list])
@@ -96,11 +100,13 @@ export const VisitList = memo(({ style }: VisitListProps) => {
     <div className={styles.listWrapper}>
       <SearchBox />
       <div className={styles.listContainer}>
-        <div className={styles.list} style={style}>
-          {groupedList.map((group, index) => (
-            <VisitGroup key={index} group={group} />
-          ))}
-        </div>
+        <ListScrollContainerContext.Provider value={listContainerRef}>
+          <div className={styles.list} style={style} ref={listContainerRef}>
+            {groupedList.map((group, index) => (
+              <VisitGroup key={index} group={group} />
+            ))}
+          </div>
+        </ListScrollContainerContext.Provider>
         {isFetching && <div className={styles.loadingOverlay}><LoadingSpinner /></div>}
       </div>
     </div>
@@ -155,6 +161,7 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const selected = currentQuicklook?.split(':')[1] === entry.id.split(':')[1]
   const entryRef = useRef<HTMLDivElement>(null)
+  const listContainerRef = React.useContext(ListScrollContainerContext)
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
 
   const select = () => {
@@ -162,13 +169,10 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   }
 
   useEffect(() => {
-    if (selected && entryRef.current) {
-      entryRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest'
-      })
+    if (selected && entryRef.current && listContainerRef) {
+      scrollToElementBelowSticky(entryRef, listContainerRef)
     }
-  }, [selected])
+  }, [selected, listContainerRef])
 
   return (
     <div
@@ -182,6 +186,87 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   )
 }
 
+// stickyな要素の下に要素が見えるようにスクロールする関数
+function scrollToElementBelowSticky(
+  elementRef: React.RefObject<HTMLElement>,
+  containerRef: React.RefObject<HTMLDivElement>
+) {
+  if (!elementRef.current || !containerRef.current) {
+    console.log('DEBUG: 要素またはコンテナが見つかりません')
+    return
+  }
+
+  const container = containerRef.current
+  const element = elementRef.current
+  const elementRect = element.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  
+  // console.log('DEBUG: 対象要素:', element)
+  // console.log('DEBUG: コンテナ:', container)
+  // console.log('DEBUG: 要素の位置:', {
+  //   top: elementRect.top,
+  //   bottom: elementRect.bottom,
+  //   height: elementRect.height
+  // })
+  // console.log('DEBUG: コンテナの位置:', {
+  //   top: containerRect.top,
+  //   bottom: containerRect.bottom,
+  //   scrollTop: container.scrollTop,
+  //   height: containerRect.height
+  // })
+
+  // 要素の位置をコンテナ内の相対位置に変換
+  const elementRelativeTop = elementRect.top - containerRect.top + container.scrollTop
+  // console.log('DEBUG: 相対位置:', elementRelativeTop)
+
+  // 最も近いグループ要素（sticky要素の親）を見つける
+  const closestGroup = element.closest(`.${styles.group}`)
+  // console.log('DEBUG: 最も近いグループ:', closestGroup)
+  
+  if (!closestGroup) {
+    // console.log('DEBUG: グループが見つからないため通常スクロール')
+    // グループが見つからない場合は通常のスクロール
+    // 注: scrollIntoViewはコンテナ要素のコンテキストで実行されないため修正
+    container.scrollTop = elementRelativeTop - containerRect.height / 2 + elementRect.height / 2
+    return
+  }
+
+  // グループヘッダーの高さを取得
+  const groupHeader = closestGroup.querySelector(`.${styles.groupHeader}`)
+  // console.log('DEBUG: グループヘッダー:', groupHeader)
+  
+  const headerHeight = groupHeader ? groupHeader.getBoundingClientRect().height : 0
+  // console.log('DEBUG: ヘッダーの高さ:', headerHeight)
+
+  // 要素が画面の上部に隠れる場合、stickyヘッダーの下に表示されるようにスクロール
+  const isHiddenByHeader = elementRect.top < containerRect.top + headerHeight
+  const isHiddenAtBottom = elementRect.bottom > containerRect.bottom
+  
+  // console.log('DEBUG: ヘッダーに隠れている:', isHiddenByHeader)
+  // console.log('DEBUG: 下部に隠れている:', isHiddenAtBottom)
+
+  if (isHiddenByHeader) {
+    const scrollTop = elementRelativeTop - headerHeight - 8 // 8pxの余白を追加
+    // console.log('DEBUG: 新しいスクロール位置(上部調整):', scrollTop)
+    
+    container.scrollTo({
+      top: scrollTop,
+      behavior: 'smooth'
+    })
+  } else if (isHiddenAtBottom) {
+    // console.log('DEBUG: 下部調整スクロール実行')
+    // コンテナ内でのスクロール位置を計算
+    const bottomAdjustment = elementRelativeTop - containerRect.height + elementRect.height + 8
+    // console.log('DEBUG: 新しいスクロール位置(下部調整):', bottomAdjustment)
+    
+    container.scrollTo({
+      top: bottomAdjustment,
+      behavior: 'smooth'
+    })
+  } else {
+    // console.log('DEBUG: スクロール不要')
+  }
+}
 
 function SearchBox() {
   const dispatch = useAppDispatch()

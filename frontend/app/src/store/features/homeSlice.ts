@@ -16,6 +16,7 @@ type State = {
   searchString: string
   dataSource: CcdDataType
   showFrame: boolean
+  hilightedCcdId: string[]
 }
 
 export type CameraParams = Record<'theta' | 'phi' | 'roll' | 'za' | 'zd' | 'zp' | 'fovy', number>
@@ -48,6 +49,7 @@ function initialState(): State {
     dataSource: 'raw',
     showFrame: true,
     cameraParams: initialSearchParams.cameraParams ?? initialCameraParams,
+    hilightedCcdId: initialHightlightCcds(),
   }
 }
 
@@ -83,5 +85,29 @@ export const homeSlice = createSlice({
     setShowFrame: (state, action: PayloadAction<boolean>) => {
       state.showFrame = action.payload
     },
+    toggleHighlightCcd: (state, action: PayloadAction<string>) => {
+      const idx = state.hilightedCcdId.indexOf(action.payload)
+      if (idx === -1) {
+        state.hilightedCcdId.push(action.payload)
+      } else {
+        state.hilightedCcdId.splice(idx, 1)
+      }
+    },
+    clearHighlightCcd: (state) => {
+      state.hilightedCcdId = []
+    },
   },
 })
+
+
+function initialHightlightCcds(): string[] {
+  const searchParams = new URLSearchParams(window.location.search)
+  const serialized = searchParams.get('detectors')
+  if (!serialized) return []
+  try {
+    return serialized.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+  }
+  catch (e) {
+    return []
+  }
+}

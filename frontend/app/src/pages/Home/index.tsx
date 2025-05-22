@@ -1,8 +1,9 @@
-import { memo, useEffect } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { memo, useEffect, useRef } from "react"
+import { useParams, useSearchParams } from "react-router-dom"
 import { CcdDataType, homeSlice } from "../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../store/hooks"
 import { wrapByHomeContext } from "./context"
+import { DataTypeSwitch } from "./DataTypeSwitch"
 import { LineProfiler } from "./LineProfiler"
 import { MainMenu } from "./MainMenu"
 import styles from './styles.module.scss'
@@ -10,12 +11,12 @@ import { Viewer } from "./Viewer"
 import { ViewerSettings } from "./ViewerSettings"
 import { Colorbar } from "./ViewerSettings/Colorbar"
 import { VisitList } from "./VisitList"
-import { DataTypeSwitch } from "./DataTypeSwitch"
+import { useOnChange } from "../../hooks/useOnChange"
 
 export const Home = wrapByHomeContext(memo(() => {
   const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)
-  // useSyncQuicklookWithUrl()
   useSetInitialSearchConditions()
+  useSyncHighlightCcdsWithUrl()
 
   return (
     <div className={styles.home}>
@@ -37,27 +38,6 @@ export const Home = wrapByHomeContext(memo(() => {
     </div>
   )
 }))
-
-
-// const useSyncQuicklookWithUrl = () => {
-//   const { visitId } = useParams()
-//   const dispatch = useAppDispatch()
-//   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-//   const navigate = useNavigate()
-
-//   useEffect(() => {
-//     if (visitId) {
-//       dispatch(homeSlice.actions.setCurrentQuicklook(visitId))
-//     }
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-//   }, [])
-
-//   useEffect(() => {
-//     if (currentQuicklook) {
-//       navigate(`/visits/${currentQuicklook}`, { replace: true })
-//     }
-//   }, [currentQuicklook, navigate])
-// }
 
 
 const useSetInitialSearchConditions = () => {
@@ -107,4 +87,22 @@ function extractDataSourceFromVisitId(visitId: string): CcdDataType | undefined 
   }
   const dataSource = visitId.split(':')[0]
   return dataSource as CcdDataType
+}
+
+
+function useSyncHighlightCcdsWithUrl() {
+  const dispatch = useAppDispatch()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { visitId } = useParams()
+  const ccds = useAppSelector(state => state.home.hilightedCcdId)
+
+  useOnChange(visitId, () => {
+    dispatch(homeSlice.actions.clearHighlightCcd())
+  })
+
+  useEffect(() => {
+    const serialized = ccds.join(',')
+    searchParams.set('detectors', serialized)
+    setSearchParams(searchParams, { replace: true })
+  }, [ccds, searchParams, setSearchParams])
 }

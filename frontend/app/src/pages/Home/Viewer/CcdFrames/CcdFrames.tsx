@@ -4,6 +4,7 @@ import React, { memo, useCallback, useEffect } from "react"
 import { useQuicklookStatus } from "../../context/quicklook"
 import { useFocusedAmp, useFocusedCcd, useWcs } from "../../hooks"
 import { BBoxLayer } from "./BBoxLayer"
+import { useAppSelector } from "../../../../store/hooks"
 
 
 const CcdFrameLayer$: React.FC = memo(() => {
@@ -70,8 +71,6 @@ const FocusedAmp$: React.FC = memo(() => {
 
 
 export function CcdFrames() {
-  const { metadata } = useQuicklookStatus()
-
   return (
     <>
       <CcdFrameLayer$ />
@@ -80,3 +79,26 @@ export function CcdFrames() {
     </>
   )
 }
+
+
+
+export const HighlitedCcds: React.FC = memo(() => {
+  const factory = useCallback((globe: Globe) => {
+    const layer = new BBoxLayer(globe, [1, 0, 1, 1])
+    return layer
+  }, [])
+  const { metadata } = useQuicklookStatus()
+  const { node, ifLayerReady } = useLayerBind<BBoxLayer>(factory, !!metadata)
+  const ccds = useAppSelector(state => state.home.hilightedCcdId)
+  const wcs = useWcs()
+
+  useEffect(() => {
+    ifLayerReady(layer => {
+      if (metadata?.ccd_meta && wcs) {
+        layer.update(metadata.ccd_meta.filter(c => ccds.includes(c.ccd_id.ccd_name)).map(r => r.bbox).flat(), wcs)
+      }
+    })
+  }, [ccds, ifLayerReady, metadata, wcs])
+
+  return node
+})

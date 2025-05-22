@@ -7,7 +7,7 @@ import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
 import { debounce } from '../../../utils/debounce'
 import { useHomeContext } from "../context"
-import { CcdFrames } from './CcdFrames/CcdFrames'
+import { CcdFrames, HighlitedCcds } from './CcdFrames/CcdFrames'
 import { CursorLine } from './CursorLine'
 import { Info } from './Info'
 import styles from './styles.module.scss'
@@ -67,6 +67,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
           <CcdFrames />
         </>)
         }
+        <HighlitedCcds />
       </Globe$>
       <CursorLine />
       <Info />

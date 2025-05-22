@@ -56,14 +56,14 @@ function defaultCopyTemplates(): CopyTemplate[] {
       isUrl: false,
     },
     {
-      name: 'dataId',
+      name: 'Data ID for Butler',
       template: "{'exposure': %(exposure), 'detector': %(detector)}",
       isUrl: false,
     },
     {
-      name: 'butler',
+      name: 'Butler Snippet',
       template: `from lsst.daf.butler import Butler
-butler = Butler('/path/to/butler/repo')
+butler = Butler('embargo')
 dataId = {'exposure': %(exposure), 'detector': %(detector)}
 data = butler.get('%(dataType)', dataId)
 `,

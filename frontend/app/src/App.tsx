@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { AppRouter } from './router'
 import { makeStore } from './store'
 import { env } from './env'
+import { QuicklookStatusProvider } from './pages/Home/context/quicklook'
 
 
 export function App() {
@@ -10,7 +11,9 @@ export function App() {
   return (
     <Provider store={store}>
       <BrowserRouter basename={env.baseUrl}>
-        <AppRouter />
+        <QuicklookStatusProvider>
+          <AppRouter />
+        </QuicklookStatusProvider>
       </BrowserRouter>
     </Provider>
   )

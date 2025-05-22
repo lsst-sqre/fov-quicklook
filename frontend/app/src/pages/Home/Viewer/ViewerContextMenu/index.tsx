@@ -2,15 +2,16 @@ import { SkyCoord } from "@stellar-globe/stellar-globe"
 import { MenuDivider, MenuItem } from "@szhsin/react-menu"
 import { Fragment, useCallback, useRef } from "react"
 import { MaterialSymbol } from "../../../../components/MaterialSymbol"
+import { env } from "../../../../env"
 import { CcdMeta, useGetVisitMetadataQuery } from "../../../../store/api/openapi"
 import { CopyTemplate } from "../../../../store/features/copyTemplateSlice"
-import { useAppSelector } from "../../../../store/hooks"
+import { homeSlice } from "../../../../store/features/homeSlice"
+import { useAppDispatch, useAppSelector } from "../../../../store/hooks"
 import { copyTextToClipboard } from "../../../../utils/copyTextToClipboard"
 import { download } from "../../../../utils/download"
 import { useFocusedCcd } from "../../hooks"
 import { ContextMenuWithClickedCoord } from "./ContextMenuWithClickedCoord"
 import { interpoateText } from "./interpoateText"
-import { env } from "../../../../env"
 
 
 export function ViewerContextMenu() {
@@ -27,15 +28,13 @@ export function ViewerContextMenu() {
 
 
 function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMeta | undefined }) {
-  const copyId = useCallback(async () => {
-    await copyTextToClipboard(ccdMeta?.ccd_id.ccd_name ?? '-')
-  }, [ccdMeta?.ccd_id.ccd_name])
+  const dispatch = useAppDispatch()
 
   const openHeaerPage = useCallback(() => {
     if (ccdMeta) {
       const visit = ccdMeta.ccd_id.visit
       const visitId = `${visit.id}`
-      window.open(`#/header/${visitId}/${ccdMeta.ccd_id.ccd_name}`)
+      window.open(`${env.baseUrl}/header/${visitId}/${ccdMeta.ccd_id.ccd_name}`)
     }
   }, [ccdMeta])
 
@@ -47,20 +46,28 @@ function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMe
     }
   }, [ccdMeta])
 
+  const toggleHighlight = useCallback(() => {
+    if (ccdMeta) {
+      const { ccd_id } = ccdMeta
+      dispatch(homeSlice.actions.toggleHighlightCcd(ccd_id.ccd_name))
+    }
+  }, [ccdMeta, dispatch])
+
   return (
     <Fragment>
       {ccdMeta &&
         <TemplateMenus ccdMeta={ccdMeta} />
       }
       <MenuDivider />
-      <MenuItem disabled={!ccdMeta} onClick={copyId}>
-        <MenuIcon symbol="content_copy" />
-        Copy ID to Clipboard
+      <MenuItem disabled={!ccdMeta} onClick={toggleHighlight}>
+        <MenuIcon symbol="star" />
+        Toggle Highlight
       </MenuItem>
       <MenuItem disabled={!ccdMeta} onClick={openHeaerPage}>
         <MenuIcon symbol="open_in_new" />
         Show FITS Header
-      </MenuItem> <MenuDivider />
+      </MenuItem>
+      <MenuDivider />
       <MenuItem disabled={!ccdMeta} onClick={downloadThisFitsFile}>
         <MenuIcon symbol="download" />
         Download this FITS File

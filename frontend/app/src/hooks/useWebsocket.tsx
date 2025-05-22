@@ -8,7 +8,6 @@ type UseWebsocketProps = {
   skip?: boolean
 }
 
-
 export function useWebsocket({
   path,
   onMessage,
@@ -22,8 +21,13 @@ export function useWebsocket({
   useEffect(() => {
     if (!skip) {
       const ws = new WebSocket(url)
+      const status = { closing: false, connected: false }
       ws.onopen = () => {
         setConnected(true)
+        status.connected = true
+        if (status.closing) {
+          ws.close()
+        }
       }
       ws.onmessage = e => {
         onMessage(e)
@@ -33,7 +37,10 @@ export function useWebsocket({
         onClose?.(e)
       }
       return () => {
-        ws.close()
+        if (status.connected) {
+          ws.close()
+        }
+        status.closing = true
       }
     }
   }, [onClose, onMessage, reconnectCount, skip, url])
