@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { copyTemplateSlice } from "../../store/features/copyTemplateSlice"
+import { CopyTemplate, copyTemplateSlice } from "../../store/features/copyTemplateSlice"
 import { useAppDispatch, useAppSelector } from "../../store/hooks"
 
 
@@ -11,7 +11,7 @@ export function ConfigPage() {
       <h1>Config</h1>
       <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
         <CopyTemplateList setSelected={setSelected} selected={selected} />
-        <CopyTemplateEditor selected={selected} />
+        <CopyTemplateEditor selected={selected} setSelected={setSelected} />
       </div>
     </div>
   )
@@ -36,32 +36,54 @@ function CopyTemplateList({ setSelected, selected }: {
 }
 
 
-function CopyTemplateEditor({ selected }: { selected?: string }) {
+function CopyTemplateEditor({ selected, setSelected }: { selected?: string, setSelected: (name: string) => void }) {
   const [name, setName] = useState('')
   const [template, setTemplate] = useState('')
   const [isUrl, setIsUrl] = useState(false)
   const templates = useAppSelector(state => state.copyTemplate.templates)
   const dispatch = useAppDispatch()
 
+  const selectedTemplate = templates.find(t => t.name === selected)
+  const isEditable = selectedTemplate?.isLocal === true
+
   useEffect(() => {
-    const selectedTemplate = templates.find(t => t.name === selected)
     if (selectedTemplate) {
       setName(selectedTemplate.name)
       setTemplate(selectedTemplate.template)
-      setIsUrl(selectedTemplate.isUrl)
+      setIsUrl(selectedTemplate.is_url)
     }
-  }, [selected, templates])
+  }, [selectedTemplate])
+
+  const handleAdd = () => {
+    const newName = prompt('Enter template name:')
+    if (newName && newName.trim()) {
+      const newTemplate: CopyTemplate = {
+        name: newName.trim(),
+        template: '',
+        is_url: false,
+        isLocal: true
+      }
+      dispatch(copyTemplateSlice.actions.updateTemplate(newTemplate))
+      setSelected(newName.trim())
+    }
+  }
 
   return (
     <div>
-
       <dl>
+        <dt>
+          Read-only:
+        </dt>
+        <dd>
+          <input type="checkbox" checked={!selectedTemplate?.isLocal} readOnly />
+        </dd>
         <dt>Name:</dt>
         <dd>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            disabled={!isEditable}
           />
         </dd>
         <dt>Template:</dt>
@@ -71,6 +93,7 @@ function CopyTemplateEditor({ selected }: { selected?: string }) {
             rows={8}
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
+            disabled={!isEditable}
           />
         </dd>
         <dt>is URL:</dt>
@@ -81,19 +104,35 @@ function CopyTemplateEditor({ selected }: { selected?: string }) {
             onChange={(e) => {
               setIsUrl(e.target.checked)
             }}
+            disabled={!isEditable}
           />
         </dd>
       </dl>
-      <button onClick={() => {
-        const updatedTemplate = { name, template, isUrl }
-        dispatch(copyTemplateSlice.actions.updateTemplate(updatedTemplate))
-      }}>Save</button>
-      <button onClick={() => {
-        const idx = templates.findIndex(t => t.name === name)
-        if (idx >= 0) {
-          dispatch(copyTemplateSlice.actions.removeTemplate(templates[idx]))
-        }
-      }}>Delete</button>
+      <button onClick={handleAdd}>
+        New
+      </button>
+      <button
+        onClick={() => {
+
+          const updatedTemplate: CopyTemplate = { name, template, is_url: isUrl, isLocal: true }
+          dispatch(copyTemplateSlice.actions.updateTemplate(updatedTemplate))
+          setSelected(name)
+        }}
+        disabled={!isEditable}
+      >
+        Save
+      </button>
+      <button
+        onClick={() => {
+          const idx = templates.findIndex(t => t.name === name)
+          if (idx >= 0) {
+            dispatch(copyTemplateSlice.actions.removeTemplate(templates[idx]))
+          }
+        }}
+        disabled={!isEditable}
+      >
+        Delete
+      </button>
       <button onClick={() => {
         dispatch(copyTemplateSlice.actions.resetToDefault())
       }}>Reset to Default</button>
