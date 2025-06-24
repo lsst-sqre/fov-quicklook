@@ -925,6 +925,29 @@
                 ],
                 "title": "CcdMeta"
             },
+            "ContextMenuTemplate": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "template": {
+                        "type": "string",
+                        "title": "Template"
+                    },
+                    "is_url": {
+                        "type": "boolean",
+                        "title": "Is Url"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "template",
+                    "is_url"
+                ],
+                "title": "ContextMenuTemplate"
+            },
             "DataSourceCcdMetadata": {
                 "properties": {
                     "visit": {
@@ -1333,11 +1356,21 @@
                 "properties": {
                     "admin_page": {
                         "type": "boolean",
-                        "title": "Admin Page",
-                        "default": true
+                        "title": "Admin Page"
+                    },
+                    "context_menu_templates": {
+                        "items": {
+                            "$ref": "#/components/schemas/ContextMenuTemplate"
+                        },
+                        "type": "array",
+                        "title": "Context Menu Templates"
                     }
                 },
                 "type": "object",
+                "required": [
+                    "admin_page",
+                    "context_menu_templates"
+                ],
                 "title": "SystemInfo"
             },
             "TransferProgress": {

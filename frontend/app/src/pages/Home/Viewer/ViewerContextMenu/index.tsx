@@ -3,7 +3,7 @@ import { MenuDivider, MenuItem } from "@szhsin/react-menu"
 import { Fragment, useCallback, useRef } from "react"
 import { MaterialSymbol } from "../../../../components/MaterialSymbol"
 import { env } from "../../../../env"
-import { CcdMeta, useGetVisitMetadataQuery } from "../../../../store/api/openapi"
+import { CcdMeta, useGetSystemInfoQuery, useGetVisitMetadataQuery } from "../../../../store/api/openapi"
 import { CopyTemplate } from "../../../../store/features/copyTemplateSlice"
 import { homeSlice } from "../../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../../store/hooks"
@@ -103,7 +103,7 @@ function TemplateMenu({ template, ccdMeta }: { template: CopyTemplate, ccdMeta: 
   const handleClick = useCallback(async () => {
     if (metadata) {
       const text = interpoateText(template.template, metadata)
-      if (template.isUrl) {
+      if (template.is_url) {
         window.open(text)
       } else {
         await copyTextToClipboard(text)
@@ -117,7 +117,7 @@ function TemplateMenu({ template, ccdMeta }: { template: CopyTemplate, ccdMeta: 
       onClick={handleClick}
       disabled={!metadata}
     >
-      <MenuIcon symbol={template.isUrl ? "open_in_new" : "content_copy"} />
+      <MenuIcon symbol={template.is_url ? "open_in_new" : "content_copy"} />
       {template.name}
     </MenuItem>
   )

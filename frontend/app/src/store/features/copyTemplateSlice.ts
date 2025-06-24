@@ -1,79 +1,64 @@
 import { createSlice } from "@reduxjs/toolkit"
 import { makeLocalStorageAccessor } from "../../utils/localStorage"
+import { SystemInfo } from "../api/openapi"
+import { getSystemInfoSync } from "../../systemInfo"
 
 type State = {
   templates: CopyTemplate[]
 }
 
-const CopyTemplateLocalStorage = makeLocalStorageAccessor<CopyTemplate[]>('copyTemplates', defaultCopyTemplates())
+const copyTemplateLocalStorage = makeLocalStorageAccessor<CopyTemplate[]>('copyTemplates', [])
 
-export type CopyTemplate = {
-  name: string
-  template: string
-  isUrl: boolean
+const localTemplatesStorage = {
+  get: (): CopyTemplate[] => {
+    return copyTemplateLocalStorage.get().map(t => ({ ...t, isLocal: true }))
+  },
+  set: (templates: CopyTemplate[]): void => {
+    const localTemplates = templates.filter(t => t.isLocal)
+    copyTemplateLocalStorage.set(localTemplates)
+  },
+  remove: (): void => {
+    copyTemplateLocalStorage.remove()
+  }
+}
+
+export type CopyTemplate = SystemInfo['context_menu_templates'][number] & {
+  isLocal?: boolean
 }
 
 
-function initialState(): State {
-  const templates = CopyTemplateLocalStorage.get()
-  if (templates.length === 0) {
-    return { templates: defaultCopyTemplates() }
-  }
+function initialState(systemInfo?: SystemInfo): State {
+  const templates: CopyTemplate[] = [
+    ...systemInfo?.context_menu_templates ?? [],
+    ...localTemplatesStorage.get(),
+  ]
   return { templates }
 }
+
+export { initialState as copyTemplateInitialState }
 
 
 export const copyTemplateSlice = createSlice({
   name: 'copyTemplate',
-  initialState: initialState(),
+  initialState,
   reducers: {
     removeTemplate: (state, action: { payload: CopyTemplate }) => {
       state.templates = state.templates.filter((t) => t.name !== action.payload.name)
-      CopyTemplateLocalStorage.set(state.templates)
+      localTemplatesStorage.set(state.templates)
     },
     updateTemplate: (state, action: { payload: CopyTemplate }) => {
       const idx = state.templates.findIndex((t) => t.name === action.payload.name)
       if (idx === -1) {
-        state.templates.push(action.payload)
+        state.templates.push({ ...action.payload, isLocal: true })
       } else {
         state.templates[idx] = action.payload
-        CopyTemplateLocalStorage.set(state.templates)
+        localTemplatesStorage.set(state.templates)
       }
     },
     resetToDefault: (state) => {
-      state.templates = defaultCopyTemplates()
-      CopyTemplateLocalStorage.set(state.templates)
+      const systemInfo = getSystemInfoSync()
+      state.templates = systemInfo.context_menu_templates
+      localTemplatesStorage.set(state.templates)
     },
   },
 })
-
-
-function defaultCopyTemplates(): CopyTemplate[] {
-  return [
-    {
-      name: 'UUID',
-      template: "%(uuid)",
-      isUrl: false,
-    },
-    {
-      name: 'Data ID for Butler',
-      template: "{'exposure': %(exposure), 'detector': %(detector)}",
-      isUrl: false,
-    },
-    {
-      name: 'Butler Snippet',
-      template: `from lsst.daf.butler import Butler
-butler = Butler('embargo')
-dataId = {'exposure': %(exposure), 'detector': %(detector)}
-data = butler.get('%(dataType)', dataId)
-`,
-      isUrl: false,
-    },
-    {
-      name: 'LSSTCam/Calexp mosaic',
-      // https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?key=lsstcam/2025-05-15/calexp_mosaic/000086/lsstcam_calexp_mosaic_2025-05-15_000086.jpg
-      template: 'https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?key=lsstcam/%(day_obs|iso8601)/calexp_mosaic/%(exposure|sequence|zeropadding(6))/lsstcam_calexp_mosaic_%(day_obs|iso8601)_%(exposure|sequence|zeropadding(6)).jpg',
-      isUrl: true,
-    }
-  ]
-}
