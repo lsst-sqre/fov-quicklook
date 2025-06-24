@@ -1,8 +1,8 @@
-import styles from './styles.module.scss'
+import classNames from 'classnames'
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useGetFitsHeaderQuery } from "../../store/api/openapi"
-import { useMemo, useState, useEffect, useRef } from "react"
-import classNames from 'classnames'
+import styles from './styles.module.scss'
 
 
 export function FItsHeaderPage() {
@@ -22,6 +22,8 @@ function FitsHeader({ ccdName: ccdId, visitId }: FitsHeaderProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const searchInputRef = useRef<HTMLInputElement>(null)
   const tableRef = useRef<HTMLTableElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const jumpDivRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     searchInputRef.current?.focus()
@@ -34,18 +36,37 @@ function FitsHeader({ ccdName: ccdId, visitId }: FitsHeaderProps) {
     ) ?? []
   }, [data, searchTerm])
 
+
   const handleJumpToHDU = (index: number) => {
-    // tableRef内でtr内の最初のtdの要素の内容が`${index}`のものを探して、その要素を取得
     const element = Array.from(tableRef.current?.querySelectorAll('tr td:first-child') ?? [])
       .find(td => td.textContent === `${index}`)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+    if (element && scrollContainerRef.current) {
+      const totalStickyHeight = calculateStickyHeadersHeight(jumpDivRef, tableRef)
+
+      // スクロールコンテナ内の要素の相対位置を計算
+      const containerRect = scrollContainerRef.current.getBoundingClientRect()
+      const elementRect = element.getBoundingClientRect()
+      const relativeTop = elementRect.top - containerRect.top + scrollContainerRef.current.scrollTop
+
+      // スクロール位置を調整
+      scrollContainerRef.current.scrollTo({
+        top: relativeTop - totalStickyHeight,
+        behavior: 'smooth'
+      })
     }
   }
 
   return (
     <div className={styles.fitsHeader}>
-      <div>
+      <div
+        ref={jumpDivRef}
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 2,
+        }}
+      >
         Jump to HDU:
         {data?.map((_, index) => (
           <button key={index} onClick={() => handleJumpToHDU(index)}>
@@ -53,22 +74,29 @@ function FitsHeader({ ccdName: ccdId, visitId }: FitsHeaderProps) {
           </button>
         ))}
       </div>
-      <div style={{ flexGrow: 1, overflowY: 'auto' }}>
+      <div
+        ref={scrollContainerRef}
+        style={{ flexGrow: 1, overflowY: 'auto' }}
+      >
         <table ref={tableRef}>
           <thead>
             <tr>
-              <th>HDU Index</th>
-              <th>
-                Key<br />
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  ref={searchInputRef}
-                />
-              </th>
-              <th>Value</th>
-              <th>Comment</th>
+              {['HDU Index', 'Key', 'Value', 'Comment'].map((header, i) => (
+                <th key={i}>
+                  {header}
+                  {header === 'Key' && (
+                    <>
+                      <br />
+                      <input
+                        type="search"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        ref={searchInputRef}
+                      />
+                    </>
+                  )}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -85,4 +113,23 @@ function FitsHeader({ ccdName: ccdId, visitId }: FitsHeaderProps) {
       </div>
     </div>
   )
+}
+
+const calculateStickyHeadersHeight = (jumpDivRef: React.RefObject<HTMLDivElement>, tableRef: React.RefObject<HTMLTableElement>): number => {
+  let totalHeight = 0;
+  
+  // Jump to HDU divの高さを追加
+  if (jumpDivRef.current) {
+    totalHeight += jumpDivRef.current.getBoundingClientRect().height;
+  }
+  
+  // theadの高さを追加
+  if (tableRef.current) {
+    const thead = tableRef.current.querySelector('thead');
+    if (thead) {
+      totalHeight += thead.getBoundingClientRect().height;
+    }
+  }
+  
+  return totalHeight;
 }
