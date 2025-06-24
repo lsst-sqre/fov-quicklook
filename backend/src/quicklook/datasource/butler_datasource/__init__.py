@@ -80,6 +80,7 @@ class DataTypeSpecificDataSource:
 
         self._butler: ButlerType = Butler(
             'embargo',
+            instrument=default_instrument,
             collections=self.collections,
         )  # type: ignore
 
