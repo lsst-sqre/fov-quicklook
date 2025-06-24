@@ -1,3 +1,5 @@
+import ccdNameTable from './ccdname-table.json'
+// grep LSSTCam ../../backend/src/quicklook/datasource/butler_datasource/ccd-name-map.txt | perl -nae 'END { print "}" } print ",\"$F[1]\":\"$F[2]\""' | sed 's/^,/{/g' | python -m json.tool > src/store/features/ccdname-table.json
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { angle, V2 } from "@stellar-globe/stellar-globe"
 import { initialSearchParams } from "../../hooks/useHashSync"
@@ -17,6 +19,7 @@ type State = {
   dataSource: CcdDataType
   showFrame: boolean
   hilightedCcdId: string[]
+  listGroupingTimeToleranceDigits: number
 }
 
 export type CameraParams = Record<'theta' | 'phi' | 'roll' | 'za' | 'zd' | 'zp' | 'fovy', number>
@@ -50,6 +53,7 @@ function initialState(): State {
     showFrame: true,
     cameraParams: initialSearchParams.cameraParams ?? initialCameraParams,
     hilightedCcdId: initialHightlightCcds(),
+    listGroupingTimeToleranceDigits: 2,
   }
 }
 
@@ -96,6 +100,9 @@ export const homeSlice = createSlice({
     clearHighlightCcd: (state) => {
       state.hilightedCcdId = []
     },
+    setListGroupingTimeToleranceDigits: (state, action: PayloadAction<number>) => {
+      state.listGroupingTimeToleranceDigits = action.payload
+    },
   },
 })
 
@@ -105,9 +112,22 @@ function initialHightlightCcds(): string[] {
   const serialized = searchParams.get('detectors')
   if (!serialized) return []
   try {
-    return serialized.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+    return serialized.split(',').map((s) => s.trim()).filter((s) => s.length > 0).map(parseDetectorName)
   }
   catch (e) {
     return []
+  }
+}
+
+function parseDetectorName(name: string) {
+  if (name.match(/^\d+$/)) {
+    // @ts-ignore
+    const translated = ccdNameTable[name] as string | undefined
+    if (translated === undefined) {
+      throw new Error(`Unknown detector name: ${name}`)
+    }
+    return translated
+  } else {
+    return name
   }
 }

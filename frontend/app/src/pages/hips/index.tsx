@@ -6,6 +6,7 @@ import { HipsViewer } from "./HipsViewer"
 import styles from './styles.module.scss'
 
 export function HipsPage() {
+  const notes = useAppSelector((state) => state.hips.notes)
   return (
     <div style={{ height: '100%', position: 'relative' }}>
       <HipsViewer />
