@@ -1,3 +1,4 @@
+import { Menu, MenuItem, SubMenu } from '@szhsin/react-menu'
 import classNames from 'classnames'
 import React, { memo, useEffect, useMemo, useRef } from "react"
 import { MaterialSymbol } from '../../../components/MaterialSymbol'
@@ -13,6 +14,21 @@ type VisitListProps = {
   style?: React.CSSProperties
 }
 
+type VisitListEntryType = ListVisitsApiResponse[number]
+
+// 露出時間の丸め処理を共通化
+function roundExposureTime(exposureTime: number, digits: number): number {
+  if (digits >= 100) return exposureTime // No rounding
+  const factor = Math.pow(10, digits)
+  return Math.round(exposureTime * factor) / factor
+}
+
+// 露出時間の表示文字列を生成
+function formatExposureTime(exposureTime: number, digits: number): string {
+  const rounded = roundExposureTime(exposureTime, digits)
+  const isRounded = rounded !== exposureTime
+  return `${isRounded ? '~' : ''}${rounded}`
+}
 
 function isValidSearchString(s: string) {
   // 20241021 or 2024102100002
@@ -41,28 +57,28 @@ function useVisitList() {
 }
 
 // exposure_timeが同等かどうかを判定する関数
-function isEquivalentExposureTime(a: number, b: number): boolean {
-  // 小数点第2位で四捨五入して比較
-  return Math.round(a * 100) / 100 === Math.round(b * 100) / 100
+function isEquivalentExposureTime(a: number, b: number, digits: number): boolean {
+  if (digits >= 100) return a === b // Exact match
+  return roundExposureTime(a, digits) === roundExposureTime(b, digits)
 }
 
 // グループが同じかどうかを判定する関数
-function isSameGroup(a: VisitListEntryType, b: VisitListEntryType): boolean {
+function isSameGroup(a: VisitListEntryType, b: VisitListEntryType, timeToleranceDigits: number): boolean {
   return a.day_obs === b.day_obs &&
     a.physical_filter === b.physical_filter &&
-    isEquivalentExposureTime(a.exposure_time, b.exposure_time) &&
+    isEquivalentExposureTime(a.exposure_time, b.exposure_time, timeToleranceDigits) &&
     a.observation_type === b.observation_type
 }
 
 // リストをグループに分割する関数
-function groupVisitList(list: VisitListEntryType[] | undefined): VisitListEntryType[][] {
+function groupVisitList(list: VisitListEntryType[] | undefined, timeToleranceDigits: number): VisitListEntryType[][] {
   if (!list || list.length === 0) return []
 
   const result: VisitListEntryType[][] = []
   let currentGroup: VisitListEntryType[] = [list[0]]
 
   for (let i = 1; i < list.length; i++) {
-    if (isSameGroup(list[i - 1], list[i])) {
+    if (isSameGroup(list[i - 1], list[i], timeToleranceDigits)) {
       currentGroup.push(list[i])
     } else {
       result.push(currentGroup)
@@ -83,12 +99,12 @@ const ListScrollContainerContext = React.createContext<React.RefObject<HTMLDivEl
 export const VisitList = memo(({ style }: VisitListProps) => {
   const { list, isFetching } = useVisitList()
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-  const dispatch = useAppDispatch()
+  const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
   const listContainerRef = useRef<HTMLDivElement>(null)
 
   // リストをグループ化
-  const groupedList = useMemo(() => groupVisitList(list), [list])
+  const groupedList = useMemo(() => groupVisitList(list, listGroupingTimeToleranceDigits), [list, listGroupingTimeToleranceDigits])
 
   useEffect(() => {
     if (currentQuicklook === undefined && list?.length) {
@@ -115,13 +131,11 @@ export const VisitList = memo(({ style }: VisitListProps) => {
 
 // グループを表示するコンポーネント
 function VisitGroup({ group }: { group: VisitListEntryType[] }) {
-  if (!group.length) return null
+  const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
 
+  if (!group.length) return null
   const firstEntry = group[0]
-  const roundedExposureTime = Math.round(firstEntry.exposure_time * 100) / 100
-  const isRounded = roundedExposureTime !== firstEntry.exposure_time
-  // 丸めた値を文字列で表示（小数点以下の不要な0は表示しない）
-  const exposureTimeDisplay = `${isRounded ? '~' : ''}${roundedExposureTime}`
+  const exposureTimeDisplay = formatExposureTime(firstEntry.exposure_time, listGroupingTimeToleranceDigits)
 
   return (
     <div className={styles.group}>
@@ -153,9 +167,6 @@ function VisitGroup({ group }: { group: VisitListEntryType[] }) {
     </div>
   )
 }
-
-type VisitListEntryType = ListVisitsApiResponse[number]
-
 
 function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
@@ -200,7 +211,7 @@ function scrollToElementBelowSticky(
   const element = elementRef.current
   const elementRect = element.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
-  
+
   // console.log('DEBUG: 対象要素:', element)
   // console.log('DEBUG: コンテナ:', container)
   // console.log('DEBUG: 要素の位置:', {
@@ -222,7 +233,7 @@ function scrollToElementBelowSticky(
   // 最も近いグループ要素（sticky要素の親）を見つける
   const closestGroup = element.closest(`.${styles.group}`)
   // console.log('DEBUG: 最も近いグループ:', closestGroup)
-  
+
   if (!closestGroup) {
     // console.log('DEBUG: グループが見つからないため通常スクロール')
     // グループが見つからない場合は通常のスクロール
@@ -234,21 +245,21 @@ function scrollToElementBelowSticky(
   // グループヘッダーの高さを取得
   const groupHeader = closestGroup.querySelector(`.${styles.groupHeader}`)
   // console.log('DEBUG: グループヘッダー:', groupHeader)
-  
+
   const headerHeight = groupHeader ? groupHeader.getBoundingClientRect().height : 0
   // console.log('DEBUG: ヘッダーの高さ:', headerHeight)
 
   // 要素が画面の上部に隠れる場合、stickyヘッダーの下に表示されるようにスクロール
   const isHiddenByHeader = elementRect.top < containerRect.top + headerHeight
   const isHiddenAtBottom = elementRect.bottom > containerRect.bottom
-  
+
   // console.log('DEBUG: ヘッダーに隠れている:', isHiddenByHeader)
   // console.log('DEBUG: 下部に隠れている:', isHiddenAtBottom)
 
   if (isHiddenByHeader) {
     const scrollTop = elementRelativeTop - headerHeight - 8 // 8pxの余白を追加
     // console.log('DEBUG: 新しいスクロール位置(上部調整):', scrollTop)
-    
+
     container.scrollTo({
       top: scrollTop,
       behavior: 'smooth'
@@ -258,7 +269,7 @@ function scrollToElementBelowSticky(
     // コンテナ内でのスクロール位置を計算
     const bottomAdjustment = elementRelativeTop - containerRect.height + elementRect.height + 8
     // console.log('DEBUG: 新しいスクロール位置(下部調整):', bottomAdjustment)
-    
+
     container.scrollTo({
       top: bottomAdjustment,
       behavior: 'smooth'
@@ -272,6 +283,7 @@ function SearchBox() {
   const dispatch = useAppDispatch()
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
+  const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
   const { refetch } = useVisitList()
 
   return (
@@ -288,6 +300,33 @@ function SearchBox() {
           <option value="post_isr_image">Post-ISR (recent)</option>
           <option value="preliminary_visit_image">Preliminary PVI (recent)</option>
         </select>
+        <Menu
+          menuButton={
+            <button >
+              <MaterialSymbol symbol='settings' />
+            </button>
+          }
+          theming='dark'
+        >
+          <SubMenu label="Exposure Time Grouping Tolerance">
+            {[
+              { digits: 100, label: "No grouping", description: "No grouping (exact match)" },
+              { digits: 0, label: "1 second tolerance", description: "1 second tolerance" },
+              { digits: 1, label: "1 digit (0.1 seconds)", description: "1 digit (0.1 seconds)" },
+              { digits: 2, label: "2 digits (0.01 seconds)", description: "2 digits (0.01 seconds)" },
+              { digits: 3, label: "3 digits (0.001 seconds)", description: "3 digits (0.001 seconds)" }
+            ].map(({ digits, label, description }) => (
+              <MenuItem
+                key={digits}
+                onClick={() => dispatch(homeSlice.actions.setListGroupingTimeToleranceDigits(digits))}
+                type='checkbox'
+                checked={digits === listGroupingTimeToleranceDigits}
+              >
+                {label}
+              </MenuItem>
+            ))}
+          </SubMenu>
+        </Menu>
         <button onClick={refetch}>
           <MaterialSymbol symbol='refresh' />
         </button>
