@@ -102,8 +102,6 @@ class Config(BaseSettings):
     def coordinator_ws_base_url(self) -> str:
         return re.sub(r'^http://', 'ws://', self.coordinator_base_url)
 
-    enable_hips: bool = True
-
     context_menu_templates: list[ContextMenuTemplate] = []
 
     model_config = SettingsConfigDict(
