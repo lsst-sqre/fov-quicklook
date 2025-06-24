@@ -1,12 +1,13 @@
 import { configureStore } from '@reduxjs/toolkit'
 // import { homeSlice } from './features/homeSlice'
 import { api } from './api'
-import { copyTemplateSlice } from './features/copyTemplateSlice'
+import { SystemInfo } from './api/openapi'
+import { copyTemplateInitialState, copyTemplateSlice } from './features/copyTemplateSlice'
 import { hipsSlice } from './features/hipsSlice'
 import { homeSlice } from './features/homeSlice'
 import { systemSlice } from './features/systemSlice'
 
-export function makeStore() {
+export function makeStore(systemInfo: SystemInfo) {
   return configureStore({
     reducer: {
       [systemSlice.name]: systemSlice.reducer,
@@ -18,6 +19,9 @@ export function makeStore() {
     middleware: (getDefaultMiddleware) => getDefaultMiddleware({
       serializableCheck: false,
     }).concat(api.middleware),
+    preloadedState: {
+      [copyTemplateSlice.name]: copyTemplateInitialState(systemInfo),
+    },
   })
 }
 

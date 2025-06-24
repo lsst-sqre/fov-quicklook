@@ -238,8 +238,14 @@ export type GetHipsFileApiResponse = /** status 200 Successful Response */ any;
 export type GetHipsFileApiArg = {
   path: string;
 };
+export type ContextMenuTemplate = {
+  name: string;
+  template: string;
+  is_url: boolean;
+};
 export type SystemInfo = {
-  admin_page?: boolean;
+  admin_page: boolean;
+  context_menu_templates: ContextMenuTemplate[];
 };
 export type ValidationError = {
   loc: (string | number)[];

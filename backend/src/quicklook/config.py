@@ -1,17 +1,23 @@
-from aiohttp import ClientTimeout
-from pprint import pprint
 import os
 import re
 from functools import cached_property
+from pprint import pprint
 from typing import Literal
 
-from pydantic import field_validator
+from aiohttp import ClientTimeout
+from pydantic import BaseModel, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase
 from quicklook.utils.s3 import S3Config
 
 os.environ['http_proxy'] = ''
+
+
+class ContextMenuTemplate(BaseModel):
+    name: str
+    template: str
+    is_url: bool
 
 
 class Config(BaseSettings):
@@ -97,6 +103,8 @@ class Config(BaseSettings):
         return re.sub(r'^http://', 'ws://', self.coordinator_base_url)
 
     enable_hips: bool = True
+
+    context_menu_templates: list[ContextMenuTemplate] = []
 
     model_config = SettingsConfigDict(
         env_prefix='QUICKLOOK_',

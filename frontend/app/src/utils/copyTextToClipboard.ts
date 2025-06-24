@@ -1,10 +1,26 @@
-export async function copyTextToClipboard(text: string): Promise<void> {
+import toast from 'react-hot-toast'
+
+type CopyOptions = {
+  showToast?: boolean
+}
+
+export async function copyTextToClipboard(text: string, options: CopyOptions = { showToast: true }): Promise<void> {
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text)
       console.log('Text copied to clipboard successfully!')
     } else {
       await fallbackCopyTextToClipboard(text)
+    }
+    if (options.showToast) {
+      toast.success('Text copied to clipboard', {
+        icon: '📋',
+        style: {
+          background: 'rgba(31, 31, 31, 0.75)',
+          color: '#fff',
+          boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)',
+        }
+      })
     }
   } catch (error) {
     console.error('Failed to copy text: ', error)
