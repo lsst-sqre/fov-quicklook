@@ -113,7 +113,6 @@ function TemplateMenu({ template, ccdMeta }: { template: CopyTemplate, ccdMeta: 
 
   return (
     <MenuItem
-      title={ccdMeta.ccd_id.visit.id}
       onClick={handleClick}
       disabled={!metadata}
     >
