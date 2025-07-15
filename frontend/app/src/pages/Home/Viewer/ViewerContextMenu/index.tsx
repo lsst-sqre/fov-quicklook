@@ -1,6 +1,6 @@
 import { SkyCoord } from "@stellar-globe/stellar-globe"
 import { MenuDivider, MenuItem } from "@szhsin/react-menu"
-import { Fragment, useCallback, useRef } from "react"
+import { Fragment, useCallback, useMemo, useRef } from "react"
 import { MaterialSymbol } from "../../../../components/MaterialSymbol"
 import { env } from "../../../../env"
 import { CcdMeta, useGetSystemInfoQuery, useGetVisitMetadataQuery } from "../../../../store/api/openapi"
@@ -100,9 +100,13 @@ function TemplateMenus({ ccdMeta }: { ccdMeta: CcdMeta }) {
 function TemplateMenu({ template, ccdMeta }: { template: CopyTemplate, ccdMeta: CcdMeta }) {
   const { data: metadata } = useGetVisitMetadataQuery({ id: ccdMeta.ccd_id.visit.id, ccdName: ccdMeta.ccd_id.ccd_name })
 
+  const text = useMemo(() => {
+    if (!metadata) return 'Loading...'
+    return interpoateText(template.template, metadata)
+  }, [metadata, template.template])
+
   const handleClick = useCallback(async () => {
     if (metadata) {
-      const text = interpoateText(template.template, metadata)
       if (template.is_url) {
         window.open(text)
       } else {
@@ -113,6 +117,7 @@ function TemplateMenu({ template, ccdMeta }: { template: CopyTemplate, ccdMeta: 
 
   return (
     <MenuItem
+      title={text}
       onClick={handleClick}
       disabled={!metadata}
     >
