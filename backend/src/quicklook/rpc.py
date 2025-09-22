@@ -6,10 +6,11 @@ RPC (Remote Procedure Call) モジュール。
 サーバー側では受信したRPCをローカルで実行し、結果をストリームで返します。
 """
 
+import inspect
 import pickle
 from dataclasses import dataclass
 from logging import getLogger
-from types import GeneratorType
+from types import AsyncGeneratorType, GeneratorType
 from typing import Any, AsyncGenerator, Callable, Generator, Generic, ParamSpec, TypeVar
 
 import aiohttp
@@ -114,6 +115,40 @@ def create_rpc_caller_endpoint(body: bytes) -> Generator[bytes, None, None]:
             yield e
 
     yield from (serialize_with_size(item) for item in g())
+
+
+async def create_rpc_caller_endpoint_async(body: bytes) -> AsyncGenerator[bytes, None]:
+    """RPCサーバー側で呼び出される非同期エンドポイント関数。
+
+    受信したバイトデータをRPCリクエストとしてデシリアライズし、
+    ローカルで関数を実行して結果をシリアライズしてyieldします。
+    非同期ジェネレータと通常のジェネレータの両方に対応します。
+    """
+    rpc: Rpc = pickle.loads(body)
+
+    async def g():
+        kwargs = rpc.kwargs or {}
+        try:
+            # 非同期関数かどうかをチェック
+            if inspect.iscoroutinefunction(rpc.function):
+                result = await rpc.function(*rpc.args, **kwargs)
+            else:
+                result = rpc.function(*rpc.args, **kwargs)
+                
+            if isinstance(result, AsyncGeneratorType):
+                async for item in result:
+                    yield item
+            elif isinstance(result, GeneratorType):
+                for item in result:
+                    yield item
+            else:
+                yield result
+        except Exception as e:
+            log_rpc_error(rpc, e)
+            yield e
+
+    async for item in g():
+        yield serialize_with_size(item)
 
 
 def log_rpc_error(rpc: Rpc, error: Exception) -> None:

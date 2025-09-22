@@ -11,6 +11,6 @@ from quicklook.comm import coordinator, generator
 coordinator_app = FastAPI(lifespan=coordinator.lifespan)
 coordinator_app.include_router(coordinator.router)
 
-# Generator アプリケーション  
+# Generator アプリケーション
 generator_app = FastAPI(lifespan=generator.lifespan)
 generator_app.include_router(generator.router)

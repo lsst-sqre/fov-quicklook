@@ -1,6 +1,6 @@
 import asyncio
 import queue
-from typing import AsyncIterable, Awaitable, Callable, Iterable, Protocol, TypeVar
+from typing import AsyncIterable, Awaitable, Callable, Iterable, TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")

@@ -58,12 +58,12 @@ app.include_router(generator.router)
 のような形で利用する。
 
 * `coordinator.router`で必要なエンドポイントを作成する
-  * `/heartbeat`
+  * `/healthz`
     * Generatorからの疎通確認
   * `/register`
     * Generatorからの登録
 * `generator.router`で必要なエンドポイントを作成する
-  * `/heartbeat`
+  * `/healthz`
     * Coordinatorからの疎通確認
   * `/rpc`
     * CoordinatorからのRPC呼び出しを受け付ける

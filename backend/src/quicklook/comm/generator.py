@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import aiohttp
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from quicklook.config import config
 
@@ -27,15 +27,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/heartbeat")
+@router.get("/comm/healthz")
 async def generator_heartbeat(fail_for_test: bool = False):
     if config.environment == 'test' and fail_for_test:
-        raise Exception("Simulated heartbeat failure")
+        raise HTTPException(status_code=500, detail="Simulated failure for test")
     return {"status": "alive"}
-
-
-@router.post("/rpc")
-async def rpc_endpoint(): ...
 
 
 @asynccontextmanager
@@ -60,7 +56,7 @@ async def _register_to_coordinator():
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         await session.post(
-            f"{config.coordinator_base_url}/register",
+            f"{config.coordinator_base_url}/comm/register",
             json=registration_data.model_dump(),
             raise_for_status=True,
         )

@@ -25,7 +25,7 @@ def run_uvicorn_app(app: str, *, port: int | None = None, timeout=10, log_prefix
                 break
             except requests.exceptions.ConnectionError:
                 pass
-            time.sleep(1)
+            time.sleep(0.1)
         else:  # pragma: no cover
             raise TimeoutError(f'{app} did not start in {timeout} seconds')
 

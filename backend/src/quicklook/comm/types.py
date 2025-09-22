@@ -2,7 +2,6 @@
 Coordinator-Generator間の通信用型定義
 """
 
-import time
 from dataclasses import dataclass
 from pydantic import BaseModel
 

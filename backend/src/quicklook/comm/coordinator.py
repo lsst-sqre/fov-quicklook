@@ -26,7 +26,7 @@ _available_generators: dict[str, GeneratorInfo] = {}
 router = APIRouter()
 
 
-@router.post("/register")
+@router.post("/comm/register")
 async def register_generator(
     request: Request,
     registration_data: GeneratorRegistrationRequest,
@@ -42,13 +42,18 @@ async def register_generator(
     logger.info(f'Available generators: {list(_available_generators.keys())}')
 
 
+@router.get("/comm/healthz")
+async def health_check():
+    return {"status": "ok"}
+
+
 if config.environment == 'test':  # pragma: no branch
 
-    @router.get("/generators")
+    @router.get("/comm/generators")
     async def list_generators():
         return {"generators": get_available_generators()}
 
-    @router.post("/trigger-heartbeat")
+    @router.post("/comm/trigger-heartbeat")
     async def trigger_heartbeat(fail_for_test: bool = False):
         await _heartbeat_check(fail_for_test=fail_for_test)
         return {"status": "ok"}
@@ -85,7 +90,7 @@ async def _heartbeat_check(*, fail_for_test: bool = False):
         generator_id: str,
         generator_info: GeneratorInfo,
     ) -> str | None:
-        url = f"{generator_info.url}/heartbeat?fail_for_test={str(fail_for_test).lower()}"
+        url = f"{generator_info.url}/comm/healthz?fail_for_test={str(fail_for_test).lower()}"
         try:
             await session.get(url, raise_for_status=True)
         except:

@@ -9,5 +9,3 @@ async def create_quickook(visit: Visit):
     # タイル化
     async for x in dynamic_dispatch(workers=, ccds=ccds):
         pass
-
-    # 
