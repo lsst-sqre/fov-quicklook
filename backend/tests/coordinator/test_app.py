@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from src.quicklook.coordinator.app import app
+from quicklook.coordinator.app import app
 
 client = TestClient(app)
 

@@ -21,6 +21,7 @@ setup(
             'httpx',
             'requests',
             'pytest-asyncio',
+            'pytest-env',
         ],
     },
 )

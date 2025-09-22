@@ -2,8 +2,10 @@ import contextlib
 import multiprocessing
 import os
 import signal
+import socket
 import time
 
+import requests
 import requests
 import uvicorn
 
@@ -13,7 +15,7 @@ def run_uvicorn_app(app: str, *, port: int | None = None, timeout=10, log_prefix
     p = multiprocessing.Process(target=uvicorn_run, args=(app,), kwargs={'port': port, 'log_prefix': log_prefix})
     p.start()
 
-    if port is None:
+    if port is None:  # pragma: no cover
         port = find_free_tcp_port()
 
     def wait_for_ready():
@@ -24,7 +26,7 @@ def run_uvicorn_app(app: str, *, port: int | None = None, timeout=10, log_prefix
             except requests.exceptions.ConnectionError:
                 pass
             time.sleep(1)
-        else:
+        else:  # pragma: no cover
             raise TimeoutError(f'{app} did not start in {timeout} seconds')
 
     try:
@@ -45,10 +47,7 @@ def uvicorn_add_log_prefix(prefix: str):
     log_config["formatters"]["default"]["fmt"] = f'{prefix}{log_config["formatters"]["default"]["fmt"]}'
 
 
-import socket
-
-
-def find_free_tcp_port(host='127.0.0.1') -> int:
+def find_free_tcp_port(host='127.0.0.1') -> int:  # pragma: no cover
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         # 0 を指定すると OS が未使用のポートを割り当てる
         s.bind((host, 0))

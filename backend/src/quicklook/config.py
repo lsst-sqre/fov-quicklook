@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,16 +10,20 @@ class Config(BaseSettings):
         case_sensitive=True,
     )
 
+    environment: Literal['production', 'test'] = 'production'
+
     dev_reload: bool = False
     dev_log_prefix: str = ''
     dev_ccd_limit: int | None = None
-    
+
     # Communication settings
-    comm_heartbeat_interval: int = 30  # seconds
-    comm_heartbeat_timeout: int = 10   # seconds
-    comm_registration_interval: int = 60  # seconds
-    comm_max_retries: int = 3
-    comm_retry_delay: int = 5  # seconds
+    frontend_port: int = 9500
+    generator_port: int = 9502
+    coordinator_base_url: str = 'http://localhost:9501'
+    comm_heartbeat_interval: int = 10  # seconds
+    comm_heartbeat_timeout: int = 2  # seconds
+    comm_registration_interval: int = 10  # seconds
+    comm_generator_max_concurrent_jobs: int = 4
 
 
 config = Config()
