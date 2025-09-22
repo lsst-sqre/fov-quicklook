@@ -2,3 +2,7 @@
 parallel = true
 concurrency = multiprocessing,thread
 branch = true
+
+[report]
+omit =
+    tests/*

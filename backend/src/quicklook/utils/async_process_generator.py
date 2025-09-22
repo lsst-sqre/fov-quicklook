@@ -6,10 +6,13 @@ AsyncProcessGenerator - 重い処理を別プロセスで非同期ストリー�
 """
 
 import multiprocessing as mp
+import os
+import signal
 import traceback
+from typing import AsyncGenerator, Callable, Generator, TypeVar
+
 import anyio
 import anyio.to_thread
-from typing import Callable, AsyncGenerator, TypeVar, Generator
 
 T = TypeVar('T')
 
@@ -54,7 +57,8 @@ async def run_async_process_generator(
     finally:
         # プロセスのクリーンアップ
         if process.is_alive():
-            process.terminate()
+            assert process.pid
+            os.kill(process.pid, signal.SIGINT)  # p.terminate() を使うとcoverageがとれないのでSIGINTを送る
             process.join(timeout=5)
             if process.is_alive():  # pragma: no cover
                 process.kill()
@@ -68,7 +72,6 @@ def _worker_process(func: Callable, queue: mp.Queue, *args, **kwargs) -> None:
         for item in generator:
             queue.put(('data', item))
         queue.put(('done', None))
-    except Exception as e:  # pragma: no cover
-        # 本当はここもテストしているがなぜかcoverageに反映されない
+    except Exception as e:
         traceback.print_exc()
         queue.put(('error', e))
