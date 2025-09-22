@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: quicklook
+Version: 0.1.0
+Requires-Dist: pytest
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: aiohttp
+Requires-Dist: httpx
+Requires-Dist: requests
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: pydantic-settings
+Provides-Extra: dev
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: httpx; extra == "dev"
+Requires-Dist: requests; extra == "dev"
+Dynamic: provides-extra
+Dynamic: requires-dist
