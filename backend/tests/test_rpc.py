@@ -54,13 +54,12 @@ TEST_APP_MODULE = "tests.test_server_app:app"
 @pytest.mark.asyncio
 async def test_rpc_square_with_uvicorn():
     """uvicornサーバーを立ち上げてRPCでsquare関数を実行するテスト。"""
-    port = find_free_tcp_port()
     
-    with run_uvicorn_app(TEST_APP_MODULE, port=port) as wait_for_ready:
-        wait_for_ready()
+    with run_uvicorn_app(TEST_APP_MODULE) as app_runner:
+        app_runner.wait_for_ready()
         
         rpc = Rpc.create(square, 5)
-        result = await run_rpc(f"http://127.0.0.1:{port}/rpc", rpc)
+        result = await run_rpc(f"{app_runner.base_url}/rpc", rpc)
         
         # 結果を確認
         assert result == 25
@@ -69,14 +68,13 @@ async def test_rpc_square_with_uvicorn():
 @pytest.mark.asyncio 
 async def test_rpc_fibonacci_stream_with_uvicorn():
     """uvicornサーバーを立ち上げてRPCでフィボナッチ数列をストリームとして実行するテスト。"""
-    port = find_free_tcp_port()
     
-    with run_uvicorn_app(TEST_APP_MODULE, port=port) as wait_for_ready:
-        wait_for_ready()
+    with run_uvicorn_app(TEST_APP_MODULE) as app_runner:
+        app_runner.wait_for_ready()
         
         rpc = Rpc.create(fibonacci, 5)
         results = []
-        async for result in run_rpc_stream(f"http://127.0.0.1:{port}/rpc", rpc):
+        async for result in run_rpc_stream(f"{app_runner.base_url}/rpc", rpc):
             results.append(result)
         
         # 結果を確認
@@ -87,15 +85,14 @@ async def test_rpc_fibonacci_stream_with_uvicorn():
 @pytest.mark.asyncio
 async def test_rpc_error_generator_stream_with_uvicorn():
     """uvicornサーバーを立ち上げてRPCでエラーが発生するジェネレータをストリームとして実行するテスト。"""
-    port = find_free_tcp_port()
     
-    with run_uvicorn_app(TEST_APP_MODULE, port=port) as wait_for_ready:
-        wait_for_ready()
+    with run_uvicorn_app(TEST_APP_MODULE) as app_runner:
+        app_runner.wait_for_ready()
         
         rpc = Rpc.create(error_generator, 5)
         results = []
         try:
-            async for result in run_rpc_stream(f"http://127.0.0.1:{port}/rpc", rpc):
+            async for result in run_rpc_stream(f"{app_runner.base_url}/rpc", rpc):
                 results.append(result)
             assert False, "Should have raised ValueError"
         except ValueError as e:
@@ -125,14 +122,13 @@ async def test_rpc_timeout_error():
 @pytest.mark.asyncio
 async def test_rpc_server_error_handling():
     """サーバーエラーのハンドリングテスト。"""
-    port = find_free_tcp_port()
     
     # 間違ったエンドポイントにリクエストして404エラーを発生させる
-    with run_uvicorn_app(TEST_APP_MODULE, port=port) as wait_for_ready:
-        wait_for_ready()
+    with run_uvicorn_app(TEST_APP_MODULE) as app_runner:
+        app_runner.wait_for_ready()
         
         rpc = Rpc.create(square, 5)
         
         # 存在しないエンドポイントへのリクエスト
         with pytest.raises(aiohttp.ClientResponseError):
-            await run_rpc(f"http://127.0.0.1:{port}/nonexistent", rpc)
+            await run_rpc(f"{app_runner.base_url}/nonexistent", rpc)

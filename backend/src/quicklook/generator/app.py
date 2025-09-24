@@ -1,11 +1,15 @@
+import traceback
+
 import fastapi
 from fastapi.responses import StreamingResponse
 
 from quicklook import rpc
+from quicklook.comm.generator import lifespan as generator_lifespan
 from quicklook.comm.generator import router as comm_generator_router
 from quicklook.utils.async_process_generator import run_async_process_generator
 
-app = fastapi.FastAPI()
+app = fastapi.FastAPI(lifespan=generator_lifespan)
+app.include_router(comm_generator_router)
 
 
 @app.get("/healthz")
@@ -24,6 +28,3 @@ async def route_rpc(request: fastapi.Request):
 def _rpc_worker(body: bytes):
     for progress in rpc.create_rpc_caller_endpoint(body):
         yield progress
-
-
-app.include_router(comm_generator_router)

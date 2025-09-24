@@ -51,7 +51,6 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
 async def _register_to_coordinator():
     registration_data = GeneratorRegistrationRequest(
         port=config.generator_port,
-        max_concurrent_jobs=config.comm_generator_max_concurrent_jobs,
     )
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
     async with aiohttp.ClientSession(timeout=timeout) as session:

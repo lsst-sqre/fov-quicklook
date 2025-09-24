@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from pydantic import BaseModel
 
 
-@dataclass
+@dataclass(frozen=True)
 class GeneratorInfo:
     host: str
     port: int
-    max_concurrent_jobs: int
 
     @property
     def url(self) -> str:
@@ -19,4 +18,3 @@ class GeneratorInfo:
 
 class GeneratorRegistrationRequest(BaseModel):
     port: int
-    max_concurrent_jobs: int

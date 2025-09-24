@@ -6,6 +6,7 @@ RPC (Remote Procedure Call) モジュール。
 サーバー側では受信したRPCをローカルで実行し、結果をストリームで返します。
 """
 
+import io
 import pickle
 from dataclasses import dataclass
 from logging import getLogger
@@ -13,6 +14,7 @@ from types import GeneratorType
 from typing import Any, AsyncGenerator, Callable, Generator, Generic, ParamSpec, TypeVar
 
 import aiohttp
+import requests
 
 from quicklook.utils.iterutils import async_bytes_iterator_to_stream
 
@@ -46,7 +48,7 @@ async def run_rpc(
     client_or_url_or_endpoint,
     rpc: Rpc[T],
     *,
-    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=1),
+    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=60),
 ) -> T:
     """RPCを実行し、単一の結果を返す。
 
@@ -56,14 +58,14 @@ async def run_rpc(
     """
     async for result in run_rpc_stream(client_or_url_or_endpoint, rpc, timeout=timeout):
         return result
-    raise RuntimeError("No data received from RPC")  # pragma: no cover
+    raise RuntimeError("No result returned from RPC")
 
 
 async def run_rpc_stream(
     url: str,
     rpc: Rpc[T],
     *,
-    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=1),
+    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=60),
 ) -> AsyncGenerator[T, None]:
     """RPCを実行し、結果をストリームで返す。
 
@@ -72,7 +74,9 @@ async def run_rpc_stream(
     """
     # RPCリクエストをpickleでシリアライズ
     pickled_rpc = pickle.dumps(rpc)
-    # URLの場合
+    res = requests.post(url, data=pickled_rpc)
+    buf = io.BytesIO(res.content)
+
     async with aiohttp.ClientSession() as session:
         async with session.post(
             url,

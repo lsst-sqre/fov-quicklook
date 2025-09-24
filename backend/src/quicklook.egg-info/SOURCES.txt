@@ -1,7 +1,0 @@
-setup.py
-src/quicklook.egg-info/PKG-INFO
-src/quicklook.egg-info/SOURCES.txt
-src/quicklook.egg-info/dependency_links.txt
-src/quicklook.egg-info/requires.txt
-src/quicklook.egg-info/top_level.txt
-tests/test_rpc.py

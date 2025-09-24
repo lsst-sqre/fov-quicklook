@@ -4,24 +4,36 @@ import os
 import signal
 import socket
 import time
+from dataclasses import dataclass
+from typing import Callable
 
 import requests
 import requests
 import uvicorn
 
 
+@dataclass
+class UvicornAppRunner:
+    """Uvicornアプリケーションランナーの情報"""
+
+    wait_for_ready: Callable[[], None]
+    base_url: str
+
+
 @contextlib.contextmanager
 def run_uvicorn_app(app: str, *, port: int | None = None, timeout=10, log_prefix='', healthz='/healthz'):
+    if port is None:  # pragma: no cover
+        port = find_free_tcp_port()
+
     p = multiprocessing.Process(target=uvicorn_run, args=(app,), kwargs={'port': port, 'log_prefix': log_prefix})
     p.start()
 
-    if port is None:  # pragma: no cover
-        port = find_free_tcp_port()
+    base_url = f'http://127.0.0.1:{port}'
 
     def wait_for_ready():
         for _ in range(timeout):
             try:
-                requests.get(f'http://127.0.0.1:{port}{healthz}')
+                requests.get(f'{base_url}{healthz}')
                 break
             except requests.exceptions.ConnectionError:
                 pass
@@ -30,7 +42,7 @@ def run_uvicorn_app(app: str, *, port: int | None = None, timeout=10, log_prefix
             raise TimeoutError(f'{app} did not start in {timeout} seconds')
 
     try:
-        yield wait_for_ready
+        yield UvicornAppRunner(wait_for_ready=wait_for_ready, base_url=base_url)
     finally:
         assert p.pid
         os.kill(p.pid, signal.SIGINT)  # p.terminate() を使うとcoverageがとれないのでSIGINTを送る

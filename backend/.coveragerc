@@ -6,3 +6,5 @@ branch = true
 [report]
 omit =
     tests/*
+exclude_also =
+    \A(?s:.*# pragma: coverage exclude file.*)\Z

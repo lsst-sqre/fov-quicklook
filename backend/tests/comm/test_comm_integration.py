@@ -14,25 +14,25 @@ def test_comm_integration():
         port=9501,
         log_prefix='[coordinator] ',
         healthz='/comm/healthz',
-    ) as wait_for_coordinator:
-        wait_for_coordinator()
-        assert len(requests.get('http://127.0.0.1:9501/comm/generators').json()['generators']) == 0
+    ) as coordinator_runner:
+        coordinator_runner.wait_for_ready()
+        assert len(requests.get(f'{coordinator_runner.base_url}/comm/generators').json()['generators']) == 0
         with run_uvicorn_app(
             'quicklook.dev.commapp:generator_app',
             port=9502,
             log_prefix='[generator] ',
             healthz='/comm/healthz',
-        ) as wait_for_generator:
-            wait_for_generator()
+        ) as generator_runner:
+            generator_runner.wait_for_ready()
 
-            assert len(requests.get('http://127.0.0.1:9501/comm/generators').json()['generators']) == 1
+            assert len(requests.get(f'{coordinator_runner.base_url}/comm/generators').json()['generators']) == 1
 
             # 成功のheartbeatを起動
-            requests.post('http://127.0.0.1:9501/comm/trigger-heartbeat')
+            requests.post(f'{coordinator_runner.base_url}/comm/trigger-heartbeat')
             time.sleep(0.1)
-            assert len(requests.get('http://127.0.0.1:9501/comm/generators').json()['generators']) == 1
+            assert len(requests.get(f'{coordinator_runner.base_url}/comm/generators').json()['generators']) == 1
 
             # 失敗のheartbeatを起動し、Generatorが終了することを確認
-            requests.post('http://127.0.0.1:9501/comm/trigger-heartbeat?fail_for_test=True')
+            requests.post(f'{coordinator_runner.base_url}/comm/trigger-heartbeat?fail_for_test=True')
             time.sleep(0.1)
-            assert len(requests.get('http://127.0.0.1:9501/comm/generators').json()['generators']) == 0
+            assert len(requests.get(f'{coordinator_runner.base_url}/comm/generators').json()['generators']) == 0

@@ -35,10 +35,9 @@ async def register_generator(
     generator_info = GeneratorInfo(
         host=client_host,
         port=registration_data.port,
-        max_concurrent_jobs=registration_data.max_concurrent_jobs,
     )
     generator_id = f"{generator_info.host}:{generator_info.port}"
-    _available_generators[generator_id] = generator_info
+    _available_generators[generator_id] = _available_generators.get(generator_id, generator_info)
     logger.info(f'Available generators: {list(_available_generators.keys())}')
 
 

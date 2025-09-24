@@ -1,0 +1,3 @@
+[submodule "k8s/phalanx"]
+	path = k8s/phalanx
+	url = git@github.com:lsst-sqre/phalanx.git

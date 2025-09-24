@@ -10,15 +10,15 @@ def coordinator_and_generator():
         port=9501,
         log_prefix='[coordinator] ',
         healthz='/comm/healthz',
-    ) as wait_for_coordinator:
-        wait_for_coordinator()
+    ) as coordinator_runner:
+        coordinator_runner.wait_for_ready()
         with run_uvicorn_app(
             'quicklook.coordinator.app:app',
             port=9502,
             log_prefix='[generator] ',
             healthz='/comm/healthz',
-        ) as wait_for_generator:
-            wait_for_generator()
+        ) as generator_runner:
+            generator_runner.wait_for_ready()
             pass
 
 
