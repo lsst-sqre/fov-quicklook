@@ -1,6 +1,7 @@
 import abc
 from dataclasses import dataclass
 
+from quicklook.datasource.butler_datasource import VisitEntry
 from quicklook.types import CcdDataType, CcdId, Visit
 
 
@@ -14,7 +15,7 @@ class Query:
 
 class DataSourceBase(abc.ABC):
     @abc.abstractmethod
-    def query_visits(self, q: Query) -> list[Visit]:  # pragma: no cover
+    def query_visits(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
         ...
 
     @abc.abstractmethod
@@ -22,15 +23,15 @@ class DataSourceBase(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def get_data(self, ref: CcdId) -> bytes:  # pragma: no cover
+    def get_data(self, ccd_id: CcdId) -> bytes:  # pragma: no cover
         ...
 
     @abc.abstractmethod
-    def get_metadata(self, ref: CcdId) -> 'DataSourceCcdMetadata':  # pragma: no cover
+    def get_metadata(self, ccd_id: CcdId) -> 'DataSourceCcdMetadata':  # pragma: no cover
         ...
 
     @abc.abstractmethod
-    def get_exposure_data_types(self, exposure: int) -> list[CcdDataType]: ...
+    def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]: ...
 
 
 @dataclass

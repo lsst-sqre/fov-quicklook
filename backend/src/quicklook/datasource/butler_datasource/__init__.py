@@ -41,7 +41,7 @@ class VisitEntry:
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def __init__(self):
-        from quicklook.butlerutils import chown_pgpassfile
+        from .butlerutils import chown_pgpassfile
 
         chown_pgpassfile()
 

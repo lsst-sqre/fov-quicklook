@@ -12,9 +12,9 @@
   * `./.venv`の環境を使う
   * pytestを使う
   * `class Test*`ではなく`def test_*`関数でテストを書く
-  * 実コードに対応するテストコードは`src/quicklook`以下のストラクチャをそのまま`tests`以下に作る。
-    * 例えば`src/quicklook/module/submodule.py`に対応するテストコードは`tests/module/test_submodule.py`に置く。
-    * 実コードが`src/quicklook/a/__init__.py`の場合は`tests/a/test___init__.py`に置く。
+  * 各モジュールに対応するテストコードは同じモジュール内に`test_*.py`として配置する。
+    * 例えば`src/quicklook/job/__init__.py`に対応するテストコードは`src/quicklook/job/test_job.py`に置く。
+    * pytestは`tests/`ディレクトリと`src/`ディレクトリの両方からテストファイルを検出する。
   * 
 * 使用ライブラリ
   * SQLAlchemy2

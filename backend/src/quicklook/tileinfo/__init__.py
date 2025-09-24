@@ -10,6 +10,7 @@ import astropy.io.fits as afits
 import rtree
 
 from quicklook.config import config
+from quicklook.generator.preprocess_ccd import RawAmp
 from quicklook.utils.geom import BBox
 
 ccd_info_path = Path(__file__).parent / 'ccd-info.json'
@@ -156,8 +157,6 @@ if __name__ == '__main__':  # pragma: no cover
         ccd_info_path.write_text(json.dumps(ccds, indent=2))
 
     def _make_ccd_meta(p: Path):
-        from .generator.preprocess_ccd import RawAmp
-
         with afits.open(p, memmap=False) as hdul:  # type: ignore
             amps = [RawAmp.from_hdu(j, hdu) for j, hdu in enumerate(hdul) if hdu.name.startswith('Segment')]  # type: ignore
             bbox = functools.reduce(lambda a, b: a.union(b.wcs.bbox), amps[1:], amps[0].wcs.bbox)

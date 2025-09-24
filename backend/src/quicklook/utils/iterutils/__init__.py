@@ -82,7 +82,7 @@ def bytes_iterator_to_stream(iterator: Iterable[bytes]) -> Callable[[int], bytes
         position += len(result)
         return result
 
-    read.tell = lambda: position
+    read.tell = lambda: position  # type: ignore
     return read
 
 

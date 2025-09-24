@@ -7,7 +7,7 @@ from quicklook.types import CcdDataType, CcdId, Visit
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import s3_download_object, s3_list_objects
 
-from .types import DataSourceBase, DataSourceCcdMetadata, Query, Visit
+from ..types import DataSourceBase, DataSourceCcdMetadata, Query, Visit
 
 
 class DummyDataSource(DataSourceBase):
@@ -30,15 +30,15 @@ class DummyDataSource(DataSourceBase):
         else:
             return _s3_get_visit_ccd_fits_raw(ccd_id)
 
-    def get_metadata(self, ref: CcdId) -> DataSourceCcdMetadata:
+    def get_metadata(self, ccd_id: CcdId) -> DataSourceCcdMetadata:
         i = Instrument.get("LSSTCam")
         return DataSourceCcdMetadata(
-            detector=i.ccd_2_detector[ref.ccd_name],
-            ccd_name=ref.ccd_name,
+            detector=i.ccd_2_detector[ccd_id.ccd_name],
+            ccd_name=ccd_id.ccd_name,
             day_obs=-1,
             exposure=-1,
-            visit=ref.visit,
-            uuid=f"dummy-uuid-{ref.visit.name}-{ref.ccd_name}",
+            visit=ccd_id.visit,
+            uuid=f"dummy-uuid-{ccd_id.visit.name}-{ccd_id.ccd_name}",
         )
 
     def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]:

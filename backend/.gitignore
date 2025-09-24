@@ -1,2 +1,5 @@
+/pyright
+
 /.coverage*
 *.egg-info
+
