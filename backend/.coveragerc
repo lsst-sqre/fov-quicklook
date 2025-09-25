@@ -6,5 +6,6 @@ branch = true
 [report]
 omit =
     tests/*
+    test_*.py
 exclude_also =
     \A(?s:.*# pragma: coverage exclude file.*)\Z

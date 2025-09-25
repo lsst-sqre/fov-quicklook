@@ -53,12 +53,14 @@ async def _register_to_coordinator():
         port=config.generator_port,
     )
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        await session.post(
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
             f"{config.coordinator_base_url}/comm/register",
             json=registration_data.model_dump(),
+            timeout=timeout,
             raise_for_status=True,
-        )
+        ) as response:
+            response.raise_for_status()
 
 
 async def _registration_loop():

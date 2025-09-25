@@ -1,7 +1,6 @@
 import abc
 from dataclasses import dataclass
 
-from quicklook.datasource.butler_datasource import VisitEntry
 from quicklook.types import CcdDataType, CcdId, Visit
 
 
@@ -11,6 +10,19 @@ class Query:
     limit: int
     exposure: int | None = None
     day_obs: int | None = None
+
+
+@dataclass
+class VisitEntry:
+    id: str
+    day_obs: int
+    physical_filter: str
+    obs_id: str
+    exposure_time: float
+    science_program: str
+    observation_type: str
+    observation_reason: str
+    target_name: str
 
 
 class DataSourceBase(abc.ABC):

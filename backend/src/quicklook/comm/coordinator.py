@@ -91,12 +91,13 @@ async def _heartbeat_check(*, fail_for_test: bool = False):
     ) -> str | None:
         url = f"{generator_info.url}/comm/healthz?fail_for_test={str(fail_for_test).lower()}"
         try:
-            await session.get(url, raise_for_status=True)
+            async with session.get(url, timeout=timeout) as response:
+                response.raise_for_status()
         except:
             traceback.print_exc()
             return generator_id
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    async with aiohttp.ClientSession() as session:
         tasks = [check_generator(session, generator_id, generator_info) for generator_id, generator_info in _available_generators.items()]
         results = await asyncio.gather(*tasks)
         to_remove = [gid for gid in results if gid is not None]

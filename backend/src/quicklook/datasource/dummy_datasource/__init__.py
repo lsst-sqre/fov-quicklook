@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from quicklook.config import config
-from quicklook.datasource.butler_datasource import VisitEntry
 from quicklook.datasource.butler_datasource.instrument import Instrument
+from quicklook.datasource.types import VisitEntry
 from quicklook.types import CcdDataType, CcdId, Visit
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import s3_download_object, s3_list_objects

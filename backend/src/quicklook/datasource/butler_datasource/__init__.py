@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from functools import cache, lru_cache
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 from venv import logger
@@ -6,6 +5,7 @@ from venv import logger
 from lsst.resources import ResourcePath
 from numpy import record
 
+from quicklook.datasource.types import VisitEntry
 from quicklook.types import CcdDataType, CcdId
 
 from ..types import DataSourceBase, DataSourceCcdMetadata, Query, Visit
@@ -24,19 +24,6 @@ else:
 
 default_instrument = 'LSSTCam'
 DataRef = Any
-
-
-@dataclass
-class VisitEntry:
-    id: str
-    day_obs: int
-    physical_filter: str
-    obs_id: str
-    exposure_time: float
-    science_program: str
-    observation_type: str
-    observation_reason: str
-    target_name: str
 
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover

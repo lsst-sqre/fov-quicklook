@@ -1,5 +1,3 @@
-import pytest
-
 from quicklook.datasource import get_datasource
 from quicklook.types import Visit
 

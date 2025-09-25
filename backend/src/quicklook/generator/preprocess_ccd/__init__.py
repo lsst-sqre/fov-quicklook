@@ -15,8 +15,6 @@ from quicklook.utils.fitsheader import HeaderType, fitsheader_to_list
 from quicklook.utils.geom import BBox
 from quicklook.utils.timeit import timeit
 
-from ..isr import parse_slice
-
 
 def preprocess_ccd(
     ccd_id: CcdId,

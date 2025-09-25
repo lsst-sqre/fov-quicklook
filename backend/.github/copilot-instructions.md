@@ -15,7 +15,9 @@
   * 各モジュールに対応するテストコードは同じモジュール内に`test_*.py`として配置する。
     * 例えば`src/quicklook/job/__init__.py`に対応するテストコードは`src/quicklook/job/test_job.py`に置く。
     * pytestは`tests/`ディレクトリと`src/`ディレクトリの両方からテストファイルを検出する。
-  * 
+  * asyncなテスト一つ一つに`@pytest.mark.asyncio`と書く必要はない。(`pytest.ini`で設定されている。)
+  * 無限ループやデッドロックに陥る可能性があるケースではタイムアウトを設定してからテストを実行する。
+
 * 使用ライブラリ
   * SQLAlchemy2
     * 新しいAPIを使う。(https://docs.sqlalchemy.org/en/20/changelog/whatsnew_20.html)

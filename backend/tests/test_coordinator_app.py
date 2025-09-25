@@ -40,12 +40,12 @@ def coordinator_url():
             healthz='/healthz',
         ) as generator_runner1:
             generator_runner1.wait_for_ready()
-            # config.generator_port = find_free_tcp_port()
-            # with run_uvicorn_app(
-            #     'quicklook.generator.app:app',
-            #     port=config.generator_port,
-            #     log_prefix='[generator2] ',
-            #     healthz='/healthz',
-            # ) as generator_runner2:
-            #     generator_runner2.wait_for_ready()
-            yield coordinator_runner.base_url
+            config.generator_port = find_free_tcp_port()
+            with run_uvicorn_app(
+                'quicklook.generator.app:app',
+                port=config.generator_port,
+                log_prefix='[generator2] ',
+                healthz='/healthz',
+            ) as generator_runner2:
+                generator_runner2.wait_for_ready()
+                yield coordinator_runner.base_url
