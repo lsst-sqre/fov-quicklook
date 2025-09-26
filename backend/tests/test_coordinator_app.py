@@ -21,7 +21,6 @@ def test_route_create_quicklook(coordinator_url: str):
     assert res.status_code == 200
 
 
-
 @pytest.fixture(scope='module')
 def coordinator_url():
     # Generator２つが登録された状態でCoordinatorを起動する
@@ -38,6 +37,7 @@ def coordinator_url():
             port=config.generator_port,
             log_prefix='[generator1] ',
             healthz='/healthz',
+            log_level='warning',
         ) as generator_runner1:
             generator_runner1.wait_for_ready()
             config.generator_port = find_free_tcp_port()
@@ -46,6 +46,7 @@ def coordinator_url():
                 port=config.generator_port,
                 log_prefix='[generator2] ',
                 healthz='/healthz',
+                log_level='warning',
             ) as generator_runner2:
                 generator_runner2.wait_for_ready()
                 yield coordinator_runner.base_url

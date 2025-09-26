@@ -20,6 +20,7 @@ install_requires = [
     'minio~=7.2.0',
     'lsst-daf-butler',
     'psycopg2-binary',
+    'zstandard',
     f'mineo_fits_decompress @ file://{mineo_path.resolve()}',
 ]
 

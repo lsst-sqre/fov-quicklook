@@ -10,6 +10,7 @@ import astropy.io.fits as afits
 import rtree
 
 from quicklook.config import config
+from quicklook.types import TilePos
 from quicklook.utils.geom import BBox
 
 ccd_info_path = Path(__file__).parent / 'ccd-info.json'
@@ -34,7 +35,11 @@ class TileInfo:
     j: int  # タイルの列インデックス
 
     @classmethod
-    def of(cls, level: int, i: int, j: int) -> 'TileInfo':
+    def from_pos(cls, pos: TilePos) -> 'TileInfo':
+        return cls._of(level=pos.level, i=pos.i, j=pos.j)
+
+    @classmethod
+    def _of(cls, level: int, i: int, j: int) -> 'TileInfo':
         """指定されたレベルと位置のタイル情報を作成する.
 
         Args:
@@ -157,7 +162,7 @@ if __name__ == '__main__':  # pragma: no cover
 
     def _make_ccd_meta(p: Path):
         from quicklook.generator.preprocess_ccd import RawAmp
-        
+
         with afits.open(p, memmap=False) as hdul:  # type: ignore
             amps = [RawAmp.from_hdu(j, hdu) for j, hdu in enumerate(hdul) if hdu.name.startswith('Segment')]  # type: ignore
             bbox = functools.reduce(lambda a, b: a.union(b.wcs.bbox), amps[1:], amps[0].wcs.bbox)

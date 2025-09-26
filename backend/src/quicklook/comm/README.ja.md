@@ -67,3 +67,4 @@ app.include_router(generator.router)
     * Coordinatorからの疎通確認
   * `/rpc`
     * CoordinatorからのRPC呼び出しを受け付ける
+

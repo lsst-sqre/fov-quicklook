@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Callable
 
 import requests
-import requests
 import uvicorn
 
 
@@ -21,11 +20,23 @@ class UvicornAppRunner:
 
 
 @contextlib.contextmanager
-def run_uvicorn_app(app: str, *, port: int | None = None, timeout=10, log_prefix='', healthz='/healthz'):
+def run_uvicorn_app(
+    app: str,
+    *,
+    port: int | None = None,
+    timeout=10,
+    log_prefix='',
+    healthz='/healthz',
+    log_level: str | int | None = None,
+):
     if port is None:  # pragma: no cover
         port = find_free_tcp_port()
 
-    p = multiprocessing.Process(target=uvicorn_run, args=(app,), kwargs={'port': port, 'log_prefix': log_prefix})
+    p = multiprocessing.Process(
+        target=uvicorn_run,
+        args=(app,),
+        kwargs={'port': port, 'log_prefix': log_prefix, 'log_level': log_level},
+    )
     p.start()
 
     base_url = f'http://127.0.0.1:{port}'
@@ -49,9 +60,13 @@ def run_uvicorn_app(app: str, *, port: int | None = None, timeout=10, log_prefix
         p.join()
 
 
-def uvicorn_run(app: str, *, port: int, log_prefix: str):
+def uvicorn_run(app: str, *, port: int, log_prefix: str, log_level: str | int | None):
     uvicorn_add_log_prefix(log_prefix)
-    uvicorn.run(app, port=port)
+    uvicorn.run(
+        app,
+        port=port,
+        log_level=log_level,
+    )
 
 
 def uvicorn_add_log_prefix(prefix: str):

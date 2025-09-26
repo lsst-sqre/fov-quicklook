@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from quicklook.tileinfo import TileInfo, _Ccd, ccd_list, ccds_by_name, ccds_intersecting, rtree_index
+from quicklook.types import TilePos
 from quicklook.utils.geom import BBox
 
 
@@ -36,7 +37,7 @@ def mock_ccd_info(tmp_path):
 def test_tile_info_creation(mock_ccd_info):
     """TileInfoの基本的な作成テスト."""
     # レベル0、位置(0,0)のタイル（256x256ピクセル）
-    tile = TileInfo.of(level=0, i=0, j=0)
+    tile = TileInfo.from_pos(TilePos(level=0, i=0, j=0))
 
     assert tile.level == 0
     assert tile.i == 0
@@ -47,9 +48,9 @@ def test_tile_info_creation(mock_ccd_info):
 def test_tile_size_property(mock_ccd_info):
     """tile_sizeプロパティのテスト."""
     # デフォルトのtile_sizeは256と仮定
-    tile_level0 = TileInfo.of(level=0, i=0, j=0)
-    tile_level1 = TileInfo.of(level=1, i=0, j=0)
-    tile_level2 = TileInfo.of(level=2, i=0, j=0)
+    tile_level0 = TileInfo.from_pos(TilePos(level=0, i=0, j=0))
+    tile_level1 = TileInfo.from_pos(TilePos(level=1, i=0, j=0))
+    tile_level2 = TileInfo.from_pos(TilePos(level=2, i=0, j=0))
 
     assert tile_level1.tile_size == tile_level0.tile_size * 2
     assert tile_level2.tile_size == tile_level0.tile_size * 4
@@ -57,7 +58,7 @@ def test_tile_size_property(mock_ccd_info):
 
 def test_bbox_property(mock_ccd_info):
     """bboxプロパティのテスト."""
-    tile = TileInfo.of(level=0, i=1, j=2)
+    tile = TileInfo.from_pos(TilePos(level=0, i=1, j=2))
     bbox = tile.bbox
 
     expected_size = tile.tile_size
@@ -70,7 +71,7 @@ def test_bbox_property(mock_ccd_info):
 def test_get_overlapping_ccds(mock_ccd_info):
     """get_overlapping_ccdsメソッドのテスト."""
     # レベル0で適切な位置のタイルを作成
-    tile = TileInfo.of(level=0, i=0, j=0)
+    tile = TileInfo.from_pos(TilePos(level=0, i=0, j=0))
     overlapping_ccds = tile.get_overlapping_ccds()
 
     assert isinstance(overlapping_ccds, list)
@@ -163,7 +164,7 @@ def test_tile_info_with_different_levels(mock_ccd_info):
     levels = [0, 1, 2, 3]
 
     for level in levels:
-        tile = TileInfo.of(level=level, i=0, j=0)
+        tile = TileInfo.from_pos(TilePos(level=level, i=0, j=0))
         assert tile.level == level
         assert tile.tile_size == 256 * (2**level)  # デフォルトtile_size=256と仮定
 
@@ -171,7 +172,7 @@ def test_tile_info_with_different_levels(mock_ccd_info):
 def test_tile_info_ccd_overlap_logic(mock_ccd_info):
     """CCDとタイルの重複ロジックのテスト."""
     # レベル0で大きなタイル（位置によってはCCDと重複する）
-    large_tile = TileInfo.of(level=3, i=0, j=0)  # 2048x2048のタイル
+    large_tile = TileInfo.from_pos(TilePos(level=3, i=0, j=0))  # 2048x2048のタイル
 
     # このタイルは複数のCCDと重複する可能性がある
     overlapping_ccds = large_tile.get_overlapping_ccds()
@@ -190,12 +191,12 @@ def test_ccd_class():
 def test_tile_info_edge_cases(mock_ccd_info):
     """TileInfoのエッジケーステスト."""
     # 非常に大きなインデックス
-    tile = TileInfo.of(level=0, i=1000, j=1000)
+    tile = TileInfo.from_pos(TilePos(level=0, i=1000, j=1000))
     assert tile.i == 1000
     assert tile.j == 1000
 
     # 負のインデックス（位置としては有効）
-    tile_negative = TileInfo.of(level=0, i=-1, j=-1)
+    tile_negative = TileInfo.from_pos(TilePos(level=0, i=-1, j=-1))
     assert tile_negative.i == -1
     assert tile_negative.j == -1
 

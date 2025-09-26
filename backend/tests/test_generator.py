@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from quicklook.generator.app import app
 import pickle
-from quicklook.rpc import Rpc
+from quicklook.comm.rpc import Rpc
 
 client = TestClient(app)
 

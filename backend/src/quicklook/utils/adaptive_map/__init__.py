@@ -9,8 +9,8 @@ Adaptive Map - 動的負荷分散による並列処理
 import asyncio
 import statistics
 import time
-from collections import deque
 from abc import ABC, abstractmethod
+from collections import deque
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Awaitable, Callable, Sequence
 
@@ -31,13 +31,18 @@ class Worker(ABC):
     """
 
     @abstractmethod
+    def id(self) -> str:
+        """workerを識別する文字列。内部では使わない。ユーザー用"""
+        ...
+
+    @abstractmethod
     def capacity(self) -> int:
         """現在のsubmitの受付可能な処理数を返す"""
         ...
 
     @abstractmethod
-    async def submit(self, func: Callable[..., Awaitable], *args, **kwargs) -> Any:
-        """workerに非同期関数funcの処理を依頼する"""
+    async def submit(self, item: Any) -> Any:
+        """workerにitemの処理を依頼する"""
         ...
 
     @abstractmethod
@@ -59,9 +64,17 @@ class Worker(ABC):
 class _HelperWorker(Worker):
     """ヘルパー関数で作成されるWorker実装"""
 
-    def __init__(self, max_concurrency: int, submit_func: Callable[..., Awaitable[Any]], teardown_func: Callable[[], Awaitable[None]]):
+    def __init__(
+        self,
+        *,
+        id: str,
+        max_concurrency: int,
+        process_item: Callable[[Any], Awaitable[Any]],
+        teardown_func: Callable[[], Awaitable[None]],
+    ):
+        self._id = id
         self._max_concurrency = max_concurrency
-        self._submit_func = submit_func
+        self._process_item = process_item
         self._teardown_func = teardown_func
         self._current_capacity = max_concurrency
         self._shutdown = False
@@ -74,7 +87,7 @@ class _HelperWorker(Worker):
             return 0
         return self._current_capacity
 
-    async def submit(self, func: Callable[..., Awaitable], *args, **kwargs) -> Any:
+    async def submit(self, item: Any) -> Any:
         async with self._lock:
             if self._shutdown:  # pragma: no cover
                 raise RuntimeError("Worker is shutdown")
@@ -88,7 +101,7 @@ class _HelperWorker(Worker):
                 self._capacity_changed.clear()
 
         try:
-            result = await self._submit_func(func, *args, **kwargs)
+            result = await self._process_item(item)
             return result
         finally:
             async with self._lock:
@@ -108,24 +121,47 @@ class _HelperWorker(Worker):
         self._capacity_changed.set()  # 待機中のwait_until_availableを解除
         await self._teardown_func()
 
+    def id(self):
+        return self._id
 
-def create_worker(teardown: Callable[[], Awaitable[None]], max_concurrency: int, submit: Callable[..., Awaitable[Any]]) -> Worker:
+
+async def _noop_teardown() -> None:
+    """デフォルトのteardown"""
+    return None
+
+
+def create_worker(
+    id: str,
+    process_item: Callable[[Any], Awaitable[Any]],
+    *,
+    max_concurrency: int = 1,
+    teardown: Callable[[], Awaitable[None]] | None = None,
+) -> Worker:
     """
     teardown、max_concurrency、submitからWorkerを作成するヘルパー関数
 
     作成されるWorkerは以下の特徴を持つ：
-    - submitされると自動的にcapacityを減らし、引数のsubmitを実行し、実行が終わればcapacityを増やす
+    - submitされると自動的にcapacityを減らし、process_itemを実行し、実行が終わればcapacityを増やす
     - wait_until_availableの実装：submitされた処理が終わったタイミングでcapacityが0以上になっていたらブロックを解除
 
     Args:
-        teardown: ワーカーをクリーンアップする非同期関数
+        process_item: itemを処理する非同期関数
         max_concurrency: 最大同時実行数
-        submit: 実際の処理を実行する非同期関数
+        teardown: ワーカーをクリーンアップする非同期関数
 
     Returns:
         Worker: 作成されたWorker
     """
-    return _HelperWorker(max_concurrency, submit, teardown)
+    if max_concurrency <= 0:
+        raise ValueError("max_concurrency must be positive")
+
+    teardown_func = teardown if teardown is not None else _noop_teardown
+    return _HelperWorker(
+        id=id,
+        max_concurrency=max_concurrency,
+        process_item=process_item,
+        teardown_func=teardown_func,
+    )
 
 
 @dataclass
@@ -169,15 +205,13 @@ class _AdaptiveMapRunner:
     def __init__(
         self,
         workers: Sequence[Worker],
-        func: Callable[[Any], Awaitable[Any]],
-        items: list[Any],
+        items: Sequence[Any],
         *,
         on_late_result: Callable[[MapResult], None] | None = None,
         cancel_on_reschedule: bool = True,
         reschedule_threshold_multiplier: float = 2.0,
     ):
         self.workers = workers
-        self.func = func
         self.remaining_items = deque(_ItemEntry(index, item) for index, item in enumerate(list(items)))
         self.on_late_result = on_late_result
         self.cancel_on_reschedule = cancel_on_reschedule
@@ -236,7 +270,7 @@ class _AdaptiveMapRunner:
             start_time = time.time()
 
             # submit用のコルーチンを作成
-            submit_coro = best_worker.submit(self.func, item)
+            submit_coro = best_worker.submit(item)
             task = asyncio.create_task(submit_coro)
             running_task = _RunningTask(worker=best_worker, item=item, item_index=item_index, task=task, start_time=start_time)
             self.running_tasks[task] = running_task
@@ -295,7 +329,7 @@ class _AdaptiveMapRunner:
 
         try:
             # 新しいタスクを作成
-            new_task = asyncio.create_task(best_worker.submit(self.func, running_task.item))
+            new_task = asyncio.create_task(best_worker.submit(running_task.item))
             new_running_task = _RunningTask(
                 worker=best_worker,
                 item=running_task.item,
@@ -346,8 +380,7 @@ class _AdaptiveMapRunner:
 
 async def adaptive_map(
     workers: Sequence[Worker],
-    func: Callable[[Any], Awaitable[Any]],
-    items: list[Any],
+    items: Sequence[Any],
     *,
     on_late_result: Callable[[MapResult], None] | None = None,
     cancel_on_reschedule: bool = True,
@@ -363,7 +396,6 @@ async def adaptive_map(
 
     Args:
         workers: 処理を行うWorkerのリスト
-        func: 各itemに対して実行する非同期関数
         items: 処理対象のアイテムリスト
         on_late_result: 遅延結果のコールバック関数
         cancel_on_reschedule: リスケジュール時に元のタスクをキャンセルするか
@@ -374,7 +406,6 @@ async def adaptive_map(
     """
     runner = _AdaptiveMapRunner(
         workers,
-        func,
         items,
         on_late_result=on_late_result,
         cancel_on_reschedule=cancel_on_reschedule,

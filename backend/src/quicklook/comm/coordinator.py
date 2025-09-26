@@ -33,12 +33,12 @@ async def register_generator(
 ):
     client_host = request.client.host if request.client else "127.0.0.1"
     generator_info = GeneratorInfo(
+        id=registration_data.generator_id,
         host=client_host,
         port=registration_data.port,
     )
-    generator_id = f"{generator_info.host}:{generator_info.port}"
-    _available_generators[generator_id] = _available_generators.get(generator_id, generator_info)
-    logger.info(f'Available generators: {list(_available_generators.keys())}')
+    _available_generators[registration_data.generator_id] = generator_info
+    logger.info(f'Available generators: {_available_generators.values()}')
 
 
 @router.get("/comm/healthz")
@@ -71,8 +71,14 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
             pass
 
 
-def get_available_generators() -> list[GeneratorInfo]:
-    return list(_available_generators.values())
+def get_available_generators() -> dict[str, GeneratorInfo]:
+    return _available_generators
+
+
+def remove_generator(generator_info: GeneratorInfo) -> None:
+    if generator_info.id in _available_generators:  # pragma: no branch
+        del _available_generators[generator_info.id]
+        logger.info(f"Generator removed: {generator_info.id}")
 
 
 async def _heartbeat_checker_loop():
@@ -83,27 +89,22 @@ async def _heartbeat_checker_loop():
 
 async def _heartbeat_check(*, fail_for_test: bool = False):
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
-
-    async def check_generator(
-        session: aiohttp.ClientSession,
-        generator_id: str,
-        generator_info: GeneratorInfo,
-    ) -> str | None:
-        url = f"{generator_info.url}/comm/healthz?fail_for_test={str(fail_for_test).lower()}"
-        try:
-            async with session.get(url, timeout=timeout) as response:
-                response.raise_for_status()
-        except:
-            traceback.print_exc()
-            return generator_id
-
     async with aiohttp.ClientSession() as session:
-        tasks = [check_generator(session, generator_id, generator_info) for generator_id, generator_info in _available_generators.items()]
+
+        async def check_generator(
+            generator_info: GeneratorInfo,
+        ) -> GeneratorInfo | None:
+            url = f"{generator_info.url}/comm/healthz?fail_for_test={str(fail_for_test).lower()}"
+            try:
+                async with session.get(url, timeout=timeout) as response:
+                    response.raise_for_status()
+            except:
+                traceback.print_exc()
+                return generator_info
+
+        tasks = [check_generator(generator_info) for generator_info in _available_generators.values()]
         results = await asyncio.gather(*tasks)
         to_remove = [gid for gid in results if gid is not None]
 
-    # 応答がなかったGeneratorを削除
-    for generator_id in to_remove:
-        if generator_id in _available_generators:  # pragma: no branch
-            del _available_generators[generator_id]
-            logger.info(f"Generator removed due to heartbeat failure: {generator_id}")
+    for generator_info in to_remove:
+        remove_generator(generator_info)

@@ -8,7 +8,7 @@ tests/test_rpc.pyからimportされる。
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 
-from quicklook.rpc import create_rpc_caller_endpoint
+from quicklook.comm.rpc import create_rpc_caller_endpoint
 
 app = FastAPI()
 

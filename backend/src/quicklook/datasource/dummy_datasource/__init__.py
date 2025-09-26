@@ -21,7 +21,7 @@ class DummyDataSource(DataSourceBase):
     def list_ccds(self, visit: Visit) -> list[str]:
         ccds = [*_s3_list_visit_ccds(visit)]
         if config.environment == 'test':
-            ccds = ccds[:4]  # テスト環境では4つに制限
+            ccds = ccds[:10]  # テスト環境では4つに制限
         return ccds
 
     def get_data(self, ccd_id: CcdId) -> bytes:

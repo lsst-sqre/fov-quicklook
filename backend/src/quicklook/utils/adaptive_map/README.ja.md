@@ -13,17 +13,22 @@
 
 * 処理を行う主体を`Worker`とする。
 * 各`Worker`はそれぞれ異なる性能を持ち、同じ処理をしてもかかる時間が同じとは限らない。
-    * `Worker`は具体的には他のプロセスやノードを抽象化したもの。
+    * `Worker`は具体的には他のプロセスや計算用ノードを抽象化したもの。
 * 処理の対象の列を`items: list[Item]`とする。
     * `items`には同じ値を複数回含めてもよい。各要素は独立したスケジュール対象として扱われる。
-    * `Item`はハッシュ可能でなくてもかまわない（例: `dict` や `list`）。`adaptive_map`は各要素の位置情報で内部管理を行うため、値の同一性やハッシュ可能性に依存しない。
+    * `Item`はハッシュ可能性や同一性比較性は求めない。
 
-## 仕様
+* `Worker`
 
-* `Worker`は次ののようなインターフェースを持つ。
-
+    次のようなインターフェースを持つ。
     ```python
     class Worker:
+        def id(self) -> str:
+            '''
+            workerを識別する文字列。内部では使わない。ユーザー用
+            '''
+            ...
+        
         def capacity(self) -> int:
             '''
             現在のsubmitの受付可能な処理数を返す
@@ -31,9 +36,9 @@
             '''
             ...
 
-        async def submit(self, func: Callable[..., Awaitable], *args, **kwargs):
+        async def submit(self, item: Item):
             '''
-            workerに非同期関数funcの処理を依頼する
+            非同期にitemに処理をする
             '''
             ...    
 
@@ -49,12 +54,12 @@
             '''
             ...
     ```
-    * これは`ThreadPoolExecutor`や`ProcessPoolExecutor`のインターフェースに似ている。
-    * これはユーザーが提供してもよいし、`teardown`, `max_concurrency`, `submit`から`Worker`をつくるヘルパー関数から生成することもできる。
+    * `item: Item`をどう処理するかは各workerによる
+    * Workerはユーザーが提供してもよいし、`Worker`をつくるヘルパー関数から生成することもできる。
 
 ### ヘルパー関数を使ったWorkerの実装例
 
-ヘルパー関数`create_worker`を使うと、`teardown`、`max_concurrency`、`submit`から簡単にWorkerを作成できる：
+ヘルパー関数`create_worker`を使うと、必須の`process_item`と任意の`max_concurrency`・`teardown`から簡単にWorkerを作成できる：
 
 ```python
 import asyncio
@@ -62,86 +67,104 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Awaitable, Any
 from . import create_worker
 
-# asyncioのrun_in_executorを使ったWorker
-def create_executor_worker(max_workers: int = 1) -> Worker:
-    executor = ThreadPoolExecutor(max_workers=max_workers)
-    
-    async def teardown():
-        executor.shutdown(wait=True)
-    
-    async def submit(func: Callable[..., Awaitable], *args, **kwargs) -> Any:
-        # 非同期関数をスレッドプールで実行
-        def sync_wrapper():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(func(*args, **kwargs))
-            finally:
-                loop.close()
-        
-        # run_in_executorを使用してスレッドプールで実行
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(executor, sync_wrapper)
-        return result
-    
-    return create_worker(teardown, max_workers, submit)
+# asyncioの単純なWorker実装
+def create_async_worker(max_concurrency: int = 1) -> Worker:
+    async def process_item(item) -> Any:
+        func, *args = item
+        return await func(*args)
+
+    return create_worker(process_item, max_concurrency=max_concurrency)
 
 # HTTPクライアントを使った分散Workerの例
 def create_http_worker(endpoint: str, max_concurrency: int = 1) -> Worker:
     import aiohttp
     
-    session = None
-    
-    async def teardown():
+    session: aiohttp.ClientSession | None = None
+
+    async def process_item(item) -> Any:
+        func_name, *args = item
+
         nonlocal session
-        if session:
-            await session.close()
-    
-    async def submit(func: Callable[..., Awaitable], *args, **kwargs) -> Any:
-        nonlocal session
-        if not session:
+        if session is None:
             session = aiohttp.ClientSession()
-        
+
         # リモートサーバーに処理を依頼する例
         # 実際の実装では適切なAPIエンドポイントを使用
         async with session.post(
             f"{endpoint}/process",
-            json={"args": args, "kwargs": kwargs}
+            json={"func_name": func_name, "args": args},
         ) as response:
             if response.status == 200:
                 result_data = await response.json()
                 return result_data["result"]
             else:
                 raise RuntimeError(f"Remote worker failed: {response.status}")
-    
-    return create_worker(teardown, max_concurrency, submit)
+
+    async def teardown() -> None:
+        nonlocal session
+        if session:
+            await session.close()
+            session = None
+
+    return create_worker(process_item, max_concurrency=max_concurrency, teardown=teardown)
 ```
 
 ヘルパー関数で作成されるWorkerは以下の特徴を持つ：
-- `submit`されると自動的に`capacity`を減らし、引数の`submit`を実行し、実行が終われば`capacity`を増やす
+- `submit`されると自動的に`capacity`を減らし、`process_item`を実行し、実行が終われば`capacity`を増やす
 - `wait_until_available`の実装：`submit`された処理が終わったタイミングで`capacity`が0以上になっていたらブロックを解除
 
-* 使い方は次のようになる。
+### 使い方の例
 
-    ```python
-    workers: list[Worker] # 処理を行う主体のリスト
-    items: list[Item] # 処理対象
-    func: Callable[[Item], Awaitable[Result]]
+```python
+import asyncio
+from typing import Any
 
-    async for map_result in adaptive_map(workers, func, items):
-        print(map_result.value) # map_result.valueはMapResult型
-    ```
+from quicklook.utils.adaptive_map2 import adaptive_map, create_worker, Worker
 
-    * `map_result`は次のような型である。
 
-        ```python
-        @dataclass
-        class MapResult:
-            worker: Worker
-            item: Item
-            value: Any
-            execution_time: float
-        ```
+def create_async_worker(max_concurrency: int = 1) -> Worker:
+    async def process_item(item) -> Any:
+        func, *args = item
+        return await func(*args)
+
+    return create_worker(process_item, max_concurrency=max_concurrency)
+
+
+async def square(x: int) -> int:
+    await asyncio.sleep(0)
+    return x * x
+
+
+async def main() -> None:
+    workers = [create_async_worker(max_concurrency=3)]
+    items = [(square, i) for i in range(10)]
+
+    async for map_result in adaptive_map(workers, items):
+        print(map_result.value, end=" ")
+
+    print()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+# 実行結果は
+# 0 1 4 9 16 25 36 49 64 81
+```
+
+`map_result`は次のような型である。
+
+```python
+@dataclass
+class MapResult:
+    worker: Worker
+    item: Item
+    value: Any # submitの結果
+    execution_time: float
+```
+
+
+## 仕様
 
 * `adaptive_map`は次のように動作する。
     * `workers`のどれかが`capacity() > 0`である限り、`items`を順次`submit`する
@@ -158,13 +181,13 @@ def create_http_worker(endpoint: str, max_concurrency: int = 1) -> Worker:
             * 1回目に完了した結果がyieldされ、2回目以降に完了したものは`adaptive_map`のオプション`on_late_result: Callable[[MapResult], None]`に渡される。
     * workerの停止
         * workerは外部の要因で停止することがある。
-        * `func`でworkerの停止を検出し、その場合`WorkerDown`を送出する
+        * `submit`の実行中に`WorkerDown`が発生したらその`Worker`が今後使えなくなったとみなす。
         * itemの処理中に`WorkerDown`例外が発生した場合
             * そのworkerは`teardown`される。
             * そのworkerはリスケジュールの対象から外れる。
             * そのworkerにスケジュールされていたitemはリスケジュールされる。
     * 例外
-        * `func`内で例外が発生したらそれはそのまま`adaptive_map`に伝播される。
+        * `submit`内で例外が発生したらそれはそのまま`adaptive_map`に伝播される。
     * pollingはしない
         * 次のitemのsubmitやリスケジュールは、どれかのworkerで`wait_until_available`が完了したタイミングで行えばよい。pollingは行わない。
 

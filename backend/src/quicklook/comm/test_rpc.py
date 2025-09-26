@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 import pytest
 
-from quicklook.rpc import Rpc, create_rpc_caller_endpoint, run_rpc, run_rpc_stream
-from quicklook.dev.run_uvicorn import run_uvicorn_app, find_free_tcp_port
+from quicklook.comm.rpc import Rpc, create_rpc_caller_endpoint, run_rpc, run_rpc_stream
+from quicklook.dev.run_uvicorn import run_uvicorn_app
 
 
 def square(x: int) -> int:
@@ -54,29 +54,29 @@ TEST_APP_MODULE = "tests.test_server_app:app"
 @pytest.mark.asyncio
 async def test_rpc_square_with_uvicorn():
     """uvicornサーバーを立ち上げてRPCでsquare関数を実行するテスト。"""
-    
+
     with run_uvicorn_app(TEST_APP_MODULE) as app_runner:
         app_runner.wait_for_ready()
-        
+
         rpc = Rpc.create(square, 5)
         result = await run_rpc(f"{app_runner.base_url}/rpc", rpc)
-        
+
         # 結果を確認
         assert result == 25
 
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_rpc_fibonacci_stream_with_uvicorn():
     """uvicornサーバーを立ち上げてRPCでフィボナッチ数列をストリームとして実行するテスト。"""
-    
+
     with run_uvicorn_app(TEST_APP_MODULE) as app_runner:
         app_runner.wait_for_ready()
-        
+
         rpc = Rpc.create(fibonacci, 5)
         results = []
         async for result in run_rpc_stream(f"{app_runner.base_url}/rpc", rpc):
             results.append(result)
-        
+
         # 結果を確認
         expected = [0, 1, 1, 2, 3]
         assert results == expected
@@ -85,10 +85,10 @@ async def test_rpc_fibonacci_stream_with_uvicorn():
 @pytest.mark.asyncio
 async def test_rpc_error_generator_stream_with_uvicorn():
     """uvicornサーバーを立ち上げてRPCでエラーが発生するジェネレータをストリームとして実行するテスト。"""
-    
+
     with run_uvicorn_app(TEST_APP_MODULE) as app_runner:
         app_runner.wait_for_ready()
-        
+
         rpc = Rpc.create(error_generator, 5)
         results = []
         try:
@@ -107,28 +107,24 @@ async def test_rpc_error_generator_stream_with_uvicorn():
 async def test_rpc_timeout_error():
     """タイムアウトエラーのテスト。"""
     import aiohttp
-    
+
     rpc = Rpc.create(square, 5)
-    
+
     # 存在しないホストに対してタイムアウトテスト
     with pytest.raises(Exception):  # ConnectionError またはTimeoutError
-        await run_rpc(
-            "http://localhost:99999/rpc", 
-            rpc, 
-            timeout=aiohttp.ClientTimeout(total=0.1)
-        )
+        await run_rpc("http://localhost:99999/rpc", rpc, timeout=aiohttp.ClientTimeout(total=0.1))
 
 
 @pytest.mark.asyncio
 async def test_rpc_server_error_handling():
     """サーバーエラーのハンドリングテスト。"""
-    
+
     # 間違ったエンドポイントにリクエストして404エラーを発生させる
     with run_uvicorn_app(TEST_APP_MODULE) as app_runner:
         app_runner.wait_for_ready()
-        
+
         rpc = Rpc.create(square, 5)
-        
+
         # 存在しないエンドポイントへのリクエスト
         with pytest.raises(aiohttp.ClientResponseError):
             await run_rpc(f"{app_runner.base_url}/nonexistent", rpc)

@@ -4,7 +4,7 @@ import numpy
 
 from quicklook.config import config
 from quicklook.generator.preprocess_ccd import PreProcessedCcd
-from quicklook.types import Progress, Tile
+from quicklook.types import Progress, Tile, TilePos
 
 
 def iterate_tiles(
@@ -36,7 +36,7 @@ def iterate_tiles(
                 tile_x2 = tile_x1 + tile_size
                 tile_data = safe_slice(data, x1, y1, tile_x1, tile_y1, tile_x2, tile_y2)
                 progress.count += 1
-                cb(Tile(visit=ppccd.ccd_id.visit, level=level, i=tile_yi, j=tile_xi, data=tile_data), progress)
+                cb(Tile(visit=ppccd.ccd_id.visit, pos=TilePos(level=level, i=tile_yi, j=tile_xi), data=tile_data), progress)
         if level >= max_level:
             break
         data = shrink_image(data, y1 % 2, y2 % 2, x1 % 2, x2 % 2)

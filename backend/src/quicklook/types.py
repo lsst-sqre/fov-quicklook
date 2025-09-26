@@ -9,8 +9,12 @@ CcdDataType: TypeAlias = Literal['raw', 'post_isr_image', 'preliminary_visit_ima
 
 @dataclass
 class Progress:
-    count: int
     total: int
+    count: int = 0
+
+    def update(self, count: int = 1):
+        self.count += count
+        return self
 
 
 @dataclass(frozen=True)
@@ -36,7 +40,7 @@ class Visit:
         return cls(id)
 
 
-@dataclass
+@dataclass(frozen=True)
 class CcdId:
     visit: Visit
     ccd_name: str
@@ -52,9 +56,14 @@ class CcdId:
 
 
 @dataclass
-class Tile:
-    visit: Visit
+class TilePos:
     level: int
     i: int
     j: int
+
+
+@dataclass
+class Tile:
+    visit: Visit
+    pos: TilePos
     data: numpy.ndarray
