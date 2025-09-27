@@ -8,7 +8,7 @@ from quicklook.comm import rpc
 from quicklook.comm.generator import lifespan as generator_lifespan
 from quicklook.comm.generator import router as comm_generator_router
 from quicklook.generator.job import Job
-from quicklook.generator.jobstorage import JobStorage
+from quicklook.generator.job_local_storage import JobLocalStorage
 from quicklook.types import TilePos
 from quicklook.utils.async_process_generator import run_async_process_generator
 from quicklook.utils.numpyutils import ndarray2npybytes
@@ -36,8 +36,8 @@ def _rpc_worker(body: bytes):
 
 
 @lru_cache(maxsize=8)
-def dep_job_storage(job_id: str):
-    return JobStorage(Job.from_id(job_id))
+def dep_job(job_id: str):
+    return Job.from_id(job_id)
 
 
 def dep_tile_pos(level: int, i: int, j: int):
@@ -45,11 +45,23 @@ def dep_tile_pos(level: int, i: int, j: int):
 
 
 @app.get('/jobs/{job_id}/tiles/{level}/{i}/{j}')
-def get_local_tile(
-    job_storage: Annotated[JobStorage, fastapi.Depends(dep_job_storage)],
+def route_get_single_fits_tile(
+    job: Annotated[Job, fastapi.Depends(dep_job)],
     tile_pos: Annotated[TilePos, fastapi.Depends(dep_tile_pos)],
 ):
     return fastapi.Response(
-        ndarray2npybytes(job_storage.single_fits_tile.load_local_merged(tile_pos)),
+        ndarray2npybytes(job.local_storage.single_fits_tile.load_local_merged(tile_pos)),
         media_type='application/octet-stream',
     )
+
+
+# @app.get('/jobs/{job_id}/merged-tiles/{level}/{i}/{j}')
+# def route_get_merged_tile(
+#     job: Annotated[Job, fastapi.Depends(dep_job)],
+#     tile_pos: Annotated[TilePos, fastapi.Depends(dep_tile_pos)],
+# ):
+#     try:
+#         data_bytes = job.storage.merged_fits_tile.load_compressed_data(tile_pos)
+#     except FileNotFoundError:
+#         raise fastapi.HTTPException(status_code=404)
+#     return fastapi.Response(data_bytes, media_type='application/octet-stream')

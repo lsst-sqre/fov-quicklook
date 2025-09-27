@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from quicklook.tileinfo import TileInfo, _Ccd, ccd_list, ccds_by_name, ccds_intersecting, rtree_index
-from quicklook.types import TilePos
+from quicklook.types import CcdName, TilePos
 from quicklook.utils.geom import BBox
 
 
@@ -86,7 +86,7 @@ def test_ccds_intersecting():
     with patch('quicklook.tileinfo.ccd_list') as mock_ccd_list, patch('quicklook.tileinfo.rtree_index') as mock_rtree:
 
         # モックの設定
-        mock_ccd_list.return_value = [_Ccd(name="CCD1", bbox=BBox(0, 100, 0, 100)), _Ccd(name="CCD2", bbox=BBox(50, 150, 50, 150))]
+        mock_ccd_list.return_value = [_Ccd(name=CcdName("CCD1"), bbox=BBox(0, 100, 0, 100)), _Ccd(name=CcdName("CCD2"), bbox=BBox(50, 150, 50, 150))]
         mock_rtree.return_value.intersection.return_value = [0, 1]
 
         result = ccds_intersecting(bbox)
@@ -182,7 +182,7 @@ def test_tile_info_ccd_overlap_logic(mock_ccd_info):
 def test_ccd_class():
     """_Ccdクラスの基本テスト."""
     bbox = BBox(minx=0.0, miny=0.0, maxx=100.0, maxy=100.0)
-    ccd = _Ccd(name="TEST_CCD", bbox=bbox)
+    ccd = _Ccd(name=CcdName("TEST_CCD"), bbox=bbox)
 
     assert ccd.name == "TEST_CCD"
     assert ccd.bbox == bbox

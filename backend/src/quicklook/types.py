@@ -1,10 +1,48 @@
 from dataclasses import dataclass
-from functools import cache, cached_property
-from typing import Literal, TypeAlias
+from typing import Generic, Literal, TypeAlias, TypeVar
 
 import numpy
+from quicklook.utils.hash_utils import hash_iterable
 
 CcdDataType: TypeAlias = Literal['raw', 'post_isr_image', 'preliminary_visit_image']
+
+
+class VisitName(str):
+    def _parts(self) -> list[str]:
+        parts = self.split(':')
+        if len(parts) < 2:
+            raise ValueError(f'Invalid visit name: {self!r}')
+        return parts
+
+    @property
+    def data_type(self) -> str:
+        return self._parts()[-2]
+
+    @property
+    def name(self) -> str:
+        return self._parts()[-1]
+
+
+class CcdName(str):
+    pass
+
+
+@dataclass(frozen=True)
+class CcdDataRef:
+    visit: VisitName
+    ccd: CcdName
+
+    @property
+    def fullname(self) -> str:
+        return f"{self.visit}/{self.ccd}"
+
+    @property
+    def ccd_name(self) -> CcdName:
+        # TODO: 代わりにself.ccdを使う
+        return self.ccd
+
+    def __str__(self) -> str:  # pragma: no cover
+        return self.fullname
 
 
 @dataclass
@@ -16,54 +54,75 @@ class Progress:
         self.count += count
         return self
 
+    def full(self):
+        self.count = self.total
+        return self
 
-@dataclass(frozen=True)
-class Visit:
-    # TODO: VisitIDという名前に変更
-    # 1つの文字列で特定される
-    id: str  # '{data_type}:{exposure}'
-
-    @cache
-    def _parts(self):
-        return self.id.split(':')
-
-    @property
-    def data_type(self):
-        return self._parts()[-2]
-
-    @property
-    def name(self):
-        return self._parts()[-1]
-
-    @classmethod
-    def from_id(cls, id: str):
-        return cls(id)
+    def update_and_yield_every(self, every: int, *, count: int = 1):
+        self.count += count
+        if self.count % every == 0:
+            yield self
 
 
-@dataclass(frozen=True)
-class CcdId:
-    visit: Visit
-    ccd_name: str
-
-    @cached_property
-    def fullname(self):
-        return f'{self.visit.id}/{self.ccd_name}'
-
-    @cached_property
-    def name(self):
-        # TODO: メソッド名をfullnameに変更
-        return self.fullname
+T = TypeVar('T')
 
 
 @dataclass
+class ReturnValue(Generic[T]):
+    value: T
+
+
+@dataclass(frozen=True)
 class TilePos:
     level: int
     i: int
     j: int
 
+    def safe_hash(self) -> int:
+        return hash_iterable((self.level, self.i, self.j))
+
 
 @dataclass
 class Tile:
-    visit: Visit
+    visit: VisitName
     pos: TilePos
     data: numpy.ndarray
+
+
+@dataclass(frozen=True)
+class PackedTilePos(TilePos):
+    @classmethod
+    def from_unpacked(cls, unpacked_pos: TilePos):
+        from quicklook.config import config
+
+        pack = config.tile_pack
+        return cls(unpacked_pos.level, unpacked_pos.i >> pack, unpacked_pos.j >> pack)
+
+    def unpackeds(self):
+        from quicklook.config import config
+
+        for i in range(1 << config.tile_pack):
+            for j in range(1 << config.tile_pack):
+                yield TilePos(self.level, self.i << config.tile_pack | i, self.j << config.tile_pack | j)
+
+    def index(self, i: int, j: int) -> int:
+        """
+        Compute a unique index for a tile within this packed tile.
+
+        Parameters:
+        - i: Unpacked i-coordinate, range: [self.i << config.tile_pack, (self.i + 1) << config.tile_pack - 1]
+        - j: Unpacked j-coordinate, range: [self.j << config.tile_pack, (self.j + 1) << config.tile_pack - 1]
+
+        Returns:
+        - A unique index in range [0, (1 << (2 * config.tile_pack)) - 1]
+        """
+        from quicklook.config import config
+
+        local_i = i - (self.i << config.tile_pack)
+        local_j = j - (self.j << config.tile_pack)
+
+        # Ensure coordinates are within valid range
+        if not (0 <= local_i < (1 << config.tile_pack) and 0 <= local_j < (1 << config.tile_pack)):  # pragma: no cover
+            raise ValueError(f"Coordinates (i={i}, j={j}) outside range of packed tile (level={self.level}, i={self.i}, j={self.j})")
+
+        return (local_i << config.tile_pack) | local_j

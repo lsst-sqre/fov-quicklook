@@ -1,14 +1,14 @@
 import contextlib
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from quicklook.config import config
 from quicklook.datasource import get_datasource
 from quicklook.generator.iteratetiles import iterate_tiles
-from quicklook.generator.jobstorage import JobStorage
-from quicklook.generator.preprocess_ccd import PreProcessedCcd, preprocess_ccd
-from quicklook.types import CcdId, Progress, Tile
+from quicklook.generator.preprocess_ccd import AmpMetadata, ImageStat, PreProcessedCcd, preprocess_ccd
+from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue, Tile
+from quicklook.utils.geom import BBox
 from quicklook.utils.timer import Timer
 
 from .job import Job
@@ -18,37 +18,58 @@ ds = get_datasource()
 
 def generate_single_fits_tiles(
     job: Job,
-    ccd_id: CcdId,
-    on_progress: Callable[[Progress], None] = lambda progress: None,
+    ref: CcdDataRef,
 ):
-    on_progress(progress := Progress(total=3))
+    yield (progress := Progress(total=3))
 
-    storage = JobStorage(job)
-
-    data_bytes = ds.get_data(ccd_id)
-    on_progress(progress.update())
+    data_bytes = ds.get_data(ref)
+    yield progress.update()
 
     try:
         with _bytes_to_file(data_bytes) as path:
 
-            ppccd = preprocess_ccd(ccd_id, path)
-            on_progress(progress.update())
+            ppccd = preprocess_ccd(ref, path)
+            yield progress.update()
 
-            generate_tiles(ppccd, storage=storage)
-            on_progress(progress.update())
+            generate_tiles(ppccd, job)
+            yield progress.update()
 
-        storage.fits_header.save(ccd_id, ppccd.headers)
+        job.local_storage.fits_header.save(ref, ppccd.headers)
+
+        yield ReturnValue(
+            CcdMetadata(
+                ccd_name=ppccd.data_ref.ccd,
+                image_stat=ppccd.stat,
+                amps=ppccd.amps,
+                bbox=ppccd.bbox,
+            )
+        )
     finally:
-        Timer(600, storage.clear_all).start()
+        # 遅いgeneratorでこの関数が実行された時
+        # coordinatorのcleanupの後にまだこの関数が実行されている可能性がるので
+        # ここでもcleanupする。
+        #
+        # from threading import Timer
+        # なぜかPython標準のTimerを使うとgenerator全体が停止してしまう。
+        Timer(600, job.local_storage.clear_all).start()
+
+
+@dataclass
+class CcdMetadata:
+    ccd_name: CcdName
+    image_stat: ImageStat
+    amps: list[AmpMetadata]
+    bbox: BBox
 
 
 def generate_tiles(
     ppccd: PreProcessedCcd,
-    *,
-    storage: JobStorage,
+    job: Job,
 ):
-    def cb(tile: Tile, progress: Progress):
-        storage.single_fits_tile.save(ppccd.ccd_id.ccd_name, tile)
+    storage = job.local_storage
+
+    def cb(tile: Tile):
+        storage.single_fits_tile.save(ppccd.data_ref.ccd, tile)
 
     iterate_tiles(ppccd, cb)
 

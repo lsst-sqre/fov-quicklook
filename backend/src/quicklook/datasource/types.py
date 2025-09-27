@@ -1,7 +1,7 @@
 import abc
 from dataclasses import dataclass
 
-from quicklook.types import CcdDataType, CcdId, Visit
+from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 
 @dataclass
@@ -31,15 +31,15 @@ class DataSourceBase(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def list_ccds(self, visit: Visit) -> list[str]:  # pragma: no cover
+    def list_ccds(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover
         ...
 
     @abc.abstractmethod
-    def get_data(self, ccd_id: CcdId) -> bytes:  # pragma: no cover
+    def get_data(self, ref: CcdDataRef) -> bytes:  # pragma: no cover
         ...
 
     @abc.abstractmethod
-    def get_metadata(self, ccd_id: CcdId) -> 'DataSourceCcdMetadata':  # pragma: no cover
+    def get_metadata(self, ref: CcdDataRef) -> 'DataSourceCcdMetadata':  # pragma: no cover
         ...
 
     @abc.abstractmethod
@@ -48,8 +48,8 @@ class DataSourceBase(abc.ABC):
 
 @dataclass
 class DataSourceCcdMetadata:
-    visit: Visit
-    ccd_name: str
+    visit_name: VisitName
+    ccd_name: CcdName
 
     detector: int
     exposure: int

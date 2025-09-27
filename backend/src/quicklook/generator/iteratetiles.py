@@ -4,17 +4,14 @@ import numpy
 
 from quicklook.config import config
 from quicklook.generator.preprocess_ccd import PreProcessedCcd
-from quicklook.types import Progress, Tile, TilePos
+from quicklook.types import Tile, TilePos
+from quicklook.utils.geom import BBox
 
 
 def iterate_tiles(
     ppccd: PreProcessedCcd,
-    cb: Callable[[Tile, Progress], None],
+    cb: Callable[[Tile], None],
 ):
-    progress = Progress(
-        count=0,
-        total=calc_num_total_tiles(ppccd),
-    )
     tile_size = config.tile_size
     max_level = config.tile_max_level
     data = ppccd.pool
@@ -35,8 +32,13 @@ def iterate_tiles(
                 tile_x1 = tile_xi * tile_size
                 tile_x2 = tile_x1 + tile_size
                 tile_data = safe_slice(data, x1, y1, tile_x1, tile_y1, tile_x2, tile_y2)
-                progress.count += 1
-                cb(Tile(visit=ppccd.ccd_id.visit, pos=TilePos(level=level, i=tile_yi, j=tile_xi), data=tile_data), progress)
+                cb(
+                    Tile(
+                        visit=ppccd.data_ref.visit,
+                        pos=TilePos(level=level, i=tile_yi, j=tile_xi),
+                        data=tile_data,
+                    ),
+                )
         if level >= max_level:
             break
         data = shrink_image(data, y1 % 2, y2 % 2, x1 % 2, x2 % 2)
@@ -95,36 +97,3 @@ def shrink_image(
     h, w = data.shape
     data = numpy.mean(data.reshape(h // 2, 2, w // 2, 2), axis=(1, 3))
     return data
-
-
-def calc_num_total_tiles(
-    ccd: PreProcessedCcd,
-):
-    tile_size = config.tile_size
-    max_level = config.tile_max_level
-    data = ccd.pool
-    h, w = data.shape
-    y1 = int(ccd.bbox.miny)  # focal planeでの始まりのy-index
-    x1 = int(ccd.bbox.minx)
-    y2 = int(y1 + h)  # 終わりのindex
-    x2 = int(x1 + w)
-    num_tiles = 0
-    for _ in range(max_level + 1):
-        tile_yi1 = y1 // tile_size
-        tile_yi2 = (y2 - 1) // tile_size + 1
-        tile_xi1 = x1 // tile_size
-        tile_xi2 = (x2 - 1) // tile_size + 1
-        num_tiles += (tile_yi2 - tile_yi1) * (tile_xi2 - tile_xi1)
-        if y1 % 2 != 0:
-            y1 -= 1
-        if y2 % 2 != 0:
-            y2 += 1
-        y1 //= 2
-        y2 //= 2
-        if x1 % 2 != 0:
-            x1 -= 1
-        if x2 % 2 != 0:
-            x2 += 1
-        x1 //= 2
-        x2 //= 2
-    return num_tiles

@@ -3,13 +3,13 @@ import tempfile
 import astropy.io.fits as pyfits
 
 from quicklook.config import config
-from quicklook.types import Visit
+from quicklook.types import VisitName
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import s3_download_object
 
 
 def test_s3_partial_load():
-    visit = Visit('calexp:192350')
+    visit = VisitName('calexp:192350')
     ccd_name = 'R11_S21'
 
     def read(start: int, end: int) -> bytes:

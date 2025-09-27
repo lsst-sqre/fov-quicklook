@@ -8,42 +8,43 @@ import mineo_fits_decompress
 import numpy
 
 from quicklook.config import config
-from quicklook.generator.isr import bias_correction, parse_slice
 from quicklook.tileinfo import ccds_by_name
-from quicklook.types import CcdId
+from quicklook.types import CcdDataRef
 from quicklook.utils.fitsheader import HeaderType, fitsheader_to_list
 from quicklook.utils.geom import BBox
 from quicklook.utils.timeit import timeit
 
+from .isr import bias_correction, parse_slice
+
 
 def preprocess_ccd(
-    ccd_id: CcdId,
+    ccd_ref: CcdDataRef,
     path: Path,
 ) -> 'PreProcessedCcd':
-    match ccd_id.visit.data_type:
+    match ccd_ref.visit.data_type:
         case 'raw':
-            return preprocess_ccd_raw(ccd_id, path)
+            return preprocess_ccd_raw(ccd_ref, path)
         case 'post_isr_image' | 'calexp' | 'preliminary_visit_image':
-            return preprocess_ccd_calexp(ccd_id, path)
+            return preprocess_ccd_calexp(ccd_ref, path)
         case _:  # pragma: no cover
-            raise ValueError(f'Unknown data_type: {ccd_id.visit.data_type}')
+            raise ValueError(f'Unknown data_type: {ccd_ref.visit.data_type}')
 
 
 def preprocess_ccd_calexp(
-    ccd_id: CcdId,
+    ccd_ref: CcdDataRef,
     path: Path,
 ) -> 'PreProcessedCcd':
-    ccd_name = ccd_id.ccd_name
-    with timeit(f'preprocess-{ccd_id.name}'):
+    ccd_name = ccd_ref.ccd_name
+    with timeit(f'preprocess-{ccd_ref.fullname}'):
         hdul = fast_open_comressed_fits(path)
         # header = hdul[0].header  # type: ignore
         # assert ccd_name == f'{header["RAFTNAME"]}_{header["SENSNAME"]}'
         bbox = ccds_by_name()[ccd_name].bbox
         pool: numpy.ndarray = numpy.array(hdul[1].data, dtype='<f4')  # type: ignore
-        with timeit(f'image-stat-{ccd_id.name}'):
+        with timeit(f'image-stat-{ccd_ref.fullname}'):
             stat = image_stat(pool)
         return PreProcessedCcd(
-            ccd_id=ccd_id,
+            data_ref=ccd_ref,
             bbox=bbox,
             pool=pool,
             stat=stat,
@@ -75,20 +76,20 @@ class RawAmp:
 
 
 def preprocess_ccd_raw(
-    ccd_id: CcdId,
+    ccd_ref: CcdDataRef,
     path: Path,
 ) -> 'PreProcessedCcd':
-    ccd_name = ccd_id.ccd_name
-    with timeit(f'preprocess-{ccd_id.name}'):
+    ccd_name = ccd_ref.ccd_name
+    with timeit(f'preprocess-{ccd_ref.fullname}'):
         hdul = fast_open_comressed_fits(path)
         header = hdul[0].header  # type: ignore
         assert ccd_name == f'{header["RAFTBAY"]}_{header["CCDSLOT"]}'
         amps = [RawAmp.from_hdu(j, hdu) for j, hdu in enumerate(hdul) if hdu.name.startswith('Segment')]  # type: ignore
         assembly = assemble_raw_amps(amps, ccd_name)
-        with timeit(f'image-stat-{ccd_id.name}'):
+        with timeit(f'image-stat-{ccd_ref.fullname}'):
             stat = image_stat(assembly.data)
         return PreProcessedCcd(
-            ccd_id=ccd_id,
+            data_ref=ccd_ref,
             bbox=assembly.bbox,
             pool=assembly.data,
             stat=stat,
@@ -106,7 +107,7 @@ def fast_open_comressed_fits(path: Path):
 class AssemblyResult:
     bbox: BBox
     data: numpy.ndarray
-    amp_metas: list['AmpMeta']
+    amp_metas: list['AmpMetadata']
 
 
 def assemble_raw_amps(amps: Iterable[RawAmp], ccd_name: str) -> AssemblyResult:
@@ -116,7 +117,7 @@ def assemble_raw_amps(amps: Iterable[RawAmp], ccd_name: str) -> AssemblyResult:
         (int(bbox.maxy - bbox.miny) + 1, int(bbox.maxx - bbox.minx) + 1),
         dtype=numpy.float32,
     )
-    amp_metas: list[AmpMeta] = []
+    amp_metas: list[AmpMetadata] = []
     for amp in amps:
         aligned = amp.wcs.align(amp.data)
         b = amp.wcs.bbox
@@ -125,7 +126,7 @@ def assemble_raw_amps(amps: Iterable[RawAmp], ccd_name: str) -> AssemblyResult:
             int(b.minx - bbox.minx) : int(b.maxx - bbox.minx + 1),
         ] = aligned
         amp_metas.append(
-            AmpMeta(
+            AmpMetadata(
                 amp_id=amp.fits_index,
                 bbox=b,
             )
@@ -221,16 +222,16 @@ class ImageStat:
 
 
 @dataclass
-class AmpMeta:
+class AmpMetadata:
     amp_id: int
     bbox: BBox
 
 
 @dataclass
 class PreProcessedCcd:
-    ccd_id: CcdId
+    data_ref: CcdDataRef
     bbox: BBox
     pool: numpy.ndarray
     stat: ImageStat
-    amps: list[AmpMeta]
+    amps: list[AmpMetadata]
     headers: list[HeaderType]

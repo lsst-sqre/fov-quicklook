@@ -10,7 +10,7 @@ import astropy.io.fits as afits
 import rtree
 
 from quicklook.config import config
-from quicklook.types import TilePos
+from quicklook.types import CcdName, TilePos
 from quicklook.utils.geom import BBox
 
 ccd_info_path = Path(__file__).parent / 'ccd-info.json'
@@ -29,7 +29,7 @@ class TileInfo:
     - レベルが1上がるごとにタイルの一辺の長さが2倍になる
     """
 
-    ccd_names: list[str]
+    ccd_names: list[CcdName]
     level: int
     i: int  # タイルの行インデックス
     j: int  # タイルの列インデックス
@@ -86,11 +86,11 @@ class TileInfo:
 class _Ccd:
     """CCDの情報を表す内部クラス."""
 
-    name: str
+    name: CcdName
     bbox: BBox
 
 
-def ccds_intersecting(bbox: BBox) -> list[str]:
+def ccds_intersecting(bbox: BBox) -> list[CcdName]:
     """指定された境界ボックスと交差するCCD名のリストを取得する.
 
     Args:
@@ -120,7 +120,7 @@ def ccd_list() -> list[_Ccd]:
 
     try:
         data = json.loads(ccd_info_path.read_text())
-        return [_Ccd(name=e['name'], bbox=BBox(**e['bbox'])) for e in data]
+        return [_Ccd(name=CcdName(e['name']), bbox=BBox(**e['bbox'])) for e in data]
     except json.JSONDecodeError as e:
         raise json.JSONDecodeError(f"CCD情報ファイルの形式が不正です: {e}", e.doc, e.pos) from e
     except KeyError as e:

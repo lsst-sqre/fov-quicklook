@@ -18,6 +18,8 @@ class Config(BaseSettings):
 
     tile_size: int = 256
     tile_max_level: int = 8
+    tile_pack: int = 2  # (1<<tile_pack) ** 2 個のタイルがまとめてオブジェクトストレージにアップロードされる。
+    # 例えばtile_pack==2のときは、16個のタイルがまとめてアップロードされる。
 
     fitsio_decompress_parallel: int = 4
     fitsio_tmpdir: Path = Path('/dev/shm/quicklook/fitsio')
@@ -51,8 +53,10 @@ class Config(BaseSettings):
     comm_heartbeat_timeout: int = 2  # seconds
     comm_registration_interval: int = 10  # seconds
 
+    max_job: int = 64
     generator_max_concurrent_jobs: int = 8
     merge_tile_parallel: int = 8
+    transfer_tile_parallel: int = 4
 
     # Logging settings
     log_level: Literal['debug', 'info', 'warning', 'error', 'critical'] = 'info'

@@ -3,8 +3,10 @@ import multiprocessing
 import os
 import signal
 import socket
+import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 import requests
@@ -61,6 +63,9 @@ def run_uvicorn_app(
 
 
 def uvicorn_run(app: str, *, port: int, log_prefix: str, log_level: str | int | None):
+    project_root = Path(__file__).resolve().parents[3]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
     uvicorn_add_log_prefix(log_prefix)
     uvicorn.run(
         app,

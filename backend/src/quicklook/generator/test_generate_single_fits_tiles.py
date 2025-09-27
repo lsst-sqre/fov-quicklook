@@ -1,10 +1,9 @@
 import pytest
 
 from quicklook.comm.generator import self_generator_id_context
-from quicklook.types import CcdId, Visit
-
 from quicklook.generator.generate_single_fits_tiles import generate_single_fits_tiles
 from quicklook.generator.job import Job
+from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue, VisitName
 
 
 @pytest.fixture(autouse=True, scope='module')
@@ -14,11 +13,12 @@ def set_generator_id():
 
 
 @pytest.fixture
-def broccoli_visit():
-    return Visit('raw:broccoli')
+def broccoli_visit() -> VisitName:
+    return VisitName('raw:broccoli')
 
 
-def test_generate_single_fits_tiles(broccoli_visit: Visit):
+def test_generate_single_fits_tiles(broccoli_visit: VisitName):
     job = Job(visit=broccoli_visit)
-    ccd_id = CcdId(broccoli_visit, 'R00_SG0')
-    generate_single_fits_tiles(job, ccd_id)
+    ccd_ref = CcdDataRef(visit=broccoli_visit, ccd=CcdName('R00_SG0'))
+    for _ in generate_single_fits_tiles(job, ccd_ref):
+        pass
