@@ -24,8 +24,7 @@ async def create_quickook(visit: VisitName):
         await _merge_tiles(job, ccd_generator_map)
         await _transfer_tiles(job)
     finally:
-        pass
-        # await rpc_scatter(Rpc.create(_cleanup, job))
+        await rpc_scatter(Rpc.create(_cleanup, job))
 
 
 async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
@@ -60,7 +59,7 @@ async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, str]):
                 job.status.notify()
 
     await rpc_scatter(Rpc.create(merge_single_fits_tiles, job), stream=True, on_yield=on_yield)
-    # await rpc_scatter(Rpc.create(_clear_single_fits_tiles, job))
+    await rpc_scatter(Rpc.create(_clear_single_fits_tiles, job))
 
 
 async def _transfer_tiles(job: Job):
