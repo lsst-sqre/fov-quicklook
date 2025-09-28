@@ -1,5 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Iterable
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Callable, Iterable
 
 import requests
 
@@ -10,6 +12,7 @@ from quicklook.job.job import Job
 from quicklook.tileinfo import ccds_by_name
 from quicklook.types import PackedTilePos, Progress, ReturnValue, TilePos
 from quicklook.utils.geom import BBox
+from quicklook.utils.stacklib import Stack, thread_local_context
 
 
 def transfer_tiles(job: Job):
@@ -110,3 +113,24 @@ def _iterate_pos(bbox: BBox):
         x1 //= 2
         y2 //= 2
         x2 //= 2
+
+
+@dataclass
+class ProcessContext:
+    thread_pool_executor: ThreadPoolExecutor
+    thread_local_requests_session: Callable[[], requests.Session]
+
+
+@contextmanager
+def enable_pool_context(n_threads: int):
+    with ThreadPoolExecutor(max_workers=n_threads) as executor:
+        with thread_local_context(requests.Session) as session:
+            ctx = ProcessContext(
+                thread_pool_executor=executor,
+                thread_local_requests_session=session,
+            )
+            with process_context.push(ctx):
+                yield
+
+
+process_context = Stack[ProcessContext]()

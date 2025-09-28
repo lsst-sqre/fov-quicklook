@@ -1,9 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
+import dis
+import threading
+from typing import Callable
 
 import numpy
 import requests
 
+from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.generator import self_generator_id
 from quicklook.comm.types import GeneratorInfo
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
@@ -11,6 +16,7 @@ from quicklook.job.job import Job
 from quicklook.types import CcdName, Progress, TilePos
 from quicklook.utils import multiprocessing_coverage_compatible, zstd
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
+from quicklook.utils.stacklib import Stack, pool_args, thread_local_context
 
 
 def merge_single_fits_tiles(job: Job):
@@ -19,8 +25,10 @@ def merge_single_fits_tiles(job: Job):
     # マージ対象のタイルは他のgeneratorに問い合わせて取得する
     # マージ対象でないタイルは他のgeneratorで処理される
     process_tiles_args = [_ProcessTileArgs(job=job, pos=pos) for pos in _iter_primary_pos(job)]
+    dist_config = job.local_storage.ccd_distribution_config.load()
+    n_generators = len(dist_config.generators)
     yield (p := Progress(len(process_tiles_args)))
-    with multiprocessing_coverage_compatible.Pool() as pool:
+    with multiprocessing_coverage_compatible.Pool(**pool_args(enable_pool_context, n_generators)) as pool:
         for _ in pool.imap_unordered(
             _process_tile,
             process_tiles_args,
@@ -80,14 +88,36 @@ def _gather_external_tile_data(
     pos: TilePos,
     external_generators: set[GeneratorInfo],
 ):
-    with ThreadPoolExecutor(len(external_generators)) as executor:
-        futures = {executor.submit(_get_npy, g, job_id, pos): g for g in external_generators}
-        for fut in as_completed(futures):
-            yield fut.result()
+    executor = process_context().thread_pool_executor
+    futures = (executor.submit(_get_npy, g, job_id, pos) for g in external_generators)
+    for fut in as_completed(futures):
+        yield fut.result()
 
 
 def _get_npy(generator: GeneratorInfo, job_id: str, pos: TilePos) -> numpy.ndarray | None:
     # OPTIMIZE: 接続を使い回す仕組みを考える
-    response = requests.get(f'{generator.url}/jobs/{job_id}/tiles/{pos.level}/{pos.i}/{pos.j}')
+    session = process_context().thread_local_requests_session()
+    response = session.get(f'{generator.url}/jobs/{job_id}/tiles/{pos.level}/{pos.i}/{pos.j}')
     response.raise_for_status()
     return npybytes2ndarray(response.content)
+
+
+@dataclass
+class ProcessContext:
+    thread_pool_executor: ThreadPoolExecutor
+    thread_local_requests_session: Callable[[], requests.Session]
+
+
+@contextmanager
+def enable_pool_context(n_threads:int):
+    with ThreadPoolExecutor(max_workers=n_threads) as executor:
+        with thread_local_context(requests.Session) as session:
+            ctx = ProcessContext(
+                thread_pool_executor=executor,
+                thread_local_requests_session=session,
+            )
+            with process_context.push(ctx):
+                yield
+
+
+process_context = Stack[ProcessContext]()
