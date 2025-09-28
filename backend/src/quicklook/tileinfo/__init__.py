@@ -101,7 +101,7 @@ def ccds_intersecting(bbox: BBox) -> list[CcdName]:
     """
     ccd_indices = rtree_index().intersection([bbox.minx, bbox.miny, bbox.maxx, bbox.maxy])
     ccds = ccd_list()
-    return [ccds[i].name for i in sorted(ccd_indices)]
+    return [ccds[i].name for i in ccd_indices]
 
 
 @cache
