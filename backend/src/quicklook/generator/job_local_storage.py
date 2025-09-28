@@ -61,6 +61,7 @@ class JobLocalStorage:
 
     @cached_property
     def logger(self) -> logging.Logger:
+        # デバッグ用
         logger_name = f'{__name__}.{self.job.id}'
         logger = logging.getLogger(logger_name)
 

@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Iterable
+from typing import Iterable
 
 import requests
 
@@ -43,22 +43,7 @@ def _process_packed_tile(job: Job, packed_pos: PackedTilePos):
             return
 
         if primary_generator_id == self_generator_id():
-            try:
-                return job.local_storage.merged_fits_tile.load_compressed_data(pos)
-            except Exception as e:
-                from pprint import pprint
-
-                pprint(
-                    {
-                        'error': str(e),
-                        'job_id': job.id,
-                        'tile_pos': pos,
-                        'primary_generator_id': primary_generator_id,
-                        'self_generator_id': self_generator_id(),
-                        'dist_config': ga.dist_config,
-                    }
-                )
-                raise e
+            return job.local_storage.merged_fits_tile.load_compressed_data(pos)
         else:
             base_url = ga.dist_config.generators[primary_generator_id].url
             response = requests.get(f'{base_url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}', timeout=10)

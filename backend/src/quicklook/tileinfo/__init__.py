@@ -7,11 +7,11 @@ from functools import cache
 from pathlib import Path
 
 import astropy.io.fits as afits
-import rtree
 
 from quicklook.config import config
 from quicklook.types import CcdName, TilePos
 from quicklook.utils.geom import BBox
+from quicklook.utils.rtree import RectangleIndex
 
 ccd_info_path = Path(__file__).parent / 'ccd-info.json'
 
@@ -138,15 +138,22 @@ def ccds_by_name() -> dict[str, _Ccd]:
 
 
 @cache
-def rtree_index() -> rtree.index.Index:
-    """CCD検索用のR-treeインデックスを取得する.
+def rtree_index() -> RectangleIndex:
+    """CCD検索用の矩形インデックスを取得する."""
 
-    Returns:
-        R-treeインデックス
-    """
-    index = rtree.index.Index()
-    for i, ccd in enumerate(ccd_list()):
-        index.insert(i, [ccd.bbox.minx, ccd.bbox.miny, ccd.bbox.maxx, ccd.bbox.maxy])
+    index = RectangleIndex()
+    index.bulk_load(
+        (
+            i,
+            (
+                ccd.bbox.minx,
+                ccd.bbox.miny,
+                ccd.bbox.maxx,
+                ccd.bbox.maxy,
+            ),
+        )
+        for i, ccd in enumerate(ccd_list())
+    )
     return index
 
 

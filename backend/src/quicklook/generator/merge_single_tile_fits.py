@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from pprint import pformat
 
 import numpy
 import requests
@@ -34,21 +33,14 @@ def merge_single_fits_tiles(job: Job):
 
 def _iter_primary_pos(job: Job):
     # プライマリジェネレータが自分自身であるTilePosをiterateする
-    logger = job.local_storage.logger
-    logger.info(f'merge: Start iterating primary positions')
-    
     storage = job.local_storage
     for pos in storage.single_fits_tile.iter_tiles():
-        logger.info(f'merge: Found position: {pos}')
         try:
             ga = GeneratorAssignment(job, pos)
-            logger.info(pformat(ga.dist_config))
             primary_generator_id = ga.primary_generator_id()
         except NoGeneratorFoundError:
-            logger.warning(f'merge: No generator found for position: {pos}')
             continue
         if primary_generator_id == self_generator_id():
-            logger.info(f'merge: Found primary position: {pos}')
             yield pos
 
 
