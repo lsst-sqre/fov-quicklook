@@ -25,12 +25,14 @@ class JobStatus:
     def from_job(cls, job: Job) -> 'JobStatus':
         return cls(job)
 
-    def notify(self):
-        # display_status(self)
-        ...
+    def notify(self, columns: int | None = None):
+        display_status(self, columns=columns)
 
 
-def display_status(status: JobStatus):
+screen_columns = 2
+
+
+def display_status(status: JobStatus, *, columns: int | None = None):
     from shutil import get_terminal_size
     import sys
 
@@ -39,15 +41,18 @@ def display_status(status: JobStatus):
     sys.stdout.flush()
 
     terminal_width = get_terminal_size(fallback=(120, 24)).columns
-    bar_width = min(60, max(10, terminal_width - 36))
+    indent = '  '
+    requested_columns = columns if columns and columns > 0 else screen_columns
+    requested_columns = max(1, requested_columns)
+    minimal_column_width = 28
 
-    def format_progress(label: str, progress: Progress) -> list[str]:
+    available_width = max(1, terminal_width - len(indent))
+
+    def format_progress(label: str, progress: Progress, width: int) -> str:
         total = progress.total
         count = progress.count
         clamped_total = total if total > 0 else 0
         ratio = 0.0 if clamped_total == 0 else min(1.0, max(0.0, count / clamped_total))
-        filled = int(bar_width * ratio)
-        bar = f"[{'#' * filled}{'.' * (bar_width - filled)}]"
 
         if clamped_total == 0:
             percent_text = '  N/A '
@@ -56,15 +61,77 @@ def display_status(status: JobStatus):
             percent_text = f'{ratio * 100:6.2f}%'
             total_text = f'({count}/{clamped_total})'
 
-        return [
-            f'{label}',
-            f'  {bar} {percent_text} {total_text}',
-        ]
+        label_text = f'• {label}'
+
+        other_width = len(percent_text) + len(total_text) + 5
+        available = max(1, width - other_width)
+
+        min_label_reserved = 4
+        available_for_bar = max(1, available - min_label_reserved)
+        preferred_bar = min(24, max(8, available * 2 // 3))
+        bar_width = max(1, min(preferred_bar, available_for_bar))
+        label_width = max(1, available - bar_width)
+
+        if len(label_text) > label_width:
+            ellipsis_reserved = 1 if label_width > 1 else 0
+            label_text = label_text[:label_width - ellipsis_reserved]
+            if ellipsis_reserved:
+                label_text += '…'
+
+        label_field = label_text.ljust(label_width)
+
+        bar_fill = min(bar_width, max(0, int(bar_width * ratio)))
+        bar_empty = bar_width - bar_fill
+        bar = f"[{'#' * bar_fill}{'.' * bar_empty}]"
+
+        return f"{label_field} {bar} {percent_text} {total_text}".ljust(width)
+
+    def determine_layout(entry_count: int) -> tuple[int, list[int]]:
+        if entry_count <= 0:
+            return 0, []
+
+        columns_to_use = min(entry_count, requested_columns)
+        while columns_to_use > 1 and available_width // columns_to_use < minimal_column_width:
+            columns_to_use -= 1
+
+        columns_to_use = max(1, columns_to_use)
+        base_width = max(1, available_width // columns_to_use)
+        column_widths = [base_width] * columns_to_use
+        leftover = available_width - base_width * columns_to_use
+        for index in range(leftover):
+            column_widths[index] += 1
+
+        return columns_to_use, column_widths
+
+    def render_section_rows(items: list[tuple[str, Progress]]) -> list[str]:
+        entry_count = len(items)
+        if entry_count == 0:
+            return []
+
+        columns_to_use, column_widths = determine_layout(entry_count)
+        rows: list[str] = []
+        buffer: list[str] = []
+        for index, (label, progress) in enumerate(items):
+            column_index = index % columns_to_use
+            width = column_widths[column_index]
+            buffer.append(format_progress(label, progress, width))
+            if column_index == columns_to_use - 1:
+                rows.append(indent + ''.join(buffer))
+                buffer = []
+
+        if buffer:
+            start_column = len(buffer)
+            for column_index in range(start_column, columns_to_use):
+                width = column_widths[column_index]
+                buffer.append(' ' * width)
+            rows.append(indent + ''.join(buffer))
+
+        return rows
 
     def section(title: str, data: Mapping[str, Progress]) -> list[str]:
         output: list[str] = [title, '-' * len(title)]
         if not data:
-            output.append('  (no entries)')
+            output.append(f'{indent}(no entries)')
             return output
 
         total_sum = sum(progress.total for progress in data.values())
@@ -72,13 +139,13 @@ def display_status(status: JobStatus):
         if total_sum > 0:
             ratio = min(1.0, max(0.0, count_sum / total_sum))
             percent_text = f'{ratio * 100:6.2f}%'
-            summary = f'  summary: {percent_text} ({count_sum}/{total_sum})'
+            summary = f'{indent}summary: {percent_text} ({count_sum}/{total_sum})'
         else:
-            summary = f'  summary:  N/A  ({count_sum}/-)'
+            summary = f'{indent}summary:  N/A  ({count_sum}/-)'
         output.append(summary)
 
-        for key, progress in sorted(data.items(), key=lambda item: str(item[0])):
-            output.extend(format_progress(f'• {key}', progress))
+        sorted_entries = sorted(((str(key), progress) for key, progress in data.items()), key=lambda item: item[0])
+        output.extend(render_section_rows(sorted_entries))
         return output
 
     lines: list[str] = []
