@@ -6,6 +6,7 @@ from typing import Callable, Iterable
 import requests
 
 from quicklook.comm.generator import self_generator_id
+from quicklook.comm.types import GeneratorInfo
 from quicklook.config import config
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
 from quicklook.job.job import Job
@@ -56,17 +57,7 @@ def _process_packed_tile(args: ProcessPackedTileArgs):
         if primary_generator_id == self_generator_id():
             return job.local_storage.merged_fits_tile.load_compressed_data(pos)
         else:
-            base_url = ga.dist_config.generators[primary_generator_id].url
-            session = process_context().thread_local_requests_session()
-            response = session.get(f'{base_url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}', timeout=10)
-            match response.status_code:
-                case 200:
-                    return response.content
-                case 404:  # pragma: no cover
-                    # ここには来ないはずだが
-                    return
-                case _:  # pragma: no cover
-                    response.raise_for_status()
+            return _get_external_tile(ga.dist_config.generators[primary_generator_id], job, pos)
 
     executor = process_context().thread_pool_executor
     merged_tiles = executor.map(
@@ -75,6 +66,20 @@ def _process_packed_tile(args: ProcessPackedTileArgs):
     )
     uploaded_size = job.object_storage.put_packed_tile_array(packed_pos, [*merged_tiles])
     return uploaded_size
+
+
+def _get_external_tile(g: GeneratorInfo, job: Job, pos: TilePos) -> bytes | None:
+    base_url = g.url
+    session = process_context().thread_local_requests_session()
+    response = session.get(f'{base_url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}', timeout=10)
+    match response.status_code:
+        case 200:
+            return response.content
+        case 404:  # pragma: no cover
+            # ここには来ないはずだが
+            return
+        case _:  # pragma: no cover
+            response.raise_for_status()
 
 
 def _iter_primary_packed_tile_pos(job: Job) -> Iterable[PackedTilePos]:

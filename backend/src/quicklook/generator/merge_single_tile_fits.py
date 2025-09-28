@@ -94,13 +94,12 @@ def _gather_external_tile_data(
     external_generators: set[GeneratorInfo],
 ):
     executor = process_context().thread_pool_executor
-    futures = (executor.submit(_get_npy, g, job_id, pos) for g in external_generators)
+    futures = (executor.submit(_get_external_tile, g, job_id, pos) for g in external_generators)
     for fut in as_completed(futures):
         yield fut.result()
 
 
-def _get_npy(generator: GeneratorInfo, job_id: str, pos: TilePos) -> numpy.ndarray | None:
-    # OPTIMIZE: 接続を使い回す仕組みを考える
+def _get_external_tile(generator: GeneratorInfo, job_id: str, pos: TilePos) -> numpy.ndarray | None:
     session = process_context().thread_local_requests_session()
     response = session.get(f'{generator.url}/jobs/{job_id}/tiles/{pos.level}/{pos.i}/{pos.j}')
     response.raise_for_status()
