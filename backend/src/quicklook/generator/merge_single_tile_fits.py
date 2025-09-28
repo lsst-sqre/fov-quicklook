@@ -28,7 +28,12 @@ def merge_single_fits_tiles(job: Job):
     dist_config = job.local_storage.ccd_distribution_config.load()
     n_generators = len(dist_config.generators)
     yield (p := Progress(len(process_tiles_args)))
-    with multiprocessing_coverage_compatible.Pool(**pool_args(enable_pool_context, n_generators)) as pool:
+    with multiprocessing_coverage_compatible.Pool(
+        **pool_args(
+            enable_pool_context,
+            n_generators,
+        )
+    ) as pool:
         for _ in pool.imap_unordered(
             _process_tile,
             process_tiles_args,
@@ -109,7 +114,7 @@ class ProcessContext:
 
 
 @contextmanager
-def enable_pool_context(n_threads:int):
+def enable_pool_context(n_threads: int):
     with ThreadPoolExecutor(max_workers=n_threads) as executor:
         with thread_local_context(requests.Session) as session:
             ctx = ProcessContext(

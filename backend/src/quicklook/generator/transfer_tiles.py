@@ -11,8 +11,9 @@ from quicklook.generator.generator_assignment import GeneratorAssignment, NoGene
 from quicklook.job.job import Job
 from quicklook.tileinfo import ccds_by_name
 from quicklook.types import PackedTilePos, Progress, ReturnValue, TilePos
+from quicklook.utils import multiprocessing_coverage_compatible
 from quicklook.utils.geom import BBox
-from quicklook.utils.stacklib import Stack, thread_local_context
+from quicklook.utils.stacklib import Stack, pool_args, thread_local_context
 
 
 def transfer_tiles(job: Job):
@@ -23,10 +24,9 @@ def transfer_tiles(job: Job):
 
     uploaded_size = 0
 
-    with ThreadPoolExecutor(config.transfer_tile_parallel) as executor:
-        futs = [executor.submit(_process_packed_tile, job, pos) for pos in packed_pos_list]
-        for fut in as_completed(futs):
-            uploaded_size += fut.result()
+    with multiprocessing_coverage_compatible.Pool(config.transfer_tile_parallel, **pool_args(enable_pool_context, 16)) as pool:
+        for result in pool.imap_unordered(_process_packed_tile, (ProcessPackedTileArgs(job, pos) for pos in packed_pos_list)):
+            uploaded_size += result
             for _ in p.update_and_yield_every(16):
                 yield p
 
@@ -34,7 +34,15 @@ def transfer_tiles(job: Job):
     yield ReturnValue(uploaded_size)
 
 
-def _process_packed_tile(job: Job, packed_pos: PackedTilePos):
+@dataclass
+class ProcessPackedTileArgs:
+    job: Job
+    packed_pos: PackedTilePos
+
+
+def _process_packed_tile(args: ProcessPackedTileArgs):
+    job = args.job
+    packed_pos = args.packed_pos
     # とあるpacked_tileに対してそれに含まれるtileを集めて
     # オブジェクトストレージにアップロードする
 
@@ -49,7 +57,8 @@ def _process_packed_tile(job: Job, packed_pos: PackedTilePos):
             return job.local_storage.merged_fits_tile.load_compressed_data(pos)
         else:
             base_url = ga.dist_config.generators[primary_generator_id].url
-            response = requests.get(f'{base_url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}', timeout=10)
+            session = process_context().thread_local_requests_session()
+            response = session.get(f'{base_url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}', timeout=10)
             match response.status_code:
                 case 200:
                     return response.content
@@ -59,13 +68,13 @@ def _process_packed_tile(job: Job, packed_pos: PackedTilePos):
                 case _:  # pragma: no cover
                     response.raise_for_status()
 
-    with ThreadPoolExecutor((1 << config.tile_pack) ** 2) as executor:
-        merged_tiles = executor.map(
-            get_merged_tile,
-            packed_pos.unpackeds(),
-        )
-        uploaded_size = job.object_storage.put_packed_tile_array(packed_pos, [*merged_tiles])
-        return uploaded_size
+    executor = process_context().thread_pool_executor
+    merged_tiles = executor.map(
+        get_merged_tile,
+        packed_pos.unpackeds(),
+    )
+    uploaded_size = job.object_storage.put_packed_tile_array(packed_pos, [*merged_tiles])
+    return uploaded_size
 
 
 def _iter_primary_packed_tile_pos(job: Job) -> Iterable[PackedTilePos]:
