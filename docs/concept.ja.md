@@ -66,10 +66,8 @@ LSST Camから得られる画像は１ショット189個のFITSファイルか�
 
 ### coordinator内メモリ
 
-* 生成中のquicklook
-  * どのgeneratorがどのFITSファイルを担当しているか
-  * どのgeneratorがどのタイルを持っているか
-  * 生成処理の進捗
+* 処理中のjob
+* 処理リクエスト
 
 ### データベース
 
@@ -83,3 +81,23 @@ LSST Camから得られる画像は１ショット189個のFITSファイルか�
       * サイズ合計
       * 生成日時
 
+## リクエストキュー
+
+* ユーザーがページを開くとそのvisitのリクエストがリクエストキューに入る
+* リクエストエントリーは次のような情報を持つ
+    ```python
+    @dataclass
+    class RequestEntry:
+        visit: VisitName
+        vote: int
+        first_request: datetime
+    ```
+* `vote`, `- first_request`大きい順に処理スロットが空いたら処理を開始する。
+  * つまり、投票の多いもの、同じ投票数なら古いものから順に処理を開始する。
+  * 投票はページを開くと1増え、ページから去ると1減る。
+* `generate_single_fits_tile`, `merge_tiles`など処理それぞれに`semaphore`を設けて同時実行数を制限する。
+
+### 実装
+
+処理スロットが空いたタイミングでrequest queueで一番優先順位の高いものをpushする。
+処理スロットが空くのを検知するには、

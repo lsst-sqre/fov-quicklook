@@ -38,7 +38,7 @@ def _iter_primary_pos(job: Job):
         try:
             ga = GeneratorAssignment(job, pos)
             primary_generator_id = ga.primary_generator_id()
-        except NoGeneratorFoundError:
+        except NoGeneratorFoundError:  # pragma: no cover
             continue
         if primary_generator_id == self_generator_id():
             yield pos
