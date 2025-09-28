@@ -1,4 +1,3 @@
-from os import rmdir
 import shutil
 from quicklook.config import config
 import pytest
@@ -8,4 +7,4 @@ import pytest
 def clear_temp_files():
     config.job_local_dir.mkdir(parents=True, exist_ok=True)
     yield
-    # shutil.rmtree(config.job_local_dir, ignore_errors=True)
+    shutil.rmtree(config.job_local_dir, ignore_errors=True)
