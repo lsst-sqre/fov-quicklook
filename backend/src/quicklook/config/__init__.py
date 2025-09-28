@@ -52,6 +52,7 @@ class Config(BaseSettings):
     comm_heartbeat_interval: int = 10  # seconds
     comm_heartbeat_timeout: int = 2  # seconds
     comm_registration_interval: int = 10  # seconds
+    rpc_timeout_total: float = 300  # seconds
 
     max_job: int = 64
     generator_max_concurrent_jobs: int = 8

@@ -2,8 +2,8 @@ from os import terminal_size
 
 import pytest
 
-from quicklook.generator.job import Job
-from quicklook.job_status import JobStatus, display_status
+from quicklook.job.job import Job
+from quicklook.job.job_status import JobStatus, display_status
 from quicklook.types import CcdName, Progress, VisitName
 
 

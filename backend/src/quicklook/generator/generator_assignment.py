@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import cache, cached_property
 
-from quicklook.generator.job import Job
+from quicklook.job.job import Job
 from quicklook.tileinfo import TileInfo
 from quicklook.types import TilePos
 

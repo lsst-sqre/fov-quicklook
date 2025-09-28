@@ -4,10 +4,10 @@ from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.rpc import Rpc
 from quicklook.datasource import get_datasource
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate_single_fits_tiles
-from quicklook.generator.job import Job
-from quicklook.generator.job_local_storage import CcdDistributionConfig
 from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_tiles import transfer_tiles
+from quicklook.job.job import Job
+from quicklook.job.job_local_storage import CcdDistributionConfig
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue, VisitName
 
 from ..comm.rpc_worker import YieledValue, adaptive_map_rpc, rpc_endpoint, rpc_scatter
@@ -64,13 +64,19 @@ async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, str]):
 
 
 async def _transfer_tiles(job: Job):
+    uploaded_size = 0
+
     def on_yield(msg):
+        nonlocal uploaded_size
         match msg:
             case YieledValue(value=Progress() as p, generator_id=generator_id):
                 job.status.transfer_tiles[generator_id] = p
                 job.status.notify()
+            case YieledValue(value=ReturnValue(value=int() as _uploaded_size), generator_id=generator_id):
+                uploaded_size += _uploaded_size
 
     await rpc_scatter(Rpc.create(transfer_tiles, job), stream=True, on_yield=on_yield)
+    print(uploaded_size)
 
 
 def _save_ccd_distribution_config(job: Job, dist_config: CcdDistributionConfig):

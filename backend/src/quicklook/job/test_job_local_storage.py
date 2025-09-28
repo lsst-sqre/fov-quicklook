@@ -2,8 +2,8 @@ import pytest
 
 from quicklook.comm.generator import self_generator_id_context
 from quicklook.config import config
-from quicklook.generator.job import Job
-from quicklook.generator.job_local_storage import JobLocalStorage
+from quicklook.job.job import Job
+from quicklook.job.job_local_storage import JobLocalStorage
 from quicklook.types import VisitName
 
 

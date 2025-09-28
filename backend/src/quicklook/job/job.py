@@ -11,7 +11,7 @@ class Job:
 
     @classmethod
     def from_id(cls, id: str):
-        from quicklook.generator.job_local_storage import JobLocalStorage
+        from quicklook.job.job_local_storage import JobLocalStorage
 
         return JobLocalStorage.from_id(id).job
 
@@ -31,6 +31,6 @@ class Job:
 
     @property
     def status(self):
-        from quicklook.job_status import JobStatus
+        from quicklook.job.job_status import JobStatus
 
         return JobStatus.from_job(self)

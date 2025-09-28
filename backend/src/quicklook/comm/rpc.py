@@ -15,7 +15,9 @@ from typing import Any, AsyncGenerator, Callable, Generator, Generic, ParamSpec,
 import aiohttp
 
 from quicklook.utils.iterutils import async_bytes_iterator_to_stream
+from quicklook.config import config
 
+timeout_total = config.rpc_timeout_total
 logger = getLogger(__name__)
 
 P = ParamSpec('P')
@@ -46,7 +48,7 @@ async def run_rpc(
     url,
     rpc: Rpc[T],
     *,
-    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=60),
+    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=timeout_total),
 ) -> T:
     """RPCを実行し、単一の結果を返す。
 
@@ -63,7 +65,7 @@ async def run_rpc_stream(
     url: str,
     rpc: Rpc[T],
     *,
-    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=60),
+    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=timeout_total),
 ) -> AsyncGenerator[T, None]:
     """RPCを実行し、結果をストリームで返す。
 

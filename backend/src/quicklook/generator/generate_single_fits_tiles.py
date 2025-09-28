@@ -11,7 +11,7 @@ from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue, Tile
 from quicklook.utils.geom import BBox
 from quicklook.utils.timer import Timer
 
-from .job import Job
+from quicklook.job.job import Job
 
 ds = get_datasource()
 

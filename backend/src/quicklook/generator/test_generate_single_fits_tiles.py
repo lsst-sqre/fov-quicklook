@@ -2,8 +2,8 @@ import pytest
 
 from quicklook.comm.generator import self_generator_id_context
 from quicklook.generator.generate_single_fits_tiles import generate_single_fits_tiles
-from quicklook.generator.job import Job
-from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue, VisitName
+from quicklook.job.job import Job
+from quicklook.types import CcdDataRef, CcdName, VisitName
 
 
 @pytest.fixture(autouse=True, scope='module')

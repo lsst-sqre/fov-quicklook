@@ -10,7 +10,7 @@ import numpy
 from quicklook.comm.generator import self_generator_id
 from quicklook.comm.types import GeneratorInfo
 from quicklook.config import config
-from quicklook.generator.job import Job
+from quicklook.job.job import Job
 from quicklook.tileinfo import TileInfo
 from quicklook.types import CcdDataRef, CcdName, Tile, TilePos
 from quicklook.utils.fitsheader import HeaderType

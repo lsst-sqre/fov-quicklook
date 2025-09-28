@@ -6,7 +6,7 @@ import requests
 from quicklook.comm.generator import self_generator_id
 from quicklook.config import config
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
-from quicklook.generator.job import Job
+from quicklook.job.job import Job
 from quicklook.tileinfo import ccds_by_name
 from quicklook.types import PackedTilePos, Progress, ReturnValue, TilePos
 from quicklook.utils.geom import BBox
@@ -53,7 +53,7 @@ def _process_packed_tile(job: Job, packed_pos: PackedTilePos):
                 case 404:  # pragma: no cover
                     # ここには来ないはずだが
                     return
-                case _:
+                case _:  # pragma: no cover
                     response.raise_for_status()
 
     with ThreadPoolExecutor((1 << config.tile_pack) ** 2) as executor:

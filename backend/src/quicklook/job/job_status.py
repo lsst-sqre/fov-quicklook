@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Literal, cast
 
 from quicklook.config import config
-from quicklook.generator.job import Job
+from quicklook.job.job import Job
 from quicklook.types import CcdName, Progress
 
 JobPhase = Literal['generate_single_fits_tiles', 'merge_tiles', 'transfer_tiles']
@@ -29,7 +29,7 @@ class JobStatus:
         display_status(self, columns=columns)
 
 
-screen_columns = 2
+screen_columns = 5
 
 
 def display_status(status: JobStatus, *, columns: int | None = None):

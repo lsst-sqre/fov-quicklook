@@ -7,7 +7,7 @@ import requests
 from quicklook.comm.generator import self_generator_id
 from quicklook.comm.types import GeneratorInfo
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
-from quicklook.generator.job import Job
+from quicklook.job.job import Job
 from quicklook.types import CcdName, Progress, TilePos
 from quicklook.utils import multiprocessing_coverage_compatible, zstd
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
