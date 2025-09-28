@@ -15,7 +15,6 @@ install_requires = [
     'pydantic-settings~=2.10.0',
     'numpy~=2.3.0',
     'astropy~=7.1.0',
-    'rtree~=1.4.1',
     'boto3~=1.40.0',
     'minio~=7.2.0',
     'lsst-daf-butler',
