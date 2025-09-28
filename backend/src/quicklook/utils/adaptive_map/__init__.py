@@ -88,17 +88,18 @@ class _HelperWorker(Worker):
         return self._current_capacity
 
     async def submit(self, item: Any) -> Any:
-        async with self._lock:
-            if self._shutdown:  # pragma: no cover
-                raise RuntimeError("Worker is shutdown")
+        while True:
+            async with self._lock:
+                if self._shutdown:  # pragma: no cover
+                    raise RuntimeError("Worker is shutdown")
 
-            if self._current_capacity <= 0:  # pragma: no cover
-                raise RuntimeError("Worker has no capacity")
+                if self._current_capacity > 0:
+                    self._current_capacity -= 1
+                    if self._current_capacity == 0:  # pragma: no branch
+                        self._capacity_changed.clear()
+                    break
 
-            # capacityを減らす
-            self._current_capacity -= 1
-            if self._current_capacity == 0:  # pragma: no branch
-                self._capacity_changed.clear()
+            await self._capacity_changed.wait()
 
         try:
             result = await self._process_item(item)

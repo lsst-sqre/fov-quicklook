@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from typing import Any
 import uuid
 
@@ -334,6 +335,49 @@ async def test_adaptive_map_requires_workers_when_items() -> None:
 async def test_adaptive_map_handles_empty_workers_and_items() -> None:
     results = [result async for result in adaptive_map([], [])]
     assert results == []
+
+
+async def test_helper_worker_submit_waits_for_capacity() -> None:
+    started: list[str] = []
+    first_done = asyncio.Event()
+    second_done = asyncio.Event()
+
+    async def process_item(item: str) -> str:
+        started.append(item)
+        if item == "first":
+            await first_done.wait()
+        else:
+            await second_done.wait()
+        return item
+
+    worker = create_worker(str(uuid.uuid4()), process_item, max_concurrency=1)
+
+    tasks = [
+        asyncio.create_task(worker.submit("first")),
+        asyncio.create_task(worker.submit("second")),
+    ]
+
+    try:
+        await asyncio.sleep(0)
+        assert started == ["first"]
+
+        first_done.set()
+        assert await asyncio.wait_for(tasks[0], timeout=1.0) == "first"
+
+        await asyncio.sleep(0)
+        assert started == ["first", "second"]
+
+        second_done.set()
+        assert await asyncio.wait_for(tasks[1], timeout=1.0) == "second"
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        for task in tasks:
+            with suppress(asyncio.CancelledError):
+                await task
+
+    await worker.teardown()
 
 
 async def test_helper_worker_capacity_zero_after_teardown() -> None:
