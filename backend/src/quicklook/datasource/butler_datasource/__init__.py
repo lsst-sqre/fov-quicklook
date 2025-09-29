@@ -31,19 +31,19 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
 
         chown_pgpassfile()
 
-    def query_visits(self, q: Query) -> list[VisitEntry]:
+    def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return get_datasource(q.data_type).query_visits(q)
 
-    def list_ccds(self, visit: VisitName) -> list[CcdName]:
+    def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
         return get_datasource(visit.data_type).list_ccds(visit)
 
-    def get_data(self, ref: CcdDataRef) -> bytes:
+    def get_data_sync(self, ref: CcdDataRef) -> bytes:
         return get_datasource(ref.visit.data_type).get_data(ref)
 
-    def get_metadata(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
+    def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
         return get_datasource(ref.visit.data_type).get_metadata(ref)
 
-    def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]:
+    def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         types: list[CcdDataType] = []
         for data_type in cast(list[CcdDataType], ['raw', 'post_isr_image', 'preliminary_visit_image']):
             datasource = get_datasource(data_type)

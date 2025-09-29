@@ -1,4 +1,5 @@
 import abc
+import asyncio
 from dataclasses import dataclass
 
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
@@ -27,23 +28,39 @@ class VisitEntry:
 
 class DataSourceBase(abc.ABC):
     @abc.abstractmethod
-    def query_visits(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
+    def query_visits_sync(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
         ...
 
-    @abc.abstractmethod
-    def list_ccds(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover
-        ...
+    async def query_visits(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
+        return await asyncio.to_thread(self.query_visits_sync, q)
 
     @abc.abstractmethod
-    def get_data(self, ref: CcdDataRef) -> bytes:  # pragma: no cover
+    def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover
         ...
 
-    @abc.abstractmethod
-    def get_metadata(self, ref: CcdDataRef) -> 'DataSourceCcdMetadata':  # pragma: no cover
-        ...
+    async def list_ccds(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover
+        return await asyncio.to_thread(self.list_ccds_sync, visit)
 
     @abc.abstractmethod
-    def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]: ...
+    def get_data_sync(self, ref: CcdDataRef) -> bytes:  # pragma: no cover
+        ...
+
+    async def get_data(self, ref: CcdDataRef) -> bytes:  # pragma: no cover
+        return await asyncio.to_thread(self.get_data_sync, ref)
+
+    @abc.abstractmethod
+    def get_metadata_sync(self, ref: CcdDataRef) -> 'DataSourceCcdMetadata':  # pragma: no cover
+        ...
+
+    async def get_metadata(self, ref: CcdDataRef) -> 'DataSourceCcdMetadata':  # pragma: no cover
+        return await asyncio.to_thread(self.get_metadata_sync, ref)
+
+    @abc.abstractmethod
+    def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:  # pragma: no cover
+        ...
+
+    async def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]:  # pragma: no cover
+        return await asyncio.to_thread(self.get_exposure_data_types_sync, exposure_id)
 
 
 @dataclass

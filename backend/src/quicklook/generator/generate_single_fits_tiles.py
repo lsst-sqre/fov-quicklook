@@ -22,7 +22,7 @@ def generate_single_fits_tiles(
 ):
     yield (progress := Progress(total=3))
 
-    data_bytes = ds.get_data(ref)
+    data_bytes = ds.get_data_sync(ref)
     yield progress.update()
 
     try:

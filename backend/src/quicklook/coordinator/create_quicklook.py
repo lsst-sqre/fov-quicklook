@@ -17,7 +17,7 @@ ds = get_datasource()
 
 async def create_quicklook(job: Job):
     visit = job.visit
-    ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in ds.list_ccds(visit)]
+    ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
     try:
         await rpc_scatter(Rpc.create(_save_job_metadata, job))
         ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)

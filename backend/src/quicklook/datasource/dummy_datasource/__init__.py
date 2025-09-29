@@ -11,27 +11,27 @@ from ..types import DataSourceBase, DataSourceCcdMetadata, Query, VisitName
 
 
 class DummyDataSource(DataSourceBase):
-    def query_visits(self, q: Query) -> list[VisitEntry]:
+    def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return [
             create_dummy_visit_entry("raw:broccoli", 20230101, "r", 30.0, target_name="dummy_target"),
             create_dummy_visit_entry("calexp:192350", 20230102, "g", 15.0, target_name="dummy_target_2"),
             *[create_dummy_visit_entry(f"raw:dummy-{i}", 20230104, "z") for i in range(50)],
         ][: q.limit]
 
-    def list_ccds(self, visit: VisitName) -> list[CcdName]:
+    def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
         ccds = [*_s3_list_visit_ccds(visit)]
         if config.environment == 'test':
             pass
             # ccds = ccds[:50]  # テスト環境では4つに制限
         return ccds
 
-    def get_data(self, ref: CcdDataRef) -> bytes:
+    def get_data_sync(self, ref: CcdDataRef) -> bytes:
         if ref.visit.data_type == "calexp":
             return _s3_get_visit_ccd_fits_calexp(ref)
         else:
             return _s3_get_visit_ccd_fits_raw(ref)
 
-    def get_metadata(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
+    def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
         i = Instrument.get("LSSTCam")
         return DataSourceCcdMetadata(
             detector=i.ccd_2_detector[ref.ccd_name],
@@ -42,7 +42,7 @@ class DummyDataSource(DataSourceBase):
             uuid=f"dummy-uuid-{ref.visit.name}-{ref.ccd_name}",
         )
 
-    def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]:
+    def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         return ['raw', 'post_isr_image']
 
 
