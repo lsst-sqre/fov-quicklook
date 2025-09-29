@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 import pytest
 
-from quicklook.comm.rpc import Rpc, create_rpc_caller_endpoint, run_rpc, run_rpc_stream
+from quicklook.comm.rpc import Rpc, create_rpc_caller_endpoint, run_rpc, run_rpc_stream, RpcRemoteError
 from quicklook.dev.run_uvicorn import run_uvicorn_app
 
 
@@ -94,10 +94,11 @@ async def test_rpc_error_generator_stream_with_uvicorn():
         try:
             async for result in run_rpc_stream(f"{app_runner.base_url}/rpc", rpc):
                 results.append(result)
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
+            assert False, "Should have raised RpcRemoteError"
+        except RpcRemoteError as e:
             # 最初の2つは正常にyieldされ、3つ目はValueError
-            assert str(e) == "Test error in generator"
+            assert isinstance(e.exception, ValueError)
+            assert str(e.exception) == "Test error in generator"
             assert len(results) == 2
             assert results[0] == 0
             assert results[1] == 1

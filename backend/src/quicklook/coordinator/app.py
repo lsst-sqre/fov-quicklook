@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from quicklook.comm.coordinator import router as comm_coordinator_router, lifespan as coordinator_lifespan
-from quicklook.coordinator.quicklook import create_quickook
+from quicklook.coordinator.create_quicklook import create_quicklook
+from quicklook.job.job import Job
 from quicklook.types import VisitName
 
 app = FastAPI(lifespan=coordinator_lifespan)
@@ -20,4 +21,5 @@ class CreateQuicklookRequest(BaseModel):
 
 @app.post('/quicklooks')
 async def route_create_quicklook(params: CreateQuicklookRequest):
-    await create_quickook(VisitName(params.visit))
+    visit = VisitName(params.visit)
+    await create_quicklook(Job(visit=visit))

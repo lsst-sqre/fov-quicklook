@@ -37,8 +37,9 @@ async def register_generator(
         host=client_host,
         port=registration_data.port,
     )
-    _available_generators[registration_data.generator_id] = generator_info
-    logger.info(f'Available generators: {_available_generators.values()}')
+    if registration_data.generator_id not in _available_generators:
+        _available_generators[registration_data.generator_id] = generator_info
+        logger.info(f'Available generators: {_available_generators.values()}')
 
 
 @router.get("/comm/healthz")
@@ -89,12 +90,12 @@ async def _heartbeat_checker_loop():
 
 async def _heartbeat_check(*, fail_for_test: bool = False):
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
-    async with aiohttp.ClientSession() as session:
 
-        async def check_generator(
-            generator_info: GeneratorInfo,
-        ) -> GeneratorInfo | None:
-            url = f"{generator_info.url}/comm/healthz?fail_for_test={str(fail_for_test).lower()}"
+    async def check_generator(
+        generator_info: GeneratorInfo,
+    ) -> GeneratorInfo | None:
+        url = f"{generator_info.url}/comm/healthz?fail_for_test={str(fail_for_test).lower()}"
+        async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url, timeout=timeout) as response:
                     response.raise_for_status()
@@ -102,9 +103,9 @@ async def _heartbeat_check(*, fail_for_test: bool = False):
                 traceback.print_exc()
                 return generator_info
 
-        tasks = [check_generator(generator_info) for generator_info in _available_generators.values()]
-        results = await asyncio.gather(*tasks)
-        to_remove = [gid for gid in results if gid is not None]
+    tasks = [check_generator(generator_info) for generator_info in _available_generators.values()]
+    results = await asyncio.gather(*tasks)
+    to_remove = [gid for gid in results if gid is not None]
 
     for generator_info in to_remove:
         remove_generator(generator_info)

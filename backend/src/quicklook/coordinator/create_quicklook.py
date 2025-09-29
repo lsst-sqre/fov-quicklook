@@ -8,19 +8,19 @@ from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
 from quicklook.job.job_local_storage import CcdDistributionConfig
-from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue, VisitName
+from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue
 
 from ..comm.rpc_worker import YieledValue, adaptive_map_rpc, rpc_endpoint, rpc_scatter
 
 ds = get_datasource()
 
 
-async def create_quickook(visit: VisitName):
-    job = Job(visit=visit)
+async def create_quicklook(job: Job):
+    visit = job.visit
     ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in ds.list_ccds(visit)]
     try:
-        ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
         await rpc_scatter(Rpc.create(_save_job_metadata, job))
+        ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
         await _merge_tiles(job, ccd_generator_map)
         await _transfer_tiles(job)
     finally:

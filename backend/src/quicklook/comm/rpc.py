@@ -91,8 +91,14 @@ async def run_rpc_stream(
                 data = await read(size)
                 result = pickle.loads(data)
                 if isinstance(result, Exception):
-                    raise result
+                    raise RpcRemoteError(result)
                 yield result
+
+
+class RpcRemoteError(RuntimeError):
+    def __init__(self, exception: Exception):
+        super().__init__(str(exception))
+        self.exception = exception
 
 
 def create_rpc_caller_endpoint(body: bytes) -> Generator[bytes, None, None]:

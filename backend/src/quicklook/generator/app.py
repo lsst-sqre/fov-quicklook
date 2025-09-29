@@ -12,6 +12,7 @@ from quicklook.types import TilePos
 from quicklook.utils.async_process_generator import run_async_process_generator
 from quicklook.utils.numpyutils import ndarray2npybytes
 
+
 app = fastapi.FastAPI(lifespan=generator_lifespan)
 app.include_router(comm_generator_router)
 

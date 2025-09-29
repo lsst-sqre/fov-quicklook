@@ -1,22 +1,23 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass
-import dis
-import threading
 from typing import Callable
 
 import numpy
 import requests
 
-from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.generator import self_generator_id
 from quicklook.comm.types import GeneratorInfo
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
+from quicklook.generator.retry_on_error import retry_on_error
 from quicklook.job.job import Job
 from quicklook.types import CcdName, Progress, TilePos
 from quicklook.utils import multiprocessing_coverage_compatible, zstd
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
 from quicklook.utils.stacklib import Stack, pool_args, thread_local_context
+
+logger = logging.getLogger(__name__)
 
 
 def merge_single_fits_tiles(job: Job):
@@ -101,7 +102,11 @@ def _gather_external_tile_data(
 
 def _get_external_tile(generator: GeneratorInfo, job_id: str, pos: TilePos) -> numpy.ndarray | None:
     session = process_context().thread_local_requests_session()
-    response = session.get(f'{generator.url}/jobs/{job_id}/tiles/{pos.level}/{pos.i}/{pos.j}')
+    response = retry_on_error(
+        lambda: session.get(f'{generator.url}/jobs/{job_id}/tiles/{pos.level}/{pos.i}/{pos.j}'),
+        requests.exceptions.ConnectionError,
+    )
+
     response.raise_for_status()
     return npybytes2ndarray(response.content)
 

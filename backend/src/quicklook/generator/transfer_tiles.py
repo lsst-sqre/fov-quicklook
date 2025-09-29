@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
+import logging
 from typing import Callable, Iterable
 
 import requests
@@ -9,12 +10,15 @@ from quicklook.comm.generator import self_generator_id
 from quicklook.comm.types import GeneratorInfo
 from quicklook.config import config
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
+from quicklook.generator.retry_on_error import retry_on_error
 from quicklook.job.job import Job
 from quicklook.tileinfo import ccds_by_name
 from quicklook.types import PackedTilePos, Progress, ReturnValue, TilePos
 from quicklook.utils import multiprocessing_coverage_compatible
 from quicklook.utils.geom import BBox
 from quicklook.utils.stacklib import Stack, pool_args, thread_local_context
+
+logger = logging.getLogger(__name__)
 
 
 def transfer_tiles(job: Job):
@@ -71,7 +75,11 @@ def _process_packed_tile(args: ProcessPackedTileArgs):
 def _get_external_tile(g: GeneratorInfo, job: Job, pos: TilePos) -> bytes | None:
     base_url = g.url
     session = process_context().thread_local_requests_session()
-    response = session.get(f'{base_url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}', timeout=10)
+    response = retry_on_error(
+        lambda: session.get(f'{base_url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}', timeout=10),
+        requests.exceptions.ConnectionError,
+    )
+
     match response.status_code:
         case 200:
             return response.content
@@ -80,6 +88,7 @@ def _get_external_tile(g: GeneratorInfo, job: Job, pos: TilePos) -> bytes | None
             return
         case _:  # pragma: no cover
             response.raise_for_status()
+            raise RuntimeError(f"Failed to get external tile from {g.url}: {response}")
 
 
 def _iter_primary_packed_tile_pos(job: Job) -> Iterable[PackedTilePos]:

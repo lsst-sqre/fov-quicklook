@@ -10,6 +10,9 @@ from quicklook.config import config
 from quicklook.dev.run_uvicorn import find_free_tcp_port, run_uvicorn_app
 
 
+pytestmark = pytest.mark.slow
+
+
 client = TestClient(app)
 
 
@@ -24,7 +27,7 @@ def test_route_create_quicklook(coordinator_url: str):
     assert res.status_code == 200
 
 
-num_generators = 2
+num_generators = 8
 
 
 @pytest.fixture(scope='module')
