@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from quicklook.coordinator.pipeline import Pipeline, Skip, Stage
+from quicklook.utils.pipeline import Pipeline, Skip, Stage
 
 
 @pytest.fixture

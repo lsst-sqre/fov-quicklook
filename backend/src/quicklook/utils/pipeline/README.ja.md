@@ -1,6 +1,6 @@
 ## coordinator のパイプライン実行モデル
 
-`quicklook.coordinator.pipeline`モジュールは、非同期キューを繋いだステージ処理を記述するための軽量なパイプライン実装を提供する。
+`quicklook.utils.pipeline`モジュールは、非同期キューを繋いだステージ処理を記述するための軽量なパイプライン実装を提供する。
 
 ### Stage
 
