@@ -1,6 +1,7 @@
 import contextlib
 import multiprocessing
 import os
+import resource
 import signal
 import socket
 import sys
@@ -31,6 +32,7 @@ def run_uvicorn_app(
     healthz='/healthz',
     log_level: str | int | None = None,
     access_log: bool = False,
+    memory_limit_mb: int | None = None,
 ):
     if port is None:  # pragma: no cover
         port = find_free_tcp_port()
@@ -38,7 +40,13 @@ def run_uvicorn_app(
     p = multiprocessing.Process(
         target=uvicorn_run,
         args=(app,),
-        kwargs={'port': port, 'log_prefix': log_prefix, 'log_level': log_level, 'access_log': access_log},
+        kwargs={
+            'port': port,
+            'log_prefix': log_prefix,
+            'log_level': log_level,
+            'access_log': access_log,
+            'memory_limit_mb': memory_limit_mb,
+        },
     )
     p.start()
 
@@ -63,10 +71,20 @@ def run_uvicorn_app(
         p.join()
 
 
-def uvicorn_run(app: str, *, port: int, log_prefix: str, log_level: str | int | None, access_log: bool):
-    project_root = Path(__file__).resolve().parents[3]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
+def uvicorn_run(
+    app: str,
+    *,
+    port: int,
+    log_prefix: str,
+    log_level: str | int | None,
+    access_log: bool,
+    memory_limit_mb: int | None = None,
+):
+    if memory_limit_mb is not None:
+        # メモリ制限を設定（RSS - Resident Set Size）
+        memory_limit_bytes = memory_limit_mb * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_RSS, (memory_limit_bytes, memory_limit_bytes))
+
     uvicorn_add_log_prefix(log_prefix)
     uvicorn.run(
         app,
