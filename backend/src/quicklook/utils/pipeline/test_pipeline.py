@@ -39,7 +39,7 @@ async def test_pipeline_processes_items(pipeline_fixture: Pipeline[int, str]) ->
 
     async with pipeline_fixture.on_finish(on_finish).run() as handle:
         for value in (0, 1, 2):
-            handle.push(value)
+            await handle.push(value)
         await asyncio.wait_for(done.wait(), timeout=1)
 
     assert results == ['ZERO', 'ONE', 'TWO']
@@ -74,7 +74,7 @@ async def test_pipeline_invokes_stage_hooks() -> None:
     ).on_finish(on_finish)
 
     async with pipeline.run() as handle:
-        handle.push(3)
+        await handle.push(3)
         await asyncio.wait_for(finished.wait(), timeout=1)
 
     assert results == [6]
@@ -110,7 +110,7 @@ async def test_pipeline_skips_items() -> None:
 
     async with pipeline.run() as handle:
         for value in (0, 1, 2, 3):
-            handle.push(value)
+            await handle.push(value)
         await asyncio.wait_for(done.wait(), timeout=1)
 
     assert results == [1, 3]
@@ -150,7 +150,7 @@ async def test_pipeline_respects_parallel_limit() -> None:
 
     async with pipeline.run() as handle:
         for value in range(6):
-            handle.push(value)
+            await handle.push(value)
         await asyncio.wait_for(done.wait(), timeout=1)
 
     assert max_active_workers == 2
@@ -199,9 +199,110 @@ async def test_pipeline_custom_item_picker_prioritizes_latest() -> None:
 
     async with pipeline.run() as handle:
         for value in range(6):
-            handle.push(value)
+            await handle.push(value)
         await asyncio.wait_for(done.wait(), timeout=1)
 
     assert sorted(results) == list(range(6))
     assert set(selection_order) == set(range(6))
     assert selection_order[2:] == sorted(selection_order[2:], reverse=True)
+
+
+async def test_buffer_size_limit_blocks_when_full() -> None:
+    """Test that _Buf blocks correctly when buffer is full."""
+    from quicklook.utils.pipeline import _Buf
+    
+    # Test _Buf directly with size limit
+    buf = _Buf(
+        item_picker=lambda items: items.pop(0),
+        max_size=2
+    )
+    
+    # Fill buffer to capacity
+    await buf.push(1)
+    assert not buf.full(), "Buffer should not be full with 1 item (max 2)"
+    
+    await buf.push(2)
+    assert buf.full(), "Buffer should be full with 2 items (max 2)"
+    
+    # Third push should block until something is consumed
+    push_blocked = False
+    
+    async def attempt_push():
+        nonlocal push_blocked
+        push_blocked = True
+        await buf.push(3)
+        push_blocked = False
+    
+    push_task = asyncio.create_task(attempt_push())
+    
+    # Give time for push to start and block
+    await asyncio.sleep(0.01)
+    assert push_blocked, "Push should have started"
+    assert not push_task.done(), "Push should be blocked on full buffer"
+    
+    # Consume an item to make space
+    item = await buf.get()
+    assert item == 1, "Should get first item"
+    
+    # Now push should complete
+    await asyncio.wait_for(push_task, timeout=1)
+    assert not push_blocked, "Push should have completed"
+    assert buf.full(), "Buffer should be full again after push completed"
+
+
+async def test_buffer_full_method() -> None:
+    """Test that buffer full method works correctly."""
+    async def process(item: int) -> int:
+        await asyncio.sleep(0)
+        return item
+
+    pipeline = Pipeline(
+        Stage[int, int](
+            process=process,
+            queue_capacity=1,  # Very small buffer
+        )
+    )
+
+    async with pipeline.run() as handle:
+        # Initially buffer should not be full
+        assert not handle.full()
+        
+        # Add one item
+        await handle.push(1)
+        
+        # Now buffer should be full
+        assert handle.full()
+
+
+async def test_pipeline_with_buffer_limits() -> None:
+    """Integration test showing buffer limits work in a complete pipeline."""
+    results: list[int] = []
+    
+    async def process(item: int) -> int:
+        # Small delay to simulate work
+        await asyncio.sleep(0.01)
+        return item * 2
+    
+    async def on_finish(result: int) -> None:
+        results.append(result)
+    
+    # Create pipeline with small buffer
+    pipeline = Pipeline(
+        Stage[int, int](
+            process=process,
+            queue_capacity=3,  # Small buffer
+            parallel=2,
+        )
+    ).on_finish(on_finish)
+    
+    async with pipeline.run() as handle:
+        # Push several items
+        for i in range(5):
+            await handle.push(i)
+        
+        # Wait a bit for processing
+        await asyncio.sleep(0.1)
+    
+    # All items should be processed
+    assert len(results) == 5
+    assert set(results) == {0, 2, 4, 6, 8}  # Each input doubled

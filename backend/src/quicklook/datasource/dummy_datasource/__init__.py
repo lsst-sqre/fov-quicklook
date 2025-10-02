@@ -21,8 +21,8 @@ class DummyDataSource(DataSourceBase):
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
         ccds = [*_s3_list_visit_ccds(visit)]
         if config.environment == 'test':
-            pass
-            # ccds = ccds[:50]  # テスト環境では4つに制限
+            # pass
+            ccds = ccds[:10]  # テスト環境では4つに制限
         return ccds
 
     def get_data_sync(self, ref: CcdDataRef) -> bytes:

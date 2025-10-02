@@ -1,13 +1,10 @@
 import contextlib
 import multiprocessing
 import os
-import resource
 import signal
 import socket
-import sys
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable
 
 import requests
@@ -15,7 +12,7 @@ import uvicorn
 
 
 @dataclass
-class UvicornAppRunner:
+class _UvicornAppRunner:
     """Uvicornアプリケーションランナーの情報"""
 
     wait_for_ready: Callable[[], None]
@@ -32,20 +29,18 @@ def run_uvicorn_app(
     healthz='/healthz',
     log_level: str | int | None = None,
     access_log: bool = False,
-    memory_limit_mb: int | None = None,
 ):
     if port is None:  # pragma: no cover
         port = find_free_tcp_port()
 
     p = multiprocessing.Process(
-        target=uvicorn_run,
+        target=_uvicorn_run,
         args=(app,),
         kwargs={
             'port': port,
             'log_prefix': log_prefix,
             'log_level': log_level,
             'access_log': access_log,
-            'memory_limit_mb': memory_limit_mb,
         },
     )
     p.start()
@@ -53,39 +48,33 @@ def run_uvicorn_app(
     base_url = f'http://127.0.0.1:{port}'
 
     def wait_for_ready():
-        for _ in range(timeout):
+        start = time.time()
+        while time.time() - start < timeout:
             try:
                 requests.get(f'{base_url}{healthz}')
                 break
             except requests.exceptions.ConnectionError:
-                pass
-            time.sleep(0.1)
-        else:  # pragma: no cover
+                time.sleep(0.1)
+        else:
             raise TimeoutError(f'{app} did not start in {timeout} seconds')
 
     try:
-        yield UvicornAppRunner(wait_for_ready=wait_for_ready, base_url=base_url)
+        yield _UvicornAppRunner(wait_for_ready=wait_for_ready, base_url=base_url)
     finally:
         assert p.pid
         os.kill(p.pid, signal.SIGINT)  # p.terminate() を使うとcoverageがとれないのでSIGINTを送る
         p.join()
 
 
-def uvicorn_run(
+def _uvicorn_run(
     app: str,
     *,
     port: int,
     log_prefix: str,
     log_level: str | int | None,
     access_log: bool,
-    memory_limit_mb: int | None = None,
 ):
-    if memory_limit_mb is not None:
-        # メモリ制限を設定（RSS - Resident Set Size）
-        memory_limit_bytes = memory_limit_mb * 1024 * 1024
-        resource.setrlimit(resource.RLIMIT_RSS, (memory_limit_bytes, memory_limit_bytes))
-
-    uvicorn_add_log_prefix(log_prefix)
+    _uvicorn_add_log_prefix(log_prefix)
     uvicorn.run(
         app,
         port=port,
@@ -94,7 +83,7 @@ def uvicorn_run(
     )
 
 
-def uvicorn_add_log_prefix(prefix: str):
+def _uvicorn_add_log_prefix(prefix: str):
     log_config = uvicorn.config.LOGGING_CONFIG  # type: ignore
     log_config["formatters"]["default"]["fmt"] = f'{prefix}{log_config["formatters"]["default"]["fmt"]}'
 

@@ -1,4 +1,3 @@
-from functools import lru_cache
 from typing import Annotated
 
 import fastapi
@@ -35,7 +34,6 @@ def _rpc_worker(body: bytes):
         yield progress
 
 
-@lru_cache(maxsize=8)
 def dep_job(job_id: str):
     return Job.from_id(job_id)
 

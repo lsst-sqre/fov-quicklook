@@ -13,13 +13,6 @@ def set_generator_id():
         yield
 
 
-@pytest.fixture(autouse=True)
-def clear_job_local_storage_cache():
-    JobLocalStorage.from_job.cache_clear()
-    yield
-    JobLocalStorage.from_job.cache_clear()
-
-
 def test_logger_writes_to_base_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(config, 'job_local_dir', tmp_path)
 

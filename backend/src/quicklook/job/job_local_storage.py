@@ -22,7 +22,6 @@ class JobLocalStorage:
     job: Job
 
     @classmethod
-    @lru_cache(config.max_job)
     def from_job(cls, job: Job) -> 'JobLocalStorage':
         return cls(job)
 
@@ -209,7 +208,7 @@ class _JobMetadataStorage:
         path.write_bytes(pickle.dumps(job))
 
     @classmethod
-    @lru_cache(config.max_job)
+    @lru_cache(maxsize=config.pipeline_queue_size * 2)
     def load_job(cls, job_id: str) -> Job:
         path = cls._path(job_id)
         job = pickle.loads(path.read_bytes())

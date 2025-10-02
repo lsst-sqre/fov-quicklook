@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Awaitable, Callable, Generic, TypeVar
 
 from quicklook.comm.coordinator import get_available_generators, remove_generator
 from quicklook.comm.rpc import Rpc, run_rpc, run_rpc_stream
@@ -13,7 +13,7 @@ from quicklook.utils.adaptive_map import MapResult, Worker, WorkerDown, adaptive
 async def adaptive_map_rpc(
     rpcs: list[Rpc],
     *,
-    on_yield: Callable[[Any], None] | None = None,
+    on_yield: Callable[[Any], Awaitable] | None = None,
     stream: bool = False,
 ):
     assert on_yield and stream or not stream, f"Invalid combination of on_progress and stream"
@@ -56,7 +56,7 @@ class _MapResult:
 @dataclass
 class _Context:
     stream: bool
-    on_yield: Callable[[Any], None] | None
+    on_yield: Callable[[Any], Awaitable] | None
     alive: bool
 
 
@@ -84,7 +84,7 @@ def _worker_from_generator(g: GeneratorInfo):
             if ctx.stream:
                 async for value in run_rpc_stream(f'{g.url}/rpc', item.rpc):
                     if ctx.alive and ctx.on_yield:
-                        ctx.on_yield(YieledValue(value, g.id, item.rpc.args))
+                        await ctx.on_yield(YieledValue(value, g.id, item.rpc.args))
             else:
                 return await run_rpc(f'{g.url}/rpc', item.rpc)
         except TimeoutError:
@@ -103,7 +103,7 @@ def _worker_from_generator(g: GeneratorInfo):
 
 async def rpc_scatter(
     rpc: Rpc,
-    on_yield: Callable[[Any], None] | None = None,
+    on_yield: Callable[[Any], Awaitable] | None = None,
     stream: bool = False,
 ):
     assert on_yield and stream or not stream, f"Invalid combination of on_progress and stream"
@@ -112,7 +112,7 @@ async def rpc_scatter(
         if stream:
             async for value in run_rpc_stream(f'{g.url}/rpc', rpc):
                 if on_yield:
-                    on_yield(YieledValue(value, g.id, rpc.args))
+                    await on_yield(YieledValue(value, g.id, rpc.args))
         else:
             return await run_rpc(f'{g.url}/rpc', rpc)
 

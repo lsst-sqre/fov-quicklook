@@ -1,4 +1,4 @@
-from functools import cache, lru_cache
+from functools import cache
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 from venv import logger
 
@@ -133,7 +133,6 @@ class DataTypeSpecificDataSource:
         butler_ref = self._refs_by_visit(ref.visit)[detector_id]
         return b.getURI(butler_ref)  # type: ignore
 
-    @lru_cache(maxsize=4)
     def _refs_by_visit(self, visit: VisitName) -> dict[int, ButlerDatasetRef]:
         b = self._butler
         refs = b.query_datasets(visit.data_type, where=f"{self.data_id_key}={visit.name}")

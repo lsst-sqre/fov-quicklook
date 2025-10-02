@@ -3,11 +3,16 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Generic, ParamSpec, TypeVar
 
+logger = logging.getLogger(__name__)
+
+
 P = ParamSpec('P')
 I = TypeVar('I')
+I2 = TypeVar('I2')
 R = TypeVar('R')
 R2 = TypeVar('R2')
 
@@ -31,6 +36,10 @@ class Pipeline(Generic[I, R]):
         self._on_finish = callback
         return self
 
+    def concat(self, another_pipeline: Pipeline[R, R2]) -> Pipeline[I, R2]:
+        self._stage_defs.extend(another_pipeline._stage_defs)
+        return self  # type: ignore
+
     @contextlib.asynccontextmanager
     async def run(self):
         async with _run_pipeline(self) as pipeline_handle:
@@ -44,6 +53,7 @@ class Stage(Generic[I, R]):
     item_picker: Callable[[list[I]], I] | None = None
     on_enter: Callable[[I], Awaitable[None]] | None = None
     on_exit: Callable[[I, R], Awaitable[None]] | None = None
+    queue_capacity: int | None = None  # None means unlimited buffer size
 
 
 def _default_item_picker(l: list):
@@ -53,13 +63,33 @@ def _default_item_picker(l: list):
 @dataclass
 class _Buf:
     item_picker: Callable[[list], Any]
+    max_size: int | None = None  # None means unlimited
 
     _items: list = field(default_factory=list)
     _ev: asyncio.Event = field(default_factory=asyncio.Event)
+    _not_full_ev: asyncio.Event = field(default_factory=lambda: asyncio.Event())
 
-    def push(self, item):
+    def __post_init__(self):
+        # Initially the buffer is not full
+        self._not_full_ev.set()
+
+    def full(self) -> bool:
+        """Check if buffer is full"""
+        if self.max_size is None:
+            return False
+        return len(self._items) >= self.max_size
+
+    async def push(self, item):
+        # Wait until buffer is not full
+        while self.full():
+            await self._not_full_ev.wait()
+
         self._items.append(item)
         self._ev.set()
+
+        # Check if buffer became full after adding the item
+        if self.full():
+            self._not_full_ev.clear()
 
     async def get(self):
         while True:
@@ -68,7 +98,12 @@ class _Buf:
                 self._ev.clear()
                 continue
 
+            was_full = self.full()
             item = self.item_picker(self._items)
+
+            # If buffer was full and now has space, signal not full
+            if was_full and not self.full():
+                self._not_full_ev.set()
 
             if not self._items:
                 self._ev.clear()
@@ -77,9 +112,10 @@ class _Buf:
 
 
 @dataclass
-class _PipelineHandle(Generic[I]):
-    push: Callable[[I], None]
+class PipelineHandle(Generic[I]):
+    push: Callable[[I], Awaitable[None]]
     cancel: Callable[..., None]
+    full: Callable[[], bool]
 
 
 @contextlib.asynccontextmanager
@@ -96,7 +132,10 @@ async def _run_pipeline(
     async with asyncio.TaskGroup() as tg:
         stage_defs = pipeline._stage_defs
         tasks: list[asyncio.Task[Any]] = []
-        in_bufs = [_Buf(item_picker=stage_def.item_picker or _default_item_picker) for stage_def in stage_defs]  # 各ステージ間を繋ぐパイプ。bufs[0]は最初のステージの入力バッファ
+        in_bufs = [
+            _Buf(item_picker=stage_def.item_picker or _default_item_picker, max_size=stage_def.queue_capacity)
+            for stage_def in stage_defs
+        ]  # 各ステージ間を繋ぐパイプ。bufs[0]は最初のステージの入力バッファ
         resolves = [*(in_bufs[i + 1].push for i in range(len(stage_defs) - 1)), done_queue.put]
         for stage_def, in_buf, resolve in zip(stage_defs, in_bufs, resolves):
             for _ in range(stage_def.parallel):
@@ -120,9 +159,10 @@ async def _run_pipeline(
                 task.cancel()
 
         try:
-            yield _PipelineHandle[I](
+            yield PipelineHandle[I](
                 cancel=cancel,
                 push=in_bufs[0].push,
+                full=in_bufs[0].full,
             )
         finally:
             cancel()
@@ -141,9 +181,7 @@ class Skip(Exception):
     pass
 
 
-async def _task(
-    args: _TaskArgs,
-):
+async def _task(args: _TaskArgs):
     while True:
         item = await args.in_buf.get()
         try:
@@ -154,4 +192,9 @@ async def _task(
             if inspect.isawaitable(resolution):
                 await resolution
         except Skip:
+            pass
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Error occurred in pipeline: {e}", exc_info=True)
             pass

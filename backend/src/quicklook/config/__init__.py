@@ -54,10 +54,17 @@ class Config(BaseSettings):
     comm_registration_interval: int = 10  # seconds
     rpc_timeout_total: float = 600  # seconds
 
-    max_job: int = 64
+    # Job settings
     generator_max_concurrent_jobs: int = 8
     merge_tile_parallel: int = 8
     transfer_tile_parallel: int = 8
+
+    # Pipeline settings
+    pipeline_queue_size: int = 64
+    pipeline_transfer_queue_size: int = 16
+    pipeline_generate_single_fits_tiles: int = 4
+    pipeline_merge_tiles: int = 2
+    pipeline_transfer_tiles: int = 2
 
     # Logging settings
     log_level: Literal['debug', 'info', 'warning', 'error', 'critical'] = 'info'
