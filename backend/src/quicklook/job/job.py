@@ -18,13 +18,13 @@ class Job:
 
     @classmethod
     def from_id(cls, id: str):
-        from quicklook.job.job_local_storage import JobLocalStorage
+        from quicklook.job.local_storage import JobLocalStorage
 
         return JobLocalStorage.from_id(id).job
 
     @cached_property
     def local_storage(self):
-        from .job_local_storage import JobLocalStorage
+        from .local_storage import JobLocalStorage
 
         return JobLocalStorage.from_job(self)
 
@@ -36,6 +36,6 @@ class Job:
 
     @cached_property
     def status(self):
-        from quicklook.job.job_status import JobStatus
+        from quicklook.job.status import JobStatus
 
         return JobStatus.from_job(self)

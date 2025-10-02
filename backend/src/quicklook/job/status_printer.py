@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from shutil import get_terminal_size
 from typing import cast
 
-from quicklook.job.job_status import JobStatus
+from quicklook.job.status import JobStatus
 from quicklook.types import Progress
 from quicklook.utils.throttle import throttle
 

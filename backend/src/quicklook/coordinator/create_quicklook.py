@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import cast
 
 from quicklook.comm.coordinator import get_available_generators
@@ -10,7 +10,7 @@ from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate
 from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
-from quicklook.job.job_local_storage import CcdDistributionConfig
+from quicklook.job.local_storage import CcdDistributionConfig
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
 

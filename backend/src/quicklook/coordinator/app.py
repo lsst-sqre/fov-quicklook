@@ -1,9 +1,7 @@
-import asyncio
 from contextlib import asynccontextmanager
 from functools import lru_cache
 import itertools
 from dataclasses import dataclass, field
-from typing import TypeVar
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -11,8 +9,8 @@ from pydantic import BaseModel
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
 from quicklook.config import config
-from quicklook.coordinator.create_quicklook import create_quicklook, quicklook_pipeline
-from quicklook.job.job_status_printer import JobStatusPrinter
+from quicklook.coordinator.create_quicklook import quicklook_pipeline
+from quicklook.job.status_printer import JobStatusPrinter
 from quicklook.job.job import Job
 from quicklook.types import VisitName
 from quicklook.utils.pipeline import Pipeline, Stage
@@ -71,14 +69,14 @@ def pipeline():
     # 最初のステージはリクエストの重複を省き、優先度の高いリクエストを選択する
     # 次のステージは行列長の制限
 
+    async def noop(req: _QuicklookRequest):
+        return req
+
     def item_picker(reqs: list[_QuicklookRequest]):
         # ここはpushされるとすぐに呼ばれる
         # reqsを破壊的に更新し、優先度の高いリクエストを選択する
         reqs.sort(key=lambda x: (-x.vote, x.seq))
         return reqs.pop(0)
-
-    async def noop(req: _QuicklookRequest):
-        return req
 
     async def make_job(req: _QuicklookRequest):
         job = Job(req.visit)
