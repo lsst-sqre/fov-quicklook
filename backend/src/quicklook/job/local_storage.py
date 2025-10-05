@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy
 
 from quicklook.comm.generator import self_generator_id
-from quicklook.comm.types import GeneratorInfo
+from quicklook.comm.types import GeneratorId, GeneratorInfo
 from quicklook.config import config
 from quicklook.job.job import Job
 from quicklook.tileinfo import TileInfo
@@ -101,8 +101,8 @@ class _FitsHeaderStorage:
 
 @dataclass
 class CcdDistributionConfig:
-    ccd_generator_map: dict[CcdName, str]
-    generators: dict[str, GeneratorInfo]
+    ccd_generator_map: dict[CcdName, GeneratorId]
+    generators: dict[GeneratorId, GeneratorInfo]
 
 
 @dataclass(frozen=True)

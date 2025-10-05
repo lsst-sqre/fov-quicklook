@@ -93,10 +93,10 @@ def test_pool_args_returns_expected_initializer() -> None:
 
 
 def test_pool_initializer_enters_context_and_registers(monkeypatch: pytest.MonkeyPatch) -> None:
-    registered_callbacks: list[Callable[..., object]] = []
+    registered_callbacks: list[tuple[Callable[..., object], tuple[object, ...]]] = []
 
-    def fake_register(callback: Callable[..., object]) -> Callable[..., object]:
-        registered_callbacks.append(callback)
+    def fake_register(callback: Callable[..., object], *args: object) -> Callable[..., object]:
+        registered_callbacks.append((callback, args))
         return callback
 
     monkeypatch.setattr(stacklib.atexit, "register", fake_register)
@@ -112,8 +112,7 @@ def test_pool_initializer_enters_context_and_registers(monkeypatch: pytest.Monke
     assert ctx.exit_count == 0
     assert len(registered_callbacks) == 1
 
-    callback = registered_callbacks[0]
-    assert getattr(callback, "__self__", None) is ctx
+    callback, args = registered_callbacks[0]
 
-    callback(None, None, None)
+    callback(*args)
     assert ctx.exit_count == 1

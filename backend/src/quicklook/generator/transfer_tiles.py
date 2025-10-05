@@ -1,20 +1,20 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
-import logging
 from typing import Callable, Iterable
 
 import requests
 
-from quicklook.comm.generator import self_generator_id
-from quicklook.comm.types import GeneratorInfo
+from quicklook.comm.generator import GeneratorIdInitializer, self_generator_id
+from quicklook.comm.types import GeneratorId, GeneratorInfo
 from quicklook.config import config
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
 from quicklook.generator.retry_on_error import retry_on_error
 from quicklook.job.job import Job
 from quicklook.tileinfo import ccds_by_name
 from quicklook.types import PackedTilePos, Progress, ReturnValue, TilePos
-from quicklook.utils import multiprocessing_coverage_compatible
+from quicklook.utils import multiprocessing_coverage_compatible as mp
 from quicklook.utils.geom import BBox
 from quicklook.utils.stacklib import Stack, pool_args, thread_local_context
 
@@ -29,8 +29,13 @@ def transfer_tiles(job: Job):
 
     uploaded_size = 0
 
-    with multiprocessing_coverage_compatible.Pool(config.transfer_tile_parallel, **pool_args(enable_pool_context, 16)) as pool:
-        for result in pool.imap_unordered(_process_packed_tile, (ProcessPackedTileArgs(job, pos) for pos in packed_pos_list)):
+    with mp.Pool(
+        config.transfer_tile_parallel,
+        **pool_args(enable_pool_context, 16, GeneratorIdInitializer()),
+    ) as pool:
+        for result in pool.imap_unordered(
+            _process_packed_tile, (ProcessPackedTileArgs(job, pos) for pos in packed_pos_list)
+        ):
             uploaded_size += result
             for _ in p.update_and_yield_every(16):
                 yield p
@@ -145,7 +150,10 @@ class ProcessContext:
 
 
 @contextmanager
-def enable_pool_context(n_threads: int):
+def enable_pool_context(
+    n_threads: int,
+    generator_id_initializer: GeneratorIdInitializer,
+):
     with ThreadPoolExecutor(max_workers=n_threads) as executor:
         with thread_local_context(requests.Session) as session:
             ctx = ProcessContext(
@@ -153,7 +161,8 @@ def enable_pool_context(n_threads: int):
                 thread_local_requests_session=session,
             )
             with process_context.push(ctx):
-                yield
+                with generator_id_initializer():
+                    yield
 
 
 process_context = Stack[ProcessContext]()

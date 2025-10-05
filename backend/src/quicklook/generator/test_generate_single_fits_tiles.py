@@ -1,6 +1,6 @@
 import pytest
 
-from quicklook.comm.generator import self_generator_id_context
+from quicklook.comm.generator import set_generator_id_for_test
 from quicklook.generator.generate_single_fits_tiles import generate_single_fits_tiles
 from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, CcdName, VisitName
@@ -8,7 +8,7 @@ from quicklook.types import CcdDataRef, CcdName, VisitName
 
 @pytest.fixture(autouse=True, scope='module')
 def set_generator_id():
-    with self_generator_id_context():
+    with set_generator_id_for_test():
         yield
 
 

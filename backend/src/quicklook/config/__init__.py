@@ -1,9 +1,17 @@
+import os
 from pathlib import Path
 from typing import Literal
 
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from quicklook.utils.s3 import S3Config
+
+
+class ContextMenuTemplate(BaseModel):
+    name: str
+    template: str
+    is_url: bool
 
 
 class Config(BaseSettings):
@@ -14,13 +22,17 @@ class Config(BaseSettings):
         case_sensitive=True,
     )
 
-    environment: Literal['production', 'test'] = 'production'
+    # app settings
+    frontend_app_prefix: str = '/fov-quicklook'
+    context_menu_templates: list[ContextMenuTemplate] = []
+    admin_page: bool = False
+
+    environment: Literal['production', 'development', 'test'] = 'production'
 
     tile_size: int = 256
     tile_max_level: int = 8
     tile_pack: int = 2  # (1<<tile_pack) ** 2 個のタイルがまとめてオブジェクトストレージにアップロードされる。
     # 例えばtile_pack==2のときは、16個のタイルがまとめてアップロードされる。
-
     fitsio_decompress_parallel: int = 4
     fitsio_tmpdir: Path = Path('/dev/shm/quicklook/fitsio')
 
@@ -44,6 +56,8 @@ class Config(BaseSettings):
         secure=False,
         bucket='quicklook-test-data',
     )
+
+    frontend_assets_dir: str = './frontend-assets'
 
     # Communication settings
     frontend_port: int = 9500
@@ -74,6 +88,9 @@ class Config(BaseSettings):
     dev_reload: bool = False
     dev_log_prefix: str = ''
     dev_ccd_limit: int | None = None
+    dev_generator_required_coordinator_connection: bool = True
 
 
-config = Config()
+config = Config(
+    _env_file=os.environ.get('ENV_FILE'),  # type: ignore
+)

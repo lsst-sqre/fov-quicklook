@@ -1,18 +1,41 @@
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 import fastapi
 from fastapi.responses import StreamingResponse
 
 from quicklook.comm import rpc
+from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.comm.generator import lifespan as generator_lifespan
 from quicklook.comm.generator import router as comm_generator_router
 from quicklook.job.job import Job
 from quicklook.types import TilePos
-from quicklook.utils.async_process_generator import run_async_process_generator
+from quicklook.utils.async_process_generator import create_async_process_pool
 from quicklook.utils.numpyutils import ndarray2npybytes
 
+# グローバルなプロセスプール
+_process_pool = None
 
-app = fastapi.FastAPI(lifespan=generator_lifespan)
+
+@asynccontextmanager
+async def lifespan(app: fastapi.FastAPI):
+    global _process_pool
+
+    from quicklook.config import config
+
+    async with generator_lifespan(app):
+        async with create_async_process_pool(
+            max_workers=config.generator_max_concurrent_jobs,
+            initializers=[GeneratorIdInitializer()],
+        ) as pool:
+            _process_pool = pool
+            try:
+                yield
+            finally:
+                _process_pool = None
+
+
+app = fastapi.FastAPI(lifespan=lifespan)
 app.include_router(comm_generator_router)
 
 
@@ -23,8 +46,11 @@ async def route_healthz():
 
 @app.post('/rpc')
 async def route_rpc(request: fastapi.Request):
+    if _process_pool is None:
+        raise RuntimeError("Process pool not initialized")
+
     return StreamingResponse(
-        run_async_process_generator(_rpc_worker, await request.body()),
+        _process_pool.run_async_process_generator(_rpc_worker, await request.body()),
         media_type='application/octet-stream',
     )
 

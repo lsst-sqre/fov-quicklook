@@ -3,8 +3,8 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def Pool(*args, **kwargs):  # pragma: no branch
-    pool = multiprocessing.Pool(*args, **kwargs)
+def Pool(*args, **kwargs):
+    pool = multiprocessing.get_context('spawn').Pool(*args, **kwargs)
     try:
         yield pool
     finally:

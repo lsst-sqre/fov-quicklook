@@ -1,13 +1,13 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from typing import Any, Awaitable, Callable, Literal
 
+from quicklook.comm.types import GeneratorId
 from quicklook.job.job import Job
 from quicklook.types import CcdName, Progress
 
 JobStage = Literal['queued', 'generate_single_fits_tiles', 'merge_tiles', 'transfer_tiles', 'done']
 
-GeneratorId = str
 
 
 @dataclass
@@ -33,11 +33,11 @@ class JobStatus:
         after = [w.which(self) for w in self._watchers]
         for w, b, a in zip(self._watchers, before, after):
             if b != a:
-                w.cb(self.job)
+                await w.cb(self.job)
 
     def on_change(
         self,
-        cb: Callable[[Job], None],
+        cb: Callable[[Job], Awaitable],
         which: Callable[['JobStatus'], Any] | None = None,
     ):
         which = which or (lambda _: object())
@@ -46,5 +46,5 @@ class JobStatus:
 
 @dataclass
 class _Watcher:
-    cb: Callable[[Job], None]
+    cb: Callable[[Job], Awaitable]
     which: Callable[['JobStatus'], Any]

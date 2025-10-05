@@ -1,19 +1,49 @@
 import pickle
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Iterable, Literal
 
 from quicklook.config import config
 from quicklook.types import PackedTilePos, TilePos, VisitName
-from quicklook.utils.s3 import s3_download_object, s3_upload_object
+from quicklook.utils.s3 import (
+    s3_delete_object,
+    s3_delete_objects_with_prefix,
+    s3_download_object,
+    s3_list_objects,
+    s3_upload_object,
+)
 
 
-def put(key: str, value: bytes) -> int:
+def put_object(key: str, value: bytes) -> int:
     s3_upload_object(config.s3_tile, f'{config.s3_tile_key_prefix}{key}', value, 'application/octet-stream')
     return len(value)
 
 
-def get(key: str) -> bytes:
+def get_object(key: str) -> bytes:
     return s3_download_object(config.s3_tile, f'{config.s3_tile_key_prefix}{key}')
+
+
+@dataclass
+class Entry:
+    name: str
+    type: Literal['directory', 'file']
+    size: int | None
+
+
+def list_entries(prefix: str) -> Iterable[Entry]:
+    for obj in s3_list_objects(config.s3_tile, prefix=f'{config.s3_tile_key_prefix}{prefix}'):
+        if obj.type == 'file':
+            yield Entry(name=obj.key.split('/')[-1], type=obj.type, size=obj.size)
+        elif obj.type == 'directory':
+            yield Entry(name=f'{obj.key.split('/')[-2]}/', type=obj.type, size=None)
+
+
+def delete_object(key: str) -> None:
+    s3_delete_object(config.s3_tile, f'{config.s3_tile_key_prefix}{key}')
+
+
+def delete_objects_by_prefix(prefix: str) -> None:
+    s3_delete_objects_with_prefix(config.s3_tile, f'{config.s3_tile_key_prefix}{prefix}')
 
 
 @dataclass
@@ -42,7 +72,7 @@ class VisitObjectStorage:
         return packed[index]
 
     def _put(self, key: str, value: bytes) -> int:
-        return put(f'quicklooks/{self.visit}/{key}', value)
+        return put_object(f'quicklooks/{self.visit}/{key}', value)
 
     def _get(self, key: str) -> bytes:
-        return get(f'quicklooks/{self.visit}/{key}')
+        return get_object(f'quicklooks/{self.visit}/{key}')

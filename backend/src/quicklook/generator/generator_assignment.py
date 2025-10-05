@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import cache, cached_property
 
+from quicklook.comm.types import GeneratorId
 from quicklook.job.job import Job
 from quicklook.tileinfo import TileInfo
 from quicklook.types import TilePos
@@ -21,11 +22,11 @@ class GeneratorAssignment:
         return self.job.local_storage.ccd_distribution_config.load()
 
     @cached_property
-    def generator_ids(self) -> list[str]:
+    def generator_ids(self) -> list[GeneratorId]:
         return sorted(set(self.dist_config.ccd_generator_map[ccd_name] for ccd_name in self.ccd_names))
 
     @cache
-    def primary_generator_id(self) -> str:
+    def primary_generator_id(self) -> GeneratorId:
         if len(self.generator_ids) == 0:
             raise NoGeneratorFoundError(self.job, self.pos)
         index = self.pos.safe_hash() % len(self.generator_ids)

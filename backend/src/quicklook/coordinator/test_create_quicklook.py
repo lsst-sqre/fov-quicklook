@@ -22,8 +22,7 @@ pytestmark = pytest.mark.slow
 
 async def test_create_quicklook_pipeline():
     job = Job(VisitName('raw:broccoli'))
-    printer = JobStatusPrinter()
-    job.status.on_change(lambda _: printer(job.status))
+    job.status.on_change(print_job_status)
     ev = asyncio.Event()
 
     async def done(job: Job):
@@ -38,9 +37,15 @@ async def test_create_quicklook_pipeline():
 
 async def test_create_quicklook():
     job = Job(VisitName('raw:broccoli'))
-    printer = JobStatusPrinter()
-    job.status.on_change(lambda _: printer(job.status))
+    job.status.on_change(print_job_status)
     await create_quicklook(job)
+
+
+printer = JobStatusPrinter()
+
+
+async def print_job_status(job: Job):
+    printer(job.status)
 
 
 @pytest.fixture(scope='module', autouse=True)
@@ -54,7 +59,7 @@ def running_coordinator():
     '''
     テストと同じプロセス内でuvicornを実行する。
     '''
-    app = 'quicklook.coordinator.app:app'
+    app = 'quicklook.coordinator.api.app:app'
     port = find_free_tcp_port()
     server = uvicorn.Server(uvicorn.Config(app, port=port, log_level='warning', ws='websockets-sansio'))
     t = threading.Thread(target=server.run, daemon=True)
@@ -101,7 +106,7 @@ def run_generators(
                 config.coordinator_base_url = coordinator_base_url
                 stack.enter_context(
                     run_uvicorn_app(
-                        'quicklook.generator.app:app',
+                        'quicklook.generator.api.app:app',
                         port=config.generator_port,
                         log_prefix=f'[generator{index + 1}] ',
                         healthz='/healthz',

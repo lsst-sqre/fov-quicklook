@@ -1,7 +1,10 @@
 from dataclasses import dataclass
-from typing import Generic, Literal, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, NewType, TypeAlias, TypeVar
 
 import numpy
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
+
 from quicklook.utils.hash_utils import hash_iterable
 
 CcdDataType: TypeAlias = Literal['raw', 'post_isr_image', 'preliminary_visit_image']
@@ -22,9 +25,12 @@ class VisitName(str):
     def name(self) -> str:
         return self._parts()[-1]
 
+    @classmethod
+    def __get_pydantic_core_schema__(cls, _src, _handler: GetCoreSchemaHandler) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
 
-class CcdName(str):
-    pass
+
+CcdName = NewType('CcdName', str)
 
 
 @dataclass(frozen=True)
@@ -123,6 +129,8 @@ class PackedTilePos(TilePos):
 
         # Ensure coordinates are within valid range
         if not (0 <= local_i < (1 << config.tile_pack) and 0 <= local_j < (1 << config.tile_pack)):  # pragma: no cover
-            raise ValueError(f"Coordinates (i={i}, j={j}) outside range of packed tile (level={self.level}, i={self.i}, j={self.j})")
+            raise ValueError(
+                f"Coordinates (i={i}, j={j}) outside range of packed tile (level={self.level}, i={self.i}, j={self.j})"
+            )
 
         return (local_i << config.tile_pack) | local_j

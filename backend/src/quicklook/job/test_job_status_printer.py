@@ -2,6 +2,7 @@ from os import terminal_size
 
 import pytest
 
+from quicklook.comm.types import GeneratorId
 from quicklook.job.status_printer import display_status
 from quicklook.job.job import Job
 from quicklook.job.status import JobStatus
@@ -13,7 +14,9 @@ def sample_job() -> Job:
     return Job(visit=VisitName('dummy:raw:visit1'), id='job-1')
 
 
-def test_display_status_multi_column_layout(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, sample_job: Job):
+def test_display_status_multi_column_layout(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, sample_job: Job
+):
     monkeypatch.setattr('shutil.get_terminal_size', lambda fallback=None: terminal_size((120, 24)))
 
     status = JobStatus(sample_job)
@@ -32,14 +35,16 @@ def test_display_status_multi_column_layout(capsys: pytest.CaptureFixture[str], 
     assert any('• ccd3' in line for line in progress_lines)
 
 
-def test_display_status_respects_requested_columns(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, sample_job: Job):
+def test_display_status_respects_requested_columns(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, sample_job: Job
+):
     monkeypatch.setattr('shutil.get_terminal_size', lambda fallback=None: terminal_size((180, 24)))
 
     status = JobStatus(sample_job)
     status.merge_tiles = {
-        'g-1': Progress(total=5, count=1),
-        'g-2': Progress(total=5, count=3),
-        'g-3': Progress(total=5, count=5),
+        GeneratorId('g-1'): Progress(total=5, count=1),
+        GeneratorId('g-2'): Progress(total=5, count=3),
+        GeneratorId('g-3'): Progress(total=5, count=5),
     }
 
     display_status(status, columns=3)
@@ -51,7 +56,9 @@ def test_display_status_respects_requested_columns(capsys: pytest.CaptureFixture
     assert '• g-1' in first_row and '• g-2' in first_row and '• g-3' in first_row
 
 
-def test_display_status_handles_empty_sections(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, sample_job: Job):
+def test_display_status_handles_empty_sections(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, sample_job: Job
+):
     monkeypatch.setattr('shutil.get_terminal_size', lambda fallback=None: terminal_size((100, 24)))
 
     status = JobStatus(sample_job)

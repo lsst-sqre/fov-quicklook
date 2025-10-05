@@ -17,9 +17,12 @@ with multiprocessing.Pool(**pool_args(enable_my_context)):
 import atexit
 import contextlib
 import threading
+import types
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable as TypingCallable, Generic, ParamSpec, TypeVar, cast
+from typing import Any
+from typing import Callable as TypingCallable
+from typing import Generic, ParamSpec, TypeVar
 
 T = TypeVar('T')
 P = ParamSpec('P')
@@ -89,7 +92,17 @@ def pool_args(
     }
 
 
+_exit_stacks = set()
+
+
 def _pool_initializer(g: Callable, args, kwargs) -> None:
+    stack = contextlib.ExitStack()
+    _exit_stacks.add(stack)
     ctx = g(*args, **kwargs)
-    ctx.__enter__()
-    atexit.register(cast(Callable[[], object], ctx.__exit__))
+    stack.enter_context(ctx)
+
+    def exit():
+        _exit_stacks.remove(stack)
+        stack.close()
+
+    atexit.register(exit)

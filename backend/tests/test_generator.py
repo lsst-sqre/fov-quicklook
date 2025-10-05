@@ -1,12 +1,19 @@
-from fastapi.testclient import TestClient
-from quicklook.generator.app import app
 import pickle
+
+import pytest
+from fastapi.testclient import TestClient
+
 from quicklook.comm.rpc import Rpc
+from quicklook.generator.api.app import app
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    with TestClient(app) as client:
+        yield client
 
 
-def test_healthz() -> None:
+def test_healthz(client: TestClient) -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -19,7 +26,7 @@ def fibonacci_generator(n: int):
         a, b = b, a + b
 
 
-def test_rpc():
+def test_rpc(client: TestClient):
     rpc = Rpc.create(fibonacci_generator, 5)
     body = pickle.dumps(rpc)
     response = client.post('/rpc', content=body, headers={'Content-Type': 'application/octet-stream'})
@@ -36,4 +43,4 @@ def test_rpc():
         offset += size
         results.append(item)
 
-    assert results ==  [1, 1, 2, 3, 5]
+    assert results == [1, 1, 2, 3, 5]

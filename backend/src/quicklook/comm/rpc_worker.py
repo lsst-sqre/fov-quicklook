@@ -5,7 +5,7 @@ from typing import Any, Awaitable, Callable, Generic, TypeVar
 
 from quicklook.comm.coordinator import get_available_generators, remove_generator
 from quicklook.comm.rpc import Rpc, run_rpc, run_rpc_stream
-from quicklook.comm.types import GeneratorInfo
+from quicklook.comm.types import GeneratorId, GeneratorInfo
 from quicklook.config import config
 from quicklook.utils.adaptive_map import MapResult, Worker, WorkerDown, adaptive_map, create_worker
 
@@ -72,7 +72,7 @@ T = TypeVar('T')
 @dataclass
 class YieledValue(Generic[T]):
     value: T
-    generator_id: str
+    generator_id: GeneratorId
     args: tuple
 
 
@@ -119,5 +119,5 @@ async def rpc_scatter(
     return await asyncio.gather(*[single(g) for g in get_available_generators().values()])
 
 
-def rpc_endpoint(generator_id: str):
-    return get_available_generators()[generator_id].id
+def rpc_endpoint(generator_id: str) -> GeneratorId:
+    return get_available_generators()[GeneratorId(generator_id)].id

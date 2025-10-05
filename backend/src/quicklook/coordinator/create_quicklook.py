@@ -4,6 +4,7 @@ from typing import cast
 
 from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.rpc import Rpc
+from quicklook.comm.types import GeneratorId
 from quicklook.config import config
 from quicklook.datasource import get_datasource
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate_single_fits_tiles
@@ -23,7 +24,8 @@ ds = get_datasource()
 
 async def create_quicklook(job: Job):
     '''
-    テスト用。本番ではパイプラインでquicklookを作成する。
+    テスト用。
+    本番ではパイプラインでquicklookを作成する。
     '''
     visit = job.visit
     ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
@@ -32,9 +34,7 @@ async def create_quicklook(job: Job):
         await _merge_tiles(job, ccd_generator_map)
         await _transfer_tiles(job)
     finally:
-        async with job.status.watch():
-            job.status.stage = 'done'
-        await _cleanup(job)
+        await _finalize(job)
 
 
 def quicklook_pipeline():
@@ -45,16 +45,16 @@ def quicklook_pipeline():
             ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
             return job, ccd_generator_map
         except:
-            await finalize(job)
+            await _finalize(job)
             raise
 
-    async def merge_tiles(args: tuple[Job, dict[CcdName, str]]):
+    async def merge_tiles(args: tuple[Job, dict[CcdName, GeneratorId]]):
         job, ccd_generator_map = args
         try:
             await _merge_tiles(job, ccd_generator_map)
             return job
         except:
-            await finalize(job)
+            await _finalize(job)
             raise
 
     async def transfer_tiles(job: Job):
@@ -62,20 +62,19 @@ def quicklook_pipeline():
             await _transfer_tiles(job)
             return job
         except:
-            await finalize(job)
+            await _finalize(job)
             raise
 
-    async def finalize(job: Job):
-        async with job.status.watch():
-            job.status.stage = 'done'
-        await _cleanup(job)
-        return job
+    def select_next_job(jobs: list[Job]):
+        jobs.sort(key=lambda j: j.priority.sort_key())
+        return jobs.pop(0)
 
     return (
         Pipeline(
             Stage(
                 generate_single_fits_tiles,
                 parallel=config.pipeline_generate_single_fits_tiles,
+                item_picker=select_next_job,
             )
         )
         .append(
@@ -91,17 +90,25 @@ def quicklook_pipeline():
                 transfer_tiles,
                 parallel=config.pipeline_transfer_tiles,
                 queue_capacity=config.pipeline_transfer_queue_size,
+                item_picker=select_next_job,
             )
         )
-        .append(Stage(finalize))
+        .append(Stage(_finalize))
     )
 
 
+def _ensure_users_exist_for_job(job: Job):
+    if job.priority.user_count <= 0:
+        raise RuntimeError(f'No users for job {job.id} (visit={job.visit}), so skipping.')
+
+
 async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
+    _ensure_users_exist_for_job(job)
+
     async with job.status.watch():
         job.status.stage = 'generate_single_fits_tiles'
 
-    ccd_generator_map: dict[CcdName, str] = {}
+    ccd_generator_map: dict[CcdName, GeneratorId] = {}
     ccd_metadata_dict: dict[CcdName, CcdMetadata] = {}
 
     rpcs = [Rpc.create(generate_single_fits_tiles, job, ccd_ref) for ccd_ref in ccd_refs]
@@ -127,7 +134,9 @@ def _save_job_metadata_rpc(job: Job):
     job.local_storage.metadata.save()
 
 
-async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, str]):
+async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, GeneratorId]):
+    _ensure_users_exist_for_job(job)
+
     async with job.status.watch():
         job.status.stage = 'merge_tiles'
 
@@ -153,6 +162,8 @@ def _save_ccd_distribution_config_rpc(job: Job, dist_config: CcdDistributionConf
 
 
 async def _transfer_tiles(job: Job):
+    _ensure_users_exist_for_job(job)
+
     async with job.status.watch() as status:
         status.stage = 'transfer_tiles'
 
@@ -178,8 +189,11 @@ class TransferTilesResult:
     uploaded_size: int
 
 
-async def _cleanup(job: Job):
+async def _finalize(job: Job):
+    async with job.status.watch():
+        job.status.stage = 'done'
     await rpc_scatter(Rpc.create(_cleanup_rpc, job))
+    return job
 
 
 def _cleanup_rpc(job: Job):

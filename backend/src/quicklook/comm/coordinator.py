@@ -17,10 +17,10 @@ from fastapi import APIRouter, Request
 
 from quicklook.config import config
 
-from .types import GeneratorInfo, GeneratorRegistrationRequest
+from .types import GeneratorId, GeneratorInfo, GeneratorRegistrationRequest
 
 logger = logging.getLogger(__name__)
-_available_generators: dict[str, GeneratorInfo] = {}
+_available_generators: dict[GeneratorId, GeneratorInfo] = {}
 
 
 router = APIRouter()
@@ -72,7 +72,7 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
             pass
 
 
-def get_available_generators() -> dict[str, GeneratorInfo]:
+def get_available_generators() -> dict[GeneratorId, GeneratorInfo]:
     return _available_generators
 
 
@@ -94,7 +94,9 @@ async def _heartbeat_check(*, fail_for_test: bool = False):
     async def check_generator(
         generator_info: GeneratorInfo,
     ) -> GeneratorInfo | None:
-        url = f"{generator_info.url}/comm/healthz?fail_for_test={str(fail_for_test).lower()}"
+        url = f"{generator_info.url}/comm/healthz"
+        if fail_for_test:
+            url += f"?fail_for_test={str(fail_for_test).lower()}"
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url, timeout=timeout) as response:

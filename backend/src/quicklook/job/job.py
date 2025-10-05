@@ -13,10 +13,6 @@ class Job:
     id: str = field(default_factory=lambda: f'j-{uuid.uuid4().hex}')
 
     @classmethod
-    def from_visit(cls, visit: VisitName):
-        return cls(visit=visit)
-
-    @classmethod
     def from_id(cls, id: str):
         from quicklook.job.local_storage import JobLocalStorage
 
@@ -36,6 +32,13 @@ class Job:
 
     @cached_property
     def status(self):
-        from quicklook.job.status import JobStatus
+        from .status import JobStatus
 
-        return JobStatus.from_job(self)
+        s = JobStatus.from_job(self)
+        return s
+
+    @cached_property
+    def priority(self):
+        from .priority import JobPriority
+
+        return JobPriority.from_job(self)

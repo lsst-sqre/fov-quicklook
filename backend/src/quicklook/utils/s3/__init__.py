@@ -122,7 +122,7 @@ def _minio_delete_objects_with_prefix(
     from minio import Minio
     from minio.deleteobjects import DeleteObject
 
-    logger = logging.getLogger(f'uvicorn.{__name__}')
+    logger = logging.getLogger(__name__)
 
     client = Minio(
         endpoint=s3_config.endpoint,

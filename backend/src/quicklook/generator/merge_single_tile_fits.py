@@ -7,13 +7,15 @@ from typing import Callable
 import numpy
 import requests
 
-from quicklook.comm.generator import self_generator_id
+from quicklook.comm.generator import GeneratorIdInitializer, self_generator_id
 from quicklook.comm.types import GeneratorInfo
+from quicklook.config import config
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
 from quicklook.generator.retry_on_error import retry_on_error
 from quicklook.job.job import Job
 from quicklook.types import CcdName, Progress, TilePos
-from quicklook.utils import multiprocessing_coverage_compatible, zstd
+from quicklook.utils import multiprocessing_coverage_compatible as mp
+from quicklook.utils import zstd
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
 from quicklook.utils.stacklib import Stack, pool_args, thread_local_context
 
@@ -29,11 +31,13 @@ def merge_single_fits_tiles(job: Job):
     dist_config = job.local_storage.ccd_distribution_config.load()
     n_generators = len(dist_config.generators)
     yield (p := Progress(len(process_tiles_args)))
-    with multiprocessing_coverage_compatible.Pool(
+    with mp.Pool(
+        config.merge_tile_parallel,
         **pool_args(
             enable_pool_context,
             n_generators,
-        )
+            GeneratorIdInitializer(),
+        ),
     ) as pool:
         for _ in pool.imap_unordered(
             _process_tile,
@@ -118,7 +122,11 @@ class ProcessContext:
 
 
 @contextmanager
-def enable_pool_context(n_threads: int):
+def enable_pool_context(
+    n_threads: int,
+    generator_id_initializer: GeneratorIdInitializer,
+):
+    # requests.sessionをスレッドローカルで使えるようにする
     with ThreadPoolExecutor(max_workers=n_threads) as executor:
         with thread_local_context(requests.Session) as session:
             ctx = ProcessContext(
@@ -126,7 +134,8 @@ def enable_pool_context(n_threads: int):
                 thread_local_requests_session=session,
             )
             with process_context.push(ctx):
-                yield
+                with generator_id_initializer():
+                    yield
 
 
 process_context = Stack[ProcessContext]()

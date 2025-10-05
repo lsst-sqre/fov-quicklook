@@ -13,14 +13,16 @@ import traceback
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass, field
 from typing import Any
 
 import aiohttp
 from fastapi import APIRouter, HTTPException
 
+from quicklook.comm.types import GeneratorId
 from quicklook.config import config
 
-from .types import GeneratorRegistrationRequest
+from .types import GeneratorId, GeneratorRegistrationRequest
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +37,13 @@ async def generator_heartbeat(fail_for_test: bool = False):
     return {"status": "alive"}
 
 
-_generator_id: str | None = None
+_generator_id: GeneratorId | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: Any) -> AsyncIterator[None]:
     global _generator_id
-    _generator_id = f'g-{uuid.uuid4().hex}'
+    _generator_id = GeneratorId(f'g-{uuid.uuid4().hex}')
     await _register_to_coordinator()
     registration_task = asyncio.create_task(_registration_loop())
     try:
@@ -54,25 +56,25 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
             pass
 
 
-def self_generator_id() -> str:
+def self_generator_id() -> GeneratorId:
     # 同じコンテナ内に2つのgeneratorがある時に
     # 作業ディレクトリがぶつからないようにするときなどに使う
     # 開発時にしか必要ないかもしれない
     if _generator_id is None:
-        raise ValueError("Generator ID is not set")
-    return _generator_id
+        raise RuntimeError(f"Generator ID is not set, pid={os.getpid()}")
+    return GeneratorId(_generator_id)
 
 
 @contextmanager
-def self_generator_id_context():
+def set_generator_id_for_test():
     """Generator IDのコンテキストマネージャ。"""
     global _generator_id
-    old_id = _generator_id
-    _generator_id = 'generator_id_for_test'
+    # assert config.environment == 'test' and _generator_id is None
+    _generator_id = GeneratorId('generator_id_for_test')
     try:
         yield
     finally:
-        _generator_id = old_id
+        _generator_id = None
 
 
 async def _register_to_coordinator():
@@ -82,12 +84,16 @@ async def _register_to_coordinator():
     )
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
     async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{config.coordinator_base_url}/comm/register",
-            json=registration_data.model_dump(),
-            timeout=timeout,
-        ) as response:
-            response.raise_for_status()
+        try:
+            async with session.post(
+                f"{config.coordinator_base_url}/comm/register",
+                json=registration_data.model_dump(),
+                timeout=timeout,
+            ) as response:
+                response.raise_for_status()
+        except:
+            if config.dev_generator_required_coordinator_connection:
+                raise
 
 
 async def _registration_loop():
@@ -106,3 +112,19 @@ async def _shutdown():  # pragma: no cover
     # さらに待って強制終了
     await asyncio.sleep(10)
     os.kill(os.getpid(), signal.SIGKILL)
+
+
+@dataclass
+class GeneratorIdInitializer:
+    # multiprocessingの子プロセスのためのinitializer
+
+    generator_id: GeneratorId = field(default_factory=self_generator_id)
+
+    @contextmanager
+    def __call__(self):
+        global _generator_id
+        _generator_id = self.generator_id
+        try:
+            yield
+        finally:
+            _generator_id = None

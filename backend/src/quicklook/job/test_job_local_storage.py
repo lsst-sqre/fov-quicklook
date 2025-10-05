@@ -1,6 +1,6 @@
 import pytest
 
-from quicklook.comm.generator import self_generator_id_context
+from quicklook.comm.generator import set_generator_id_for_test
 from quicklook.config import config
 from quicklook.job.job import Job
 from quicklook.job.local_storage import JobLocalStorage
@@ -9,7 +9,7 @@ from quicklook.types import VisitName
 
 @pytest.fixture(autouse=True, scope='module')
 def set_generator_id():
-    with self_generator_id_context():
+    with set_generator_id_for_test():
         yield
 
 
