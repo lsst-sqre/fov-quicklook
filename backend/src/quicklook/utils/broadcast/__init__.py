@@ -12,6 +12,10 @@ class Broadcast(Generic[T]):
     _upstream: asyncio.Queue[T] = field(default_factory=asyncio.Queue)
     _subscribers: set[asyncio.Queue[T]] = field(default_factory=set)
 
+    def __post_init__(self):
+        if self.max_queue_size is not None:
+            assert self.max_queue_size > 0, "max_queue_size must be positive"
+
     def put(self, item: T):
         self._upstream.put_nowait(item)
 
@@ -36,11 +40,7 @@ class Broadcast(Generic[T]):
     def _put_to_subscriber_queue(self, queue: asyncio.Queue[T], item: T):
         """キューにアイテムを追加。上限を超える場合は古いアイテムを削除。"""
         if self.max_queue_size is not None and queue.qsize() >= self.max_queue_size:
-            # キューが満杯の場合、古いアイテムを削除
-            try:
-                queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
+            queue.get_nowait()
         queue.put_nowait(item)
 
     async def subscribe(self) -> AsyncIterator[T]:

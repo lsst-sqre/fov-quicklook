@@ -10,7 +10,7 @@ from quicklook.utils.throttle import throttle
 
 
 @dataclass
-class JobStatusPrinter:
+class JobStatusPrinter:  # pragma: no cover
     n_columns: int = 4
 
     @throttle(0.5)

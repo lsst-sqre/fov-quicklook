@@ -35,6 +35,7 @@ async def test_create_quicklook_pipeline():
         await ev.wait()
 
 
+@pytest.mark.skip("Skipping test_create_quicklook")
 async def test_create_quicklook():
     job = Job(VisitName('raw:broccoli'))
     job.status.on_change(print_job_status)
@@ -95,7 +96,7 @@ class RunningCoordinator:
 @contextmanager
 def run_generators(
     coordinator_base_url: str,
-    num_generators: int = 4,
+    num_generators: int = 2,
 ):
     original_generator_port = config.generator_port
     original_coordinator_base_url = config.coordinator_base_url

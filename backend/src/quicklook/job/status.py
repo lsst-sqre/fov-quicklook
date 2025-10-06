@@ -9,7 +9,6 @@ from quicklook.types import CcdName, Progress
 JobStage = Literal['queued', 'generate_single_fits_tiles', 'merge_tiles', 'transfer_tiles', 'done']
 
 
-
 @dataclass
 class JobStatus:
     # coordinator内で使用される
@@ -32,7 +31,7 @@ class JobStatus:
         yield self
         after = [w.which(self) for w in self._watchers]
         for w, b, a in zip(self._watchers, before, after):
-            if b != a:
+            if b != a:  # pragma: no branch
                 await w.cb(self.job)
 
     def on_change(

@@ -19,6 +19,3 @@ class JobPriority:
 
     def sort_key(self: "JobPriority"):
         return -self.user_count, self.seq
-
-    def __hash__(self) -> int:
-        return hash(self.job)

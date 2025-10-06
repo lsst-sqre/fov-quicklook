@@ -2,6 +2,10 @@
 test:
 	./.venv/bin/pytest
 
+.PHONY: test/cov
+test/cov:
+	./.venv/bin/pytest --cov=. --cov-report=html -m 'slow or not slow'
+
 .PHONY: test/cov-server
 test/cov-server:
 	./.venv/bin/python -m http.server -d htmlcov 4000

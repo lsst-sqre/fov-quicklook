@@ -49,13 +49,13 @@ def run_uvicorn_app(
 
     def wait_for_ready():
         start = time.time()
-        while time.time() - start < timeout:
+        while time.time() - start < timeout:  # pragma: no branch
             try:
                 requests.get(f'{base_url}{healthz}')
                 break
             except requests.exceptions.ConnectionError:
                 time.sleep(0.1)
-        else:
+        else:  # pragma: no cover
             raise TimeoutError(f'{app} did not start in {timeout} seconds')
 
     try:

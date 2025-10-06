@@ -64,7 +64,7 @@ class JobLocalStorage:
         logger_name = f'{__name__}.{self.job.id}'
         logger = logging.getLogger(logger_name)
 
-        if not logger.handlers:
+        if not logger.handlers:  # pragma: no branch
             log_path = self.base_dir / 'log'
             self.base_dir.mkdir(parents=True, exist_ok=True)
             handler = logging.FileHandler(log_path, encoding='utf-8')
@@ -188,7 +188,7 @@ class _MergedFitsTileStorage:
 
     def load_compressed_data(self, pos: TilePos) -> bytes:
         infile = self._path(pos)
-        if not infile.exists():
+        if not infile.exists():  # pragma: no cover
             raise FileNotFoundError(f'Merged FITS tile not found: {infile}')
         return infile.read_bytes()
 

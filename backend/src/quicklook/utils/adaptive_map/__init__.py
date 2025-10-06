@@ -222,6 +222,8 @@ class _AdaptiveMapRunner:
         self.completed_execution_times: list[float] = []
         self.yielded_item_indexes: set[int] = set()
         self.failed_workers: set[Worker] = set()
+        # リスケジュールされて削除されたタスクのメタ情報を保持
+        self.rescheduled_tasks: dict[asyncio.Task, _RunningTask] = {}
 
     async def run(self) -> AsyncIterator[MapResult]:
         """メインの処理ループを実行"""
@@ -232,15 +234,16 @@ class _AdaptiveMapRunner:
             raise ValueError("No available workers")
 
         try:
-            while self.remaining_items or self.running_tasks:
+            while self.remaining_items or self.running_tasks or self.rescheduled_tasks:
                 # 新しいitemをsubmitする
                 await self._submit_new_tasks()
 
-                if not self.running_tasks:  # pragma: no cover
+                if not self.running_tasks and not self.rescheduled_tasks:  # pragma: no cover
                     break
 
-                # タスク完了を待つ
-                done_tasks, _ = await asyncio.wait(list(self.running_tasks.keys()), return_when=asyncio.FIRST_COMPLETED)
+                # タスク完了を待つ（running_tasksとrescheduled_tasksの両方を監視）
+                all_tasks = list(self.running_tasks.keys()) + list(self.rescheduled_tasks.keys())
+                done_tasks, _ = await asyncio.wait(all_tasks, return_when=asyncio.FIRST_COMPLETED)
 
                 # 完了したタスクを処理
                 for task in done_tasks:
@@ -253,9 +256,12 @@ class _AdaptiveMapRunner:
 
         finally:
             # 残りのタスクをキャンセル
-            for task in self.running_tasks:
-                if not task.done():
-                    task.cancel()
+            for task in self.running_tasks:  # pragma: no cover
+                if not task.done():  # pragma: no cover
+                    task.cancel()  # pragma: no cover
+            for task in self.rescheduled_tasks:  # pragma: no cover
+                if not task.done():  # pragma: no cover
+                    task.cancel()  # pragma: no cover
 
     async def _submit_new_tasks(self) -> None:
         """新しいitemをsubmitする"""
@@ -273,7 +279,9 @@ class _AdaptiveMapRunner:
             # submit用のコルーチンを作成
             submit_coro = best_worker.submit(item)
             task = asyncio.create_task(submit_coro)
-            running_task = _RunningTask(worker=best_worker, item=item, item_index=item_index, task=task, start_time=start_time)
+            running_task = _RunningTask(
+                worker=best_worker, item=item, item_index=item_index, task=task, start_time=start_time
+            )
             self.running_tasks[task] = running_task
 
             # capacityが確実に更新されるように少し待つ
@@ -281,20 +289,47 @@ class _AdaptiveMapRunner:
 
     async def _handle_completed_task(self, task: asyncio.Task) -> MapResult | None:
         """完了したタスクを処理し、必要に応じてMapResultを返す"""
-        running_task = self.running_tasks.pop(task)
+        # リスケジュールされたタスクはrunning_tasksから削除されている可能性がある
+        running_task = self.running_tasks.pop(task, None)
+        if running_task is None:
+            # リスケジュールされて削除されたタスクが完了した場合
+            # (cancel_on_reschedule=Falseの場合にバックグラウンドで実行継続していた)
+            running_task = self.rescheduled_tasks.pop(task, None)
+            if running_task is None:  # pragma: no cover
+                # 想定外: タスクの情報が見つからない
+                return None
+
+            try:
+                result = await task
+                execution_time = time.time() - running_task.start_time
+                map_result = MapResult(
+                    worker=running_task.worker, item=running_task.item, value=result, execution_time=execution_time
+                )
+                # リスケジュールされたタスクなので遅延結果として処理
+                if self.on_late_result:  # pragma: no branch
+                    self.on_late_result(map_result)
+            except asyncio.CancelledError:  # pragma: no cover
+                # キャンセルされたタスク（cancel_on_reschedule=Trueの場合）
+                pass  # pragma: no cover
+            except WorkerDown:  # pragma: no cover
+                # Workerが停止した場合
+                self.failed_workers.add(running_task.worker)  # pragma: no cover
+            return None
 
         try:
             result = await task
             execution_time = time.time() - running_task.start_time
 
-            map_result = MapResult(worker=running_task.worker, item=running_task.item, value=result, execution_time=execution_time)
+            map_result = MapResult(
+                worker=running_task.worker, item=running_task.item, value=result, execution_time=execution_time
+            )
 
             if running_task.item_index not in self.yielded_item_indexes:
                 # 初回完了の場合
                 self.yielded_item_indexes.add(running_task.item_index)
                 self.completed_execution_times.append(execution_time)
                 return map_result
-            elif self.on_late_result:  # pragma: no branch
+            elif self.on_late_result:  # pragma: no cover
                 # 遅延結果の場合
                 self.on_late_result(map_result)
 
@@ -321,8 +356,8 @@ class _AdaptiveMapRunner:
     async def _reschedule_task(self, task: asyncio.Task, running_task: _RunningTask) -> None:
         """単一のタスクをリスケジュールする"""
         available_workers = self._get_available_workers()
-        if not available_workers:
-            return
+        if not available_workers:  # pragma: no cover
+            return  # pragma: no cover
 
         best_worker = self._select_best_worker(available_workers)
         if best_worker == running_task.worker:
@@ -344,9 +379,17 @@ class _AdaptiveMapRunner:
             # 元のタスクをリスケジュール済みとしてマーク
             running_task.rescheduled = True
 
+            # 元のタスクをrunning_tasksから削除し、rescheduled_tasksに移動
+            # (先に完了した方を使うため、遅い方の完了を待つ必要はない)
+            del self.running_tasks[task]
+            self.rescheduled_tasks[task] = running_task
+
             # 必要に応じて元のタスクをキャンセル
             if self.cancel_on_reschedule:
                 task.cancel()
+            # cancel_on_reschedule=Falseの場合でもrunning_tasksから削除
+            # タスクはバックグラウンドで実行継続し、完了時に_handle_completed_taskで
+            # on_late_resultコールバックが呼ばれるが、メインループは待たない
 
         except WorkerDown:  # pragma: no cover
             self.failed_workers.add(best_worker)
@@ -366,7 +409,7 @@ class _AdaptiveMapRunner:
         """リスケジュール判定の閾値を計算"""
         if self.completed_execution_times:
             median_time = statistics.median(self.completed_execution_times)
-        else:
+        else:  # pragma: no cover
             median_time = 0.0
         return median_time * self.reschedule_threshold_multiplier
 

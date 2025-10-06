@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 ds = get_datasource()
 
 
-async def create_quicklook(job: Job):
+async def create_quicklook(job: Job):  # pragma: no cover
     '''
     テスト用。
     本番ではパイプラインでquicklookを作成する。
@@ -44,7 +44,7 @@ def quicklook_pipeline():
             ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
             ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
             return job, ccd_generator_map
-        except:
+        except Exception:  # pragma: no cover
             await _finalize(job)
             raise
 
@@ -53,7 +53,7 @@ def quicklook_pipeline():
         try:
             await _merge_tiles(job, ccd_generator_map)
             return job
-        except:
+        except Exception:  # pragma: no cover
             await _finalize(job)
             raise
 
@@ -61,7 +61,7 @@ def quicklook_pipeline():
         try:
             await _transfer_tiles(job)
             return job
-        except:
+        except Exception:  # pragma: no cover
             await _finalize(job)
             raise
 
@@ -98,7 +98,7 @@ def quicklook_pipeline():
 
 
 def _ensure_users_exist_for_job(job: Job):
-    if job.priority.user_count <= 0:
+    if job.priority.user_count <= 0:  # pragma: no cover
         raise RuntimeError(f'No users for job {job.id} (visit={job.visit}), so skipping.')
 
 
@@ -121,6 +121,8 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
                     job.status.generate_single_fits_tiles[ccd_name] = p
             case YieledValue(value=ReturnValue(value=CcdMetadata() as ccd_metadata)):
                 ccd_metadata_dict[ccd_metadata.ccd_name] = ccd_metadata
+            case _:  # pragma: no cover
+                raise ValueError(f"Unexpected message: {msg}")
 
     async for result in adaptive_map_rpc(rpcs, stream=True, on_yield=on_yield):
         ccd_generator_map[result.args[1].ccd] = rpc_endpoint(result.generator_id)
@@ -148,6 +150,8 @@ async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, GeneratorId]):
             case YieledValue(value=Progress() as p, generator_id=generator_id):
                 async with job.status.watch():
                     job.status.merge_tiles[generator_id] = p
+            case _:  # pragma: no cover
+                raise ValueError(f"Unexpected message: {msg}")
 
     await rpc_scatter(Rpc.create(merge_single_fits_tiles, job), stream=True, on_yield=on_yield)
     await rpc_scatter(Rpc.create(_clear_single_fits_tiles_rpc, job))
@@ -177,6 +181,8 @@ async def _transfer_tiles(job: Job):
                     job.status.transfer_tiles[generator_id] = p
             case YieledValue(value=ReturnValue(value=int() as _uploaded_size), generator_id=generator_id):
                 uploaded_size += _uploaded_size
+            case _:  # pragma: no cover
+                raise ValueError(f"Unexpected message: {msg}")
 
     await rpc_scatter(Rpc.create(transfer_tiles, job), stream=True, on_yield=on_yield)
     return TransferTilesResult(

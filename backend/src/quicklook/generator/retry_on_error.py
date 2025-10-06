@@ -13,8 +13,8 @@ def retry_on_error[R](
     for _ in range(1, n_retry):
         try:
             return f()
-        except expected:
+        except expected:  # pragma: no cover
             time.sleep(wait)
             wait *= 1.5
             continue
-    return f()
+    return f()  # pragma: no cover

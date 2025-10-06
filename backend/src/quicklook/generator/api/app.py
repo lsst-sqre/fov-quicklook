@@ -8,6 +8,7 @@ from quicklook.comm import rpc
 from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.comm.generator import lifespan as generator_lifespan
 from quicklook.comm.generator import router as comm_generator_router
+from quicklook.config import config
 from quicklook.job.job import Job
 from quicklook.types import TilePos
 from quicklook.utils.async_process_generator import create_async_process_pool
@@ -20,8 +21,6 @@ _process_pool = None
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     global _process_pool
-
-    from quicklook.config import config
 
     async with generator_lifespan(app):
         async with create_async_process_pool(
@@ -46,7 +45,7 @@ async def route_healthz():
 
 @app.post('/rpc')
 async def route_rpc(request: fastapi.Request):
-    if _process_pool is None:
+    if _process_pool is None:  # pragma: no cover
         raise RuntimeError("Process pool not initialized")
 
     return StreamingResponse(
@@ -86,6 +85,6 @@ def route_get_merged_tile(
 ):
     try:
         data_bytes = job.local_storage.merged_fits_tile.load_compressed_data(tile_pos)
-    except FileNotFoundError:
+    except FileNotFoundError:  # pragma: no cover
         raise fastapi.HTTPException(status_code=404)
     return fastapi.Response(data_bytes, media_type='application/octet-stream')

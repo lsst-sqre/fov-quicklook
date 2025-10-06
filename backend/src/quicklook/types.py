@@ -13,7 +13,7 @@ CcdDataType: TypeAlias = Literal['raw', 'post_isr_image', 'preliminary_visit_ima
 class VisitName(str):
     def _parts(self) -> list[str]:
         parts = self.split(':')
-        if len(parts) < 2:
+        if len(parts) < 2:  # pragma: no cover
             raise ValueError(f'Invalid visit name: {self!r}')
         return parts
 

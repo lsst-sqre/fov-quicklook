@@ -83,14 +83,14 @@ def _worker_from_generator(g: GeneratorInfo):
         try:
             if ctx.stream:
                 async for value in run_rpc_stream(f'{g.url}/rpc', item.rpc):
-                    if ctx.alive and ctx.on_yield:
+                    if ctx.alive and ctx.on_yield:  # pragma: no branch
                         await ctx.on_yield(YieledValue(value, g.id, item.rpc.args))
             else:
                 return await run_rpc(f'{g.url}/rpc', item.rpc)
-        except TimeoutError:
-            raise WorkerDown
+        except TimeoutError:  # pragma: no cover
+            raise WorkerDown()
 
-    async def teardown():
+    async def teardown():  # pragma: no cover
         remove_generator(g)
 
     return create_worker(
@@ -111,7 +111,7 @@ async def rpc_scatter(
     async def single(g: GeneratorInfo):
         if stream:
             async for value in run_rpc_stream(f'{g.url}/rpc', rpc):
-                if on_yield:
+                if on_yield:  # pragma: no branch
                     await on_yield(YieledValue(value, g.id, rpc.args))
         else:
             return await run_rpc(f'{g.url}/rpc', rpc)

@@ -205,8 +205,12 @@ async def test_adaptive_map_late_results_callback_called() -> None:
             reschedule_threshold_multiplier=0.05,
         )
     ]
+    
+    # バックグラウンドタスクの完了を待つ
+    await asyncio.sleep(0.5)
 
     assert {result.item for result in results} == {1, 2}
+    assert late_results, "No late results received"
     assert any(res.item == 2 and res.worker is slow for res in late_results)
 
     await fast.teardown()
@@ -387,3 +391,211 @@ async def test_helper_worker_capacity_zero_after_teardown() -> None:
     worker = create_worker(str(uuid.uuid4()), process_item, max_concurrency=1)
     await worker.teardown()
     assert worker.capacity() == 0
+
+
+async def test_adaptive_map_cancel_on_reschedule_true() -> None:
+    """cancel_on_reschedule=Trueの場合、元のタスクがキャンセルされることを確認"""
+    fast = ControllableWorker(max_capacity=1, name="fast")
+    slow = ControllableWorker(max_capacity=1, name="slow")
+
+    async def fast_process(item: int) -> int:
+        await asyncio.sleep(0.01)
+        return item
+
+    async def slow_process(item: int) -> int:
+        delay = 0.3 if item == 2 else 0.05
+        await asyncio.sleep(delay)
+        return item
+
+    fast.set_process(fast_process)
+    slow.set_process(slow_process)
+
+    results = [
+        result
+        async for result in adaptive_map(
+            [fast, slow],
+            [1, 2],
+            cancel_on_reschedule=True,
+            reschedule_threshold_multiplier=0.05,
+        )
+    ]
+
+    assert {result.item for result in results} == {1, 2}
+    # item 2がslowからfastにリスケジュールされている
+    assert 2 in fast.submitted
+
+    await fast.teardown()
+    await slow.teardown()
+
+
+async def test_adaptive_map_rescheduled_task_worker_down() -> None:
+    """リスケジュールされたタスクでWorkerDownが発生した場合の処理"""
+    fast = ControllableWorker(max_capacity=1, name="fast")
+    slow = ControllableWorker(max_capacity=1, name="slow")
+
+    async def fast_process(item: int) -> int:
+        await asyncio.sleep(0.01)
+        return item
+
+    async def slow_process(item: int) -> int:
+        await asyncio.sleep(0.3)
+        return item
+
+    fast.set_process(fast_process)
+    slow.set_process(slow_process)
+    slow.fail_for(2)  # slowがitem 2で失敗
+
+    results = [
+        result
+        async for result in adaptive_map(
+            [fast, slow],
+            [1, 2],
+            cancel_on_reschedule=False,
+            reschedule_threshold_multiplier=0.05,
+        )
+    ]
+
+    assert {result.item for result in results} == {1, 2}
+    # item 2はfastで処理される
+    worker_by_item = {result.item: result.worker for result in results}
+    assert worker_by_item[2] is fast
+
+    await fast.teardown()
+    await slow.teardown()
+
+
+async def test_adaptive_map_regular_task_worker_down_reschedules() -> None:
+    """通常のタスクでWorkerDownが発生し、itemが再スケジュールされることを確認"""
+    fast = ControllableWorker(max_capacity=2, name="fast")
+    slow = ControllableWorker(max_capacity=1, name="slow")
+
+    async def process(item: int) -> int:
+        await asyncio.sleep(0.01)
+        return item
+
+    fast.set_process(process)
+    slow.set_process(process)
+    
+    # fastがitem 2で失敗するように設定
+    fast.fail_for(2)
+
+    results = [
+        result
+        async for result in adaptive_map([fast, slow], [1, 2, 3])
+    ]
+
+    assert {result.item for result in results} == {1, 2, 3}
+    # item 2はslowで処理される（fastが失敗したため）
+    worker_by_item = {result.item: result.worker for result in results}
+    assert worker_by_item[2] is slow
+
+    await fast.teardown()
+    await slow.teardown()
+
+
+async def test_create_worker_id() -> None:
+    """create_workerで作成したWorkerのid()が正しいことを確認"""
+    async def process_item(item: int) -> int:
+        return item
+
+    worker_id = "test-worker-123"
+    worker = create_worker(worker_id, process_item, max_concurrency=1)
+    
+    assert worker.id() == worker_id
+    
+    await worker.teardown()
+
+
+async def test_adaptive_map_early_exit_cancels_tasks() -> None:
+    """ジェネレータを途中で終了した場合、残りのタスクがキャンセルされることを確認"""
+    worker = ControllableWorker(max_capacity=3, name="worker")
+
+    cancel_count = 0
+    completed = []
+
+    async def process(item: int) -> int:
+        nonlocal cancel_count
+        try:
+            await asyncio.sleep(2.0)  # 非常に長い処理
+            completed.append(item)
+            return item
+        except asyncio.CancelledError:
+            # キャンセルされたことを記録
+            cancel_count += 1
+            raise
+
+    worker.set_process(process)
+
+    results = []
+    gen = adaptive_map([worker], [1, 2, 3, 4])
+    try:
+        # タスクがサブミットされるまで少し待つ
+        await asyncio.sleep(0.01)
+        # ジェネレータを明示的に閉じる（1つも取得せずに）
+        await gen.aclose()  # type: ignore
+    except StopAsyncIteration:  # pragma: no cover
+        pass
+
+    # 結果は取得していないこと
+    assert len(results) == 0
+
+    # キャンセルされたタスクがあること
+    await asyncio.sleep(0.1)
+    # 少なくとも1つのタスクがキャンセルされている
+    assert cancel_count > 0 or len(completed) == 0
+
+    await worker.teardown()
+
+
+async def test_adaptive_map_no_reschedule_when_no_workers_available() -> None:
+    """利用可能なworkerがない場合、リスケジューリングが行われないことを確認"""
+    worker = ControllableWorker(max_capacity=1, name="worker")
+
+    async def process(item: int) -> int:
+        # 最初のitemは遅く、2つ目以降は速い
+        delay = 0.2 if item == 1 else 0.01
+        await asyncio.sleep(delay)
+        return item
+
+    worker.set_process(process)
+
+    # workerが1つしかなく、capacityも1なので、リスケジューリングは発生しない
+    results = [
+        result
+        async for result in adaptive_map(
+            [worker],
+            [1, 2],
+            reschedule_threshold_multiplier=0.05,
+        )
+    ]
+
+    assert {result.item for result in results} == {1, 2}
+
+    await worker.teardown()
+
+
+async def test_adaptive_map_no_reschedule_when_same_worker() -> None:
+    """リスケジュール先が同じworkerの場合、リスケジューリングが行われないことを確認"""
+    worker = ControllableWorker(max_capacity=2, name="worker")
+
+    async def process(item: int) -> int:
+        # item 1は遅く、item 2は速い
+        delay = 0.2 if item == 1 else 0.01
+        await asyncio.sleep(delay)
+        return item
+
+    worker.set_process(process)
+
+    # 同じworkerしかないので、リスケジューリング対象になっても実際には行われない
+    results = [
+        result
+        async for result in adaptive_map(
+            [worker],
+            [1, 2],
+            reschedule_threshold_multiplier=0.05,
+        )
+    ]
+
+    assert {result.item for result in results} == {1, 2}
+
+    await worker.teardown()

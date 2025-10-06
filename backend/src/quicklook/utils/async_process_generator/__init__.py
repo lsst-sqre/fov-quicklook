@@ -53,7 +53,7 @@ class AsyncProcessPool:
         Raises:
             プロセス内で発生した例外
         """
-        if executor is None or manager is None:
+        if executor is None or manager is None:  # pragma: no cover
             raise RuntimeError("AsyncProcessPool not initialized")
 
         queue: mp.Queue = manager.Queue()  # type: ignore[attr-defined]
@@ -96,7 +96,8 @@ def _initialize_worker(initializers: list[Callable[[], ContextManager]]) -> None
 
     _exit_stacks.add(stack)
 
-    def exit():
+    def exit():  # pragma: no cover
+        # atexitで実行される関数はcoverageはとれないようだ
         _exit_stacks.remove(stack)
         stack.close()
 

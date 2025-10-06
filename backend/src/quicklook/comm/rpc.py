@@ -56,9 +56,9 @@ async def run_rpc(
     ストリームから最初の結果を取得して返します。
     結果がない場合はRuntimeErrorを発生させます。
     """
-    async for result in run_rpc_stream(url, rpc, timeout=timeout):
+    async for result in run_rpc_stream(url, rpc, timeout=timeout):  # pragma: no branch
         return result
-    raise RuntimeError("No result returned from RPC")
+    raise RuntimeError("No result returned from RPC")  # pragma: no cover
 
 
 async def run_rpc_stream(

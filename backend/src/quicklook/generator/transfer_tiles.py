@@ -160,8 +160,8 @@ def enable_pool_context(
                 thread_pool_executor=executor,
                 thread_local_requests_session=session,
             )
-            with process_context.push(ctx):
-                with generator_id_initializer():
+            with process_context.push(ctx):  # pragma: no branch
+                with generator_id_initializer():  # pragma: no branch
                     yield
 
 

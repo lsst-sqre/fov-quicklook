@@ -36,9 +36,9 @@ class Pipeline(Generic[I, R]):
         self._on_finish = callback
         return self
 
-    def concat(self, another_pipeline: Pipeline[R, R2]) -> Pipeline[I, R2]:
-        self._stage_defs.extend(another_pipeline._stage_defs)
-        return self  # type: ignore
+    # def concat(self, another_pipeline: Pipeline[R, R2]) -> Pipeline[I, R2]:
+    #     self._stage_defs.extend(another_pipeline._stage_defs)
+    #     return self  # type: ignore
 
     @contextlib.asynccontextmanager
     async def run(self):
@@ -189,12 +189,12 @@ async def _task(args: _TaskArgs):
             result = await args.process(item)
             await args.on_exit(item, result)
             resolution = args.resolve(result)
-            if inspect.isawaitable(resolution):
+            if inspect.isawaitable(resolution):  # pragma: no branch
                 await resolution
         except Skip:
             pass
-        except asyncio.CancelledError:
+        except asyncio.CancelledError:  # pragma: no cover
             raise
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             logger.error(f"Error occurred in pipeline: {e}", exc_info=True)
             pass

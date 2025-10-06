@@ -60,7 +60,7 @@ def self_generator_id() -> GeneratorId:
     # 同じコンテナ内に2つのgeneratorがある時に
     # 作業ディレクトリがぶつからないようにするときなどに使う
     # 開発時にしか必要ないかもしれない
-    if _generator_id is None:
+    if _generator_id is None:  # pragma: no cover
         raise RuntimeError(f"Generator ID is not set, pid={os.getpid()}")
     return GeneratorId(_generator_id)
 
@@ -78,6 +78,7 @@ def set_generator_id_for_test():
 
 
 async def _register_to_coordinator():
+
     registration_data = GeneratorRegistrationRequest(
         generator_id=self_generator_id(),
         port=config.generator_port,
@@ -91,8 +92,8 @@ async def _register_to_coordinator():
                 timeout=timeout,
             ) as response:
                 response.raise_for_status()
-        except:
-            if config.dev_generator_required_coordinator_connection:
+        except Exception:
+            if config.dev_generator_required_coordinator_connection:  # pragma: no cover
                 raise
 
 
@@ -126,5 +127,5 @@ class GeneratorIdInitializer:
         _generator_id = self.generator_id
         try:
             yield
-        finally:
+        finally:  # pragma: no cover
             _generator_id = None

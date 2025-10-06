@@ -101,7 +101,7 @@ async def _heartbeat_check(*, fail_for_test: bool = False):
             try:
                 async with session.get(url, timeout=timeout) as response:
                     response.raise_for_status()
-            except:
+            except Exception:
                 traceback.print_exc()
                 return generator_info
 
