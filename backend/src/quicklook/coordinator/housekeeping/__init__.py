@@ -20,7 +20,7 @@ async def select_quicklook_to_delete() -> str | None:
     最近1週間以内のアクセスが少ないもの順、それが同じならcreated_atが古いもの順。
     """
     async with get_session() as session:
-        one_week_ago = datetime.utcnow() - timedelta(days=7)
+        one_week_ago = datetime.now() - timedelta(days=7)
         
         # 1週間以内のアクセス数をカウント
         recent_access_count = (

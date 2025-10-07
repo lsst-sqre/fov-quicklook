@@ -25,12 +25,14 @@ async def test_create_quicklook_pipeline():
     job.watcher.on_change(print_job_status)
     ev = asyncio.Event()
 
-    async def done(job: Job):
-        ev.set()
+    async def on_change(job: Job):
+        if job.status.stage in {'done', 'error'}:
+            ev.set()
+            assert job.status.stage == 'done'
 
-    pipeline = quicklook_pipeline().append(Stage(done))
+    job.watcher.on_change(on_change, which=lambda s: s.stage)
 
-    async with pipeline.run() as ph:
+    async with quicklook_pipeline().run() as ph:
         await ph.push(job)
         await ev.wait()
 

@@ -8,13 +8,9 @@ from quicklook.types import PackedTilePos, TilePos, VisitName
 
 if TYPE_CHECKING:
     from quicklook.generator.generate_single_fits_tiles import CcdMetadata
-from quicklook.utils.s3 import (
-    s3_delete_object,
-    s3_delete_objects_with_prefix,
-    s3_download_object,
-    s3_list_objects,
-    s3_upload_object,
-)
+
+from quicklook.utils.fitsheader import HeaderType
+from quicklook.utils.s3 import s3_delete_object, s3_delete_objects_with_prefix, s3_download_object, s3_list_objects, s3_upload_object
 
 
 def put_object(key: str, value: bytes) -> int:
@@ -79,19 +75,21 @@ class VisitObjectStorage:
 
     def _get(self, key: str) -> bytes:
         return get_object(f'quicklooks/{self.visit}/{key}')
-    
+
     def delete_all(self) -> None:
         """このvisitに関連するすべてのオブジェクトを削除"""
         delete_objects_by_prefix(f'quicklooks/{self.visit}/')
-    
-    def put_fits_header(self, ccd_name: str, headers: dict) -> int:
+
+    def put_fits_headers(self, ccd_name: str, headers: list[HeaderType]) -> int:
         """FITS headerをobject storageに保存"""
         import pickle
+
         data = pickle.dumps(headers)
         return self._put(f'fits-headers/{ccd_name}.pickle', data)
-    
+
     def put_ccd_metadata_list(self, metadata_list: list['CcdMetadata']) -> int:
         """CCD metadata listをobject storageに保存"""
         import pickle
+
         data = pickle.dumps(metadata_list)
         return self._put('ccd-metadata-list.pickle', data)

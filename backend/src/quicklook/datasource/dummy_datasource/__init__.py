@@ -22,7 +22,7 @@ class DummyDataSource(DataSourceBase):
         ccds = [*_s3_list_visit_ccds(visit)]
         match config.environment:
             case 'test':
-                ccds = ccds[:2]
+                ccds = ccds[:4]
             case 'development':
                 ccds = ccds[:10]
         return ccds

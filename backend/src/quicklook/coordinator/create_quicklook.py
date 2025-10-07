@@ -45,6 +45,7 @@ def quicklook_pipeline():
     async def generate_single_fits_tiles(job: Job):
         visit = job.visit
         try:
+            raise RuntimeError("My Error")
             # DBに初期レコードを作成
             await _create_quicklook_record(job)
             ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
@@ -245,7 +246,7 @@ async def _create_quicklook_record(job: Job):
             job_id=job.id,
             disk_usage=0,
             ready=False,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(),
         )
         session.add(quicklook)
         await session.commit()
