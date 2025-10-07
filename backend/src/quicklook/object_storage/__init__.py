@@ -80,3 +80,9 @@ class VisitObjectStorage:
     def delete_all(self) -> None:
         """このvisitに関連するすべてのオブジェクトを削除"""
         delete_objects_by_prefix(f'quicklooks/{self.visit}/')
+    
+    def put_fits_header(self, ccd_name: str, headers: dict) -> int:
+        """FITS headerをobject storageに保存"""
+        import pickle
+        data = pickle.dumps(headers)
+        return self._put(f'fits-headers/{ccd_name}.pickle', data)

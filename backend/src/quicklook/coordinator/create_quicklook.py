@@ -11,6 +11,7 @@ from quicklook.datasource import get_datasource
 from quicklook.db import Quicklook, get_session
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate_single_fits_tiles
 from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
+from quicklook.generator.transfer_fits_headers import transfer_fits_headers
 from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
@@ -162,6 +163,10 @@ async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, GeneratorId]):
                 raise ValueError(f"Unexpected message: {msg}")
 
     await rpc_scatter(Rpc.create(merge_single_fits_tiles, job), stream=True, on_yield=on_yield)
+    
+    # transfer_fits_headersをmerge_tilesの後に実行
+    await _transfer_fits_headers(job)
+    
     await rpc_scatter(Rpc.create(_clear_single_fits_tiles_rpc, job))
 
 
@@ -171,6 +176,24 @@ def _clear_single_fits_tiles_rpc(job: Job):
 
 def _save_ccd_distribution_config_rpc(job: Job, dist_config: CcdDistributionConfig):
     job.local_storage.ccd_distribution_config.save(dist_config)
+
+
+async def _transfer_fits_headers(job: Job):
+    """FITS headerをobject storageにアップロードする"""
+    _ensure_users_exist_for_job(job)
+
+    async def on_yield(msg):
+        match msg:
+            case YieledValue(value=Progress() as p, generator_id=generator_id):
+                # Progressを記録（必要に応じて）
+                pass
+            case YieledValue(value=ReturnValue(value=int() as _uploaded_size), generator_id=generator_id):
+                # アップロードサイズを記録（必要に応じて）
+                pass
+            case _:  # pragma: no cover
+                raise ValueError(f"Unexpected message: {msg}")
+
+    await rpc_scatter(Rpc.create(transfer_fits_headers, job), stream=True, on_yield=on_yield)
 
 
 async def _transfer_tiles(job: Job):
