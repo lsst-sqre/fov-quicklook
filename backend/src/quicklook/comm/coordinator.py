@@ -46,7 +46,7 @@ async def register_generator(
         if registration_data.coordinator_id != _coordinator_id:
             raise HTTPException(
                 status_code=409,
-                detail=f"Coordinator ID mismatch: expected {_coordinator_id}, got {registration_data.coordinator_id}"
+                detail="Coordinator ID mismatch"
             )
     
     client_host = request.client.host if request.client else "127.0.0.1"
