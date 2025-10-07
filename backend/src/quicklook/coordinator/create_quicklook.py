@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import cast
 
 from quicklook.comm.coordinator import get_available_generators
@@ -7,6 +8,7 @@ from quicklook.comm.rpc import Rpc
 from quicklook.comm.types import GeneratorId
 from quicklook.config import config
 from quicklook.datasource import get_datasource
+from quicklook.db import Quicklook, get_session
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate_single_fits_tiles
 from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_tiles import transfer_tiles
@@ -41,11 +43,13 @@ def quicklook_pipeline():
     async def generate_single_fits_tiles(job: Job):
         visit = job.visit
         try:
+            # DBに初期レコードを作成
+            await _create_quicklook_record(job)
             ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
             ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
             return job, ccd_generator_map
         except Exception:  # pragma: no cover
-            await _finalize(job)
+            await _finalize(job, error=True)
             raise
 
     async def merge_tiles(args: tuple[Job, dict[CcdName, GeneratorId]]):
@@ -54,15 +58,15 @@ def quicklook_pipeline():
             await _merge_tiles(job, ccd_generator_map)
             return job
         except Exception:  # pragma: no cover
-            await _finalize(job)
+            await _finalize(job, error=True)
             raise
 
     async def transfer_tiles(job: Job):
         try:
-            await _transfer_tiles(job)
-            return job
+            result = await _transfer_tiles(job)
+            return job, result
         except Exception:  # pragma: no cover
-            await _finalize(job)
+            await _finalize(job, error=True)
             raise
 
     def select_next_job(jobs: list[Job]):
@@ -93,7 +97,7 @@ def quicklook_pipeline():
                 item_picker=select_next_job,
             )
         )
-        .append(Stage(_finalize))
+        .append(Stage(_finalize_success))
     )
 
 
@@ -195,9 +199,61 @@ class TransferTilesResult:
     uploaded_size: int
 
 
-async def _finalize(job: Job):
+async def _create_quicklook_record(job: Job):
+    """DBにquicklookの初期レコードを作成（ready=False）"""
+    async with get_session() as session:
+        quicklook = Quicklook(
+            visit_name=str(job.visit),
+            job_id=job.id,
+            disk_usage=0,
+            ready=False,
+            created_at=datetime.utcnow(),
+        )
+        session.add(quicklook)
+        await session.commit()
+        logger.info(f"Created quicklook record for {job.visit} (job_id={job.id})")
+
+
+async def _finalize_success(args: tuple[Job, TransferTilesResult]):
+    """正常終了時の処理：DBレコードをready=Trueに更新"""
+    job, result = args
     async with job.watcher.watch():
         job.status.stage = 'done'
+    
+    # DBレコードを更新
+    async with get_session() as session:
+        from sqlalchemy import select, update
+        stmt = (
+            update(Quicklook)
+            .where(Quicklook.visit_name == str(job.visit))
+            .values(ready=True, disk_usage=result.uploaded_size)
+        )
+        await session.execute(stmt)
+        await session.commit()
+        logger.info(f"Updated quicklook record for {job.visit}: ready=True, disk_usage={result.uploaded_size}")
+    
+    await rpc_scatter(Rpc.create(_cleanup_rpc, job))
+    return job
+
+
+async def _finalize(job: Job, error: bool = False):
+    """エラー時の処理：DBレコードとobject storageを削除"""
+    async with job.watcher.watch():
+        job.status.stage = 'done'
+    
+    if error:
+        # エラー時はobject storageのデータを削除
+        logger.info(f"Deleting object storage data for {job.visit} due to error")
+        job.object_storage.delete_all()
+        
+        # DBレコードも削除
+        async with get_session() as session:
+            from sqlalchemy import delete
+            stmt = delete(Quicklook).where(Quicklook.visit_name == str(job.visit))
+            await session.execute(stmt)
+            await session.commit()
+            logger.info(f"Deleted quicklook record for {job.visit} due to error")
+    
     await rpc_scatter(Rpc.create(_cleanup_rpc, job))
     return job
 

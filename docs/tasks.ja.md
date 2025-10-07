@@ -1,6 +1,6 @@
 # 残りタスク
 
-* [ ] commのリファクタリング
+* [x] commのリファクタリング
   * `./src/quicklook/comm`にcoordinatorとgeneratorの連携の処理がある。
   * 現在、generatorからcoordinatorへ定期的に自身の登録処理を行っているが、これに処理を加える。
   * coordinatorは起動時にuuidを自身に割り当てる
@@ -12,9 +12,9 @@
   * 開発環境
     * `make db/docker` で開発用DBが起動する。
     * DBへの接続情報は`src/quicklook/config/__init__.py`に記述する。
-  * [ ] async版のSQLAlchemy2を導入
+  * [x] async版のSQLAlchemy2を導入
     * スキーマは下記参照
-  * [ ] alembic導入
+  * [x] alembic導入
     * `Makefile`の`db/*`でalembicに関するタスクを管理できるようにする。
 * DBへのquicklookの情報を登録する
   * [ ] `src/quicklook/coordinator/create_quicklook.py`を実装する。

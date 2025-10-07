@@ -76,3 +76,7 @@ class VisitObjectStorage:
 
     def _get(self, key: str) -> bytes:
         return get_object(f'quicklooks/{self.visit}/{key}')
+    
+    def delete_all(self) -> None:
+        """このvisitに関連するすべてのオブジェクトを削除"""
+        delete_objects_by_prefix(f'quicklooks/{self.visit}/')
