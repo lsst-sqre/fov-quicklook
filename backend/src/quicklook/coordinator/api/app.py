@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator, Awaitable, Callable
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy import select
 
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
@@ -17,6 +18,7 @@ from quicklook.coordinator.api.types import (
     SharedStatusMessageJobStatusList,
 )
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
+from quicklook.db import Quicklook, get_session
 from quicklook.job.job import Job
 from quicklook.types import VisitName
 from quicklook.utils.broadcast import Broadcast
@@ -49,6 +51,17 @@ type JobDict = dict[VisitName, Job]
 @app.post('/quicklooks')
 async def route_create_quicklook(params: CreateQuicklookRequest):
     visit = VisitName(params.visit)
+    
+    async with get_session() as session:
+        result = await session.execute(
+            select(Quicklook).where(Quicklook.visit_name == visit)
+        )
+        quicklook = result.scalar_one_or_none()
+        
+        if quicklook is not None:
+            logger.info(f'Quicklook for visit {visit} already exists in DB')
+            return
+    
     await running_pipeline.push(visit)
 
 
