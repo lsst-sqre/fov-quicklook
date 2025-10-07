@@ -13,6 +13,7 @@ from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate
 from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_fits_headers import transfer_fits_headers
 from quicklook.generator.transfer_tiles import transfer_tiles
+from quicklook.object_storage import VisitObjectStorage
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue
@@ -137,8 +138,18 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
         job.status.ccd_generator_map = ccd_generator_map
 
     await rpc_scatter(Rpc.create(_save_job_metadata_rpc, job))
+    
+    # メタデータをobject storageに保存
+    _save_quicklook_metadata(job, ccd_metadata_dict)
 
     return ccd_generator_map
+
+
+def _save_quicklook_metadata(job: Job, ccd_metadata_dict: dict[CcdName, CcdMetadata]) -> None:
+    """quicklookメタデータをobject storageに保存"""
+    visit_storage = VisitObjectStorage(job.visit)
+    metadata_list = list(ccd_metadata_dict.values())
+    visit_storage.put_ccd_metadata_list(metadata_list)
 
 
 def _save_job_metadata_rpc(job: Job):
