@@ -1,20 +1,22 @@
 ## 未完了タスク
-* [ ] `src/quicklook/coordinator/housekeeping/test_housekeeping.py`のリファクタリング
+
+
+
+# 完了タスク
+
+* [x] `src/quicklook/coordinator/housekeeping/test_housekeeping.py`のリファクタリング
   * このテストが通りません。直してください。
   * テストを直すためにDBを完全にリセットして良いです。(`alembic_version`テーブルの削除も含め)
     * `src/quicklook/scripts/bootstrap_db.py` ではDBの不整合が起きたらその方法でリセットするコードを含めてください。
     * `src/quicklook/scripts/bootstrap_db.py` がちゃんと動くことを確認してください。
-* [ ] `./src/quicklook/coordinator/create_quicklook.py`周辺のリファクタリング
+* [x] `./src/quicklook/coordinator/create_quicklook.py`周辺のリファクタリング
   * パイプラインの各ステージの戻り値は1つの共通のオブジェクトを引き回すべし
     * dataclass `PipeLineResult` を作成し各ステージでプロパティを更新するようにする
     * 各ステージの入出力の形を揃え`select_next_job`と`select_next_job_with_size`のような同じような関数をたくさん作る必要をなくします。
-* [ ] `./src/quicklook/object_storage/__init__.py`周辺のリファクタリング
+* [x] `./src/quicklook/object_storage/__init__.py`周辺のリファクタリング
   * `import asyncio`はファイルの先頭にまとめてください。
-* [ ] `./src/quicklook/coordinator/housekeeping/__init__.py`周辺のリファクタリング
+* [x] `./src/quicklook/coordinator/housekeeping/__init__.py`周辺のリファクタリング
   * `_delete_object_storage_sync` は `storage.delete_all_sync` はasync版があるのでそれを使って非同期関数にしましょう。
-
-# 完了タスク
-
 * [x] `src/quicklook/coordinator/test_create_quicklook.py`のリファクタリング
   * このモジュールのテストの開始時に`quicklooks`テーブルの状態をリセットする。
   * `./.venv/bin/pytest src/quicklook/coordinator/test_create_quicklook.py -m 'slow'` でテスト実施

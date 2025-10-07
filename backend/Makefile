@@ -30,20 +30,19 @@ pyright/watch:
 	[ -x ./pyright/node_modules/.bin/pyright ] || ( mkdir -p pyright && cd pyright && npm install pyright  )
 	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python --watch
 
+export ENV_FILE=./.dev.env
+
 .PHONY: dev/coordinator
 dev/coordinator:
-	ENV_FILE=./.dev.env \
-	./.venv/bin/uvicorn --reload quicklook.coordinator.api.app:app --port 9501 --no-access-log
+	./.venv/bin/uvicorn --reload quicklook.coordinator.api.app:app --port 9501 --no-access-log --reload-dir src
 
  .PHONY: dev/generator
 dev/generator:
-	ENV_FILE=./.dev.env \
-	./.venv/bin/uvicorn --reload quicklook.generator.api.app:app --port 9502 --no-access-log
+	./.venv/bin/uvicorn --reload quicklook.generator.api.app:app --port 9502 --no-access-log --reload-dir src
 
 .PHONY: dev/frontend
 dev/frontend:
-	ENV_FILE=./.dev.env \
-	./.venv/bin/uvicorn --reload quicklook.frontend.api.app:app --port 9500 --no-access-log
+	./.venv/bin/uvicorn --reload quicklook.frontend.api.app:app --port 9500 --no-access-log --reload-dir src
 
 
 .PHONY: dev/openapi
@@ -61,17 +60,14 @@ db/create-migration:
 
 .PHONY: db/migrate
 db/migrate:
-	ENV_FILE=./.dev.env \
 	./.venv/bin/alembic upgrade head
 
 .PHONY: db/rollback
 db/rollback:
-	ENV_FILE=./.dev.env \
 	./.venv/bin/alembic downgrade -1
 
 .PHONY: db/bootstrap
 db/bootstrap:
-	ENV_FILE=./.dev.env \
 	./.venv/bin/python -m quicklook.scripts.bootstrap_db
 
 .PHONY: db/docker

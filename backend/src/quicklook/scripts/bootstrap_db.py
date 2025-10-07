@@ -9,7 +9,6 @@ and retries the migration.
 
 import asyncio
 import logging
-import sys
 from pathlib import Path
 
 from alembic import command
@@ -41,8 +40,8 @@ async def drop_all_tables():
 
 def delete_all_object_storage():
     """Delete all objects from object storage with the configured prefix."""
-    logger.info(f"Deleting all objects with prefix: {config.s3_tile_key_prefix}quicklooks/")
-    delete_objects_by_prefix("quicklooks/")
+    logger.info(f"Deleting all objects with prefix: {repr(config.s3_tile_key_prefix)}")
+    delete_objects_by_prefix("")
     logger.info("All objects deleted from object storage")
 
 

@@ -15,7 +15,6 @@ from quicklook.generator.transfer_fits_headers import transfer_fits_headers
 from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
-from quicklook.object_storage import VisitObjectStorage
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
 
@@ -99,19 +98,15 @@ def quicklook_pipeline():
             await _finalize_error(job)
             raise
 
+    async def finalize_success(result: _PipelineResult):
+        return await _finalize_success(result)
+
     def select_next_result(results: list[_PipelineResult]):
         results.sort(key=lambda r: r.job.priority.sort_key())
         return results.pop(0)
 
-    async def finalize_success(result: _PipelineResult):
-        return await _finalize_success(result)
-
     return (
-        Pipeline(
-            Stage(
-                arg_adapter,
-            )
-        )
+        Pipeline(Stage(arg_adapter))
         .append(
             Stage(
                 generate_single_fits_tiles,
@@ -133,8 +128,6 @@ def quicklook_pipeline():
         )
         .append(
             Stage(
-                # transferステージ。ここが一番時間がかかる
-                # 1jobあたり20GBのローカルストレージが必要
                 transfer_tiles,
                 parallel=config.pipeline_transfer_tiles,
                 queue_capacity=config.pipeline_transfer_queue_size,
@@ -175,10 +168,6 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
     async for result in adaptive_map_rpc(rpcs, stream=True, on_yield=on_yield):
         ccd_generator_map[result.args[1].ccd] = rpc_endpoint(result.generator_id)
 
-    # JobStatusにccd_generator_mapを保存
-    async with job.watcher.watch():
-        job.status.ccd_generator_map = ccd_generator_map
-
     await rpc_scatter(Rpc.create(_save_job_metadata_rpc, job))
 
     # メタデータをobject storageに保存
@@ -189,9 +178,8 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
 
 def _save_quicklook_metadata(job: Job, ccd_metadata_dict: dict[CcdName, CcdMetadata]) -> None:
     """quicklookメタデータをobject storageに保存"""
-    visit_storage = VisitObjectStorage(job.visit)
     metadata_list = list(ccd_metadata_dict.values())
-    visit_storage.put_ccd_metadata_list_sync(metadata_list)
+    job.object_storage.put_ccd_metadata_list_sync(metadata_list)
 
 
 def _save_job_metadata_rpc(job: Job):
@@ -309,7 +297,7 @@ async def _finalize_success(result: _PipelineResult):
 
     # DBレコードを更新
     async with get_session() as session:
-        from sqlalchemy import select, update
+        from sqlalchemy import update
 
         stmt = (
             update(Quicklook)

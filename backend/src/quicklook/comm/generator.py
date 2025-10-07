@@ -9,7 +9,6 @@ import asyncio
 import logging
 import os
 import signal
-import traceback
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, contextmanager
@@ -19,14 +18,10 @@ from typing import Any
 import aiohttp
 from fastapi import APIRouter, HTTPException
 
-from quicklook.comm.types import GeneratorId, CoordinatorId
+from quicklook.comm.types import CoordinatorId, GeneratorId
 from quicklook.config import config
 
-from .types import (
-    GeneratorId,
-    GeneratorRegistrationRequest,
-    GeneratorRegistrationResponse,
-)
+from .types import GeneratorId, GeneratorRegistrationRequest, GeneratorRegistrationResponse
 
 logger = logging.getLogger(__name__)
 

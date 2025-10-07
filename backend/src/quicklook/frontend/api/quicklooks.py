@@ -14,7 +14,9 @@ from pydantic import BaseModel, TypeAdapter
 from quicklook.config import config
 from quicklook.coordinator.api.types import CreateQuicklookRequest, JobStatusList
 from quicklook.frontend.api.deps import dep_visit_name
+from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.job.status import JobStatus
+from quicklook.object_storage import VisitObjectStorage
 from quicklook.types import VisitName
 from quicklook.utils.broadcast import Broadcast
 from quicklook.utils.hash_utils import json_digest
@@ -116,9 +118,9 @@ async def quicklook_status_relay():
 
 
 class QuicklookMetadata(BaseModel):
-    id: str
+    visit_name: VisitName
     wcs: dict
-    # ccd_meta: list[CcdMetadata] | None
+    ccd_metadata_list: list[CcdMetadata]
 
 
 @router.get(
@@ -128,6 +130,7 @@ class QuicklookMetadata(BaseModel):
 async def show_quicklook_metadata(
     visit: Annotated[VisitName, Depends(dep_visit_name)],
 ):
+    
     ...
     # metadata = quicklook_metadata(visit=visit)
     # if metadata:
@@ -136,26 +139,26 @@ async def show_quicklook_metadata(
     # raise HTTPException(status.HTTP_404_NOT_FOUND)
 
 
-def quicklook_metadata(visit: VisitName) -> QuicklookMetadata | None:
-    meta = storage.get_quicklook_meta(visit)
-    if meta:
-        scale = 0.2 / 3600.0  # pixel size in degree
-        return QuicklookMetadata(
-            id=visit.id,
-            wcs={
-                "NAXIS1": 63424,
-                "NAXIS2": 63376,
-                "CRVAL1": 0,
-                "CRVAL2": 0,
-                "CRPIX1": 31750.5,
-                "CRPIX2": 31750.5,
-                "CD1_1": -scale,
-                "CD1_2": 0,
-                "CD2_1": 0,
-                "CD2_2": scale,
-            },
-            ccd_meta=meta.ccd_meta,
-        )
+async def quicklook_metadata(visit: VisitName) -> QuicklookMetadata:
+    storage = VisitObjectStorage(visit)
+    ccd_metadata_list = await storage.get_ccd_metadata_list()
+    scale = 0.2 / 3600.0  # pixel size in degree
+    return QuicklookMetadata(
+        visit_name=visit,
+        wcs={
+            "NAXIS1": 63424,
+            "NAXIS2": 63376,
+            "CRVAL1": 0,
+            "CRVAL2": 0,
+            "CRPIX1": 31750.5,
+            "CRPIX2": 31750.5,
+            "CD1_1": -scale,
+            "CD1_2": 0,
+            "CD2_1": 0,
+            "CD2_2": scale,
+        },
+        ccd_metadata_list=ccd_metadata_list,
+    )
 
 
 @router.post('/api/quicklooks', description='Create a quicklook')

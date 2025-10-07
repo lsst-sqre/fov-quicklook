@@ -99,6 +99,10 @@ class VisitObjectStorage:
         data = pickle.dumps(metadata_list)
         return self._put_sync('ccd-metadata-list.pickle', data)
 
+    def get_ccd_metadata_list_sync(self) -> list['CcdMetadata']:
+        data = self._get_sync('ccd-metadata-list.pickle')
+        return pickle.loads(data)
+
     # Async versions (run sync versions in thread pool)
     async def put_packed_tile_array(self, packed_pos: PackedTilePos, array: list[bytes | None]) -> int:
         return await asyncio.to_thread(self.put_packed_tile_array_sync, packed_pos, array)
@@ -117,3 +121,6 @@ class VisitObjectStorage:
 
     async def put_ccd_metadata_list(self, metadata_list: list['CcdMetadata']) -> int:
         return await asyncio.to_thread(self.put_ccd_metadata_list_sync, metadata_list)
+
+    async def get_ccd_metadata_list(self) -> list['CcdMetadata']:
+        return await asyncio.to_thread(self.get_ccd_metadata_list_sync)

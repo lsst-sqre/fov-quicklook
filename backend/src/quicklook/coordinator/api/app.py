@@ -1,6 +1,6 @@
 import asyncio
+import logging
 import pickle
-from collections.abc import Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Awaitable, Callable
@@ -15,6 +15,8 @@ from quicklook.job.job import Job
 from quicklook.types import VisitName
 from quicklook.utils.broadcast import Broadcast
 from quicklook.utils.websocket import run_until_disconnect, safe_websocket
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -48,6 +50,12 @@ def _job_status_list(jobs: JobDict) -> JobStatusList:
     return {visit: job.status for visit, job in jobs.items()}
 
 
+@app.get('/quicklooks/*/status', response_model=JobStatusList)
+async def route_quicklook_status():
+    jobs = running_pipeline.jobs()
+    return _job_status_list(jobs)
+
+
 @app.websocket('/quicklooks/*/status.ws')
 async def ws_route_quicklook_status(ws: WebSocket):
     async with safe_websocket(ws):
@@ -69,6 +77,7 @@ async def run_quicklook_pipeline():
 
     async def push(visit: VisitName) -> None:
         if visit in jobs:
+            logger.info(f'Job for visit {visit} is already running')
             return
         job = Job(visit)
         job.watcher.on_change(on_status_change, which=lambda s: s.stage)
@@ -79,13 +88,17 @@ async def run_quicklook_pipeline():
         await ph.push(job)
 
     async def on_status_change(job: Job):
-        if job.status.stage == 'done':
-            del jobs[job.visit]
-        elif job.status.stage == 'error':
-            # エラー時は30秒待ってから削除
-            await asyncio.sleep(30)
+        async def _cleanup_delay():
+            await asyncio.sleep(5)
             if job.visit in jobs:
                 del jobs[job.visit]
+                await notify(job)
+
+        match job.status.stage:
+            case 'done':
+                del jobs[job.visit]
+            case 'error':
+                asyncio.create_task(_cleanup_delay())
 
     async with quicklook_pipeline().run() as ph:
         async with broadcast.activate():
