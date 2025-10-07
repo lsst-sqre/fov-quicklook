@@ -67,6 +67,10 @@ db/migrate:
 db/rollback:
 	./.venv/bin/alembic downgrade -1
 
+.PHONY: db/bootstrap
+db/bootstrap:
+	./.venv/bin/python -m quicklook.scripts.bootstrap_db
+
 .PHONY: db/docker
 db/docker:
 	docker run --rm \
