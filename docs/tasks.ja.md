@@ -1,13 +1,17 @@
 ## 未完了タスク
 
 * [ ] coordinatorとfrontendの大きめのオブジェクトの共有方法の実装
-  `JobStatus`のリストは頻繁に更新されるがサイズが小さいので全部の要素を毎回送っているが、大きい要素を含んでいるとこれは効率的ではない。
+
+  主に`src/quicklook/coordinator/api/app.py`, `src/quicklook/coordinator/create_quicklook.py`, `src/quicklook/frontend/api/quicklooks.py`についての話である。
+  現在`JobStatus`のリストは頻繁に更新されるがサイズが小さいので全部の要素を毎回送っているが、大きい要素を含んでいるとこれは効率的ではない。
   `JobStatus`には含まれないが`ccd_generator_map`と`ccd_metadata_list`はcoordinatorとfrontendの両方でリアルタイムで共有したい。
+
   * これには`JobSharedLargeStatus`クラスを作り実現する。
-  * このクラスには`ccd_generator_map`と`ccd_metadata_list`を含める。
-  * `job.shared_large_status`でアクセスできるようにする
+    * `JobStatus`を参考に。
+    * このクラスには`ccd_generator_map`と`ccd_metadata_list`を含める。
+    * `job.shared_large_status`でアクセスできるようにする
   * `JobStatus`と同様に`JobWatcher`が通知に関して対応する。
-    * `asynccontextmanager notify_shared_large_status`をつくり、これがexitしたあとに`on_shared_large_status_change`で登録されたcallbackを呼び出す。
+    * `Jobwatcher`に`asynccontextmanager notify_shared_large_status`をつくり、これがexitしたあとに`on_shared_large_status_change`で登録されたcallbackを呼び出す。
   * coordinatorとfrontendの共有は現在の`JobStatusList`の共有の仕方を拡張して行う。
     * `src/quicklook/coordinator/api/app.py`において
       * 現在coordinatorでは`/quicklooks/*/status.ws`でfrontendに`JobStatusList`を通知している。
