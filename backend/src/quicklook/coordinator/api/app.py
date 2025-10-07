@@ -10,13 +10,7 @@ from sqlalchemy import select
 
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
-from quicklook.coordinator.api.types import (
-    CreateQuicklookRequest,
-    JobStatusList,
-    SharedStatusMessage,
-    SharedStatusMessageJobSharedLargeStatus,
-    SharedStatusMessageJobStatusList,
-)
+from quicklook.coordinator.api.types import CreateQuicklookRequest, JobStatusList, SharedStatusMessage, SharedStatusMessageJobSharedLargeStatus, SharedStatusMessageJobStatusList
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
 from quicklook.db import Quicklook, get_session
 from quicklook.job.job import Job
@@ -51,17 +45,15 @@ type JobDict = dict[VisitName, Job]
 @app.post('/quicklooks')
 async def route_create_quicklook(params: CreateQuicklookRequest):
     visit = VisitName(params.visit)
-    
+
     async with get_session() as session:
-        result = await session.execute(
-            select(Quicklook).where(Quicklook.visit_name == visit)
-        )
+        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
         quicklook = result.scalar_one_or_none()
-        
+
         if quicklook is not None:
             logger.info(f'Quicklook for visit {visit} already exists in DB')
             return
-    
+
     await running_pipeline.push(visit)
 
 
@@ -89,18 +81,17 @@ async def ws_route_quicklook_shared_status(ws: WebSocket):
 @asynccontextmanager
 async def run_quicklook_pipeline():
     jobs: JobDict = {}
-    broadcast = Broadcast[JobDict](4)
-    shared_status_broadcast = Broadcast[SharedStatusMessage](4)
+    broadcast = Broadcast[SharedStatusMessage]()
 
-    async def notify(_: Job):
-        broadcast.put(jobs)
+    async def notify_progress(_: Job):
+        broadcast.put(SharedStatusMessageJobStatusList(data=_job_status_list(jobs)))
 
     async def notify_shared_large_status(job: Job):
         msg = SharedStatusMessageJobSharedLargeStatus(
             visit=job.visit,
             data=job.shared_large_status,
         )
-        shared_status_broadcast.put(msg)
+        broadcast.put(msg)
 
     async def push(visit: VisitName) -> None:
         if visit in jobs:
@@ -108,7 +99,7 @@ async def run_quicklook_pipeline():
             return
         job = Job(visit)
         job.watcher.on_change_status(on_status_change, which=lambda s: s.stage)
-        job.watcher.on_change_status(notify)
+        job.watcher.on_change_status(notify_progress)
         job.watcher.on_shared_large_status_change(notify_shared_large_status)
         jobs[visit] = job
         if ph.full():
@@ -120,7 +111,7 @@ async def run_quicklook_pipeline():
             await asyncio.sleep(5)
             if job.visit in jobs:
                 del jobs[job.visit]
-                await notify(job)
+                await notify_progress(job)
 
         match job.status.stage:
             case 'ready':
@@ -128,51 +119,17 @@ async def run_quicklook_pipeline():
             case 'error':
                 asyncio.create_task(_cleanup_delay())
 
-    async def subscribe_shared_status():
-        job_status_queue: asyncio.Queue[SharedStatusMessage] = asyncio.Queue()
-        
-        async def forward_job_status():
-            async for jobs_dict in broadcast.subscribe():
-                msg = SharedStatusMessageJobStatusList(data=_job_status_list(jobs_dict))
-                await job_status_queue.put(msg)
-        
-        async def forward_shared_large_status():
-            async for msg in shared_status_broadcast.subscribe():
-                await job_status_queue.put(msg)
-        
-        task1 = asyncio.create_task(forward_job_status())
-        task2 = asyncio.create_task(forward_shared_large_status())
-        
-        try:
-            while True:
-                msg = await job_status_queue.get()
-                yield msg
-        finally:
-            task1.cancel()
-            task2.cancel()
-            try:
-                await task1
-            except asyncio.CancelledError:
-                pass
-            try:
-                await task2
-            except asyncio.CancelledError:
-                pass
-
     async with quicklook_pipeline().run() as ph:
         async with broadcast.activate():
-            async with shared_status_broadcast.activate():
-                yield RunningPipeline(
-                    push=push,
-                    jobs=lambda: jobs,
-                    subscribe_progress=broadcast.subscribe,
-                    subscribe_shared_status=subscribe_shared_status,
-                )
+            yield RunningPipeline(
+                push=push,
+                jobs=lambda: jobs,
+                subscribe_shared_status=broadcast.subscribe,
+            )
 
 
 @dataclass
 class RunningPipeline:
     push: Callable[[VisitName], Awaitable[None]]
     jobs: Callable[[], JobDict]
-    subscribe_progress: Callable[[], AsyncIterator[JobDict]]
     subscribe_shared_status: Callable[[], AsyncIterator[SharedStatusMessage]]

@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 @router.get('/api/quicklooks/*/status', response_model=JobStatusList)
 async def get_all_quicklook_jobs():
-    async for jobs in job_status_list.subscribe():
+    async for jobs in job_status_dict.subscribe():
         return jobs
 
 
@@ -58,7 +58,7 @@ async def websocket_quicklooks_status(ws: WebSocket):
     async with safe_websocket(ws):
 
         async def send_progress():
-            async for jobs in job_status_list.subscribe():
+            async for jobs in job_status_dict.subscribe():
                 await ws.send_json({visit: type_adapter_JsonStatus.dump_python(job) for visit, job in jobs.items()})
 
         await run_until_disconnect(ws, send_progress())
@@ -69,18 +69,17 @@ async def get_quicklook_status(
     visit: Annotated[VisitName, Depends(dep_visit_name)],
 ):
     async with get_session() as session:
-        result = await session.execute(
-            select(Quicklook).where(Quicklook.visit_name == visit, Quicklook.ready == True)
-        )
+        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit, Quicklook.ready == True))
         quicklook = result.scalar_one_or_none()
-        
+
         if quicklook is not None:
             from quicklook.job.job import Job
+
             job = Job(visit)
             job.status.stage = 'ready'
             return type_adapter_JsonStatus.dump_python(job.status)
-    
-    async for jobs in job_status_list.subscribe():
+
+    async for jobs in job_status_dict.subscribe():
         return type_adapter_JsonStatus.dump_python(jobs.get(visit))
 
 
@@ -97,16 +96,17 @@ async def websocket_quicklook_status(
                     select(Quicklook).where(Quicklook.visit_name == visit, Quicklook.ready == True)
                 )
                 quicklook = result.scalar_one_or_none()
-                
+
                 if quicklook is not None:
                     from quicklook.job.job import Job
+
                     job = Job(visit)
                     job.status.stage = 'ready'
                     await ws.send_json(type_adapter_JsonStatus.dump_python(job.status))
                     return
-            
+
             last_digest = b''
-            async for jobs in job_status_list.subscribe():
+            async for jobs in job_status_dict.subscribe():
                 job_dict = type_adapter_JsonStatus.dump_python(jobs.get(visit))
                 digest = json_digest(job_dict)
                 if digest != last_digest:
@@ -116,15 +116,18 @@ async def websocket_quicklook_status(
         await run_until_disconnect(ws, send_progress())
 
 
+job_shared_large_status_dict: dict[VisitName, JobSharedLargeStatus] = {}
+
+
 @asynccontextmanager
 async def quicklook_status_relay():
-    global job_status_list, job_shared_large_status_dict
+    global job_status_dict
 
     ws_base_url = re.sub(r'^http://', 'ws://', config.coordinator_base_url)
-    job_status_list = Broadcast[JobStatusList](max_queue_size=2)
-    job_shared_large_status_dict: dict[VisitName, JobSharedLargeStatus] = {}
+    job_status_dict = Broadcast[JobStatusList](max_queue_size=2)
 
     async def main():
+        global job_shared_large_status_dict
         for i in reversed(range(5)):
             try:
                 async with websockets.connect(f'{ws_base_url}/quicklooks/*/shared_status.ws') as ws:
@@ -132,30 +135,31 @@ async def quicklook_status_relay():
                         msg_bytes = await ws.recv()
                         assert isinstance(msg_bytes, bytes)
                         msg: SharedStatusMessage = pickle.loads(msg_bytes)
-                        
+
                         match msg:
                             case SharedStatusMessageJobStatusList(data=data):
-                                job_status_list.put(data)
-                                # クリーンアップ: 現在のjobsに存在しないエントリを削除
-                                max_entries = config.pipeline_queue_size * 2
-                                if len(job_shared_large_status_dict) > max_entries:
-                                    current_visits = set(data.keys())
-                                    for visit in list(job_shared_large_status_dict.keys()):
-                                        if visit not in current_visits:
-                                            del job_shared_large_status_dict[visit]
-                                            if len(job_shared_large_status_dict) <= max_entries:
-                                                break
+                                job_status_dict.put(data)
                             case SharedStatusMessageJobSharedLargeStatus(visit=visit, data=data):
                                 job_shared_large_status_dict[visit] = data
+                                jobs = job_status_dict.last_value()
+                                if jobs:
+                                    job_shared_large_status_dict = {
+                                        visit: job_shared_large_status_dict[visit] for visit in jobs
+                                    }
+                                print(job_shared_large_status_dict)
+
             except Exception as e:
                 logger.warning(f'Failed to connect to {ws_base_url}: {str(e)}. Remaining retries: {i}')
+                import traceback
+
+                traceback.print_exc()
                 await asyncio.sleep(5)
         else:
             await _shutdown()
 
     main_task = asyncio.create_task(main())
 
-    async with job_status_list.activate():
+    async with job_status_dict.activate():
         try:
             yield
         finally:
@@ -179,7 +183,7 @@ class QuicklookMetadata(BaseModel):
 async def get_quicklook_metadata(
     visit: Annotated[VisitName, Depends(dep_visit_name)],
 ):
-    
+
     ...
     # metadata = quicklook_metadata(visit=visit)
     # if metadata:

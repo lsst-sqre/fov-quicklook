@@ -27,7 +27,7 @@ class Broadcast(Generic[T]):
 
     # モジュールレベルのセントリネルをセット
 
-    _last_value: object = field(default_factory=lambda: NO_VALUE)  # type: ignore[name-defined]
+    _last_value: object | T = field(default_factory=lambda: NO_VALUE)  # type: ignore[name-defined]
 
     def __post_init__(self):
         if self.max_queue_size is not None:
@@ -83,3 +83,7 @@ class Broadcast(Generic[T]):
             raise
         finally:
             self._subscribers.remove(queue)
+
+    def last_value(self) -> T | None:
+        if self._last_value is not NO_VALUE:
+            return self._last_value  # type: ignore
