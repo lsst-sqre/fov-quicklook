@@ -56,7 +56,7 @@ async def websocket_quicklooks_status(ws: WebSocket):
 
 
 @router.get('/api/quicklooks/{visit_name}/status', response_model=JobStatus | None)
-async def route_quicklook_status(
+async def get_quicklook_status(
     visit: Annotated[VisitName, Depends(dep_visit_name)],
 ):
     async for jobs in job_status_list.subscribe():
@@ -127,7 +127,7 @@ class QuicklookMetadata(BaseModel):
     '/api/quicklooks/{visit_name}/metadata',
     response_model=QuicklookMetadata,
 )
-async def show_quicklook_metadata(
+async def get_quicklook_metadata(
     visit: Annotated[VisitName, Depends(dep_visit_name)],
 ):
     

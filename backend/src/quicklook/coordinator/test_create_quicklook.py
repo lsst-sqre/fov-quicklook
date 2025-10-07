@@ -33,15 +33,15 @@ async def reset_db():
 
 async def test_create_quicklook_pipeline():
     job = Job(VisitName('raw:broccoli'))
-    job.watcher.on_change(print_job_status)
+    job.watcher.on_change_status(print_job_status)
     ev = asyncio.Event()
 
     async def on_change(job: Job):
-        if job.status.stage in {'done', 'error'}:
+        if job.status.stage in {'ready', 'error'}:
             ev.set()
-            assert job.status.stage == 'done'
+            assert job.status.stage == 'ready'
 
-    job.watcher.on_change(on_change, which=lambda s: s.stage)
+    job.watcher.on_change_status(on_change, which=lambda s: s.stage)
 
     async with quicklook_pipeline().run() as ph:
         await ph.push(job)
@@ -51,7 +51,7 @@ async def test_create_quicklook_pipeline():
 @pytest.mark.skip("Skipping test_create_quicklook")
 async def test_create_quicklook():
     job = Job(VisitName('raw:broccoli'))
-    job.watcher.on_change(print_job_status)
+    job.watcher.on_change_status(print_job_status)
     await create_quicklook(job)
 
 

@@ -1,3 +1,4 @@
+# TODO: このモジュールの削除。どこからも使われていないかも。
 from __future__ import annotations
 
 import asyncio

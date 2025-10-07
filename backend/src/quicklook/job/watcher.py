@@ -16,7 +16,7 @@ class JobWatcher:
         return cls(job=job)
 
     @asynccontextmanager
-    async def watch(self):
+    async def watch_status(self):
         before = [w.which(self.job.status) for w in self._watchers]
         yield self
         after = [w.which(self.job.status) for w in self._watchers]
@@ -24,7 +24,7 @@ class JobWatcher:
             if b != a:  # pragma: no branch
                 await w.cb(self.job)
 
-    def on_change(
+    def on_change_status(
         self,
         cb: Callable[[Job], Awaitable],
         which: Callable[[JobStatus], Any] | None = None,

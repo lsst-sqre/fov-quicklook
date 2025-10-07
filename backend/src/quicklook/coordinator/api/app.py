@@ -80,8 +80,8 @@ async def run_quicklook_pipeline():
             logger.info(f'Job for visit {visit} is already running')
             return
         job = Job(visit)
-        job.watcher.on_change(on_status_change, which=lambda s: s.stage)
-        job.watcher.on_change(notify)
+        job.watcher.on_change_status(on_status_change, which=lambda s: s.stage)
+        job.watcher.on_change_status(notify)
         jobs[visit] = job
         if ph.full():
             raise HTTPException(503)
@@ -95,7 +95,7 @@ async def run_quicklook_pipeline():
                 await notify(job)
 
         match job.status.stage:
-            case 'done':
+            case 'ready':
                 del jobs[job.visit]
             case 'error':
                 asyncio.create_task(_cleanup_delay())
