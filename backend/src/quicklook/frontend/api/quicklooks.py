@@ -10,6 +10,7 @@ from typing import Annotated
 import websockets
 from fastapi import APIRouter, Depends, FastAPI, WebSocket
 from pydantic import BaseModel, TypeAdapter
+from sqlalchemy import select
 
 from quicklook.config import config
 from quicklook.coordinator.api.types import (
@@ -19,6 +20,7 @@ from quicklook.coordinator.api.types import (
     SharedStatusMessageJobSharedLargeStatus,
     SharedStatusMessageJobStatusList,
 )
+from quicklook.db import Quicklook, get_session
 from quicklook.frontend.api.deps import dep_visit_name
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.job.shared_large_status import JobSharedLargeStatus
@@ -66,6 +68,18 @@ async def websocket_quicklooks_status(ws: WebSocket):
 async def get_quicklook_status(
     visit: Annotated[VisitName, Depends(dep_visit_name)],
 ):
+    async with get_session() as session:
+        result = await session.execute(
+            select(Quicklook).where(Quicklook.visit_name == visit, Quicklook.ready == True)
+        )
+        quicklook = result.scalar_one_or_none()
+        
+        if quicklook is not None:
+            from quicklook.job.job import Job
+            job = Job(visit)
+            job.status.stage = 'ready'
+            return type_adapter_JsonStatus.dump_python(job.status)
+    
     async for jobs in job_status_list.subscribe():
         return type_adapter_JsonStatus.dump_python(jobs.get(visit))
 
@@ -78,6 +92,19 @@ async def websocket_quicklook_status(
     async with safe_websocket(ws):
 
         async def send_progress():
+            async with get_session() as session:
+                result = await session.execute(
+                    select(Quicklook).where(Quicklook.visit_name == visit, Quicklook.ready == True)
+                )
+                quicklook = result.scalar_one_or_none()
+                
+                if quicklook is not None:
+                    from quicklook.job.job import Job
+                    job = Job(visit)
+                    job.status.stage = 'ready'
+                    await ws.send_json(type_adapter_JsonStatus.dump_python(job.status))
+                    return
+            
             last_digest = b''
             async for jobs in job_status_list.subscribe():
                 job_dict = type_adapter_JsonStatus.dump_python(jobs.get(visit))
