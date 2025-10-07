@@ -1,11 +1,26 @@
-# 未完タスク
+## 未完了タスク
+* [ ] `src/quicklook/coordinator/housekeeping/test_housekeeping.py`のリファクタリング
+  * このテストが通りません。直してください。
+  * テストを直すためにDBを完全にリセットして良いです。(`alembic_version`テーブルの削除も含め)
+    * `src/quicklook/scripts/bootstrap_db.py` ではDBの不整合が起きたらその方法でリセットするコードを含めてください。
+    * `src/quicklook/scripts/bootstrap_db.py` がちゃんと動くことを確認してください。
+* [ ] `./src/quicklook/coordinator/create_quicklook.py`周辺のリファクタリング
+  * パイプラインの各ステージの戻り値は1つの共通のオブジェクトを引き回すべし
+    * dataclass `PipeLineResult` を作成し各ステージでプロパティを更新するようにする
+    * 各ステージの入出力の形を揃え`select_next_job`と`select_next_job_with_size`のような同じような関数をたくさん作る必要をなくします。
+* [ ] `./src/quicklook/object_storage/__init__.py`周辺のリファクタリング
+  * `import asyncio`はファイルの先頭にまとめてください。
+* [ ] `./src/quicklook/coordinator/housekeeping/__init__.py`周辺のリファクタリング
+  * `_delete_object_storage_sync` は `storage.delete_all_sync` はasync版があるのでそれを使って非同期関数にしましょう。
 
-* [ ] `src/quicklook/coordinator/test_create_quicklook.py`のリファクタリング
+# 完了タスク
+
+* [x] `src/quicklook/coordinator/test_create_quicklook.py`のリファクタリング
   * このモジュールのテストの開始時に`quicklooks`テーブルの状態をリセットする。
   * `./.venv/bin/pytest src/quicklook/coordinator/test_create_quicklook.py -m 'slow'` でテスト実施
-* [ ] `./src/quicklook/comm`周辺のリファクタリング
+* [x] `./src/quicklook/comm`周辺のリファクタリング
   * coordinatorはエラー時にcoordinator_idをエラー通知に含めない
-* [ ] `./src/quicklook/coordinator/create_quicklook.py`周辺のリファクタリング
+* [x] `./src/quicklook/coordinator/create_quicklook.py`周辺のリファクタリング
   * `_finalize`は必ず`error=True`で呼び出されているので`_finalize_error`という名前に変更し、`error`パラメーターを削除
   * `JobStatus.stage`に`error`ステータスを追加する。
     * エラー時はステータスを`error`にする
@@ -13,20 +28,17 @@
   * `_transfer_fits_headers`は`_merge_tiles`などと同列にpipelineのステージとして扱う。
     * `_transfer_fits_headers`の`uploaded_size`も`transfer_tiles`の`uploaded_size`と合算してDBのエントリーの情報に記録する。
   * `./.venv/bin/pytest src/quicklook/coordinator/test_create_quicklook.py -m 'slow'` でテスト実施
-* [ ] `./src/quicklook/object_storage/__init__.py`周辺のリファクタリング
+* [x] `./src/quicklook/object_storage/__init__.py`周辺のリファクタリング
   * `VisitObjectStorage`にasync版のメソッドを追加する。
     * s3関係のメソッドは同期関数なので時間がかかる場合はasync環境で実行すると全体をブロックしてしまう。そのため、async版のメソッドを追加し、非同期で実行できるようにする必要がある。
   * 既存のオブジェクトストレージにアクセスするsync版のメソッドはメソッド名の末尾に`_sync`をつけたものにrenameする。
   * async版はsync版を別スレッドで動かす。
   * 既存メソッドの呼び出し元を探しasync環境で呼び出されているものはasync版に置き換える
-* [ ] `./src/quicklook/config/__init__.py`周りのリファクタリング
+* [x] `./src/quicklook/config/__init__.py`周りのリファクタリング
   * `max_object_storage_usage`のデフォルト値を45GBに変更
-* [ ] `./src/quicklook/coordinator/housekeeping/__init__.py`周辺のリファクタリング
+* [x] `./src/quicklook/coordinator/housekeeping/__init__.py`周辺のリファクタリング
   * テストコードを作成
     * テスト開始時にDBを全てリセットしても良い
-
-# 完了タスク
-
 * [x] commのリファクタリング
   * `./src/quicklook/comm`にcoordinatorとgeneratorの連携の処理がある。
   * 現在、generatorからcoordinatorへ定期的に自身の登録処理を行っているが、これに処理を加える。

@@ -14,7 +14,7 @@ from quicklook.types import VisitName
 pytestmark = pytest.mark.slow
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 async def reset_db():
     """テスト開始時にDBを全てリセット"""
     async with get_session() as session:

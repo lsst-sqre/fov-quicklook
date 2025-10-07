@@ -61,14 +61,17 @@ db/create-migration:
 
 .PHONY: db/migrate
 db/migrate:
+	ENV_FILE=./.dev.env \
 	./.venv/bin/alembic upgrade head
 
 .PHONY: db/rollback
 db/rollback:
+	ENV_FILE=./.dev.env \
 	./.venv/bin/alembic downgrade -1
 
 .PHONY: db/bootstrap
 db/bootstrap:
+	ENV_FILE=./.dev.env \
 	./.venv/bin/python -m quicklook.scripts.bootstrap_db
 
 .PHONY: db/docker

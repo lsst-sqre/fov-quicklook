@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from quicklook.config import config
 
@@ -20,10 +21,13 @@ _async_session_maker: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
+        # テスト環境ではNullPoolを使用して接続プールを無効化
+        poolclass = NullPool if config.environment == "test" else None
         _engine = create_async_engine(
             config.db_url,
             echo=config.log_level == "debug",
             pool_pre_ping=True,
+            poolclass=poolclass,
         )
     return _engine
 
