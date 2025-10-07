@@ -2,6 +2,7 @@
 
 * [ ] `src/quicklook/coordinator/test_create_quicklook.py`のリファクタリング
   * このモジュールのテストの開始時に`quicklooks`テーブルの状態をリセットする。
+  * `./.venv/bin/pytest src/quicklook/coordinator/test_create_quicklook.py -m 'slow'` でテスト実施
 * [ ] `./src/quicklook/comm`周辺のリファクタリング
   * coordinatorはエラー時にcoordinator_idをエラー通知に含めない
 * [ ] `./src/quicklook/coordinator/create_quicklook.py`周辺のリファクタリング
@@ -11,6 +12,7 @@
     * `src/quicklook/coordinator/api/app.py`ではエラー時はすぐに`jobs`から削除するのではなく30秒経過してから削除する
   * `_transfer_fits_headers`は`_merge_tiles`などと同列にpipelineのステージとして扱う。
     * `_transfer_fits_headers`の`uploaded_size`も`transfer_tiles`の`uploaded_size`と合算してDBのエントリーの情報に記録する。
+  * `./.venv/bin/pytest src/quicklook/coordinator/test_create_quicklook.py -m 'slow'` でテスト実施
 * [ ] `./src/quicklook/object_storage/__init__.py`周辺のリファクタリング
   * `VisitObjectStorage`にasync版のメソッドを追加する。
     * s3関係のメソッドは同期関数なので時間がかかる場合はasync環境で実行すると全体をブロックしてしまう。そのため、async版のメソッドを追加し、非同期で実行できるようにする必要がある。
@@ -18,7 +20,7 @@
   * async版はsync版を別スレッドで動かす。
   * 既存メソッドの呼び出し元を探しasync環境で呼び出されているものはasync版に置き換える
 * [ ] `./src/quicklook/config/__init__.py`周りのリファクタリング
-  * `max_object_storage_usage`のデフォルト値は45GB
+  * `max_object_storage_usage`のデフォルト値を45GBに変更
 * [ ] `./src/quicklook/coordinator/housekeeping/__init__.py`周辺のリファクタリング
   * テストコードを作成
     * テスト開始時にDBを全てリセットしても良い
