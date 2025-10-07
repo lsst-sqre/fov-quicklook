@@ -1,0 +1,1031 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "FastAPI",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/api/system_info": {
+            "get": {
+                "summary": "Get System Info",
+                "operationId": "get_system_info",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SystemInfo"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/healthz": {
+            "get": {
+                "summary": "Healthz",
+                "operationId": "healthz",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/tiles/{z}/{y}/{x}": {
+            "get": {
+                "summary": "Get Tile",
+                "operationId": "get_tile",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    },
+                    {
+                        "name": "z",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Z"
+                        }
+                    },
+                    {
+                        "name": "y",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Y"
+                        }
+                    },
+                    {
+                        "name": "x",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "X"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/fits_header/{ccd_name}": {
+            "get": {
+                "summary": "Get Fits Header",
+                "operationId": "get_fits_header",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    },
+                    {
+                        "name": "ccd_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+$",
+                            "title": "Ccd Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/HeaderType"
+                                    },
+                                    "title": "Response Get Fits Header Api Quicklooks  Visit Name  Fits Header  Ccd Name  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/*/status": {
+            "get": {
+                "summary": "Get All Quicklook Jobs",
+                "operationId": "get_all_quicklook_jobs",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/JobStatusList"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/status": {
+            "get": {
+                "summary": "Show Quicklook Status",
+                "operationId": "show_quicklook_status",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/QuicklookStatus"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ],
+                                    "title": "Response Show Quicklook Status Api Quicklooks  Visit Name  Status Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/metadata": {
+            "get": {
+                "summary": "Show Quicklook Metadata",
+                "operationId": "show_quicklook_metadata",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QuicklookMetadata"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks": {
+            "post": {
+                "summary": "Create Quicklook",
+                "description": "Create a quicklook",
+                "operationId": "create_quicklook",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateQuicklookRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/visits": {
+            "get": {
+                "summary": "List Visits",
+                "operationId": "list_visits",
+                "parameters": [
+                    {
+                        "name": "exposure",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Exposure"
+                        }
+                    },
+                    {
+                        "name": "day_obs",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Day Obs"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 10000,
+                            "default": 1000,
+                            "title": "Limit"
+                        }
+                    },
+                    {
+                        "name": "data_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "enum": [
+                                "raw",
+                                "post_isr_image",
+                                "preliminary_visit_image"
+                            ],
+                            "type": "string",
+                            "default": "raw",
+                            "title": "Data Type"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/VisitEntry"
+                                    },
+                                    "title": "Response List Visits Api Visits Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/visits/{visit_name}/ccds/{ccd_name}": {
+            "get": {
+                "summary": "Get Visit Metadata",
+                "operationId": "get_visit_metadata",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Visit Name"
+                        }
+                    },
+                    {
+                        "name": "ccd_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Ccd Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DataSourceCcdMetadata"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exposures/{id}/types": {
+            "get": {
+                "summary": "Get Exposure Data Types",
+                "operationId": "get_exposure_data_types",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "enum": [
+                                            "raw",
+                                            "post_isr_image",
+                                            "preliminary_visit_image"
+                                        ],
+                                        "type": "string"
+                                    },
+                                    "title": "Response Get Exposure Data Types Api Exposures  Id  Types Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/fits/{ccd_name}": {
+            "get": {
+                "summary": "Get Fits File",
+                "operationId": "get_fits_file",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    },
+                    {
+                        "name": "ccd_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+$",
+                            "title": "Ccd Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/storage": {
+            "get": {
+                "summary": "List Storage Entries",
+                "operationId": "list_storage_entries",
+                "parameters": [
+                    {
+                        "name": "path",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Path"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Entry"
+                                    },
+                                    "title": "Response List Storage Entries Api Storage Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete Storage Entry",
+                "operationId": "delete_storage_entry",
+                "parameters": [
+                    {
+                        "name": "path",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Path"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/storage/by-prefix": {
+            "delete": {
+                "summary": "Delete Storage Entries By Prefix",
+                "operationId": "delete_storage_entries_by_prefix",
+                "parameters": [
+                    {
+                        "name": "prefix",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Prefix"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "CardType": {
+                "prefixItems": [
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "string"
+                    }
+                ],
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
+            },
+            "ContextMenuTemplate": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "template": {
+                        "type": "string",
+                        "title": "Template"
+                    },
+                    "is_url": {
+                        "type": "boolean",
+                        "title": "Is Url"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "template",
+                    "is_url"
+                ],
+                "title": "ContextMenuTemplate"
+            },
+            "CreateQuicklookRequest": {
+                "properties": {
+                    "visit": {
+                        "type": "string",
+                        "title": "Visit"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit"
+                ],
+                "title": "CreateQuicklookRequest"
+            },
+            "DataSourceCcdMetadata": {
+                "properties": {
+                    "visit_name": {
+                        "type": "string",
+                        "title": "Visit Name"
+                    },
+                    "ccd_name": {
+                        "type": "string",
+                        "title": "Ccd Name"
+                    },
+                    "detector": {
+                        "type": "integer",
+                        "title": "Detector"
+                    },
+                    "exposure": {
+                        "type": "integer",
+                        "title": "Exposure"
+                    },
+                    "day_obs": {
+                        "type": "integer",
+                        "title": "Day Obs"
+                    },
+                    "uuid": {
+                        "type": "string",
+                        "title": "Uuid"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit_name",
+                    "ccd_name",
+                    "detector",
+                    "exposure",
+                    "day_obs",
+                    "uuid"
+                ],
+                "title": "DataSourceCcdMetadata"
+            },
+            "Entry": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "directory",
+                            "file"
+                        ],
+                        "title": "Type"
+                    },
+                    "size": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Size"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "type",
+                    "size"
+                ],
+                "title": "Entry"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "HeaderType": {
+                "items": {
+                    "$ref": "#/components/schemas/CardType"
+                },
+                "type": "array"
+            },
+            "Job": {
+                "properties": {
+                    "visit": {
+                        "type": "string",
+                        "title": "Visit"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit"
+                ],
+                "title": "Job"
+            },
+            "JobStatus": {
+                "properties": {
+                    "job": {
+                        "$ref": "#/components/schemas/Job"
+                    },
+                    "stage": {
+                        "type": "string",
+                        "enum": [
+                            "queued",
+                            "generate_single_fits_tiles",
+                            "merge_tiles",
+                            "transfer_tiles",
+                            "done"
+                        ],
+                        "title": "Stage",
+                        "default": "queued"
+                    },
+                    "generate_single_fits_tiles": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Progress"
+                        },
+                        "type": "object",
+                        "title": "Generate Single Fits Tiles"
+                    },
+                    "merge_tiles": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Progress"
+                        },
+                        "type": "object",
+                        "title": "Merge Tiles"
+                    },
+                    "transfer_tiles": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Progress"
+                        },
+                        "type": "object",
+                        "title": "Transfer Tiles"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "job"
+                ],
+                "title": "JobStatus"
+            },
+            "JobStatusList": {
+                "additionalProperties": {
+                    "$ref": "#/components/schemas/JobStatus"
+                },
+                "type": "object"
+            },
+            "Progress": {
+                "properties": {
+                    "total": {
+                        "type": "integer",
+                        "title": "Total"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "title": "Count",
+                        "default": 0
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "total"
+                ],
+                "title": "Progress"
+            },
+            "QuicklookMetadata": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "wcs": {
+                        "additionalProperties": true,
+                        "type": "object",
+                        "title": "Wcs"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "wcs"
+                ],
+                "title": "QuicklookMetadata"
+            },
+            "QuicklookStatus": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id"
+                ],
+                "title": "QuicklookStatus"
+            },
+            "SystemInfo": {
+                "properties": {
+                    "admin_page": {
+                        "type": "boolean",
+                        "title": "Admin Page"
+                    },
+                    "context_menu_templates": {
+                        "items": {
+                            "$ref": "#/components/schemas/ContextMenuTemplate"
+                        },
+                        "type": "array",
+                        "title": "Context Menu Templates"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "admin_page",
+                    "context_menu_templates"
+                ],
+                "title": "SystemInfo"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            },
+            "VisitEntry": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "day_obs": {
+                        "type": "integer",
+                        "title": "Day Obs"
+                    },
+                    "physical_filter": {
+                        "type": "string",
+                        "title": "Physical Filter"
+                    },
+                    "obs_id": {
+                        "type": "string",
+                        "title": "Obs Id"
+                    },
+                    "exposure_time": {
+                        "type": "number",
+                        "title": "Exposure Time"
+                    },
+                    "science_program": {
+                        "type": "string",
+                        "title": "Science Program"
+                    },
+                    "observation_type": {
+                        "type": "string",
+                        "title": "Observation Type"
+                    },
+                    "observation_reason": {
+                        "type": "string",
+                        "title": "Observation Reason"
+                    },
+                    "target_name": {
+                        "type": "string",
+                        "title": "Target Name"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "day_obs",
+                    "physical_filter",
+                    "obs_id",
+                    "exposure_time",
+                    "science_program",
+                    "observation_type",
+                    "observation_reason",
+                    "target_name"
+                ],
+                "title": "VisitEntry"
+            }
+        }
+    }
+}

@@ -1,0 +1,9 @@
+
+{
+  "schemaFile": "./openapi.json",
+  "apiFile": "./src/store/api/base.ts",
+  "apiImport": "baseApi",
+  "outputFile": "./src/store/api/openapi.ts",
+  "exportName": "api",
+  "hooks": true
+}

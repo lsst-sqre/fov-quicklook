@@ -12,6 +12,7 @@ from .get_fits_file import router as get_fits_file_router
 from .get_fits_header import router as get_fits_header_router
 from .get_tile import router as gettile_router
 from .health import router as health_router
+from .quicklooks import lifespan as quicklook_lifespan
 from .quicklooks import router as quicklooks_router
 from .storage_explorer import router as storage_explorer_router
 from .systeminfo import router as systeminfo_router
@@ -22,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    async with quicklook_lifespan(app):
+        yield
 
 
 app = FastAPI(lifespan=lifespan)

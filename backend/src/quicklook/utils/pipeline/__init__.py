@@ -114,7 +114,6 @@ class _Buf:
 @dataclass
 class PipelineHandle(Generic[I]):
     push: Callable[[I], Awaitable[None]]
-    cancel: Callable[..., None]
     full: Callable[[], bool]
 
 
@@ -160,7 +159,6 @@ async def _run_pipeline(
 
         try:
             yield PipelineHandle[I](
-                cancel=cancel,
                 push=in_bufs[0].push,
                 full=in_bufs[0].full,
             )

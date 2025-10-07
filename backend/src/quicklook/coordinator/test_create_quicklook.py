@@ -22,7 +22,7 @@ pytestmark = pytest.mark.slow
 
 async def test_create_quicklook_pipeline():
     job = Job(VisitName('raw:broccoli'))
-    job.status.on_change(print_job_status)
+    job.watcher.on_change(print_job_status)
     ev = asyncio.Event()
 
     async def done(job: Job):
@@ -38,7 +38,7 @@ async def test_create_quicklook_pipeline():
 @pytest.mark.skip("Skipping test_create_quicklook")
 async def test_create_quicklook():
     job = Job(VisitName('raw:broccoli'))
-    job.status.on_change(print_job_status)
+    job.watcher.on_change(print_job_status)
     await create_quicklook(job)
 
 
@@ -46,7 +46,7 @@ printer = JobStatusPrinter()
 
 
 async def print_job_status(job: Job):
-    printer(job.status)
+    printer(job.watcher)
 
 
 @pytest.fixture(scope='module', autouse=True)

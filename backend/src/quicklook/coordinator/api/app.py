@@ -1,23 +1,26 @@
+import asyncio
+import pickle
+from collections.abc import Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Callable
+from typing import Any, AsyncIterator, Awaitable, Callable
 
-from fastapi import FastAPI, HTTPException, WebSocket
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
+from quicklook.coordinator.api.types import CreateQuicklookRequest, JobStatusList
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
 from quicklook.job.job import Job
-from quicklook.job.status_printer import JobStatusPrinter
 from quicklook.types import VisitName
 from quicklook.utils.broadcast import Broadcast
-from quicklook.utils.websocket import safe_websocket
+from quicklook.utils.websocket import run_until_disconnect, safe_websocket
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global running_pipeline
+
     async with coordinator_lifespan(app):
         async with run_quicklook_pipeline() as running_pipeline:
             yield
@@ -32,8 +35,7 @@ async def route_healthz():
     return
 
 
-class CreateQuicklookRequest(BaseModel):
-    visit: str
+type JobDict = dict[VisitName, Job]
 
 
 @app.post('/quicklooks')
@@ -42,40 +44,35 @@ async def route_create_quicklook(params: CreateQuicklookRequest):
     await running_pipeline.push(visit)
 
 
-type JobStatusList = dict[VisitName, Job]
-
-
-@app.get('/quicklooks/*/status', response_model=JobStatusList)
-async def route_quicklook_status():
-    # これは使わないかも。
-    return running_pipeline.jobs()
+def _job_status_list(jobs: JobDict) -> JobStatusList:
+    return {visit: job.status for visit, job in jobs.items()}
 
 
 @app.websocket('/quicklooks/*/status.ws')
 async def ws_route_quicklook_status(ws: WebSocket):
-    await ws.accept()
     async with safe_websocket(ws):
-        async for status in running_pipeline.subscribe():
-            await ws.send_json(status)
+
+        async def send_progress():
+            async for jobs in running_pipeline.subscribe_progress():
+                await ws.send_bytes(pickle.dumps(_job_status_list(jobs)))
+
+        await run_until_disconnect(ws, send_progress())
 
 
 @asynccontextmanager
 async def run_quicklook_pipeline():
-    jobs: JobStatusList = {}
-    broadcast = Broadcast(4)
+    jobs: JobDict = {}
+    broadcast = Broadcast[JobDict](4)
 
-    printer = JobStatusPrinter()
-
-    async def notify(job: Job):
-        printer(job.status)
-        broadcast.put(job)
+    async def notify(_: Job):
+        broadcast.put(jobs)
 
     async def push(visit: VisitName) -> None:
         if visit in jobs:
             return
         job = Job(visit)
-        job.status.on_change(on_status_change, which=lambda s: s.stage)
-        job.status.on_change(notify)
+        job.watcher.on_change(on_status_change, which=lambda s: s.stage)
+        job.watcher.on_change(notify)
         jobs[visit] = job
         if ph.full():
             raise HTTPException(503)
@@ -83,19 +80,19 @@ async def run_quicklook_pipeline():
 
     async def on_status_change(job: Job):
         if job.status.stage == 'done':
-            printer.flush()
             del jobs[job.visit]
 
     async with quicklook_pipeline().run() as ph:
         async with broadcast.activate():
-            try:
-                yield RunningPipeline(push, broadcast.subscribe, lambda: jobs)
-            finally:
-                ph.cancel()
+            yield RunningPipeline(
+                push=push,
+                jobs=lambda: jobs,
+                subscribe_progress=broadcast.subscribe,
+            )
 
 
 @dataclass
 class RunningPipeline:
-    push: Any
-    subscribe: Callable[[], AsyncIterator[JobStatusList]]
-    jobs: Callable[[], JobStatusList]
+    push: Callable[[VisitName], Awaitable[None]]
+    jobs: Callable[[], JobDict]
+    subscribe_progress: Callable[[], AsyncIterator[JobDict]]

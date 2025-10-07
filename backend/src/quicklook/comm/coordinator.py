@@ -101,8 +101,8 @@ async def _heartbeat_check(*, fail_for_test: bool = False):
             try:
                 async with session.get(url, timeout=timeout) as response:
                     response.raise_for_status()
-            except Exception:
-                traceback.print_exc()
+            except Exception as e:
+                logger.warning(f"Health check failed for {generator_info.id}: {e}")
                 return generator_info
 
     tasks = [check_generator(generator_info) for generator_info in _available_generators.values()]

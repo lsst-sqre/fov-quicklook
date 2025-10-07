@@ -5,6 +5,7 @@ from shutil import get_terminal_size
 from typing import cast
 
 from quicklook.job.status import JobStatus
+from quicklook.job.watcher import JobWatcher
 from quicklook.types import Progress
 from quicklook.utils.throttle import throttle
 
@@ -14,14 +15,14 @@ class JobStatusPrinter:  # pragma: no cover
     n_columns: int = 4
 
     @throttle(0.5)
-    def __call__(self, status: JobStatus, *, columns: int | None = None):
+    def __call__(self, status: JobStatus | JobWatcher, *, columns: int | None = None):
         self._display_status(status, columns=columns)
 
     def flush(self):
         """Flush any pending throttled calls."""
         self.__call__.flush()  # type: ignore
 
-    def _display_status(self, status: JobStatus, *, columns: int | None = None):
+    def _display_status(self, status: JobStatus | JobWatcher, *, columns: int | None = None):
         n_columns = self.n_columns
 
         # Clear the terminal and move the cursor to the top-left corner.
@@ -137,8 +138,9 @@ class JobStatusPrinter:  # pragma: no cover
             return output
 
         lines: list[str] = []
-        header = f'Job Status for {status.job.id}'
-        visit_line = f'Visit: {status.job.visit}'
+        job_status = status if isinstance(status, JobStatus) else status.job.status
+        header = f'Job Status for {job_status.job.id}'
+        visit_line = f'Visit: {job_status.job.visit}'
         separator = '=' * min(terminal_width, max(len(header), len(visit_line)))
 
         lines.append(header)
@@ -146,9 +148,9 @@ class JobStatusPrinter:  # pragma: no cover
         lines.append(separator)
 
         sections = (
-            ('Generate FITS tiles', status.generate_single_fits_tiles),
-            ('Merge tiles', status.merge_tiles),
-            ('Transfer tiles', status.transfer_tiles),
+            ('Generate FITS tiles', job_status.generate_single_fits_tiles),
+            ('Merge tiles', job_status.merge_tiles),
+            ('Transfer tiles', job_status.transfer_tiles),
         )
 
         for title, data in sections:

@@ -34,8 +34,13 @@ class Job:
     def status(self):
         from .status import JobStatus
 
-        s = JobStatus.from_job(self)
-        return s
+        return JobStatus.from_job(self)
+
+    @cached_property
+    def watcher(self):
+        from .watcher import JobWatcher
+
+        return JobWatcher.from_job(self)
 
     @cached_property
     def priority(self):

@@ -1,0 +1,16 @@
+.background {
+  background-color: #033;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.bar {
+  background-color: #077;
+  transition: width 0.2s ease-out, background-color 0.2s ease-out 0.2s;
+  height: 100%;
+  border-radius: 2px;
+}
+
+.completed {
+  background-color: #0cc;
+}

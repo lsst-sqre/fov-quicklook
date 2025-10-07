@@ -30,7 +30,9 @@ async def test_basic_broadcast():
             if len(items) >= 2:
                 break
         
-        assert items == [1, 2]
+    # notify_last_on_subscribe のデフォルトが True になったため、購読開始時に直近値が最初に届く
+    assert set(items) == {1, 2}
+    assert items[0] == 2
 
 
 async def test_queue_size_limit():
@@ -149,3 +151,46 @@ async def test_queue_overflow_edge_cases():
         items = await subscriber_task
         
         assert items == [3]
+ 
+
+async def test_notify_last_on_subscribe_enabled():
+    """notify_last_on_subscribe=True のとき、購読開始時に最後に put された値が即座に配信されることをテスト"""
+    broadcast = Broadcast[int](notify_last_on_subscribe=True)
+
+    async with broadcast.activate():
+        # まず値を put してから購読を開始
+        broadcast.put(42)
+
+        # 購読開始すると最初に 42 を受け取るはず
+        items = []
+        async for item in broadcast.subscribe():
+            items.append(item)
+            break
+
+        assert items == [42]
+
+
+async def test_notify_last_on_subscribe_disabled():
+    """notify_last_on_subscribe=False のとき、購読開始時に過去の値は配信されないことをテスト"""
+    broadcast = Broadcast[int](notify_last_on_subscribe=False)
+
+    async with broadcast.activate():
+        # 値を put してから購読を開始
+        broadcast.put(99)
+
+        # 購読を開始しても過去の値は届かないのでタイミングを見て new value を受け取る
+        collected = []
+
+        async def collect_one():
+            async for item in broadcast.subscribe():
+                collected.append(item)
+                break
+
+        task = asyncio.create_task(collect_one())
+
+        # 少し待ってから新しい値を put
+        await asyncio.sleep(0.01)
+        broadcast.put(100)
+
+        await task
+        assert collected == [100]

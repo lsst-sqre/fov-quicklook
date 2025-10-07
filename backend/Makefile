@@ -52,3 +52,28 @@ dev/openapi:
 	QUICKLOOK_frontend_app_prefix= \
 	ENV_FILE=./.dev.env \
 	./.venv/bin/python -m quicklook.frontend.api.openapi
+
+
+.PHONY: db/create-migration
+db/create-migration:
+	@ [ "$(message)" ] || (echo "message is not set" && false)
+	./.venv/bin/alembic revision --autogenerate -m "$(message)"
+
+.PHONY: db/migrate
+db/migrate:
+	./.venv/bin/alembic upgrade head
+
+.PHONY: db/rollback
+db/rollback:
+	./.venv/bin/alembic downgrade -1
+
+.PHONY: db/docker
+db/docker:
+	docker run --rm \
+		--name quicklook-db \
+		-e POSTGRES_USER=quicklook \
+		-e POSTGRES_PASSWORD=quicklook \
+		-e POSTGRES_DB=quicklook \
+		-p 5432:5432 \
+		-v $(PWD)/docker-volumes/postgres:/var/lib/postgresql/data \
+		postgres:16

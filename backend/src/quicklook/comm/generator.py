@@ -98,16 +98,18 @@ async def _register_to_coordinator():
 
 
 async def _registration_loop():
-    try:
-        while True:
+    while True:
+        await asyncio.sleep(config.comm_registration_interval)
+        try:
             await _register_to_coordinator()
-            await asyncio.sleep(config.comm_registration_interval)
-    except Exception as e:  # pragma: no cover
-        traceback.print_exc()
-        await _shutdown()
+            continue
+        except Exception as e:  # pragma: no cover
+            logger.warning(f'Error occurred while registering generator: {e}')
+            await _shutdown()
 
 
 async def _shutdown():  # pragma: no cover
+    logger.error(f'Shutting down generator {self_generator_id()}')
     await asyncio.sleep(10)  # 繰り返しの再起動を防ぐために少し待つ
     os.kill(os.getpid(), signal.SIGINT)
     # さらに待って強制終了

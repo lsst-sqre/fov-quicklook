@@ -20,6 +20,7 @@ install_requires = [
     'lsst-daf-butler',
     'psycopg2-binary',
     'zstandard',
+    'websockets',
     f'mineo_fits_decompress @ file://{mineo_path.resolve()}',
 ]
 

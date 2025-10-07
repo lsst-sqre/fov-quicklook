@@ -105,7 +105,7 @@ def _ensure_users_exist_for_job(job: Job):
 async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
     _ensure_users_exist_for_job(job)
 
-    async with job.status.watch():
+    async with job.watcher.watch():
         job.status.stage = 'generate_single_fits_tiles'
 
     ccd_generator_map: dict[CcdName, GeneratorId] = {}
@@ -117,7 +117,7 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
         match msg:
             case YieledValue(value=Progress() as p, args=(_, ccd_ref)):
                 ccd_name = cast(CcdDataRef, ccd_ref).ccd
-                async with job.status.watch():
+                async with job.watcher.watch():
                     job.status.generate_single_fits_tiles[ccd_name] = p
             case YieledValue(value=ReturnValue(value=CcdMetadata() as ccd_metadata)):
                 ccd_metadata_dict[ccd_metadata.ccd_name] = ccd_metadata
@@ -139,7 +139,7 @@ def _save_job_metadata_rpc(job: Job):
 async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, GeneratorId]):
     _ensure_users_exist_for_job(job)
 
-    async with job.status.watch():
+    async with job.watcher.watch():
         job.status.stage = 'merge_tiles'
 
     dist_config = CcdDistributionConfig(ccd_generator_map, get_available_generators())
@@ -148,7 +148,7 @@ async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, GeneratorId]):
     async def on_yield(msg):
         match msg:
             case YieledValue(value=Progress() as p, generator_id=generator_id):
-                async with job.status.watch():
+                async with job.watcher.watch():
                     job.status.merge_tiles[generator_id] = p
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
@@ -168,8 +168,8 @@ def _save_ccd_distribution_config_rpc(job: Job, dist_config: CcdDistributionConf
 async def _transfer_tiles(job: Job):
     _ensure_users_exist_for_job(job)
 
-    async with job.status.watch() as status:
-        status.stage = 'transfer_tiles'
+    async with job.watcher.watch():
+        job.status.stage = 'transfer_tiles'
 
     uploaded_size = 0
 
@@ -177,7 +177,7 @@ async def _transfer_tiles(job: Job):
         nonlocal uploaded_size
         match msg:
             case YieledValue(value=Progress() as p, generator_id=generator_id):
-                async with job.status.watch():
+                async with job.watcher.watch():
                     job.status.transfer_tiles[generator_id] = p
             case YieledValue(value=ReturnValue(value=int() as _uploaded_size), generator_id=generator_id):
                 uploaded_size += _uploaded_size
@@ -196,7 +196,7 @@ class TransferTilesResult:
 
 
 async def _finalize(job: Job):
-    async with job.status.watch():
+    async with job.watcher.watch():
         job.status.stage = 'done'
     await rpc_scatter(Rpc.create(_cleanup_rpc, job))
     return job

@@ -44,7 +44,7 @@ def merge_single_fits_tiles(job: Job):
             process_tiles_args,
             chunksize=64,
         ):
-            for _ in p.update_and_yield_every(64):
+            for _ in p.update_and_yield_every(512):
                 yield p
     yield p.full()
 

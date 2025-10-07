@@ -1,0 +1,300 @@
+import { baseApi as api } from "./base";
+const injectedRtkApi = api.injectEndpoints({
+  endpoints: (build) => ({
+    getSystemInfo: build.query<GetSystemInfoApiResponse, GetSystemInfoApiArg>({
+      query: () => ({ url: `/api/system_info` }),
+    }),
+    healthz: build.query<HealthzApiResponse, HealthzApiArg>({
+      query: () => ({ url: `/api/healthz` }),
+    }),
+    getTile: build.query<GetTileApiResponse, GetTileApiArg>({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/tiles/${queryArg.z}/${queryArg.y}/${queryArg.x}`,
+      }),
+    }),
+    getFitsHeader: build.query<GetFitsHeaderApiResponse, GetFitsHeaderApiArg>({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/fits_header/${queryArg.ccdName}`,
+      }),
+    }),
+    getAllQuicklookJobs: build.query<
+      GetAllQuicklookJobsApiResponse,
+      GetAllQuicklookJobsApiArg
+    >({
+      query: () => ({ url: `/api/quicklooks/*/status` }),
+    }),
+    showQuicklookStatus: build.query<
+      ShowQuicklookStatusApiResponse,
+      ShowQuicklookStatusApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/status`,
+      }),
+    }),
+    showQuicklookMetadata: build.query<
+      ShowQuicklookMetadataApiResponse,
+      ShowQuicklookMetadataApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/metadata`,
+      }),
+    }),
+    createQuicklook: build.mutation<
+      CreateQuicklookApiResponse,
+      CreateQuicklookApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks`,
+        method: "POST",
+        body: queryArg.createQuicklookRequest,
+      }),
+    }),
+    listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
+      query: (queryArg) => ({
+        url: `/api/visits`,
+        params: {
+          exposure: queryArg.exposure,
+          day_obs: queryArg.dayObs,
+          limit: queryArg.limit,
+          data_type: queryArg.dataType,
+        },
+      }),
+    }),
+    getVisitMetadata: build.query<
+      GetVisitMetadataApiResponse,
+      GetVisitMetadataApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/visits/${queryArg.visitName}/ccds/${queryArg.ccdName}`,
+      }),
+    }),
+    getExposureDataTypes: build.query<
+      GetExposureDataTypesApiResponse,
+      GetExposureDataTypesApiArg
+    >({
+      query: (queryArg) => ({ url: `/api/exposures/${queryArg.id}/types` }),
+    }),
+    getFitsFile: build.query<GetFitsFileApiResponse, GetFitsFileApiArg>({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/fits/${queryArg.ccdName}`,
+      }),
+    }),
+    listStorageEntries: build.query<
+      ListStorageEntriesApiResponse,
+      ListStorageEntriesApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/storage`,
+        params: {
+          path: queryArg.path,
+        },
+      }),
+    }),
+    deleteStorageEntry: build.mutation<
+      DeleteStorageEntryApiResponse,
+      DeleteStorageEntryApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/storage`,
+        method: "DELETE",
+        params: {
+          path: queryArg.path,
+        },
+      }),
+    }),
+    deleteStorageEntriesByPrefix: build.mutation<
+      DeleteStorageEntriesByPrefixApiResponse,
+      DeleteStorageEntriesByPrefixApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/storage/by-prefix`,
+        method: "DELETE",
+        params: {
+          prefix: queryArg.prefix,
+        },
+      }),
+    }),
+  }),
+  overrideExisting: false,
+});
+export { injectedRtkApi as api };
+export type GetSystemInfoApiResponse =
+  /** status 200 Successful Response */ SystemInfo;
+export type GetSystemInfoApiArg = void;
+export type HealthzApiResponse = /** status 200 Successful Response */ any;
+export type HealthzApiArg = void;
+export type GetTileApiResponse = /** status 200 Successful Response */ any;
+export type GetTileApiArg = {
+  visitName: string;
+  z: number;
+  y: number;
+  x: number;
+};
+export type GetFitsHeaderApiResponse =
+  /** status 200 Successful Response */ HeaderType[];
+export type GetFitsHeaderApiArg = {
+  visitName: string;
+  ccdName: string;
+};
+export type GetAllQuicklookJobsApiResponse =
+  /** status 200 Successful Response */ JobStatusList;
+export type GetAllQuicklookJobsApiArg = void;
+export type ShowQuicklookStatusApiResponse =
+  /** status 200 Successful Response */ QuicklookStatus | null;
+export type ShowQuicklookStatusApiArg = {
+  visitName: string;
+};
+export type ShowQuicklookMetadataApiResponse =
+  /** status 200 Successful Response */ QuicklookMetadata;
+export type ShowQuicklookMetadataApiArg = {
+  visitName: string;
+};
+export type CreateQuicklookApiResponse =
+  /** status 200 Successful Response */ any;
+export type CreateQuicklookApiArg = {
+  createQuicklookRequest: CreateQuicklookRequest;
+};
+export type ListVisitsApiResponse =
+  /** status 200 Successful Response */ VisitEntry[];
+export type ListVisitsApiArg = {
+  exposure?: number | null;
+  dayObs?: number | null;
+  limit?: number;
+  dataType?: "raw" | "post_isr_image" | "preliminary_visit_image";
+};
+export type GetVisitMetadataApiResponse =
+  /** status 200 Successful Response */ DataSourceCcdMetadata;
+export type GetVisitMetadataApiArg = {
+  visitName: string;
+  ccdName: string;
+};
+export type GetExposureDataTypesApiResponse =
+  /** status 200 Successful Response */ (
+    | "raw"
+    | "post_isr_image"
+    | "preliminary_visit_image"
+  )[];
+export type GetExposureDataTypesApiArg = {
+  id: number;
+};
+export type GetFitsFileApiResponse = /** status 200 Successful Response */ any;
+export type GetFitsFileApiArg = {
+  visitName: string;
+  ccdName: string;
+};
+export type ListStorageEntriesApiResponse =
+  /** status 200 Successful Response */ Entry[];
+export type ListStorageEntriesApiArg = {
+  path: string;
+};
+export type DeleteStorageEntryApiResponse =
+  /** status 200 Successful Response */ any;
+export type DeleteStorageEntryApiArg = {
+  path: string;
+};
+export type DeleteStorageEntriesByPrefixApiResponse =
+  /** status 200 Successful Response */ any;
+export type DeleteStorageEntriesByPrefixApiArg = {
+  prefix: string;
+};
+export type ContextMenuTemplate = {
+  name: string;
+  template: string;
+  is_url: boolean;
+};
+export type SystemInfo = {
+  admin_page: boolean;
+  context_menu_templates: ContextMenuTemplate[];
+};
+export type ValidationError = {
+  loc: (string | number)[];
+  msg: string;
+  type: string;
+};
+export type HttpValidationError = {
+  detail?: ValidationError[];
+};
+export type CardType = [string, string, string, string];
+export type HeaderType = CardType[];
+export type Job = {
+  visit: string;
+  id?: string;
+};
+export type Progress = {
+  total: number;
+  count?: number;
+};
+export type JobStatus = {
+  job: Job;
+  stage?:
+    | "queued"
+    | "generate_single_fits_tiles"
+    | "merge_tiles"
+    | "transfer_tiles"
+    | "done";
+  generate_single_fits_tiles?: {
+    [key: string]: Progress;
+  };
+  merge_tiles?: {
+    [key: string]: Progress;
+  };
+  transfer_tiles?: {
+    [key: string]: Progress;
+  };
+};
+export type JobStatusList = {
+  [key: string]: JobStatus;
+};
+export type QuicklookStatus = {
+  id: string;
+};
+export type QuicklookMetadata = {
+  id: string;
+  wcs: {
+    [key: string]: any;
+  };
+};
+export type CreateQuicklookRequest = {
+  visit: string;
+};
+export type VisitEntry = {
+  id: string;
+  day_obs: number;
+  physical_filter: string;
+  obs_id: string;
+  exposure_time: number;
+  science_program: string;
+  observation_type: string;
+  observation_reason: string;
+  target_name: string;
+};
+export type DataSourceCcdMetadata = {
+  visit_name: string;
+  ccd_name: string;
+  detector: number;
+  exposure: number;
+  day_obs: number;
+  uuid: string;
+};
+export type Entry = {
+  name: string;
+  type: "directory" | "file";
+  size: number | null;
+};
+export const {
+  useGetSystemInfoQuery,
+  useHealthzQuery,
+  useGetTileQuery,
+  useGetFitsHeaderQuery,
+  useGetAllQuicklookJobsQuery,
+  useShowQuicklookStatusQuery,
+  useShowQuicklookMetadataQuery,
+  useCreateQuicklookMutation,
+  useListVisitsQuery,
+  useGetVisitMetadataQuery,
+  useGetExposureDataTypesQuery,
+  useGetFitsFileQuery,
+  useListStorageEntriesQuery,
+  useDeleteStorageEntryMutation,
+  useDeleteStorageEntriesByPrefixMutation,
+} = injectedRtkApi;

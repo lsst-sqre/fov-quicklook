@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Iterable
+import json
+from typing import Any, Iterable
 
 __all__ = ['hash_iterable']
 
@@ -34,3 +35,8 @@ def _int_to_bytes(value: int) -> bytes:
             return value.to_bytes(length, byteorder='big', signed=True)
         except OverflowError:
             length += 1
+
+
+def json_digest(obj: Any):
+    s = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.blake2b(s.encode("utf-8"), digest_size=16).digest()
