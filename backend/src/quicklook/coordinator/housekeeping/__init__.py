@@ -104,22 +104,26 @@ async def get_total_disk_usage() -> int:
         return total if total is not None else 0
 
 
-async def housekeeping() -> None:
+async def housekeeping(max_usage: int | None = None) -> None:
     """
     object storage容量管理のためのハウスキーピング。
     設定された上限を超えている場合、古いquicklookを削除する。
+    
+    Args:
+        max_usage: テスト用の容量上限（指定しない場合はconfigの値を使用）
     """
+    max_usage_limit = max_usage if max_usage is not None else config.max_object_storage_usage
     total_usage = await get_total_disk_usage()
     logger.info(f"Current object storage usage: {total_usage:,} bytes ({total_usage / 1024**3:.2f} GB)")
     
-    if total_usage <= config.max_object_storage_usage:
-        logger.info(f"Usage is within limit ({config.max_object_storage_usage:,} bytes), no housekeeping needed")
+    if total_usage <= max_usage_limit:
+        logger.info(f"Usage is within limit ({max_usage_limit:,} bytes), no housekeeping needed")
         return
     
     logger.info(f"Usage exceeds limit, starting housekeeping...")
     deleted_count = 0
     
-    while total_usage > config.max_object_storage_usage:
+    while total_usage > max_usage_limit:
         visit_name = await select_quicklook_to_delete()
         if not visit_name:
             logger.warning("No more quicklooks to delete, but still over limit")
