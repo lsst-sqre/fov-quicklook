@@ -53,7 +53,7 @@ async def select_quicklook_to_delete() -> str | None:
 def _delete_object_storage_sync(visit_name: str) -> None:
     """object storageのデータを同期的に削除（別スレッドで実行される）"""
     storage = VisitObjectStorage(visit=VisitName(visit_name))
-    storage.delete_all()
+    storage.delete_all_sync()
     logger.info(f"Deleted object storage data for {visit_name}")
 
 

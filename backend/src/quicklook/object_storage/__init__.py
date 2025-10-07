@@ -56,40 +56,66 @@ class VisitObjectStorage:
     def _packed_tile_key(self, packed_pos: PackedTilePos) -> str:
         return f'packed-tile/{packed_pos.level}/{packed_pos.i}/{packed_pos.j}.npy.zstd.list.pickle'
 
-    def put_packed_tile_array(self, packed_pos: PackedTilePos, array: list[bytes | None]) -> int:
+    # Sync versions (with _sync suffix)
+    def put_packed_tile_array_sync(self, packed_pos: PackedTilePos, array: list[bytes | None]) -> int:
         data = pickle.dumps(array)
-        return self._put(self._packed_tile_key(packed_pos), data)
+        return self._put_sync(self._packed_tile_key(packed_pos), data)
 
     @lru_cache(maxsize=32)  # Tile 100KB~200KBほど。config.tile_pack == 2 で PackedTile 1.6~3.2MBほど
-    def get_packed_tile_array(self, packed_pos: PackedTilePos) -> list[bytes | None]:
-        return pickle.loads(self._get(self._packed_tile_key(packed_pos)))
+    def get_packed_tile_array_sync(self, packed_pos: PackedTilePos) -> list[bytes | None]:
+        return pickle.loads(self._get_sync(self._packed_tile_key(packed_pos)))
 
-    def get_quicklook_tile_bytes(self, pos: TilePos) -> bytes | None:
+    def get_quicklook_tile_bytes_sync(self, pos: TilePos) -> bytes | None:
         packed_pos = PackedTilePos.from_unpacked(pos)
-        packed = self.get_packed_tile_array(packed_pos)
+        packed = self.get_packed_tile_array_sync(packed_pos)
         index = packed_pos.index(packed_pos.i, packed_pos.j)
         return packed[index]
 
-    def _put(self, key: str, value: bytes) -> int:
+    def _put_sync(self, key: str, value: bytes) -> int:
         return put_object(f'quicklooks/{self.visit}/{key}', value)
 
-    def _get(self, key: str) -> bytes:
+    def _get_sync(self, key: str) -> bytes:
         return get_object(f'quicklooks/{self.visit}/{key}')
 
-    def delete_all(self) -> None:
+    def delete_all_sync(self) -> None:
         """このvisitに関連するすべてのオブジェクトを削除"""
         delete_objects_by_prefix(f'quicklooks/{self.visit}/')
 
-    def put_fits_headers(self, ccd_name: str, headers: list[HeaderType]) -> int:
+    def put_fits_headers_sync(self, ccd_name: str, headers: list[HeaderType]) -> int:
         """FITS headerをobject storageに保存"""
         import pickle
 
         data = pickle.dumps(headers)
-        return self._put(f'fits-headers/{ccd_name}.pickle', data)
+        return self._put_sync(f'fits-headers/{ccd_name}.pickle', data)
 
-    def put_ccd_metadata_list(self, metadata_list: list['CcdMetadata']) -> int:
+    def put_ccd_metadata_list_sync(self, metadata_list: list['CcdMetadata']) -> int:
         """CCD metadata listをobject storageに保存"""
         import pickle
 
         data = pickle.dumps(metadata_list)
-        return self._put('ccd-metadata-list.pickle', data)
+        return self._put_sync('ccd-metadata-list.pickle', data)
+
+    # Async versions (run sync versions in thread pool)
+    async def put_packed_tile_array(self, packed_pos: PackedTilePos, array: list[bytes | None]) -> int:
+        import asyncio
+        return await asyncio.to_thread(self.put_packed_tile_array_sync, packed_pos, array)
+
+    async def get_packed_tile_array(self, packed_pos: PackedTilePos) -> list[bytes | None]:
+        import asyncio
+        return await asyncio.to_thread(self.get_packed_tile_array_sync, packed_pos)
+
+    async def get_quicklook_tile_bytes(self, pos: TilePos) -> bytes | None:
+        import asyncio
+        return await asyncio.to_thread(self.get_quicklook_tile_bytes_sync, pos)
+
+    async def delete_all(self) -> None:
+        import asyncio
+        await asyncio.to_thread(self.delete_all_sync)
+
+    async def put_fits_headers(self, ccd_name: str, headers: list[HeaderType]) -> int:
+        import asyncio
+        return await asyncio.to_thread(self.put_fits_headers_sync, ccd_name, headers)
+
+    async def put_ccd_metadata_list(self, metadata_list: list['CcdMetadata']) -> int:
+        import asyncio
+        return await asyncio.to_thread(self.put_ccd_metadata_list_sync, metadata_list)

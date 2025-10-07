@@ -73,7 +73,7 @@ def _process_packed_tile(args: ProcessPackedTileArgs):
         get_merged_tile,
         packed_pos.unpackeds(),
     )
-    uploaded_size = job.object_storage.put_packed_tile_array(packed_pos, [*merged_tiles])
+    uploaded_size = job.object_storage.put_packed_tile_array_sync(packed_pos, [*merged_tiles])
     return uploaded_size
 
 

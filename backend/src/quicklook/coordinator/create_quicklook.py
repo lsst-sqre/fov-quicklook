@@ -171,7 +171,7 @@ def _save_quicklook_metadata(job: Job, ccd_metadata_dict: dict[CcdName, CcdMetad
     """quicklookメタデータをobject storageに保存"""
     visit_storage = VisitObjectStorage(job.visit)
     metadata_list = list(ccd_metadata_dict.values())
-    visit_storage.put_ccd_metadata_list(metadata_list)
+    visit_storage.put_ccd_metadata_list_sync(metadata_list)
 
 
 def _save_job_metadata_rpc(job: Job):
@@ -309,7 +309,7 @@ async def _finalize_error(job: Job):
     
     # エラー時はobject storageのデータを削除
     logger.info(f"Deleting object storage data for {job.visit} due to error")
-    job.object_storage.delete_all()
+    await job.object_storage.delete_all()
     
     # DBレコードも削除
     async with get_session() as session:
