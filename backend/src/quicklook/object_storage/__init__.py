@@ -11,7 +11,13 @@ if TYPE_CHECKING:
     from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 
 from quicklook.utils.fitsheader import HeaderType
-from quicklook.utils.s3 import s3_delete_object, s3_delete_objects_with_prefix, s3_download_object, s3_list_objects, s3_upload_object
+from quicklook.utils.s3 import (
+    s3_delete_object,
+    s3_delete_objects_with_prefix,
+    s3_download_object,
+    s3_list_objects,
+    s3_upload_object,
+)
 
 
 def put_object(key: str, value: bytes) -> int:
@@ -57,7 +63,6 @@ class VisitObjectStorage:
     def _packed_tile_key(self, packed_pos: PackedTilePos) -> str:
         return f'packed-tile/{packed_pos.level}/{packed_pos.i}/{packed_pos.j}.npy.zstd.list.pickle'
 
-    # Sync versions (with _sync suffix)
     def put_packed_tile_array_sync(self, packed_pos: PackedTilePos, array: list[bytes | None]) -> int:
         data = pickle.dumps(array)
         return self._put_sync(self._packed_tile_key(packed_pos), data)
@@ -84,14 +89,12 @@ class VisitObjectStorage:
 
     def put_fits_headers_sync(self, ccd_name: str, headers: list[HeaderType]) -> int:
         """FITS headerをobject storageに保存"""
-        import pickle
 
         data = pickle.dumps(headers)
         return self._put_sync(f'fits-headers/{ccd_name}.pickle', data)
 
     def put_ccd_metadata_list_sync(self, metadata_list: list['CcdMetadata']) -> int:
         """CCD metadata listをobject storageに保存"""
-        import pickle
 
         data = pickle.dumps(metadata_list)
         return self._put_sync('ccd-metadata-list.pickle', data)

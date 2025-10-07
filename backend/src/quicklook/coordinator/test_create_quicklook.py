@@ -44,8 +44,7 @@ async def test_create_quicklook_pipeline():
     job.watcher.on_change(on_change, which=lambda s: s.stage)
 
     async with quicklook_pipeline().run() as ph:
-        from quicklook.coordinator.create_quicklook import PipeLineResult
-        await ph.push(PipeLineResult(job=job))
+        await ph.push(job)
         await ev.wait()
 
 

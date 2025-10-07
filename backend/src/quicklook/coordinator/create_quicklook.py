@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, cast
 
@@ -13,9 +13,9 @@ from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate
 from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_fits_headers import transfer_fits_headers
 from quicklook.generator.transfer_tiles import transfer_tiles
-from quicklook.object_storage import VisitObjectStorage
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
+from quicklook.object_storage import VisitObjectStorage
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
 
@@ -27,10 +27,12 @@ ds = get_datasource()
 
 
 @dataclass
-class PipeLineResult:
-    """パイプライン各ステージの結果を格納するコンテナ"""
+class _PipelineResult:
     job: Job
-    data: Any = None
+    # data: Any = None
+    ccd_generator_map: dict[CcdName, GeneratorId] = field(default_factory=dict)
+    tiles_uploaded_size: int = 0
+    headers_uploaded_size: int = 0
 
 
 async def create_quicklook(job: Job):  # pragma: no cover
@@ -43,13 +45,17 @@ async def create_quicklook(job: Job):  # pragma: no cover
     try:
         ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
         await _merge_tiles(job, ccd_generator_map)
+        await _transfer_fits_headers(job)
         await _transfer_tiles(job)
     finally:
         await _finalize_error(job)
 
 
 def quicklook_pipeline():
-    async def generate_single_fits_tiles(result: PipeLineResult):
+    async def arg_adapter(job: Job):
+        return _PipelineResult(job=job)
+
+    async def generate_single_fits_tiles(result: _PipelineResult):
         job = result.job
         visit = job.visit
         try:
@@ -57,51 +63,56 @@ def quicklook_pipeline():
             await _create_quicklook_record(job)
             ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
             ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
-            return PipeLineResult(job=job, data=ccd_generator_map)
+            result.ccd_generator_map = ccd_generator_map
+            return result
         except Exception:  # pragma: no cover
             await _finalize_error(job)
             raise
 
-    async def merge_tiles(result: PipeLineResult):
+    async def merge_tiles(result: _PipelineResult):
         job = result.job
-        ccd_generator_map = result.data
+        ccd_generator_map = result.ccd_generator_map
         try:
             await _merge_tiles(job, ccd_generator_map)
-            return PipeLineResult(job=job)
+            return result
         except Exception:  # pragma: no cover
             await _finalize_error(job)
             raise
 
-    async def transfer_fits_headers(result: PipeLineResult):
+    async def transfer_fits_headers(result: _PipelineResult):
         job = result.job
         try:
             uploaded_size = await _transfer_fits_headers(job)
-            return PipeLineResult(job=job, data=uploaded_size)
+            result.tiles_uploaded_size += uploaded_size
+            return result
         except Exception:  # pragma: no cover
             await _finalize_error(job)
             raise
 
-    async def transfer_tiles(result: PipeLineResult):
+    async def transfer_tiles(result: _PipelineResult):
         job = result.job
-        fits_headers_size = result.data
         try:
             transfer_result = await _transfer_tiles(job)
-            # FITS headersとtilesのサイズを合算
-            total_uploaded_size = fits_headers_size + transfer_result.uploaded_size
-            return PipeLineResult(job=job, data=total_uploaded_size)
+            result.tiles_uploaded_size += transfer_result.uploaded_size
+            return result
         except Exception:  # pragma: no cover
             await _finalize_error(job)
             raise
 
-    def select_next_result(results: list[PipeLineResult]):
+    def select_next_result(results: list[_PipelineResult]):
         results.sort(key=lambda r: r.job.priority.sort_key())
         return results.pop(0)
 
-    async def finalize_success(result: PipeLineResult):
+    async def finalize_success(result: _PipelineResult):
         return await _finalize_success(result)
 
     return (
         Pipeline(
+            Stage(
+                arg_adapter,
+            )
+        )
+        .append(
             Stage(
                 generate_single_fits_tiles,
                 parallel=config.pipeline_generate_single_fits_tiles,
@@ -169,7 +180,7 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
         job.status.ccd_generator_map = ccd_generator_map
 
     await rpc_scatter(Rpc.create(_save_job_metadata_rpc, job))
-    
+
     # メタデータをobject storageに保存
     _save_quicklook_metadata(job, ccd_metadata_dict)
 
@@ -205,10 +216,10 @@ async def _merge_tiles(job: Job, ccd_generator_map: dict[CcdName, GeneratorId]):
                 raise ValueError(f"Unexpected message: {msg}")
 
     await rpc_scatter(Rpc.create(merge_single_fits_tiles, job), stream=True, on_yield=on_yield)
-    
+
     # transfer_fits_headersをmerge_tilesの後に実行
     await _transfer_fits_headers(job)
-    
+
     await rpc_scatter(Rpc.create(_clear_single_fits_tiles_rpc, job))
 
 
@@ -289,16 +300,17 @@ async def _create_quicklook_record(job: Job):
         logger.info(f"Created quicklook record for {job.visit} (job_id={job.id})")
 
 
-async def _finalize_success(result: PipeLineResult):
+async def _finalize_success(result: _PipelineResult):
     """正常終了時の処理：DBレコードをready=Trueに更新"""
     job = result.job
-    total_uploaded_size = result.data
+    total_uploaded_size = result.tiles_uploaded_size + result.headers_uploaded_size
     async with job.watcher.watch():
         job.status.stage = 'done'
-    
+
     # DBレコードを更新
     async with get_session() as session:
         from sqlalchemy import select, update
+
         stmt = (
             update(Quicklook)
             .where(Quicklook.visit_name == str(job.visit))
@@ -307,7 +319,7 @@ async def _finalize_success(result: PipeLineResult):
         await session.execute(stmt)
         await session.commit()
         logger.info(f"Updated quicklook record for {job.visit}: ready=True, disk_usage={total_uploaded_size}")
-    
+
     await rpc_scatter(Rpc.create(_cleanup_rpc, job))
     return job
 
@@ -316,19 +328,20 @@ async def _finalize_error(job: Job):
     """エラー時の処理：DBレコードとobject storageを削除"""
     async with job.watcher.watch():
         job.status.stage = 'error'
-    
+
     # エラー時はobject storageのデータを削除
     logger.info(f"Deleting object storage data for {job.visit} due to error")
     await job.object_storage.delete_all()
-    
+
     # DBレコードも削除
     async with get_session() as session:
         from sqlalchemy import delete
+
         stmt = delete(Quicklook).where(Quicklook.visit_name == str(job.visit))
         await session.execute(stmt)
         await session.commit()
         logger.info(f"Deleted quicklook record for {job.visit} due to error")
-    
+
     await rpc_scatter(Rpc.create(_cleanup_rpc, job))
     return job
 
