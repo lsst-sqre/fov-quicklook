@@ -157,6 +157,10 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
     async for result in adaptive_map_rpc(rpcs, stream=True, on_yield=on_yield):
         ccd_generator_map[result.args[1].ccd] = rpc_endpoint(result.generator_id)
 
+    async with job.watcher.notify_shared_large_status():
+        job.shared_large_status.ccd_generator_map = ccd_generator_map
+        job.shared_large_status.ccd_metadata_list = ccd_metadata_list
+
     await rpc_scatter(Rpc.create(_save_job_metadata_rpc, job))
 
     return ccd_generator_map, ccd_metadata_list

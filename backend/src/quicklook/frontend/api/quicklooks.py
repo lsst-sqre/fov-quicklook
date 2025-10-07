@@ -12,9 +12,16 @@ from fastapi import APIRouter, Depends, FastAPI, WebSocket
 from pydantic import BaseModel, TypeAdapter
 
 from quicklook.config import config
-from quicklook.coordinator.api.types import CreateQuicklookRequest, JobStatusList
+from quicklook.coordinator.api.types import (
+    CreateQuicklookRequest,
+    JobStatusList,
+    SharedStatusMessage,
+    SharedStatusMessageJobSharedLargeStatus,
+    SharedStatusMessageJobStatusList,
+)
 from quicklook.frontend.api.deps import dep_visit_name
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata
+from quicklook.job.shared_large_status import JobSharedLargeStatus
 from quicklook.job.status import JobStatus
 from quicklook.object_storage import VisitObjectStorage
 from quicklook.types import VisitName
@@ -84,20 +91,35 @@ async def websocket_quicklook_status(
 
 @asynccontextmanager
 async def quicklook_status_relay():
-    global job_status_list
+    global job_status_list, job_shared_large_status_dict
 
     ws_base_url = re.sub(r'^http://', 'ws://', config.coordinator_base_url)
     job_status_list = Broadcast[JobStatusList](max_queue_size=2)
+    job_shared_large_status_dict: dict[VisitName, JobSharedLargeStatus] = {}
 
     async def main():
         for i in reversed(range(5)):
             try:
-                async with websockets.connect(f'{ws_base_url}/quicklooks/*/status.ws') as ws:
+                async with websockets.connect(f'{ws_base_url}/quicklooks/*/shared_status.ws') as ws:
                     while True:
                         msg_bytes = await ws.recv()
                         assert isinstance(msg_bytes, bytes)
-                        msg: JobStatusList = pickle.loads(msg_bytes)
-                        job_status_list.put(msg)
+                        msg: SharedStatusMessage = pickle.loads(msg_bytes)
+                        
+                        match msg:
+                            case SharedStatusMessageJobStatusList(data=data):
+                                job_status_list.put(data)
+                                # クリーンアップ: 現在のjobsに存在しないエントリを削除
+                                max_entries = config.pipeline_queue_size * 2
+                                if len(job_shared_large_status_dict) > max_entries:
+                                    current_visits = set(data.keys())
+                                    for visit in list(job_shared_large_status_dict.keys()):
+                                        if visit not in current_visits:
+                                            del job_shared_large_status_dict[visit]
+                                            if len(job_shared_large_status_dict) <= max_entries:
+                                                break
+                            case SharedStatusMessageJobSharedLargeStatus(visit=visit, data=data):
+                                job_shared_large_status_dict[visit] = data
             except Exception as e:
                 logger.warning(f'Failed to connect to {ws_base_url}: {str(e)}. Remaining retries: {i}')
                 await asyncio.sleep(5)

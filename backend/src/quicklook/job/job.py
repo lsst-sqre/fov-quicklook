@@ -47,3 +47,9 @@ class Job:
         from .priority import JobPriority
 
         return JobPriority.from_job(self)
+
+    @cached_property
+    def shared_large_status(self):
+        from .shared_large_status import JobSharedLargeStatus
+
+        return JobSharedLargeStatus.from_job(self)
