@@ -1,6 +1,5 @@
 """Housekeeping functions for managing object storage capacity."""
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -50,13 +49,6 @@ async def select_quicklook_to_delete() -> str | None:
         return row[0] if row else None
 
 
-def _delete_object_storage_sync(visit_name: str) -> None:
-    """object storageのデータを同期的に削除（別スレッドで実行される）"""
-    storage = VisitObjectStorage(visit=VisitName(visit_name))
-    storage.delete_all_sync()
-    logger.info(f"Deleted object storage data for {visit_name}")
-
-
 async def delete_one_quicklook(visit_name: str) -> int:
     """
     指定されたquicklookを削除する。
@@ -82,8 +74,10 @@ async def delete_one_quicklook(visit_name: str) -> int:
         await session.commit()
         logger.info(f"Marked quicklook {visit_name} as not ready")
     
-    # object storageのデータを削除（別スレッドで実行）
-    await asyncio.to_thread(_delete_object_storage_sync, visit_name)
+    # object storageのデータを削除
+    storage = VisitObjectStorage(visit=VisitName(visit_name))
+    await storage.delete_all()
+    logger.info(f"Deleted object storage data for {visit_name}")
     
     # DBエントリーを削除
     async with get_session() as session:
