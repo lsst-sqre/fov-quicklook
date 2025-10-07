@@ -1,3 +1,4 @@
+import asyncio
 import pickle
 from dataclasses import dataclass
 from functools import lru_cache
@@ -97,25 +98,19 @@ class VisitObjectStorage:
 
     # Async versions (run sync versions in thread pool)
     async def put_packed_tile_array(self, packed_pos: PackedTilePos, array: list[bytes | None]) -> int:
-        import asyncio
         return await asyncio.to_thread(self.put_packed_tile_array_sync, packed_pos, array)
 
     async def get_packed_tile_array(self, packed_pos: PackedTilePos) -> list[bytes | None]:
-        import asyncio
         return await asyncio.to_thread(self.get_packed_tile_array_sync, packed_pos)
 
     async def get_quicklook_tile_bytes(self, pos: TilePos) -> bytes | None:
-        import asyncio
         return await asyncio.to_thread(self.get_quicklook_tile_bytes_sync, pos)
 
     async def delete_all(self) -> None:
-        import asyncio
         await asyncio.to_thread(self.delete_all_sync)
 
     async def put_fits_headers(self, ccd_name: str, headers: list[HeaderType]) -> int:
-        import asyncio
         return await asyncio.to_thread(self.put_fits_headers_sync, ccd_name, headers)
 
     async def put_ccd_metadata_list(self, metadata_list: list['CcdMetadata']) -> int:
-        import asyncio
         return await asyncio.to_thread(self.put_ccd_metadata_list_sync, metadata_list)
