@@ -81,6 +81,11 @@ async def run_quicklook_pipeline():
     async def on_status_change(job: Job):
         if job.status.stage == 'done':
             del jobs[job.visit]
+        elif job.status.stage == 'error':
+            # エラー時は30秒待ってから削除
+            await asyncio.sleep(30)
+            if job.visit in jobs:
+                del jobs[job.visit]
 
     async with quicklook_pipeline().run() as ph:
         async with broadcast.activate():

@@ -38,7 +38,7 @@ async def create_quicklook(job: Job):  # pragma: no cover
         await _merge_tiles(job, ccd_generator_map)
         await _transfer_tiles(job)
     finally:
-        await _finalize(job)
+        await _finalize_error(job)
 
 
 def quicklook_pipeline():
@@ -52,7 +52,7 @@ def quicklook_pipeline():
             ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
             return job, ccd_generator_map
         except Exception:  # pragma: no cover
-            await _finalize(job, error=True)
+            await _finalize_error(job)
             raise
 
     async def merge_tiles(args: tuple[Job, dict[CcdName, GeneratorId]]):
@@ -61,19 +61,34 @@ def quicklook_pipeline():
             await _merge_tiles(job, ccd_generator_map)
             return job
         except Exception:  # pragma: no cover
-            await _finalize(job, error=True)
+            await _finalize_error(job)
             raise
 
-    async def transfer_tiles(job: Job):
+    async def transfer_fits_headers(job: Job):
+        try:
+            uploaded_size = await _transfer_fits_headers(job)
+            return job, uploaded_size
+        except Exception:  # pragma: no cover
+            await _finalize_error(job)
+            raise
+
+    async def transfer_tiles(args: tuple[Job, int]):
+        job, fits_headers_size = args
         try:
             result = await _transfer_tiles(job)
-            return job, result
+            # FITS headersとtilesのサイズを合算
+            total_uploaded_size = fits_headers_size + result.uploaded_size
+            return job, total_uploaded_size
         except Exception:  # pragma: no cover
-            await _finalize(job, error=True)
+            await _finalize_error(job)
             raise
 
     def select_next_job(jobs: list[Job]):
         jobs.sort(key=lambda j: j.priority.sort_key())
+        return jobs.pop(0)
+    
+    def select_next_job_with_size(jobs: list[tuple[Job, int]]):
+        jobs.sort(key=lambda j: j[0].priority.sort_key())
         return jobs.pop(0)
 
     return (
@@ -92,12 +107,18 @@ def quicklook_pipeline():
         )
         .append(
             Stage(
+                transfer_fits_headers,
+                parallel=config.pipeline_merge_tiles,
+            )
+        )
+        .append(
+            Stage(
                 # transferステージ。ここが一番時間がかかる
                 # 1jobあたり20GBのローカルストレージが必要
                 transfer_tiles,
                 parallel=config.pipeline_transfer_tiles,
                 queue_capacity=config.pipeline_transfer_queue_size,
-                item_picker=select_next_job,
+                item_picker=select_next_job_with_size,
             )
         )
         .append(Stage(_finalize_success))
@@ -190,22 +211,28 @@ def _save_ccd_distribution_config_rpc(job: Job, dist_config: CcdDistributionConf
     job.local_storage.ccd_distribution_config.save(dist_config)
 
 
-async def _transfer_fits_headers(job: Job):
+async def _transfer_fits_headers(job: Job) -> int:
     """FITS headerをobject storageにアップロードする"""
     _ensure_users_exist_for_job(job)
 
+    async with job.watcher.watch():
+        job.status.stage = 'transfer_fits_headers'
+
+    total_uploaded_size = 0
+
     async def on_yield(msg):
+        nonlocal total_uploaded_size
         match msg:
             case YieledValue(value=Progress() as p, generator_id=generator_id):
                 # Progressを記録（必要に応じて）
                 pass
-            case YieledValue(value=ReturnValue(value=int() as _uploaded_size), generator_id=generator_id):
-                # アップロードサイズを記録（必要に応じて）
-                pass
+            case YieledValue(value=ReturnValue(value=int() as uploaded_size), generator_id=generator_id):
+                total_uploaded_size += uploaded_size
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
     await rpc_scatter(Rpc.create(transfer_fits_headers, job), stream=True, on_yield=on_yield)
+    return total_uploaded_size
 
 
 async def _transfer_tiles(job: Job):
@@ -253,9 +280,9 @@ async def _create_quicklook_record(job: Job):
         logger.info(f"Created quicklook record for {job.visit} (job_id={job.id})")
 
 
-async def _finalize_success(args: tuple[Job, TransferTilesResult]):
+async def _finalize_success(args: tuple[Job, int]):
     """正常終了時の処理：DBレコードをready=Trueに更新"""
-    job, result = args
+    job, total_uploaded_size = args
     async with job.watcher.watch():
         job.status.stage = 'done'
     
@@ -265,33 +292,32 @@ async def _finalize_success(args: tuple[Job, TransferTilesResult]):
         stmt = (
             update(Quicklook)
             .where(Quicklook.visit_name == str(job.visit))
-            .values(ready=True, disk_usage=result.uploaded_size)
+            .values(ready=True, disk_usage=total_uploaded_size)
         )
         await session.execute(stmt)
         await session.commit()
-        logger.info(f"Updated quicklook record for {job.visit}: ready=True, disk_usage={result.uploaded_size}")
+        logger.info(f"Updated quicklook record for {job.visit}: ready=True, disk_usage={total_uploaded_size}")
     
     await rpc_scatter(Rpc.create(_cleanup_rpc, job))
     return job
 
 
-async def _finalize(job: Job, error: bool = False):
+async def _finalize_error(job: Job):
     """エラー時の処理：DBレコードとobject storageを削除"""
     async with job.watcher.watch():
-        job.status.stage = 'done'
+        job.status.stage = 'error'
     
-    if error:
-        # エラー時はobject storageのデータを削除
-        logger.info(f"Deleting object storage data for {job.visit} due to error")
-        job.object_storage.delete_all()
-        
-        # DBレコードも削除
-        async with get_session() as session:
-            from sqlalchemy import delete
-            stmt = delete(Quicklook).where(Quicklook.visit_name == str(job.visit))
-            await session.execute(stmt)
-            await session.commit()
-            logger.info(f"Deleted quicklook record for {job.visit} due to error")
+    # エラー時はobject storageのデータを削除
+    logger.info(f"Deleting object storage data for {job.visit} due to error")
+    job.object_storage.delete_all()
+    
+    # DBレコードも削除
+    async with get_session() as session:
+        from sqlalchemy import delete
+        stmt = delete(Quicklook).where(Quicklook.visit_name == str(job.visit))
+        await session.execute(stmt)
+        await session.commit()
+        logger.info(f"Deleted quicklook record for {job.visit} due to error")
     
     await rpc_scatter(Rpc.create(_cleanup_rpc, job))
     return job
