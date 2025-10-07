@@ -91,7 +91,7 @@ class Config(BaseSettings):
     dev_generator_required_coordinator_connection: bool = True
 
     # Database settings
-    db_url: str = 'postgresql+asyncpg://postgres:postgres@localhost:5432/quicklook'
+    db_url: str = 'postgresql+asyncpg://quicklook:quicklook@localhost:5432/quicklook'
 
 
 config = Config(
