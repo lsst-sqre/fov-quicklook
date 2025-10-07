@@ -94,7 +94,7 @@ class Config(BaseSettings):
     db_url: str = 'postgresql+asyncpg://quicklook:quicklook@localhost:5432/quicklook'
     
     # Housekeeping settings
-    max_object_storage_usage: int = 1024 * 1024 * 1024 * 100  # 100GB in bytes
+    max_object_storage_usage: int = 1024 * 1024 * 1024 * 45  # 45GB in bytes
 
 
 config = Config(
