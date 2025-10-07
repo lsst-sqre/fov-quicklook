@@ -90,6 +90,9 @@ class Config(BaseSettings):
     dev_ccd_limit: int | None = None
     dev_generator_required_coordinator_connection: bool = True
 
+    # Database settings
+    db_url: str = 'postgresql+asyncpg://postgres:postgres@localhost:5432/quicklook'
+
 
 config = Config(
     _env_file=os.environ.get('ENV_FILE'),  # type: ignore
