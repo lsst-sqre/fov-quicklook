@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 
 from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.rpc import Rpc
@@ -26,6 +26,13 @@ logger = logging.getLogger(__name__)
 ds = get_datasource()
 
 
+@dataclass
+class PipeLineResult:
+    """パイプライン各ステージの結果を格納するコンテナ"""
+    job: Job
+    data: Any = None
+
+
 async def create_quicklook(job: Job):  # pragma: no cover
     '''
     テスト用。
@@ -42,61 +49,63 @@ async def create_quicklook(job: Job):  # pragma: no cover
 
 
 def quicklook_pipeline():
-    async def generate_single_fits_tiles(job: Job):
+    async def generate_single_fits_tiles(result: PipeLineResult):
+        job = result.job
         visit = job.visit
         try:
-            raise RuntimeError("My Error")
             # DBに初期レコードを作成
             await _create_quicklook_record(job)
             ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
             ccd_generator_map = await _generate_single_fits_tiles(job, ccd_refs)
-            return job, ccd_generator_map
+            return PipeLineResult(job=job, data=ccd_generator_map)
         except Exception:  # pragma: no cover
             await _finalize_error(job)
             raise
 
-    async def merge_tiles(args: tuple[Job, dict[CcdName, GeneratorId]]):
-        job, ccd_generator_map = args
+    async def merge_tiles(result: PipeLineResult):
+        job = result.job
+        ccd_generator_map = result.data
         try:
             await _merge_tiles(job, ccd_generator_map)
-            return job
+            return PipeLineResult(job=job)
         except Exception:  # pragma: no cover
             await _finalize_error(job)
             raise
 
-    async def transfer_fits_headers(job: Job):
+    async def transfer_fits_headers(result: PipeLineResult):
+        job = result.job
         try:
             uploaded_size = await _transfer_fits_headers(job)
-            return job, uploaded_size
+            return PipeLineResult(job=job, data=uploaded_size)
         except Exception:  # pragma: no cover
             await _finalize_error(job)
             raise
 
-    async def transfer_tiles(args: tuple[Job, int]):
-        job, fits_headers_size = args
+    async def transfer_tiles(result: PipeLineResult):
+        job = result.job
+        fits_headers_size = result.data
         try:
-            result = await _transfer_tiles(job)
+            transfer_result = await _transfer_tiles(job)
             # FITS headersとtilesのサイズを合算
-            total_uploaded_size = fits_headers_size + result.uploaded_size
-            return job, total_uploaded_size
+            total_uploaded_size = fits_headers_size + transfer_result.uploaded_size
+            return PipeLineResult(job=job, data=total_uploaded_size)
         except Exception:  # pragma: no cover
             await _finalize_error(job)
             raise
 
-    def select_next_job(jobs: list[Job]):
-        jobs.sort(key=lambda j: j.priority.sort_key())
-        return jobs.pop(0)
-    
-    def select_next_job_with_size(jobs: list[tuple[Job, int]]):
-        jobs.sort(key=lambda j: j[0].priority.sort_key())
-        return jobs.pop(0)
+    def select_next_result(results: list[PipeLineResult]):
+        results.sort(key=lambda r: r.job.priority.sort_key())
+        return results.pop(0)
+
+    async def finalize_success(result: PipeLineResult):
+        return await _finalize_success(result)
 
     return (
         Pipeline(
             Stage(
                 generate_single_fits_tiles,
                 parallel=config.pipeline_generate_single_fits_tiles,
-                item_picker=select_next_job,
+                item_picker=select_next_result,
             )
         )
         .append(
@@ -118,10 +127,10 @@ def quicklook_pipeline():
                 transfer_tiles,
                 parallel=config.pipeline_transfer_tiles,
                 queue_capacity=config.pipeline_transfer_queue_size,
-                item_picker=select_next_job_with_size,
+                item_picker=select_next_result,
             )
         )
-        .append(Stage(_finalize_success))
+        .append(Stage(finalize_success))
     )
 
 
@@ -280,9 +289,10 @@ async def _create_quicklook_record(job: Job):
         logger.info(f"Created quicklook record for {job.visit} (job_id={job.id})")
 
 
-async def _finalize_success(args: tuple[Job, int]):
+async def _finalize_success(result: PipeLineResult):
     """正常終了時の処理：DBレコードをready=Trueに更新"""
-    job, total_uploaded_size = args
+    job = result.job
+    total_uploaded_size = result.data
     async with job.watcher.watch():
         job.status.stage = 'done'
     

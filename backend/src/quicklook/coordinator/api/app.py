@@ -76,7 +76,8 @@ async def run_quicklook_pipeline():
         jobs[visit] = job
         if ph.full():
             raise HTTPException(503)
-        await ph.push(job)
+        from quicklook.coordinator.create_quicklook import PipeLineResult
+        await ph.push(PipeLineResult(job=job))
 
     async def on_status_change(job: Job):
         if job.status.stage == 'done':
