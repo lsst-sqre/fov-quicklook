@@ -8,19 +8,27 @@ GeneratorからのRegistration要求を受け付け、利用可能なGenerator�
 import asyncio
 import logging
 import traceback
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 import aiohttp
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 
 from quicklook.config import config
 
-from .types import GeneratorId, GeneratorInfo, GeneratorRegistrationRequest
+from .types import (
+    CoordinatorId,
+    GeneratorId,
+    GeneratorInfo,
+    GeneratorRegistrationRequest,
+    GeneratorRegistrationResponse,
+)
 
 logger = logging.getLogger(__name__)
 _available_generators: dict[GeneratorId, GeneratorInfo] = {}
+_coordinator_id: CoordinatorId | None = None
 
 
 router = APIRouter()
@@ -30,7 +38,17 @@ router = APIRouter()
 async def register_generator(
     request: Request,
     registration_data: GeneratorRegistrationRequest,
-):
+) -> GeneratorRegistrationResponse:
+    if _coordinator_id is None:
+        raise HTTPException(status_code=500, detail="Coordinator ID not initialized")
+    
+    if registration_data.coordinator_id is not None:
+        if registration_data.coordinator_id != _coordinator_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Coordinator ID mismatch: expected {_coordinator_id}, got {registration_data.coordinator_id}"
+            )
+    
     client_host = request.client.host if request.client else "127.0.0.1"
     generator_info = GeneratorInfo(
         id=registration_data.generator_id,
@@ -40,6 +58,8 @@ async def register_generator(
     if registration_data.generator_id not in _available_generators:
         _available_generators[registration_data.generator_id] = generator_info
         logger.info(f'Available generators: {_available_generators.values()}')
+    
+    return GeneratorRegistrationResponse(coordinator_id=_coordinator_id)
 
 
 @router.get("/comm/healthz")
@@ -61,6 +81,9 @@ if config.environment == 'test':  # pragma: no branch
 
 @asynccontextmanager
 async def lifespan(app: Any) -> AsyncIterator[None]:
+    global _coordinator_id
+    _coordinator_id = CoordinatorId(f'c-{uuid.uuid4().hex}')
+    logger.info(f"Coordinator ID: {_coordinator_id}")
     heartbeat_task = asyncio.create_task(_heartbeat_checker_loop())
     try:
         yield

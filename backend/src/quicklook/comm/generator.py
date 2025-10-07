@@ -19,10 +19,14 @@ from typing import Any
 import aiohttp
 from fastapi import APIRouter, HTTPException
 
-from quicklook.comm.types import GeneratorId
+from quicklook.comm.types import GeneratorId, CoordinatorId
 from quicklook.config import config
 
-from .types import GeneratorId, GeneratorRegistrationRequest
+from .types import (
+    GeneratorId,
+    GeneratorRegistrationRequest,
+    GeneratorRegistrationResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +42,7 @@ async def generator_heartbeat(fail_for_test: bool = False):
 
 
 _generator_id: GeneratorId | None = None
+_coordinator_id: CoordinatorId | None = None
 
 
 @asynccontextmanager
@@ -78,10 +83,12 @@ def set_generator_id_for_test():
 
 
 async def _register_to_coordinator():
+    global _coordinator_id
 
     registration_data = GeneratorRegistrationRequest(
         generator_id=self_generator_id(),
         port=config.generator_port,
+        coordinator_id=_coordinator_id,
     )
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
     async with aiohttp.ClientSession() as session:
@@ -92,6 +99,18 @@ async def _register_to_coordinator():
                 timeout=timeout,
             ) as response:
                 response.raise_for_status()
+                response_data = await response.json()
+                registration_response = GeneratorRegistrationResponse(**response_data)
+                
+                if _coordinator_id is None:
+                    _coordinator_id = registration_response.coordinator_id
+                    logger.info(f"Received coordinator ID: {_coordinator_id}")
+                elif _coordinator_id != registration_response.coordinator_id:
+                    logger.error(
+                        f"Coordinator ID changed from {_coordinator_id} to {registration_response.coordinator_id}. "
+                        "Coordinator has been restarted."
+                    )
+                    raise RuntimeError("Coordinator ID mismatch")
         except Exception:
             if config.dev_generator_required_coordinator_connection:  # pragma: no cover
                 raise

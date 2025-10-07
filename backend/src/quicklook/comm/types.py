@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 
 GeneratorId = NewType("GeneratorId", str)
+CoordinatorId = NewType("CoordinatorId", str)
 
 
 @dataclass(frozen=True)
@@ -25,3 +26,8 @@ class GeneratorInfo:
 class GeneratorRegistrationRequest(BaseModel):
     generator_id: GeneratorId
     port: int
+    coordinator_id: CoordinatorId | None = None
+
+
+class GeneratorRegistrationResponse(BaseModel):
+    coordinator_id: CoordinatorId
