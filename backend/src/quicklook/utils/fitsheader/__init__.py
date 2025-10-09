@@ -1,11 +1,12 @@
-import astropy.io.fits as pyfits
+from collections.abc import Iterable
+from typing import Any
 
 
 type CardType = tuple[str, str, str, str]
 type HeaderType = list[CardType]
 
 
-def fitsheader_to_list(hdul: pyfits.HDUList) -> list[HeaderType]:
+def fitsheader_to_list(hdul: Iterable[Any]) -> list[HeaderType]:
     headers: list[HeaderType] = []
     for hdu in hdul:
         cards: HeaderType = []
