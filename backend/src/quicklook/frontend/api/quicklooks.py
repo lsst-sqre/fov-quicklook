@@ -1,5 +1,5 @@
 import asyncio
-import logging
+import quicklook.logging
 import os
 import pickle
 import re
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 router = APIRouter()
 
-logger = logging.getLogger(__name__)
+logger = quicklook.logging.getLogger(__name__)
 
 
 @router.post('/api/quicklooks', description='Create a quicklook')

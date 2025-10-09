@@ -1,4 +1,4 @@
-import logging
+import quicklook.logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -19,7 +19,7 @@ from .systeminfo import router as systeminfo_router
 from .visits import router as visits_router
 from .cache_entries import router as cache_entries_router
 
-logger = logging.getLogger(__name__)
+logger = quicklook.logging.getLogger(__name__)
 
 
 @asynccontextmanager

@@ -1,5 +1,5 @@
 import asyncio
-import logging
+import quicklook.logging
 import pickle
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -18,7 +18,7 @@ from quicklook.types import VisitName
 from quicklook.utils.broadcast import Broadcast
 from quicklook.utils.websocket import run_until_disconnect, safe_websocket
 
-logger = logging.getLogger(__name__)
+logger = quicklook.logging.getLogger(__name__)
 
 
 @asynccontextmanager

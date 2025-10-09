@@ -1,4 +1,4 @@
-import logging
+import quicklook.logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, cast
@@ -20,7 +20,7 @@ from quicklook.utils.pipeline import Pipeline, Stage
 
 from ..comm.rpc_worker import YieledValue, adaptive_map_rpc, rpc_endpoint, rpc_scatter
 
-logger = logging.getLogger(__name__)
+logger = quicklook.logging.getLogger(__name__)
 
 ds = get_datasource()
 

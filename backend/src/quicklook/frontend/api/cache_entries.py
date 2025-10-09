@@ -1,4 +1,4 @@
-import logging
+import quicklook.logging
 from datetime import datetime
 
 from fastapi import APIRouter
@@ -9,7 +9,7 @@ from quicklook.coordinator.housekeeping import delete_one_quicklook, select_quic
 from quicklook.db import Quicklook
 from quicklook.db.session import get_db_session
 
-logger = logging.getLogger('uvicorn')
+logger = quicklook.logging.getLogger('uvicorn')
 
 router = APIRouter()
 

@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-import logging
+import quicklook.logging
 import traceback
 from functools import cache
 from typing import Annotated
@@ -18,7 +18,7 @@ from quicklook.utils.s3 import NoSuchKey
 
 from .deps import dep_tile_pos, dep_visit_name
 
-logger = logging.getLogger(__name__)
+logger = quicklook.logging.getLogger(__name__)
 
 router = APIRouter()
 

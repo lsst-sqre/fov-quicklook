@@ -1,4 +1,4 @@
-import logging
+import quicklook.logging
 from typing import Annotated
 
 import aiohttp
@@ -11,7 +11,7 @@ import quicklook.object_storage as storage
 from quicklook.types import CcdName, VisitName
 from quicklook.utils.fitsheader import HeaderType
 
-logger = logging.getLogger(__name__)
+logger = quicklook.logging.getLogger(__name__)
 
 router = APIRouter()
 

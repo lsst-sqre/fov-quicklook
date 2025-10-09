@@ -6,7 +6,7 @@ GeneratorからのRegistration要求を受け付け、利用可能なGenerator�
 """
 
 import asyncio
-import logging
+import quicklook.logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -25,7 +25,7 @@ from .types import (
     GeneratorRegistrationResponse,
 )
 
-logger = logging.getLogger(__name__)
+logger = quicklook.logging.getLogger(__name__)
 _available_generators: dict[GeneratorId, GeneratorInfo] = {}
 _coordinator_id: CoordinatorId | None = None
 

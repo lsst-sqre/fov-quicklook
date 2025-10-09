@@ -6,7 +6,7 @@ Coordinatorとの疎通を定期的に確認し、失敗した場合は自プロ
 """
 
 import asyncio
-import logging
+import quicklook.logging
 import os
 import signal
 import uuid
@@ -23,7 +23,7 @@ from quicklook.config import config
 
 from .types import GeneratorId, GeneratorRegistrationRequest, GeneratorRegistrationResponse
 
-logger = logging.getLogger(__name__)
+logger = quicklook.logging.getLogger(__name__)
 
 
 router = APIRouter()
