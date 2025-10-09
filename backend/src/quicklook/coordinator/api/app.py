@@ -12,7 +12,7 @@ from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
 from quicklook.coordinator.api.types import CreateQuicklookRequest, JobStatusList, SharedStatusMessage, SharedStatusMessageJobSharedLargeStatus, SharedStatusMessageJobStatusList
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
-from quicklook.db import Quicklook, get_session
+from quicklook.db import Quicklook, get_db_session
 from quicklook.job.job import Job
 from quicklook.types import VisitName
 from quicklook.utils.broadcast import Broadcast
@@ -46,7 +46,7 @@ type JobDict = dict[VisitName, Job]
 async def route_create_quicklook(params: CreateQuicklookRequest):
     visit = VisitName(params.visit)
 
-    async with get_session() as session:
+    async with get_db_session() as session:
         result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
         quicklook = result.scalar_one_or_none()
 

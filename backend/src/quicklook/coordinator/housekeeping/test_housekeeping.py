@@ -8,7 +8,7 @@ from quicklook.coordinator.housekeeping import (
     housekeeping,
     select_quicklook_to_delete,
 )
-from quicklook.db import Access, Quicklook, get_session
+from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.types import VisitName
 
 pytestmark = pytest.mark.slow
@@ -17,7 +17,7 @@ pytestmark = pytest.mark.slow
 @pytest.fixture(autouse=True, scope="function")
 async def reset_db():
     """テスト開始時にDBを全てリセット"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         await session.execute(delete(Access))
         await session.execute(delete(Quicklook))
         await session.commit()
@@ -25,7 +25,7 @@ async def reset_db():
 
 async def test_select_quicklook_to_delete_oldest():
     """最もアクセスが少なく古いquicklookが選択されることを確認"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         # 3つのquicklookを作成
         now = datetime.now()
         quicklook1 = Quicklook(
@@ -64,7 +64,7 @@ async def test_select_quicklook_to_delete_oldest():
 
 async def test_select_quicklook_to_delete_no_ready():
     """ready=falseのquicklookは選択されないことを確認"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         now = datetime.now()
         quicklook1 = Quicklook(
             visit_name="raw:visit1",
@@ -90,7 +90,7 @@ async def test_select_quicklook_to_delete_no_ready():
 
 async def test_delete_one_quicklook():
     """quicklookが正しく削除されることを確認"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         now = datetime.now()
         quicklook = Quicklook(
             visit_name="raw:test_delete",
@@ -107,7 +107,7 @@ async def test_delete_one_quicklook():
     assert disk_usage == 5000
     
     # DBから削除されていることを確認
-    async with get_session() as session:
+    async with get_db_session() as session:
         stmt = select(Quicklook).where(Quicklook.visit_name == "raw:test_delete")
         result = await session.execute(stmt)
         assert result.first() is None
@@ -115,7 +115,7 @@ async def test_delete_one_quicklook():
 
 async def test_cleanup_at_startup():
     """起動時のクリーンアップが動作することを確認"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         now = datetime.now()
         quicklook1 = Quicklook(
             visit_name="raw:incomplete1",
@@ -138,7 +138,7 @@ async def test_cleanup_at_startup():
     await cleanup_at_startup()
     
     # ready=falseのエントリーが削除されていることを確認
-    async with get_session() as session:
+    async with get_db_session() as session:
         stmt = select(Quicklook).where(Quicklook.visit_name == "raw:incomplete1")
         result = await session.execute(stmt)
         assert result.first() is None
@@ -151,7 +151,7 @@ async def test_cleanup_at_startup():
 
 async def test_housekeeping_with_limit():
     """容量制限を超えた場合にhousekeepingが動作することを確認"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         now = datetime.now()
         # 合計10000バイトのquicklookを作成
         for i in range(5):
@@ -169,7 +169,7 @@ async def test_housekeeping_with_limit():
     await housekeeping(max_usage=6000)
     
     # 削除後、合計が6000バイト以下になっているはず
-    async with get_session() as session:
+    async with get_db_session() as session:
         stmt = select(Quicklook)
         result = await session.execute(stmt)
         remaining = result.scalars().all()

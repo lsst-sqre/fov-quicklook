@@ -21,7 +21,10 @@ install_requires = [
     'psycopg2-binary',
     'zstandard',
     'websockets',
-    f'mineo_fits_decompress @ file://{mineo_path.resolve()}',
+    'alembic',
+    'asyncpg',
+    # f'mineo_fits_decompress @ file://{mineo_path.resolve()}',
+    # ↑コンテナの高速ビルドのため除外
 ]
 
 setup(

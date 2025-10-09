@@ -35,6 +35,7 @@ class Config(BaseSettings):
     # 例えばtile_pack==2のときは、16個のタイルがまとめてアップロードされる。
     fitsio_decompress_parallel: int = 4
     fitsio_tmpdir: Path = Path('/dev/shm/quicklook/fitsio')
+    fitsio_memory_saving_mode: bool = True
 
     data_source: Literal['butler', 'dummy'] = 'butler'
 

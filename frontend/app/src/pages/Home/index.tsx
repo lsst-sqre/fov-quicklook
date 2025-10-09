@@ -23,7 +23,7 @@ export const Home = wrapByHomeContext(memo(() => {
       <div style={{ flexGrow: 1, display: 'flex' }}>
         <div style={{ width: 'min(30%, 300px)', display: 'flex', flexDirection: 'column' }}>
           <VisitList style={{ flexGrow: 1 }} />
-          <ViewerSettings />
+          {/* <ViewerSettings /> */}
         </div>
         <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <Viewer style={{ flexGrow: 1 }} />

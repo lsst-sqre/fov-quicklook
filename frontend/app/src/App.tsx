@@ -5,7 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { WindowCenter } from './components/layout'
 import { LoadingSpinner } from './components/Loading'
 import { env } from './env'
-import { QuicklookStatusProvider } from './pages/Home/context/quicklook'
+import { QuicklookMetadataProvider } from './pages/Home/context/quicklook'
 import { AppRouter } from './router'
 import { makeStore } from './store'
 import { SystemInfo } from './store/api/openapi'
@@ -34,9 +34,9 @@ function RawApp({ systemInfo }: { systemInfo: SystemInfo }) {
   return (
     <Provider store={storeRef.current}>
       <BrowserRouter basename={env.baseUrl}>
-        <QuicklookStatusProvider>
+        <QuicklookMetadataProvider>
           <AppRouter />
-        </QuicklookStatusProvider>
+        </QuicklookMetadataProvider>
       </BrowserRouter>
       <Toaster />
     </Provider>

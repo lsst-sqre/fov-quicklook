@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { RubinImageFilterParams } from "../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter"
-import { QuicklookMetadata } from "../../../store/api/openapi"
+import { QuicklookMetadata, QuicklookMetadataReady } from "../../../store/api/openapi"
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
 import { useHomeContext } from "../context"
@@ -17,8 +17,8 @@ export const FilterParams = memo(() => {
   const metadata = currentQuicklook.metadata
   const { min, max, colormap, scale, gamma } = params
   const [barMinMax, setBarMinMax] = useState<[number, number]>([-1, 1])
-  const origin = useMemo(() => metadata ? getImageMedian(metadata) : 0, [metadata])
-  const mad = useMemo(() => metadata ? getImageSigma(metadata) : 1, [metadata])
+  const origin = useMemo(() => metadata?.type === 'ready' ? getImageMedian(metadata) : 0, [metadata])
+  const mad = useMemo(() => metadata?.type === 'ready' ? getImageSigma(metadata) : 1, [metadata])
   const [[contrast, bias], setContrastBias] = useState<[number, number]>(defaultContrastBias)
   const [showTextInputs, setShowTextInputs] = useState(false)
 
@@ -27,7 +27,7 @@ export const FilterParams = memo(() => {
   }, [dispatch])
 
   useEffect(() => {
-    if (metadata) {
+    if (metadata?.type === 'ready') {
       const [min, max] = autoBarMinMax(metadata)
       setBarMinMax([min, max])
       const shouldDoAutoMinMax = currentQuicklook.changeCount() > 1 || initialSearchParams.filterParams === undefined
@@ -39,7 +39,7 @@ export const FilterParams = memo(() => {
   }, [metadata])
 
   const reset = useCallback(() => {
-    if (metadata) {
+    if (metadata?.type === 'ready') {
       setContrastBias(defaultContrastBias)
       setParams({ ...params, ...autoMinMax(metadata, ...defaultContrastBias), gamma: 0, colormap: 'Gray' })
     }
@@ -47,7 +47,7 @@ export const FilterParams = memo(() => {
 
   const handleParamChange = useCallback((newContrast: number, newBias: number) => {
     setContrastBias([newContrast, newBias])
-    if (metadata) {
+    if (metadata?.type === 'ready') {
       setParams({ ...params, ...autoMinMax(metadata, newContrast, newBias) })
     }
   }, [metadata, params, setParams])
@@ -274,18 +274,17 @@ const FilterParamTextInputs = memo(({
 
 const MAD2STDDEV = Math.sqrt(2 / Math.PI)
 
-function autoBarMinMax(tileMeta: QuicklookMetadata) {
+function autoBarMinMax(qlmeta: QuicklookMetadataReady) {
   const n = 5000
-  // TODO: revive
-  // @ts-ignore
-  const ccds = (tileMeta.ccd_meta ?? []).filter(ccd => typeof ccd.image_stat.median === 'number')
+
+  const ccds = (qlmeta.ccd_metadata_list ?? []).filter(ccd => typeof ccd.image_stat.median === 'number')
   const min = Math.min(+Infinity, ...ccds.map(ccd => ccd.image_stat.median!))
   const max = Math.max(-Infinity, ...ccds.map(ccd => ccd.image_stat.median!))
   const maxSigma = Math.max(-Infinity, ...ccds.map(ccd => ccd.image_stat.mad!)) * MAD2STDDEV
   return [min - n * maxSigma, max + n * maxSigma]
 }
 
-function autoMinMax(tileMeta: QuicklookMetadata, contrast: number, bias: number) {
+function autoMinMax(tileMeta: QuicklookMetadataReady, contrast: number, bias: number) {
   const sigma = getImageSigma(tileMeta)
   const origin = getImageMedian(tileMeta)
   return {
@@ -304,10 +303,8 @@ function median(arr: number[]) {
   }
 }
 
-function getImageMedian(tileMeta: QuicklookMetadata) {
-  // TODO: revive
-  // @ts-ignore
-  const ccds = (tileMeta.ccd_meta ?? []).filter(ccd => typeof ccd.image_stat.median === 'number')
+function getImageMedian(tileMeta: QuicklookMetadataReady) {
+  const ccds = (tileMeta.ccd_metadata_list ?? []).filter(ccd => typeof ccd.image_stat.median === 'number')
   const medians = ccds.map(ccd => ccd.image_stat.median!)
   return median(medians)
 }

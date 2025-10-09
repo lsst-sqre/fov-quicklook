@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import delete, func, select
 
 from quicklook.config import config
-from quicklook.db import Access, Quicklook, get_session
+from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.object_storage import VisitObjectStorage
 from quicklook.types import VisitName
 
@@ -18,7 +18,7 @@ async def select_quicklook_to_delete() -> str | None:
     削除すべきquicklookを1つ選択する。
     最近1週間以内のアクセスが少ないもの順、それが同じならcreated_atが古いもの順。
     """
-    async with get_session() as session:
+    async with get_db_session() as session:
         one_week_ago = datetime.now() - timedelta(days=7)
         
         # 1週間以内のアクセス数をカウント
@@ -60,7 +60,7 @@ async def delete_one_quicklook(visit_name: str) -> int:
         削除されたdisk_usage（bytes）
     """
     # ready=falseに更新
-    async with get_session() as session:
+    async with get_db_session() as session:
         stmt = select(Quicklook).where(Quicklook.visit_name == visit_name)
         result = await session.execute(stmt)
         quicklook = result.scalar_one_or_none()
@@ -80,7 +80,7 @@ async def delete_one_quicklook(visit_name: str) -> int:
     logger.info(f"Deleted object storage data for {visit_name}")
     
     # DBエントリーを削除
-    async with get_session() as session:
+    async with get_db_session() as session:
         stmt = delete(Quicklook).where(Quicklook.visit_name == visit_name)
         await session.execute(stmt)
         await session.commit()
@@ -91,7 +91,7 @@ async def delete_one_quicklook(visit_name: str) -> int:
 
 async def get_total_disk_usage() -> int:
     """現在のobject storageの総使用量を取得（bytes）"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         stmt = select(func.sum(Quicklook.disk_usage)).where(Quicklook.ready == True)
         result = await session.execute(stmt)
         total = result.scalar()
@@ -140,7 +140,7 @@ async def cleanup_at_startup() -> None:
     起動時のクリーンアップ。
     ready=falseのquicklookエントリーを見つけて、関連データを削除する。
     """
-    async with get_session() as session:
+    async with get_db_session() as session:
         stmt = select(Quicklook.visit_name).where(Quicklook.ready == False)
         result = await session.execute(stmt)
         unready_visits = [row[0] for row in result.all()]

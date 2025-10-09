@@ -1,50 +1,23 @@
-import { useCallback, useEffect, useRef, useState, createContext, useContext, ReactNode } from "react"
-import { env } from "../../../env"
-import { useWebsocket } from "../../../hooks/useWebsocket"
-import { QuicklookStatus, useCreateQuicklookMutation, useShowQuicklookMetadataQuery } from "../../../store/api/openapi"
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef } from "react"
+import { useGetQuicklookMetadata_WS_Query } from "../../../store/api/base"
+import { QuicklookMetadata, useCreateQuicklookMutation } from "../../../store/api/openapi"
 import { useAppSelector } from "../../../store/hooks"
 
 type QuicklookContextType = {
-  status: QuicklookStatus | null
+  metadata: QuicklookMetadata | undefined
   ready: boolean
-  reconnect: () => void
 }
 
 const QuicklookContext = createContext<QuicklookContextType | undefined>(undefined)
 
-export function QuicklookStatusProvider({ children }: { children: ReactNode }) {
-  const [statusMap, setStatusMap] = useState<Record<string, QuicklookStatus | null>>({})
-  const currentId = useAppSelector(state => state.home.currentQuicklook)
-
-  // 準備完了の判定ロジックを単純化
-  const isReady = useCallback((id: string | undefined): boolean => {
-    // TODO: revive
-    return false
-    // if (!id) return false
-    // const currentStatus = statusMap[id]
-    // return (currentStatus?.phase ?? 0) >= 2
-  }, [statusMap])
-
-  const ready = isReady(currentId)
-
-  // WebSocketの設定
-  // const { reconnect } = useWebsocket({
-  //   path: `${env.baseUrl}/api/quicklooks/${currentId}/status.ws`,
-  //   onMessage: useCallback(e => {
-  //     if (currentId) {
-  //       const newStatus: QuicklookStatus | null = JSON.parse(e.data)
-  //       setStatusMap(prev => ({ ...prev, [currentId]: newStatus }))
-  //     }
-  //   }, [currentId]),
-  //   skip: !currentId || ready,
-  // })
-  const reconnect = () => { }
+export function QuicklookMetadataProvider({ children }: { children: ReactNode }) {
+  const visitName = useAppSelector(state => state.home.currentQuicklook)
+  const { data: metadata } = useGetQuicklookMetadata_WS_Query({ visitName: visitName! }, { skip: !visitName })
 
   // コンテキスト値を構築
   const contextValue: QuicklookContextType = {
-    status: currentId ? statusMap[currentId] : null,
-    ready,
-    reconnect,
+    metadata,
+    ready: metadata?.type === 'ready',
   }
 
   return (
@@ -63,29 +36,18 @@ function useQuicklookContext() {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function useQuicklookStatus() {
+export function useQuicklookMetadata() {
   const currentId = useAppSelector(state => state.home.currentQuicklook)
-  const { status, ready, reconnect } = useQuicklookContext()
+  const { metadata, ready } = useQuicklookContext()
   const changeCount = useRef(0)
-
-  // メタデータの取得
-  const {
-    data: metadata,
-    isFetching: isLoadingMetadata
-  } = useShowQuicklookMetadataQuery(
-    { visitName: currentId ?? '-' },
-    { skip: !ready }
-  )
 
   const [createQuicklook] = useCreateQuicklookMutation()
 
-  // Quicklook作成関数をシンプルに
   const initializeQuicklook = useCallback(async () => {
     if (currentId) {
       await createQuicklook({ createQuicklookRequest: { visit: currentId } })
-      reconnect()
     }
-  }, [createQuicklook, currentId, reconnect])
+  }, [createQuicklook, currentId])
 
   // 初期化
   useEffect(() => {
@@ -101,8 +63,7 @@ export function useQuicklookStatus() {
 
   return {
     id: currentId,
-    status,
-    metadata: ready && !isLoadingMetadata && metadata || undefined,
+    metadata,
     ready,
     changeCount: () => changeCount.current,
   }

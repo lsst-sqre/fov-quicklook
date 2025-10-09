@@ -1,4 +1,5 @@
 import contextlib
+import multiprocessing
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,7 +16,6 @@ from quicklook.job.job import Job
 
 ds = get_datasource()
 
-
 def generate_single_fits_tiles(
     job: Job,
     ref: CcdDataRef,
@@ -27,12 +27,11 @@ def generate_single_fits_tiles(
 
     try:
         with _bytes_to_file(data_bytes) as path:
-
             ppccd = preprocess_ccd(ref, path)
             yield progress.update()
-
-            generate_tiles(ppccd, job)
-            yield progress.update()
+        
+        generate_tiles(ppccd, job)
+        yield progress.update()
 
         job.local_storage.fits_header.save(ref, ppccd.headers)
 

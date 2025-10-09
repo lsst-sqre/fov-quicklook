@@ -8,7 +8,7 @@ from quicklook.comm.rpc import Rpc
 from quicklook.comm.types import GeneratorId
 from quicklook.config import config
 from quicklook.datasource import get_datasource
-from quicklook.db import Quicklook, get_session
+from quicklook.db import Quicklook, get_db_session
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate_single_fits_tiles
 from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_fits_headers import transfer_fits_headers
@@ -228,7 +228,7 @@ async def _transfer_fits_headers(job: Job) -> int:
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
-    await rpc_scatter(Rpc.create(transfer_fits_headers, job), stream=True, on_yield=on_yield)
+    # await rpc_scatter(Rpc.create(transfer_fits_headers, job), stream=True, on_yield=on_yield)
     return total_uploaded_size
 
 
@@ -257,7 +257,7 @@ async def _transfer_tiles(job: Job):
 
 async def _create_quicklook_record(job: Job):
     """DBにquicklookの初期レコードを作成（ready=False）"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         quicklook = Quicklook(
             visit_name=str(job.visit),
             job_id=job.id,
@@ -278,7 +278,7 @@ async def _finalize_success(result: _PipelineResult):
         job.status.stage = 'ready'
 
     # DBレコードを更新
-    async with get_session() as session:
+    async with get_db_session() as session:
         from sqlalchemy import update
 
         stmt = (
@@ -304,7 +304,7 @@ async def _finalize_error(job: Job):
     await job.object_storage.delete_all()
 
     # DBレコードも削除
-    async with get_session() as session:
+    async with get_db_session() as session:
         from sqlalchemy import delete
 
         stmt = delete(Quicklook).where(Quicklook.visit_name == str(job.visit))

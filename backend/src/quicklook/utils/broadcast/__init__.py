@@ -80,6 +80,7 @@ class Broadcast(Generic[T]):
                 item = await queue.get()
                 yield item
         except GeneratorExit:
+            # TODO: これで本当にfinallyが呼ばれるのか確認。
             raise
         finally:
             self._subscribers.remove(queue)
@@ -87,3 +88,4 @@ class Broadcast(Generic[T]):
     def last_value(self) -> T | None:
         if self._last_value is not NO_VALUE:
             return self._last_value  # type: ignore
+

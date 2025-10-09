@@ -17,28 +17,6 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/quicklooks/${queryArg.visitName}/fits_header/${queryArg.ccdName}`,
       }),
     }),
-    getAllQuicklookJobs: build.query<
-      GetAllQuicklookJobsApiResponse,
-      GetAllQuicklookJobsApiArg
-    >({
-      query: () => ({ url: `/api/quicklooks/*/status` }),
-    }),
-    showQuicklookStatus: build.query<
-      ShowQuicklookStatusApiResponse,
-      ShowQuicklookStatusApiArg
-    >({
-      query: (queryArg) => ({
-        url: `/api/quicklooks/${queryArg.visitName}/status`,
-      }),
-    }),
-    showQuicklookMetadata: build.query<
-      ShowQuicklookMetadataApiResponse,
-      ShowQuicklookMetadataApiArg
-    >({
-      query: (queryArg) => ({
-        url: `/api/quicklooks/${queryArg.visitName}/metadata`,
-      }),
-    }),
     createQuicklook: build.mutation<
       CreateQuicklookApiResponse,
       CreateQuicklookApiArg
@@ -47,6 +25,20 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/quicklooks`,
         method: "POST",
         body: queryArg.createQuicklookRequest,
+      }),
+    }),
+    getAllQuicklookJobs: build.query<
+      GetAllQuicklookJobsApiResponse,
+      GetAllQuicklookJobsApiArg
+    >({
+      query: () => ({ url: `/api/quicklooks/*/status` }),
+    }),
+    getQuicklookMetadata: build.query<
+      GetQuicklookMetadataApiResponse,
+      GetQuicklookMetadataApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/quicklook_metadata`,
       }),
     }),
     listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
@@ -77,6 +69,27 @@ const injectedRtkApi = api.injectEndpoints({
     getFitsFile: build.query<GetFitsFileApiResponse, GetFitsFileApiArg>({
       query: (queryArg) => ({
         url: `/api/quicklooks/${queryArg.visitName}/fits/${queryArg.ccdName}`,
+      }),
+    }),
+    listCacheEntries: build.query<
+      ListCacheEntriesApiResponse,
+      ListCacheEntriesApiArg
+    >({
+      query: () => ({ url: `/api/cache_entries` }),
+    }),
+    deleteAllCacheEntries: build.mutation<
+      DeleteAllCacheEntriesApiResponse,
+      DeleteAllCacheEntriesApiArg
+    >({
+      query: () => ({ url: `/api/cache_entries/*`, method: "DELETE" }),
+    }),
+    deleteCacheEntry: build.mutation<
+      DeleteCacheEntryApiResponse,
+      DeleteCacheEntryApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/cache_entries/${queryArg.visitName}`,
+        method: "DELETE",
       }),
     }),
     listStorageEntries: build.query<
@@ -136,23 +149,18 @@ export type GetFitsHeaderApiArg = {
   visitName: string;
   ccdName: string;
 };
-export type GetAllQuicklookJobsApiResponse =
-  /** status 200 Successful Response */ JobStatusList;
-export type GetAllQuicklookJobsApiArg = void;
-export type ShowQuicklookStatusApiResponse =
-  /** status 200 Successful Response */ QuicklookStatus | null;
-export type ShowQuicklookStatusApiArg = {
-  visitName: string;
-};
-export type ShowQuicklookMetadataApiResponse =
-  /** status 200 Successful Response */ QuicklookMetadata;
-export type ShowQuicklookMetadataApiArg = {
-  visitName: string;
-};
 export type CreateQuicklookApiResponse =
   /** status 200 Successful Response */ any;
 export type CreateQuicklookApiArg = {
   createQuicklookRequest: CreateQuicklookRequest;
+};
+export type GetAllQuicklookJobsApiResponse =
+  /** status 200 Successful Response */ JobStatusList;
+export type GetAllQuicklookJobsApiArg = void;
+export type GetQuicklookMetadataApiResponse =
+  /** status 200 Successful Response */ QuicklookMetadata;
+export type GetQuicklookMetadataApiArg = {
+  visitName: string;
 };
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitEntry[];
@@ -181,6 +189,17 @@ export type GetFitsFileApiResponse = /** status 200 Successful Response */ any;
 export type GetFitsFileApiArg = {
   visitName: string;
   ccdName: string;
+};
+export type ListCacheEntriesApiResponse =
+  /** status 200 Successful Response */ CacheEntry[];
+export type ListCacheEntriesApiArg = void;
+export type DeleteAllCacheEntriesApiResponse =
+  /** status 200 Successful Response */ any;
+export type DeleteAllCacheEntriesApiArg = void;
+export type DeleteCacheEntryApiResponse =
+  /** status 200 Successful Response */ any;
+export type DeleteCacheEntryApiArg = {
+  visitName: string;
 };
 export type ListStorageEntriesApiResponse =
   /** status 200 Successful Response */ Entry[];
@@ -216,6 +235,9 @@ export type HttpValidationError = {
 };
 export type CardType = [string, string, string, string];
 export type HeaderType = CardType[];
+export type CreateQuicklookRequest = {
+  visit: string;
+};
 export type Job = {
   visit: string;
   id?: string;
@@ -230,8 +252,10 @@ export type JobStatus = {
     | "queued"
     | "generate_single_fits_tiles"
     | "merge_tiles"
+    | "transfer_fits_headers"
     | "transfer_tiles"
-    | "done";
+    | "ready"
+    | "error";
   generate_single_fits_tiles?: {
     [key: string]: Progress;
   };
@@ -245,18 +269,50 @@ export type JobStatus = {
 export type JobStatusList = {
   [key: string]: JobStatus;
 };
-export type QuicklookStatus = {
-  id: string;
+export type ImageStat = {
+  median: number | null;
+  mad: number | null;
+  shape: number[];
 };
-export type QuicklookMetadata = {
-  id: string;
+export type BBox = {
+  miny: number;
+  maxy: number;
+  minx: number;
+  maxx: number;
+};
+export type AmpMetadata = {
+  amp_id: number;
+  bbox: BBox;
+};
+export type CcdMetadata = {
+  ccd_name: string;
+  image_stat: ImageStat;
+  amps: AmpMetadata[];
+  bbox: BBox;
+};
+export type QuicklookMetadataReady = {
+  visit_name: string;
+  ccd_metadata_list: CcdMetadata[];
   wcs: {
     [key: string]: any;
   };
+  type?: "ready";
 };
-export type CreateQuicklookRequest = {
-  visit: string;
+export type QuicklookMetadataProgress = {
+  visit_name: string;
+  progress: {
+    [key: string]: Progress;
+  };
+  type?: "progress";
 };
+export type QuicklookMetadataError = {
+  visit_name: string;
+  type?: "error";
+};
+export type QuicklookMetadata =
+  | QuicklookMetadataReady
+  | QuicklookMetadataProgress
+  | QuicklookMetadataError;
 export type VisitEntry = {
   id: string;
   day_obs: number;
@@ -276,6 +332,12 @@ export type DataSourceCcdMetadata = {
   day_obs: number;
   uuid: string;
 };
+export type CacheEntry = {
+  visit_name: string;
+  ready: boolean;
+  created_at: string;
+  disk_usage: number;
+};
 export type Entry = {
   name: string;
   type: "directory" | "file";
@@ -286,14 +348,16 @@ export const {
   useHealthzQuery,
   useGetTileQuery,
   useGetFitsHeaderQuery,
-  useGetAllQuicklookJobsQuery,
-  useShowQuicklookStatusQuery,
-  useShowQuicklookMetadataQuery,
   useCreateQuicklookMutation,
+  useGetAllQuicklookJobsQuery,
+  useGetQuicklookMetadataQuery,
   useListVisitsQuery,
   useGetVisitMetadataQuery,
   useGetExposureDataTypesQuery,
   useGetFitsFileQuery,
+  useListCacheEntriesQuery,
+  useDeleteAllCacheEntriesMutation,
+  useDeleteCacheEntryMutation,
   useListStorageEntriesQuery,
   useDeleteStorageEntryMutation,
   useDeleteStorageEntriesByPrefixMutation,

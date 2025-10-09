@@ -1,5 +1,3 @@
-from typing import Literal
-
 from pydantic import BaseModel
 
 from quicklook.job.shared_large_status import JobSharedLargeStatus
@@ -15,12 +13,10 @@ class CreateQuicklookRequest(BaseModel):
 
 
 class SharedStatusMessageJobStatusList(BaseModel):
-    type: Literal['job_status_list'] = 'job_status_list'
     data: JobStatusList
 
 
 class SharedStatusMessageJobSharedLargeStatus(BaseModel):
-    type: Literal['job_shared_large_status'] = 'job_shared_large_status'
     visit: VisitName
     data: JobSharedLargeStatus
 

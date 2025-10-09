@@ -12,7 +12,7 @@ function useQuicklookMetadata() {
 export function useWcs() {
   const metadata = useQuicklookMetadata()
   return useMemo(() => {
-    if (metadata) {
+    if (metadata?.type === 'ready') {
       return Tract.fromFitsHeader(metadata.wcs)
     }
   }, [metadata])
@@ -47,42 +47,40 @@ export function useFocusedCcd() {
   const [x, y] = useMouseCursorFocalPlaneCoord()
 
   return useMemo(() => {
-    // TODO: revive
-    // if (metadata && metadata.ccd_meta) {
-    //   for (const ccd of metadata.ccd_meta) {
-    //     const { ccd_id, bbox } = ccd
-    //     const [p1, p2, p3, p4] = [
-    //       [bbox.minx, bbox.miny],
-    //       [bbox.maxx, bbox.miny],
-    //       [bbox.maxx, bbox.maxy],
-    //       [bbox.minx, bbox.maxy],
-    //     ] as V2[]
-    //     if (includedInPolygon([x, y], [p1, p2, p3, p4])) {
-    //       return ccd
-    //     }
-    //   }
-    // }
+    if (metadata?.type === 'ready') {
+      for (const ccd of metadata.ccd_metadata_list) {
+        const { bbox } = ccd
+        const [p1, p2, p3, p4] = [
+          [bbox.minx, bbox.miny],
+          [bbox.maxx, bbox.miny],
+          [bbox.maxx, bbox.maxy],
+          [bbox.minx, bbox.maxy],
+        ] as V2[]
+        if (includedInPolygon([x, y], [p1, p2, p3, p4])) {
+          return ccd
+        }
+      }
+    }
   }, [metadata, x, y])
 }
 
 export function useFocusedAmp() {
-  // TODO: revive
-  // const focusedCcd = useFocusedCcd()
-  // const [x, y] = useMouseCursorFocalPlaneCoord()
+  const focusedCcd = useFocusedCcd()
+  const [x, y] = useMouseCursorFocalPlaneCoord()
 
-  // return useMemo(() => {
-  //   if (focusedCcd?.amps) {
-  //     for (const amp of focusedCcd.amps) {
-  //       const b = amp.bbox
-  //       if (includedInPolygon([x, y], [
-  //         [b.minx, b.miny],
-  //         [b.maxx, b.miny],
-  //         [b.maxx, b.maxy],
-  //         [b.minx, b.maxy]
-  //       ])) {
-  //         return amp
-  //       }
-  //     }
-  //   }
-  // }, [focusedCcd, x, y])
+  return useMemo(() => {
+    if (focusedCcd?.amps) {
+      for (const amp of focusedCcd.amps) {
+        const b = amp.bbox
+        if (includedInPolygon([x, y], [
+          [b.minx, b.miny],
+          [b.maxx, b.miny],
+          [b.maxx, b.maxy],
+          [b.minx, b.maxy]
+        ])) {
+          return amp
+        }
+      }
+    }
+  }, [focusedCcd, x, y])
 }

@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from quicklook.db import Base, Quicklook, Access, get_session
+from quicklook.db import Base, Quicklook, Access, get_db_session
 from quicklook.config import config
 
 

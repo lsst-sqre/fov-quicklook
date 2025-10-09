@@ -4,16 +4,15 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import astropy.io.fits as afits
-import mineo_fits_decompress
 import numpy
 
-from quicklook.config import config
 from quicklook.tileinfo import ccds_by_name
 from quicklook.types import CcdDataRef
 from quicklook.utils.fitsheader import HeaderType, fitsheader_to_list
 from quicklook.utils.geom import BBox
 from quicklook.utils.timeit import timeit
 
+from .fast_open_comressed_fits import fast_open_comressed_fits
 from .isr import bias_correction, parse_slice
 
 
@@ -96,11 +95,6 @@ def preprocess_ccd_raw(
             amps=assembly.amp_metas,
             headers=fitsheader_to_list(hdul),
         )
-
-
-def fast_open_comressed_fits(path: Path):
-    buf = mineo_fits_decompress.decompressed_bytes(path, config.fitsio_decompress_parallel)
-    return afits.HDUList.fromstring(buf)
 
 
 @dataclass

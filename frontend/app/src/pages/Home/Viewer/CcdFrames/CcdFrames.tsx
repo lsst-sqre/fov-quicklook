@@ -1,14 +1,15 @@
 import { useLayerBind } from "@stellar-globe/react-stellar-globe"
 import { Globe } from "@stellar-globe/stellar-globe"
 import React, { memo, useCallback, useEffect } from "react"
-import { useQuicklookStatus } from "../../context/quicklook"
+import { useQuicklookMetadata } from "../../context/quicklook"
 import { useFocusedAmp, useFocusedCcd, useWcs } from "../../hooks"
 import { BBoxLayer } from "./BBoxLayer"
 import { useAppSelector } from "../../../../store/hooks"
 
 
 const CcdFrameLayer$: React.FC = memo(() => {
-  const { metadata } = useQuicklookStatus()
+  const { metadata } = useQuicklookMetadata()
+
   const factory = useCallback((globe: Globe) => {
     const layer = new BBoxLayer(globe, [0, 0, 1, 0.2])
     return layer
@@ -18,8 +19,8 @@ const CcdFrameLayer$: React.FC = memo(() => {
 
   useEffect(() => {
     ifLayerReady(layer => {
-      if (metadata?.ccd_meta && wcs) {
-        layer.update(metadata.ccd_meta.map(r => r.bbox).flat(), wcs)
+      if (metadata?.type === 'ready' && wcs) {
+        layer.update(metadata.ccd_metadata_list.map(r => r.bbox).flat(), wcs)
       }
     })
   }, [ifLayerReady, metadata, wcs])
@@ -87,7 +88,7 @@ export const HighlitedCcds: React.FC = memo(() => {
     const layer = new BBoxLayer(globe, [1, 0, 1, 1])
     return layer
   }, [])
-  const { metadata } = useQuicklookStatus()
+  const { metadata } = useQuicklookMetadata()
   const { node, ifLayerReady } = useLayerBind<BBoxLayer>(factory, !!metadata)
   const ccds = useAppSelector(state => state.home.hilightedCcdId)
   const wcs = useWcs()

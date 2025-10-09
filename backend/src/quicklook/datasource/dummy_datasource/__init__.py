@@ -22,9 +22,10 @@ class DummyDataSource(DataSourceBase):
         ccds = [*_s3_list_visit_ccds(visit)]
         match config.environment:
             case 'test':
-                ccds = ccds[:4]
+                ccds = ccds[:40]
             case 'development':
-                ccds = ccds[:10]
+                ccds = ccds[:40]
+                # pass
         return ccds
 
     def get_data_sync(self, ref: CcdDataRef) -> bytes:

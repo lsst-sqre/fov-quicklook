@@ -162,13 +162,15 @@ class _SingleFitsTileStorage:
         return merged
 
     def iter_tiles(self):
-        for p in Path(f'{self.storage.base_dir}/tiles').iterdir():
-            if p.is_dir():  # pragma: no branch
-                for q in p.iterdir():
-                    if q.is_dir():  # pragma: no branch
-                        for r in q.iterdir():
-                            if r.is_dir():  # pragma: no branch
-                                yield TilePos(level=int(p.name), i=int(q.name), j=int(r.name))
+        tiles_dir = Path(f'{self.storage.base_dir}/tiles')
+        if tiles_dir.exists():
+            for p in tiles_dir.iterdir():
+                if p.is_dir():  # pragma: no branch
+                    for q in p.iterdir():
+                        if q.is_dir():  # pragma: no branch
+                            for r in q.iterdir():
+                                if r.is_dir():  # pragma: no branch
+                                    yield TilePos(level=int(p.name), i=int(q.name), j=int(r.name))
 
     def clear(self):
         shutil.rmtree(f'{self.storage.base_dir}/tiles', ignore_errors=True)

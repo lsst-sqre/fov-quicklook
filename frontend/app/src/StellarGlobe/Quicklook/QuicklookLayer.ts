@@ -1,7 +1,7 @@
 import { useLayerBind } from "@stellar-globe/react-stellar-globe"
 import { Globe, Layer, V2, View } from "@stellar-globe/stellar-globe"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
-import { QuicklookMetadata } from "../../store/api/openapi"
+import { QuicklookMetadata, QuicklookMetadataReady } from "../../store/api/openapi"
 import { QuicklookRenderer } from "./QuicklookTileRenderer"
 import { RubinImageFilterParams } from "./QuicklookTileRenderer/ImaegFilter"
 
@@ -11,7 +11,7 @@ class QuicklookLayer extends Layer {
 
   constructor(
     globe: Globe,
-    metadata: QuicklookMetadata,
+    metadata: QuicklookMetadataReady,
     filterParams: RubinImageFilterParams,
   ) {
     super(globe)
@@ -29,7 +29,7 @@ class QuicklookLayer extends Layer {
 
 type QuicklookProps = {
   visible?: boolean
-  metadata: QuicklookMetadata
+  metadata: QuicklookMetadataReady
   filterParams: RubinImageFilterParams
 }
 

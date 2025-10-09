@@ -7,7 +7,6 @@ GeneratorからのRegistration要求を受け付け、利用可能なGenerator�
 
 import asyncio
 import logging
-import traceback
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager

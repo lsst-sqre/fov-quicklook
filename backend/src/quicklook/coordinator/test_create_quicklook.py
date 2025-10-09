@@ -12,7 +12,7 @@ from sqlalchemy import delete
 
 from quicklook.config import config
 from quicklook.coordinator.create_quicklook import create_quicklook, quicklook_pipeline
-from quicklook.db import Access, Quicklook, get_session
+from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.dev.run_uvicorn import find_free_tcp_port, run_uvicorn_app
 from quicklook.job.job import Job
 from quicklook.job.status_printer import JobStatusPrinter
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.slow
 @pytest.fixture(scope='module', autouse=True)
 async def reset_db():
     """テスト開始時にquickloooksテーブルをリセット"""
-    async with get_session() as session:
+    async with get_db_session() as session:
         await session.execute(delete(Access))
         await session.execute(delete(Quicklook))
         await session.commit()

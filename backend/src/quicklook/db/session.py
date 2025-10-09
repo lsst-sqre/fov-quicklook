@@ -44,7 +44,7 @@ def get_session_maker() -> async_sessionmaker[AsyncSession]:
 
 
 @asynccontextmanager
-async def get_session() -> AsyncIterator[AsyncSession]:
+async def get_db_session() -> AsyncIterator[AsyncSession]:
     session_maker = get_session_maker()
     async with session_maker() as session:
         try:

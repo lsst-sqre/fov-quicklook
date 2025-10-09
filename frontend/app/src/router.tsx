@@ -7,6 +7,8 @@ import { Home } from './pages/Home'
 import { Layout } from './pages/Layout'
 import { AppStore } from './store'
 import { Dev } from './pages/Dev'
+import { CacheEntries } from './pages/admin/CacheEntries'
+import { StorageExplorer } from './pages/admin/StorageExplorer'
 
 
 export const AppRouter = () => {
@@ -24,6 +26,10 @@ export const AppRouter = () => {
         <Route path="config" element={<ConfigPage />} />
         <Route path="dev">
           <Route index element={<Dev />} />
+        </Route>
+        <Route path="admin">
+          <Route path="storage" element={<StorageExplorer />} />
+          <Route path="cache-entries" element={<CacheEntries />} />
         </Route>
       </Route>
     </Routes>

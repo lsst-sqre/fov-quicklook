@@ -11,6 +11,7 @@ import { CursorLine } from './CursorLine'
 import { Info } from './Info'
 import styles from './styles.module.scss'
 import { ViewerContextMenu } from './ViewerContextMenu'
+import { GenerateSingleFitsTilesVisualizer } from '../../../components/JobStatusVisualizer/JobStatusVisualizer'
 
 type ViewerProps = {
   style?: React.CSSProperties
@@ -54,7 +55,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
         <RollLayer$ />
         <TouchLayer$ />
         <PanLayer$ />
-        {currentQuicklook.metadata &&
+        {currentQuicklook.metadata?.type === 'ready' &&
           <Quicklook$
             ref={quicklookHandle}
             metadata={currentQuicklook.metadata}
@@ -70,10 +71,9 @@ export const Viewer = memo(({ style }: ViewerProps) => {
       </Globe$>
       <CursorLine />
       <Info />
-      {!!currentQuicklook.metadata || (
+      {currentQuicklook.metadata?.type === 'progress' && (
         <div className={styles.viewerBlock}>
-          {/* TODO: revive */}
-          {/* <GenerateProgress s={currentQuicklook.status} /> */}
+          <GenerateSingleFitsTilesVisualizer tiles={currentQuicklook.metadata.progress} />
         </div>
       )}
     </div>

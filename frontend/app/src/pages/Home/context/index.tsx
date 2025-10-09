@@ -2,14 +2,14 @@ import { GlobeHandle } from "@stellar-globe/react-stellar-globe"
 import { angle, SkyCoord } from "@stellar-globe/stellar-globe"
 import { createContext, FC, ReactNode, RefObject, useCallback, useContext, useRef } from "react"
 import { QuicklookLayerHandle } from "../../../StellarGlobe/Quicklook/QuicklookLayer"
-import { useQuicklookStatus } from "./quicklook"
+import { useQuicklookMetadata } from "./quicklook"
 // import { RubinTileHandle } from "./RubinTileLayer/RubinTileComponent"
 
 
 type ContextType = {
   globeHandle: RefObject<GlobeHandle>,
   quicklookLayerHandle: RefObject<QuicklookLayerHandle>,
-  currentQuicklook: ReturnType<typeof useQuicklookStatus>
+  currentQuicklook: ReturnType<typeof useQuicklookMetadata>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -23,7 +23,7 @@ type HomeContextProps = {
 // eslint-disable-next-line react-refresh/only-export-components
 function HomeContextProvider({ children }: HomeContextProps) {
   const globeHandle = useRef<GlobeHandle>(null)
-  const currentQuicklook = useQuicklookStatus()
+  const currentQuicklook = useQuicklookMetadata()
   const quicklookLayerHandle = useRef<QuicklookLayerHandle>(null)
 
   const context: ContextType = {

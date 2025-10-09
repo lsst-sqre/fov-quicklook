@@ -1,31 +1,8 @@
 ## 未完了タスク
 
-* [ ] coordinatorとfrontendの大きめのオブジェクトの共有方法の実装
-
-  主に`src/quicklook/coordinator/api/app.py`, `src/quicklook/coordinator/create_quicklook.py`, `src/quicklook/frontend/api/quicklooks.py`についての話である。
-  現在`JobStatus`のリストは頻繁に更新されるがサイズが小さいので全部の要素を毎回送っているが、大きい要素を含んでいるとこれは効率的ではない。
-  `JobStatus`には含まれないが`ccd_generator_map`と`ccd_metadata_list`はcoordinatorとfrontendの両方でリアルタイムで共有したい。
-
-  * これには`JobSharedLargeStatus`クラスを作り実現する。
-    * `JobStatus`を参考に。
-    * このクラスには`ccd_generator_map`と`ccd_metadata_list`を含める。
-    * `job.shared_large_status`でアクセスできるようにする
-  * `JobStatus`と同様に`JobWatcher`が通知に関して対応する。
-    * `Jobwatcher`に`asynccontextmanager notify_shared_large_status`をつくり、これがexitしたあとに`on_shared_large_status_change`で登録されたcallbackを呼び出す。
-  * coordinatorとfrontendの共有は現在の`JobStatusList`の共有の仕方を拡張して行う。
-    * `src/quicklook/coordinator/api/app.py`において
-      * 現在coordinatorでは`/quicklooks/*/status.ws`でfrontendに`JobStatusList`を通知している。
-      * このエンドポイントには`src/quicklook/frontend/api/quicklooks.py`の`quicklook_status_relay`が接続している。
-      * このエンドポイントを`/quicklooks/*/shared_status.ws`に変更し、`JobStatusList`の通知と`JobSharedLargeStatus`の通知を2種類をこの接続を通して行うこととする。
-      * ２種類の通知をするのでそれに対応したプロトコルにする
-      * `quicklook_status_relay`もこれに対応させ、名前も適したものに変更する。
-      * `JobSharedLargeStatus`の通知はjob単位で行う。frontendではこの通知を受け取ったら該当するjobの情報を更新する。
-        frontendでは古いエントリーは消していく（最大で`config.pipeline_queue_size*2`だけ保持する）。
-* [ ] `src/quicklook/coordinator/api/app.py::route_create_quicklook`でDBに対応するエントリーがない時だけpipelineにpushするようにする
-* [ ] `src/quicklook/frontend/api/quicklooks.py::{get_quicklook_status,websocket_quicklook_status}`の実装の修正
-  * DBに`ready=true`なエントリーがあるか調べる
-  * あれば`stage='ready'`な`JobStatus`を返す
-  * なければ`job_status_list`から取得し返す
+* [ ] 管理用画面
+  * キャッシュビューワー
+  * DBビューワー
 
 ## webappとの繋ぎ検討
 
@@ -35,7 +12,8 @@
   * createをリクエスト
   * statusをws でwatch
   * single fits tile generationが終わるまでは進捗表示
-  * 終わったらquicklook metadataの取得
+  * quicklook metadataは同じwebsocketから送られてくる
+    * 
   * それを使いtile表示
 
 * frontendの流れ
@@ -69,7 +47,32 @@
           frontendでは古いエントリーは消していく（最大で`config.pipeline_queue_size*2`だけ保持する）。
 
 # 完了タスク
+* [x] coordinatorとfrontendの大きめのオブジェクトの共有方法の実装
 
+  主に`src/quicklook/coordinator/api/app.py`, `src/quicklook/coordinator/create_quicklook.py`, `src/quicklook/frontend/api/quicklooks.py`についての話である。
+  現在`JobStatus`のリストは頻繁に更新されるがサイズが小さいので全部の要素を毎回送っているが、大きい要素を含んでいるとこれは効率的ではない。
+  `JobStatus`には含まれないが`ccd_generator_map`と`ccd_metadata_list`はcoordinatorとfrontendの両方でリアルタイムで共有したい。
+
+  * これには`JobSharedLargeStatus`クラスを作り実現する。
+    * `JobStatus`を参考に。
+    * このクラスには`ccd_generator_map`と`ccd_metadata_list`を含める。
+    * `job.shared_large_status`でアクセスできるようにする
+  * `JobStatus`と同様に`JobWatcher`が通知に関して対応する。
+    * `Jobwatcher`に`asynccontextmanager notify_shared_large_status`をつくり、これがexitしたあとに`on_shared_large_status_change`で登録されたcallbackを呼び出す。
+  * coordinatorとfrontendの共有は現在の`JobStatusList`の共有の仕方を拡張して行う。
+    * `src/quicklook/coordinator/api/app.py`において
+      * 現在coordinatorでは`/quicklooks/*/status.ws`でfrontendに`JobStatusList`を通知している。
+      * このエンドポイントには`src/quicklook/frontend/api/quicklooks.py`の`quicklook_status_relay`が接続している。
+      * このエンドポイントを`/quicklooks/*/shared_status.ws`に変更し、`JobStatusList`の通知と`JobSharedLargeStatus`の通知を2種類をこの接続を通して行うこととする。
+      * ２種類の通知をするのでそれに対応したプロトコルにする
+      * `quicklook_status_relay`もこれに対応させ、名前も適したものに変更する。
+      * `JobSharedLargeStatus`の通知はjob単位で行う。frontendではこの通知を受け取ったら該当するjobの情報を更新する。
+        frontendでは古いエントリーは消していく（最大で`config.pipeline_queue_size*2`だけ保持する）。
+* [x] `src/quicklook/coordinator/api/app.py::route_create_quicklook`でDBに対応するエントリーがない時だけpipelineにpushするようにする
+* [x] `src/quicklook/frontend/api/quicklooks.py::{get_quicklook_status,websocket_quicklook_status}`の実装の修正
+  * DBに`ready=true`なエントリーがあるか調べる
+  * あれば`stage='ready'`な`JobStatus`を返す
+  * なければ`job_status_list`から取得し返す
 * [x] `src/quicklook/coordinator/housekeeping/test_housekeeping.py`のリファクタリング
   * このテストが通りません。直してください。
   * テストを直すためにDBを完全にリセットして良いです。(`alembic_version`テーブルの削除も含め)
