@@ -2,10 +2,8 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
-import mineo_fits_decompress
-
 from quicklook.config import config
-from quicklook.generator.preprocess_ccd import fast_open_comressed_fits, preprocess_ccd
+from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.types import CcdDataRef, CcdName, VisitName
 from quicklook.utils.fits import preload_pyfits_compression_code
 from quicklook.utils.s3 import s3_download_object

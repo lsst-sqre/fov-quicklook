@@ -2,7 +2,6 @@ from setuptools import setup, find_namespace_packages
 from pathlib import Path
 
 base_path = Path(__file__).parent
-mineo_path = base_path / "lib" / "mineo-fits-decompress"
 
 install_requires = [
     'pytest~=8.4.0',
@@ -23,8 +22,6 @@ install_requires = [
     'websockets',
     'alembic',
     'asyncpg',
-    # f'mineo_fits_decompress @ file://{mineo_path.resolve()}',
-    # ↑コンテナの高速ビルドのため除外
 ]
 
 setup(

@@ -1,3 +1,9 @@
+## 今回のタスク
+
+* 高速FITSローダーの実装
+  * C言語拡張で実装
+  * 詳細は`src/quicklook/utils/fits_loader/README.md`を参照
+
 ## 未完了タスク
 
 * [ ] 省メモリ化
