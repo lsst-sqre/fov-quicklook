@@ -98,8 +98,8 @@ async def run_quicklook_pipeline():
             logger.info(f'Job for visit {visit} is already running')
             return
         job = Job(visit)
-        job.watcher.on_change_status(on_status_change, which=lambda s: s.stage)
         job.watcher.on_change_status(notify_progress)
+        job.watcher.on_change_status(on_status_change, which=lambda s: s.stage)
         job.watcher.on_shared_large_status_change(notify_shared_large_status)
         jobs[visit] = job
         if ph.full():
@@ -116,6 +116,7 @@ async def run_quicklook_pipeline():
         match job.status.stage:
             case 'ready':
                 del jobs[job.visit]
+                await notify_progress(job)
             case 'error':
                 asyncio.create_task(_cleanup_delay())
 

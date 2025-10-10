@@ -1,11 +1,11 @@
 import asyncio
-import quicklook.logging
 import os
 import pickle
 import re
 import signal
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Annotated, AsyncGenerator, Callable, Literal, TypeVar
 
 import websockets
@@ -13,14 +13,20 @@ from fastapi import APIRouter, Depends, FastAPI, WebSocket
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
+import quicklook.logging
 from quicklook.config import config
-from quicklook.coordinator.api.types import CreateQuicklookRequest, JobStatusList, SharedStatusMessage, SharedStatusMessageJobSharedLargeStatus, SharedStatusMessageJobStatusList
+from quicklook.coordinator.api.types import (
+    CreateQuicklookRequest,
+    JobStatusList,
+    SharedStatusMessage,
+    SharedStatusMessageJobSharedLargeStatus,
+    SharedStatusMessageJobStatusList,
+)
 from quicklook.db import Quicklook, get_db_session
 from quicklook.frontend.api.deps import dep_visit_name
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata
-from quicklook.job.job import Job
 from quicklook.job.shared_large_status import JobSharedLargeStatus
-from quicklook.job.status import JobStatus
+from quicklook.job.status import JobStage, JobStatus
 from quicklook.object_storage import VisitObjectStorage
 from quicklook.types import CcdName, Progress, VisitName
 from quicklook.utils.broadcast import Broadcast
@@ -119,13 +125,14 @@ async def websocket_quicklook_metadata(
                 await ws.send_json(type_adapter_QuicklookMetadata.dump_python(metadata))
                 return
 
-            # async for metadata in _yield_on_digest_change(
-            #     _get_quicklook_metadata_from_shared_status(visit),
-            #     json_digest,
-            # ):
-            #     await ws.send_json(type_adapter_QuicklookMetadata.dump_python(metadata))
-            async for metadata in _get_quicklook_metadata_from_shared_status(visit):
-                await ws.send_json(type_adapter_QuicklookMetadata.dump_python(metadata))
+            async for metadata_json in _yield_on_digest_change(
+                (
+                    type_adapter_QuicklookMetadata.dump_python(metadata)
+                    async for metadata in _get_quicklook_metadata_from_shared_status(visit)
+                ),
+                json_digest,
+            ):
+                await ws.send_json(metadata_json)
 
         await run_until_disconnect(ws, push())
 
@@ -133,7 +140,10 @@ async def websocket_quicklook_metadata(
 T = TypeVar('T')
 
 
-async def _yield_on_digest_change(g: AsyncGenerator, digest: Callable[[T], bytes]) -> AsyncGenerator[T, None]:
+async def _yield_on_digest_change(
+    g: AsyncGenerator,
+    digest: Callable[[T], bytes],
+) -> AsyncGenerator[T, None]:
     last_digest = None
     async for value in g:
         current_digest = digest(value)
@@ -161,17 +171,21 @@ async def _get_quicklook_metadata_from_db(visit: VisitName) -> QuicklookMetadata
 
 
 async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncGenerator[QuicklookMetadata, None]:
+    job_status = None
     async for jobs in _job_status_dict.subscribe():
-        job_status = jobs.get(visit)
+        # TODO: refactoring
+        # タイル生成jobが完了すると即座にjobsからエントリーが消える
+        # その場合はQuicklookMetadataReadyを返したいので。
+        job_status = jobs.get(visit, job_status)
         match job_status:
             case None:
-                yield QuicklookMetadataProgress(visit, progress={})
+                yield QuicklookMetadataProgress(visit_name=visit, progress={})
             case JobStatus(stage='queued' | 'generate_single_fits_tiles'):
                 yield QuicklookMetadataProgress(
                     visit_name=visit,
                     progress=job_status.generate_single_fits_tiles,
                 )
-            case JobStatus(stage='merge_tiles' | 'transfer_fits_headers' | 'transfer_tiles' | 'ready'):
+            case JobStatus(stage='merge_tiles' | 'upload_to_object_storage' | 'ready'):
                 yield QuicklookMetadataReady(
                     visit_name=visit,
                     ccd_metadata_list=_job_shared_large_status_dict[visit].ccd_metadata_list,
@@ -179,12 +193,36 @@ async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncG
                 )
             case JobStatus(stage='error'):
                 yield QuicklookMetadataError(visit_name=visit)
-            case _:
+            case _:  # pragma: no cover
                 raise ValueError(f"Unknown job status stage: {job_status.stage}")
 
 
 _job_shared_large_status_dict: dict[VisitName, JobSharedLargeStatus] = {}
 _job_status_dict = Broadcast[JobStatusList](max_queue_size=2)
+
+
+@dataclass
+class QuicklookSharedStatus:
+    visit_name: VisitName
+
+    @cached_property
+    def job_status(self) -> JobStatus | None:
+        jobs = _job_status_dict.last_value()
+        if jobs and (job_status := jobs[self.visit_name]):
+            return job_status
+
+    @cached_property
+    def job(self):
+        if self.job_status:
+            return self.job_status.job
+
+    @cached_property
+    def _large_status(self) -> JobSharedLargeStatus | None:
+        return _job_shared_large_status_dict.get(self.visit_name)
+
+    @cached_property
+    def dist_config(self):
+        return self._large_status.dist_config if self._large_status else None
 
 
 @asynccontextmanager

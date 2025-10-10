@@ -54,8 +54,8 @@ def _iter_primary_pos(job: Job):
     storage = job.local_storage
     for pos in storage.single_fits_tile.iter_tiles():
         try:
-            ga = GeneratorAssignment(job, pos)
-            primary_generator_id = ga.primary_generator_id()
+            ga = GeneratorAssignment.from_job_and_pos(job, pos)
+            primary_generator_id = ga.primary_generator_id
         except NoGeneratorFoundError:  # pragma: no cover
             continue
         if primary_generator_id == self_generator_id():
@@ -71,7 +71,7 @@ class _ProcessTileArgs:
 def _process_tile(args: _ProcessTileArgs):
     storage = args.job.local_storage
     dist_config = storage.ccd_distribution_config.load()
-    ga = GeneratorAssignment(args.job, args.pos)
+    ga = GeneratorAssignment(args.pos, dist_config)
 
     internal_ccd_names: list[CcdName] = []
     external_generators: set[GeneratorInfo] = set()

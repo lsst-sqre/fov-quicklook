@@ -64,7 +64,7 @@ class Config(BaseSettings):
     frontend_port: int = 9500
     generator_port: int = 9502
     coordinator_base_url: str = 'http://localhost:9501'
-    comm_heartbeat_interval: int = 10  # seconds
+    comm_heartbeat_interval: int = 5  # seconds
     comm_heartbeat_timeout: int = 2  # seconds
     comm_registration_interval: int = 10  # seconds
     rpc_timeout_total: float = 600  # seconds

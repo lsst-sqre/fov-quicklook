@@ -4,6 +4,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from math import prod
 from pathlib import Path
+from tempfile import TemporaryFile
 from typing import Any, ClassVar
 
 import numpy
@@ -97,11 +98,16 @@ class FastHdu:
         if spec is None:
             return None
         if self._data is None:
-            array = numpy.frombuffer(spec.view, dtype=spec.dtype)
-            if spec.shape:
-                array = array.reshape(spec.shape)
-            if spec.needs_scaling:
-                array = numpy.asarray(array, dtype=numpy.float32) * float(spec.bscale) + float(spec.bzero)
+            # Handle empty arrays or arrays with itemsize=0
+            if len(spec.view) == 0 or spec.dtype.itemsize == 0:
+                # Create an empty array with the specified dtype and shape
+                array = numpy.empty(spec.shape, dtype=spec.dtype)
+            else:
+                array = numpy.frombuffer(spec.view, dtype=spec.dtype)
+                if spec.shape:
+                    array = array.reshape(spec.shape)
+                if spec.needs_scaling:
+                    array = numpy.asarray(array, dtype=numpy.float32) * float(spec.bscale) + float(spec.bzero)
             self._data = array
         return self._data
 
@@ -183,6 +189,20 @@ class FitsParser:
         naxis = int(header.get('NAXIS', 0))
         if naxis == 0 or bitpix == 0:
             return None
+
+        xtension = str(header.get('XTENSION', '')).strip().upper()
+
+        # Skip BINTABLE and TABLE extensions (not image data)
+        if xtension in {'BINTABLE', 'TABLE'}:
+            axes = [int(header[f'NAXIS{i}']) for i in range(1, naxis + 1)]
+            nelem = prod(axes)
+            pcount = int(header.get('PCOUNT', 0))
+            gcount = int(header.get('GCOUNT', 1))
+            raw_bytes = pcount + nelem * gcount
+            self._offset += raw_bytes + (-raw_bytes % BLOCK_SIZE)
+            return None
+
+        # Regular IMAGE extension
         axes = [int(header[f'NAXIS{i}']) for i in range(1, naxis + 1)]
         nelem = prod(axes)
         pcount = int(header.get('PCOUNT', 0))
@@ -198,10 +218,6 @@ class FitsParser:
         raw_end = data_start + raw_bytes
         data_view = self._view[data_start:data_end]
         self._offset = raw_end + (-raw_bytes % BLOCK_SIZE)
-
-        xtension = str(header.get('XTENSION', '')).strip().upper()
-        if xtension in {'BINTABLE', 'TABLE'}:
-            return None
 
         dtype = numpy.dtype(dtype_code)
         shape: tuple[int, ...] = ()
@@ -232,7 +248,55 @@ class FitsParser:
 
 def fast_open_comressed_fits(path: Path) -> FastHDUList:
     buf = mineo_fits_decompress.decompressed_bytes(path, config.fitsio_decompress_parallel)
-    # import astropy.io.fits as pyfits
-    # return pyfits.HDUList.fromstring(buf)
-    parser = FitsParser(buf)
-    return parser.parse()
+
+    # For compressed FITS (tile-compressed), we need to use astropy
+    # to handle the decompression properly
+    import astropy.io.fits as pyfits
+    import io
+
+    # First, quickly check if this FITS contains compressed HDUs (BINTABLE with ZIMAGE)
+    # by scanning the first few HDU headers
+    has_compressed_hdu = b'ZIMAGE' in buf[:100000]  # Quick heuristic check
+
+    if has_compressed_hdu:
+        # Use astropy for compressed FITS
+        # Note: This creates a view, not a copy, so memory usage is reasonable
+        astropy_hdul = pyfits.open(io.BytesIO(buf), memmap=False, lazy_load_hdus=False)
+
+        # Convert astropy HDUs to FastHdu
+        hdus: list[FastHdu] = []
+        for hdu in astropy_hdul:
+            # Get the cards from astropy HDU
+            cards: list[Card] = [Card.fromstring(str(card)) for card in hdu.header.cards]  # type: ignore
+
+            # Create DataSpec if data exists
+            data_spec: DataSpec | None = None
+            if hdu.data is not None:  # type: ignore
+                # Create a memoryview from the numpy array's buffer
+                # This avoids copying the data
+                data_array: numpy.ndarray = numpy.asarray(hdu.data)  # type: ignore
+
+                # For empty arrays or arrays with itemsize=0, use an empty memoryview
+                if data_array.size == 0 or data_array.dtype.itemsize == 0:
+                    data_view = memoryview(b'')
+                else:
+                    data_bytes = data_array.tobytes()
+                    data_view = memoryview(data_bytes)
+
+                data_spec = DataSpec(
+                    view=data_view,
+                    dtype=data_array.dtype,
+                    shape=data_array.shape,
+                    bscale=1.0,
+                    bzero=0.0,
+                )
+
+            fast_hdu = FastHdu(name=hdu.name, cards=cards, data_spec=data_spec)  # type: ignore
+            hdus.append(fast_hdu)
+
+        astropy_hdul.close()
+        return FastHDUList(buf, hdus)
+    else:
+        # Use fast parser for uncompressed FITS
+        parser = FitsParser(buf)
+        return parser.parse()

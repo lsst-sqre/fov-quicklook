@@ -74,7 +74,7 @@ def route_get_single_fits_tile(
 ):
     return fastapi.Response(
         ndarray2npybytes(job.local_storage.single_fits_tile.load_local_merged(tile_pos)),
-        media_type='application/octet-stream',
+        media_type='application/npy',
     )
 
 
@@ -87,4 +87,4 @@ def route_get_merged_tile(
         data_bytes = job.local_storage.merged_fits_tile.load_compressed_data(tile_pos)
     except FileNotFoundError:  # pragma: no cover
         raise fastapi.HTTPException(status_code=404)
-    return fastapi.Response(data_bytes, media_type='application/octet-stream')
+    return fastapi.Response(data_bytes, media_type='application/npy+zstd')

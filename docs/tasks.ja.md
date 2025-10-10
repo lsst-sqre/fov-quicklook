@@ -1,8 +1,12 @@
 ## 未完了タスク
 
-* [ ] 管理用画面
-  * キャッシュビューワー
-  * DBビューワー
+* [ ] 省メモリ化
+* [ ] ページを離れた時にwaiting_userを減らす
+* [ ] generatorへの接続を使い回す
+  * src/quicklook/frontend/api/get_tile.py
+  * life_spanで接続オブジェクトを作る
+  * retryを考慮
+    * src/quicklook/generator/retry_on_error.py
 
 ## webappとの繋ぎ検討
 
@@ -13,7 +17,6 @@
   * statusをws でwatch
   * single fits tile generationが終わるまでは進捗表示
   * quicklook metadataは同じwebsocketから送られてくる
-    * 
   * それを使いtile表示
 
 * frontendの流れ
@@ -24,6 +27,8 @@
     * stageを監視し、generate_single_fits_tiles以降になるのを待つ
     * quicklook_metadataを取得
     * tile表示
+
+* タイル生成時エラーハンドリング
 
 * 検討事項
   * coordinatorとfrontendの大きめのオブジェクトの共有方法
@@ -47,6 +52,9 @@
           frontendでは古いエントリーは消していく（最大で`config.pipeline_queue_size*2`だけ保持する）。
 
 # 完了タスク
+* [x] 管理用画面
+  * キャッシュビューワー
+  * DBビューワー
 * [x] coordinatorとfrontendの大きめのオブジェクトの共有方法の実装
 
   主に`src/quicklook/coordinator/api/app.py`, `src/quicklook/coordinator/create_quicklook.py`, `src/quicklook/frontend/api/quicklooks.py`についての話である。

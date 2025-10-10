@@ -57,9 +57,9 @@ def _process_packed_tile(args: ProcessPackedTileArgs):
     # オブジェクトストレージにアップロードする
 
     def get_merged_tile(pos: TilePos) -> bytes | None:
-        ga = GeneratorAssignment(job, pos)
+        ga = GeneratorAssignment.from_job_and_pos(job, pos)
         try:
-            primary_generator_id = ga.primary_generator_id()
+            primary_generator_id = ga.primary_generator_id
         except NoGeneratorFoundError:
             return
 

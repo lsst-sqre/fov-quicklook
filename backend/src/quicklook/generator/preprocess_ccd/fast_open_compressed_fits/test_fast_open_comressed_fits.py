@@ -10,7 +10,7 @@ import pytest
 
 import mineo_fits_decompress
 
-from quicklook.generator.preprocess_ccd.fast_open_comressed_fits import FastHdu, fast_open_comressed_fits
+from .fast_open_comressed_fits import FastHdu, fast_open_comressed_fits
 from quicklook.utils.fitsheader import fitsheader_to_list
 
 

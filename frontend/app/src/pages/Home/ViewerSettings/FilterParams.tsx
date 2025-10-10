@@ -284,9 +284,9 @@ function autoBarMinMax(qlmeta: QuicklookMetadataReady) {
   return [min - n * maxSigma, max + n * maxSigma]
 }
 
-function autoMinMax(tileMeta: QuicklookMetadataReady, contrast: number, bias: number) {
-  const sigma = getImageSigma(tileMeta)
-  const origin = getImageMedian(tileMeta)
+function autoMinMax(qlmetadata: QuicklookMetadataReady, contrast: number, bias: number) {
+  const sigma = getImageSigma(qlmetadata)
+  const origin = getImageMedian(qlmetadata)
   return {
     min: origin - bias * sigma - sigma / (2 * contrast),
     max: origin - bias * sigma + sigma / (2 * contrast),
@@ -309,10 +309,8 @@ function getImageMedian(tileMeta: QuicklookMetadataReady) {
   return median(medians)
 }
 
-function getImageSigma(tileMeta: QuicklookMetadata) {
-  // TODO: revive
-  // @ts-ignore
-  const ccds = (tileMeta.ccd_meta ?? []).filter(ccd => typeof ccd.image_stat.median === 'number')
+function getImageSigma(tileMeta: QuicklookMetadataReady) {
+  const ccds = (tileMeta.ccd_metadata_list ?? []).filter(ccd => typeof ccd.image_stat.median === 'number')
   const minMad = Math.min(...ccds.map(ccd => ccd.image_stat.mad!))
   const maxMad = Math.max(...ccds.map(ccd => ccd.image_stat.mad!))
   const mad = Math.max(...ccds.map(ccd => ccd.image_stat.mad!))

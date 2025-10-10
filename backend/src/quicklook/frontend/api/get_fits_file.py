@@ -17,5 +17,5 @@ async def get_fits_file(
     ccd_data_ref: Annotated[CcdDataRef, Depends(dep_ccd_data_ref)],
 ):
     ds = get_datasource()
-    data = ds.get_data(ccd_data_ref)
+    data = await ds.get_data(ccd_data_ref)
     return Response(content=data, media_type='image/fits')

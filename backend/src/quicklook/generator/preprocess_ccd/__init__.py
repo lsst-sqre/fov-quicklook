@@ -1,3 +1,4 @@
+import astropy.io.fits as pyfits
 import functools
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,7 +13,6 @@ from quicklook.utils.fitsheader import HeaderType, fitsheader_to_list
 from quicklook.utils.geom import BBox
 from quicklook.utils.timeit import timeit
 
-from .fast_open_comressed_fits import fast_open_comressed_fits
 from .isr import bias_correction, parse_slice
 
 
@@ -35,7 +35,7 @@ def preprocess_ccd_calexp(
 ) -> 'PreProcessedCcd':
     ccd_name = ccd_ref.ccd_name
     with timeit(f'preprocess-{ccd_ref.fullname}'):
-        hdul = fast_open_comressed_fits(path)
+        hdul = pyfits.open(path, memmap=False)
         # header = hdul[0].header  # type: ignore
         # assert ccd_name == f'{header["RAFTNAME"]}_{header["SENSNAME"]}'
         bbox = ccds_by_name()[ccd_name].bbox
@@ -80,7 +80,7 @@ def preprocess_ccd_raw(
 ) -> 'PreProcessedCcd':
     ccd_name = ccd_ref.ccd_name
     with timeit(f'preprocess-{ccd_ref.fullname}'):
-        hdul = fast_open_comressed_fits(path)
+        hdul = pyfits.open(path, memmap=False)
         header = hdul[0].header  # type: ignore
         assert ccd_name == f'{header["RAFTBAY"]}_{header["CCDSLOT"]}'
         amps = [RawAmp.from_hdu(j, hdu) for j, hdu in enumerate(hdul) if hdu.name.startswith('Segment')]  # type: ignore

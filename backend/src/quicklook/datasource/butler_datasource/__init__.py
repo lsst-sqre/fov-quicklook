@@ -1,4 +1,5 @@
-from functools import cache
+import threading
+from functools import cache, lru_cache
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 from venv import logger
 
@@ -32,21 +33,21 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         chown_pgpassfile()
 
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
-        return get_datasource(q.data_type).query_visits(q)
+        return _get_datasource(q.data_type).query_visits(q)
 
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
-        return get_datasource(visit.data_type).list_ccds(visit)
+        return _get_datasource(visit.data_type).list_ccds(visit)
 
     def get_data_sync(self, ref: CcdDataRef) -> bytes:
-        return get_datasource(ref.visit.data_type).get_data(ref)
+        return _get_datasource(ref.visit.data_type).get_data(ref)
 
     def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
-        return get_datasource(ref.visit.data_type).get_metadata(ref)
+        return _get_datasource(ref.visit.data_type).get_metadata(ref)
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         types: list[CcdDataType] = []
         for data_type in cast(list[CcdDataType], ['raw', 'post_isr_image', 'preliminary_visit_image']):
-            datasource = get_datasource(data_type)
+            datasource = _get_datasource(data_type)
             if datasource.exposure_exists(exposure_id):
                 types.append(data_type)
         return types
@@ -146,7 +147,9 @@ class DataTypeSpecificDataSource:
             where=f"{self.data_id_key}={ref.visit.name} and detector={detector_id}",
         )
         if len(butler_refs) != 1:
-            raise ValueError(f"Cannot find unique dataset for {ref.visit.name} and detector {detector_id}. found {len(butler_refs)} matches")
+            raise ValueError(
+                f"Cannot find unique dataset for {ref.visit.name} and detector {detector_id}. found {len(butler_refs)} matches"
+            )
         butler_ref = butler_refs[0]
         return DataSourceCcdMetadata(
             detector=detector_id,
@@ -190,8 +193,17 @@ class PreliminaryVisitImageDataSource(DataTypeSpecificDataSource):
     partial = True
 
 
-@cache
-def get_datasource(data_type: CcdDataType) -> DataTypeSpecificDataSource:
+def _get_datasource(data_type: CcdDataType) -> DataTypeSpecificDataSource:
+    thread_id = threading.get_ident()
+    return _get_datasource_cache(data_type, thread_id=thread_id)
+
+
+@lru_cache(64)
+def _get_datasource_cache(data_type: CcdDataType, thread_id: int) -> DataTypeSpecificDataSource:
+    return _get_datasource_no_cache(data_type)
+
+
+def _get_datasource_no_cache(data_type: CcdDataType) -> DataTypeSpecificDataSource:
     match data_type:
         case 'raw':
             return RawDataSource()

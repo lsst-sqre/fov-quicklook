@@ -40,6 +40,10 @@ dev/coordinator:
 dev/generator:
 	./.venv/bin/uvicorn --reload quicklook.generator.api.app:app --port 9502 --no-access-log --reload-dir src
 
+ .PHONY: dev/generator2
+dev/generator2:
+	QUICKLOOK_generator_port=9600 ./.venv/bin/uvicorn --reload quicklook.generator.api.app:app --port 9600 --no-access-log --reload-dir src
+
 .PHONY: dev/frontend
 dev/frontend:
 	./.venv/bin/uvicorn --reload quicklook.frontend.api.app:app --port 9500 --no-access-log --reload-dir src

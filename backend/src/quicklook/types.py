@@ -18,8 +18,8 @@ class VisitName(str):
         return parts
 
     @property
-    def data_type(self) -> str:
-        return self._parts()[-2]
+    def data_type(self) -> CcdDataType:
+        return self._parts()[-2]  # type: ignore
 
     @property
     def name(self) -> str:

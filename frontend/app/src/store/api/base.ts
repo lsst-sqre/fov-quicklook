@@ -43,7 +43,6 @@ export const baseApi = createApi({
           await cacheDataLoaded
 
           const listener = (event: MessageEvent) => {
-            console.log(event.data)
             const data = JSON.parse(event.data) as QuicklookMetadata
             updateCachedData(() => data)
           }

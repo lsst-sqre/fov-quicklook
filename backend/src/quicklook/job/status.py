@@ -5,7 +5,7 @@ from quicklook.comm.types import GeneratorId
 from quicklook.job.job import Job
 from quicklook.types import CcdName, Progress
 
-JobStage = Literal['queued', 'generate_single_fits_tiles', 'merge_tiles', 'transfer_fits_headers', 'transfer_tiles', 'ready', 'error']
+JobStage = Literal['queued', 'generate_single_fits_tiles', 'merge_tiles', 'upload_to_object_storage', 'ready', 'error']
 
 
 @dataclass

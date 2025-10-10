@@ -3,7 +3,7 @@ import { MenuDivider, MenuItem } from "@szhsin/react-menu"
 import { Fragment, useCallback, useMemo, useRef } from "react"
 import { MaterialSymbol } from "../../../../components/MaterialSymbol"
 import { env } from "../../../../env"
-import {  useGetSystemInfoQuery, useGetVisitMetadataQuery } from "../../../../store/api/openapi"
+import { CcdMetadata, useGetVisitMetadataQuery } from "../../../../store/api/openapi"
 import { CopyTemplate } from "../../../../store/features/copyTemplateSlice"
 import { homeSlice } from "../../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../../store/hooks"
@@ -13,63 +13,68 @@ import { useFocusedCcd } from "../../hooks"
 import { ContextMenuWithClickedCoord } from "./ContextMenuWithClickedCoord"
 import { interpoateText } from "./interpoateText"
 
-type CcdMeta = any
 
 export function ViewerContextMenu() {
   const focusedCcd = useFocusedCcd()
-  const ccdMetaAtOpen = useRef<CcdMeta>()
+  const CcdMetadataAtOpen = useRef<CcdMetadata>()
 
   return (
     <ContextMenuWithClickedCoord
-      render={openedAt => <ContextMenuAtPosition openedAt={openedAt} ccdMeta={ccdMetaAtOpen.current} />}
-      onOpen={() => ccdMetaAtOpen.current = focusedCcd}
+      render={openedAt => <ContextMenuAtPosition openedAt={openedAt} CcdMetadata={CcdMetadataAtOpen.current} />}
+      onOpen={() => CcdMetadataAtOpen.current = focusedCcd}
     />
   )
 }
 
+function useVisit() {
+  const currentId = useAppSelector(state => state.home.currentQuicklook)
+  if (currentId === undefined) {
+    throw new Error("No current quicklook")
+  }
+  return currentId
+}
 
-function ContextMenuAtPosition({ ccdMeta }: { openedAt: SkyCoord, ccdMeta: CcdMeta | undefined }) {
+
+
+function ContextMenuAtPosition({ CcdMetadata }: { openedAt: SkyCoord, CcdMetadata: CcdMetadata | undefined }) {
   const dispatch = useAppDispatch()
+  const visit = useVisit()
 
-  const openHeaerPage = useCallback(() => {
-    if (ccdMeta) {
-      const visit = ccdMeta.ccd_id.visit
-      const visitId = `${visit.id}`
-      window.open(`${env.baseUrl}/header/${visitId}/${ccdMeta.ccd_id.ccd_name}`)
+  const openHeaderPage = useCallback(() => {
+    if (CcdMetadata) {
+      window.open(`${env.baseUrl}/header/${visit}/${CcdMetadata.ccd_name}`)
     }
-  }, [ccdMeta])
+  }, [CcdMetadata])
 
   const downloadThisFitsFile = useCallback(() => {
-    if (ccdMeta) {
-      const { id } = ccdMeta.ccd_id.visit
-      const fitsUrl = `${env.baseUrl}/api/quicklooks/${id}/fits/${ccdMeta.ccd_id.ccd_name}`
-      download(fitsUrl, `${id}-${ccdMeta.ccd_id.ccd_name}.fits`)
+    if (CcdMetadata) {
+      const fitsUrl = `${env.baseUrl}/api/quicklooks/${visit}/fits/${CcdMetadata.ccd_name}`
+      download(fitsUrl, `${visit}-${CcdMetadata.ccd_name}.fits`)
     }
-  }, [ccdMeta])
+  }, [CcdMetadata])
 
   const toggleHighlight = useCallback(() => {
-    if (ccdMeta) {
-      const { ccd_id } = ccdMeta
-      dispatch(homeSlice.actions.toggleHighlightCcd(ccd_id.ccd_name))
+    if (CcdMetadata) {
+      dispatch(homeSlice.actions.toggleHighlightCcd(CcdMetadata.ccd_name))
     }
-  }, [ccdMeta, dispatch])
+  }, [CcdMetadata, dispatch])
 
   return (
     <Fragment>
-      {ccdMeta &&
-        <TemplateMenus ccdMeta={ccdMeta} />
+      {CcdMetadata &&
+        <TemplateMenus CcdMetadata={CcdMetadata} />
       }
       <MenuDivider />
-      <MenuItem disabled={!ccdMeta} onClick={toggleHighlight}>
+      <MenuItem disabled={!CcdMetadata} onClick={toggleHighlight}>
         <MenuIcon symbol="star" />
         Toggle Highlight
       </MenuItem>
-      <MenuItem disabled={!ccdMeta} onClick={openHeaerPage}>
+      <MenuItem disabled={!CcdMetadata} onClick={openHeaderPage}>
         <MenuIcon symbol="open_in_new" />
         Show FITS Header
       </MenuItem>
       <MenuDivider />
-      <MenuItem disabled={!ccdMeta} onClick={downloadThisFitsFile}>
+      <MenuItem disabled={!CcdMetadata} onClick={downloadThisFitsFile}>
         <MenuIcon symbol="download" />
         Download this FITS File
       </MenuItem>
@@ -87,19 +92,20 @@ function MenuIcon({ symbol }: { symbol: Parameters<typeof MaterialSymbol>[0]['sy
 }
 
 
-function TemplateMenus({ ccdMeta }: { ccdMeta: CcdMeta }) {
+function TemplateMenus({ CcdMetadata }: { CcdMetadata: CcdMetadata }) {
   const templates = useAppSelector(state => state.copyTemplate.templates)
 
   return (
     <>
-      {templates.map((t) => <TemplateMenu key={t.name} template={t} ccdMeta={ccdMeta} />)}
+      {templates.map((t) => <TemplateMenu key={t.name} template={t} CcdMetadata={CcdMetadata} />)}
     </>
   )
 }
 
 
-function TemplateMenu({ template, ccdMeta }: { template: CopyTemplate, ccdMeta: CcdMeta }) {
-  const { data: metadata } = useGetVisitMetadataQuery({ visitName: ccdMeta.ccd_id.visit.id, ccdName: ccdMeta.ccd_id.ccd_name })
+function TemplateMenu({ template, CcdMetadata }: { template: CopyTemplate, CcdMetadata: CcdMetadata }) {
+  const visit = useVisit()
+  const { data: metadata } = useGetVisitMetadataQuery({ visitName: visit, ccdName: CcdMetadata.ccd_name })
 
   const text = useMemo(() => {
     if (!metadata) return 'Loading...'

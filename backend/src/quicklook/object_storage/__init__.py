@@ -52,7 +52,7 @@ def delete_objects_by_prefix(prefix: str) -> None:
     s3_delete_objects_with_prefix(config.s3_tile, f'{config.s3_tile_key_prefix}{prefix}')
 
 
-@dataclass
+@dataclass(frozen=True)
 class VisitObjectStorage:
     visit: VisitName
 
@@ -74,7 +74,7 @@ class VisitObjectStorage:
     def get_quicklook_tile_bytes_sync(self, pos: TilePos) -> bytes | None:
         packed_pos = PackedTilePos.from_unpacked(pos)
         packed = self.get_packed_tile_array_sync(packed_pos)
-        index = packed_pos.index(packed_pos.i, packed_pos.j)
+        index = packed_pos.index(pos.i, pos.j)
         return packed[index]
 
     def _put_sync(self, key: str, value: bytes) -> int:
