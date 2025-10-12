@@ -1,0 +1,168 @@
+import asyncio
+
+import pytest
+
+from quicklook.rpc import Rpc, RpcQueue, RpcRemoteError, create_rpc_endpoint, rpc_lifespan
+from fastapi import FastAPI, WebSocket
+import uvicorn
+
+
+def simple_function(x: int, y: int) -> int:
+    """シンプルな関数"""
+    return x + y
+
+
+def generator_function(n: int):
+    """ジェネレータ関数"""
+    for i in range(n):
+        yield i
+
+
+def error_function():
+    """エラーを発生させる関数"""
+    raise ValueError("Test error")
+
+
+async def async_function():
+    """非同期関数（サポートされない）"""
+    await asyncio.sleep(0.1)
+    return "async result"
+
+
+def queue_consumer_function(q) -> list[int]:
+    """キューから値を受け取る関数"""
+    results = []
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        results.append(item * 2)
+    return results
+
+
+def queue_generator_function(q):
+    """キューから値を受け取ってyieldする関数"""
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        yield item * 2
+
+
+@pytest.fixture
+async def rpc_app():
+    """テスト用のFastAPIアプリケーション"""
+    app = FastAPI(lifespan=rpc_lifespan)
+
+    @app.websocket("/rpc")
+    async def rpc_endpoint(ws: WebSocket):
+        await create_rpc_endpoint(app, ws)
+
+    return app
+
+
+@pytest.fixture
+async def rpc_server(rpc_app):
+    """テスト用のサーバーを起動"""
+    config = uvicorn.Config(rpc_app, host="127.0.0.1", port=8765, log_level="error")
+    server = uvicorn.Server(config)
+
+    # サーバーをバックグラウンドで起動
+    task = asyncio.create_task(server.serve())
+
+    # サーバーが起動するまで待機
+    await asyncio.sleep(0.5)
+
+    yield "ws://127.0.0.1:8765/rpc"
+
+    # サーバーをシャットダウン
+    server.should_exit = True
+    await task
+
+
+@pytest.mark.timeout(10)
+async def test_simple_function(rpc_server):
+    """シンプルな関数のRPC呼び出しをテスト"""
+    result = await Rpc(rpc_server, simple_function, 3, 5).run()
+    assert result == 8
+
+
+@pytest.mark.timeout(10)
+async def test_generator_function(rpc_server):
+    """ジェネレータ関数のRPC呼び出しをテスト"""
+    results = []
+    async for item in await Rpc(rpc_server, generator_function, 5).run():
+        results.append(item)
+    assert results == [0, 1, 2, 3, 4]
+
+
+@pytest.mark.timeout(10)
+async def test_error_function(rpc_server):
+    """エラーが発生する関数のRPC呼び出しをテスト"""
+    with pytest.raises(RpcRemoteError) as exc_info:
+        await Rpc(rpc_server, error_function).run()
+    
+    assert exc_info.value.error_type == "ValueError"
+    assert "Test error" in exc_info.value.error_message
+
+
+@pytest.mark.timeout(10)
+async def test_async_function_not_supported(rpc_server):
+    """非同期関数がサポートされないことをテスト"""
+    with pytest.raises(RpcRemoteError) as exc_info:
+        await Rpc(rpc_server, async_function).run()
+    
+    assert exc_info.value.error_type == "TypeError"
+    assert "Async functions are not supported" in exc_info.value.error_message
+
+
+@pytest.mark.timeout(10)
+async def test_queue_consumer(rpc_server):
+    """キューを使った関数のRPC呼び出しをテスト"""
+    client_queue = asyncio.Queue()
+    
+    async def produce():
+        for i in range(3):
+            await client_queue.put(i)
+        await client_queue.put(None)
+    
+    task = asyncio.create_task(produce())
+    result = await Rpc(rpc_server, queue_consumer_function, RpcQueue(client_queue)).run()
+    
+    await task
+    assert result == [0, 2, 4]
+
+
+@pytest.mark.timeout(10)
+async def test_queue_generator(rpc_server):
+    """キューを使ったジェネレータのRPC呼び出しをテスト"""
+    client_queue = asyncio.Queue()
+    
+    async def produce():
+        for i in range(3):
+            await client_queue.put(i)
+            await asyncio.sleep(0.01)
+        await client_queue.put(None)
+    
+    task = asyncio.create_task(produce())
+    
+    results = []
+    async for item in await Rpc(rpc_server, queue_generator_function, RpcQueue(client_queue)).run():
+        results.append(item)
+    
+    await task
+    assert results == [0, 2, 4]
+
+
+@pytest.mark.timeout(10)
+async def test_kwargs(rpc_server):
+    """キーワード引数を使ったRPC呼び出しをテスト"""
+    result = await Rpc(rpc_server, simple_function, x=10, y=20).run()
+    assert result == 30
+
+
+@pytest.mark.timeout(10)
+async def test_mixed_args_kwargs(rpc_server):
+    """位置引数とキーワード引数を混ぜたRPC呼び出しをテスト"""
+    result = await Rpc(rpc_server, simple_function, 15, y=25).run()
+    assert result == 40
