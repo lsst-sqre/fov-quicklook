@@ -101,12 +101,12 @@ class Rpc:
                     processed_kwargs[k] = v
 
             # CallMessageを送信
-            call_msg: CallMessage = {
-                "type": "call",
-                "func": self.func,
-                "args": tuple(processed_args),
-                "kwargs": processed_kwargs,
-            }
+            call_msg = CallMessage(
+                type="call",
+                func=self.func,
+                args=tuple(processed_args),
+                kwargs=processed_kwargs,
+            )
             await ws.send(pickle.dumps(call_msg))
 
             # 結果を受信
@@ -128,19 +128,19 @@ class Rpc:
                 item = await q.get()
                 if item is None:
                     # 終了メッセージを送信
-                    done_msg: QueueDoneMessage = {
-                        "type": "queue_done",
-                        "queue_id": queue_id,
-                    }
+                    done_msg = QueueDoneMessage(
+                        type="queue_done",
+                        queue_id=queue_id,
+                    )
                     await ws.send(pickle.dumps(done_msg))
                     break
                 else:
                     # putメッセージを送信
-                    put_msg: QueuePutMessage = {
-                        "type": "queue_put",
-                        "queue_id": queue_id,
-                        "value": item,
-                    }
+                    put_msg = QueuePutMessage(
+                        type="queue_put",
+                        queue_id=queue_id,
+                        value=item,
+                    )
                     await ws.send(pickle.dumps(put_msg))
         except asyncio.CancelledError:
             raise
@@ -169,24 +169,20 @@ class Rpc:
                     continue
                 message: Message = pickle.loads(data)
 
-                match message["type"]:
-                    case "yield":
-                        is_generator = True
-                        yield_msg: YieldMessage = message  # type: ignore
-                        results.append(yield_msg["value"])
-                    case "return":
-                        return_msg: ReturnMessage = message  # type: ignore
-                        if not is_generator:
-                            return return_msg["value"]
-                        # ジェネレータの場合は終了
-                        break
-                    case "error":
-                        error_msg: ErrorMessage = message  # type: ignore
-                        raise RpcRemoteError(
-                            error_msg["error_type"],
-                            error_msg["error_message"],
-                            error_msg["traceback"],
-                        )
+                if isinstance(message, YieldMessage):
+                    is_generator = True
+                    results.append(message.value)
+                elif isinstance(message, ReturnMessage):
+                    if not is_generator:
+                        return message.value
+                    # ジェネレータの場合は終了
+                    break
+                elif isinstance(message, ErrorMessage):
+                    raise RpcRemoteError(
+                        message.error_type,
+                        message.error_message,
+                        message.traceback,
+                    )
 
         finally:
             # キューのタスクをキャンセル

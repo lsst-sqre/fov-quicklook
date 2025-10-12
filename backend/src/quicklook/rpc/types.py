@@ -1,4 +1,5 @@
-from typing import Any, TypedDict
+from dataclasses import dataclass
+from typing import Any
 
 
 class RpcRemoteError(Exception):
@@ -11,7 +12,8 @@ class RpcRemoteError(Exception):
         super().__init__(f"{error_type}: {error_message}\n{traceback}")
 
 
-class CallMessage(TypedDict):
+@dataclass
+class CallMessage:
     """関数呼び出しメッセージ"""
 
     type: str  # "call"
@@ -20,21 +22,24 @@ class CallMessage(TypedDict):
     kwargs: dict[str, Any]
 
 
-class YieldMessage(TypedDict):
+@dataclass
+class YieldMessage:
     """ジェネレータからのyieldメッセージ"""
 
     type: str  # "yield"
     value: Any
 
 
-class ReturnMessage(TypedDict):
+@dataclass
+class ReturnMessage:
     """関数の戻り値メッセージ"""
 
     type: str  # "return"
     value: Any
 
 
-class ErrorMessage(TypedDict):
+@dataclass
+class ErrorMessage:
     """エラーメッセージ"""
 
     type: str  # "error"
@@ -43,7 +48,8 @@ class ErrorMessage(TypedDict):
     traceback: str
 
 
-class QueuePutMessage(TypedDict):
+@dataclass
+class QueuePutMessage:
     """キューへのput操作メッセージ"""
 
     type: str  # "queue_put"
@@ -51,7 +57,8 @@ class QueuePutMessage(TypedDict):
     value: Any
 
 
-class QueueDoneMessage(TypedDict):
+@dataclass
+class QueueDoneMessage:
     """キューの終了メッセージ"""
 
     type: str  # "queue_done"
