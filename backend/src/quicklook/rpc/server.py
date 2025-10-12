@@ -119,11 +119,8 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         data = await ws.receive_bytes()
         message: Message = pickle.loads(data)
 
-        if message.type != "call":  # pragma: no branch
-            raise ValueError(f"Expected 'call' message, got {message.type}")
-
         if not isinstance(message, CallMessage):  # pragma: no branch
-            raise ValueError("Invalid message type")
+            raise ValueError(f"Expected CallMessage, got {type(message).__name__}")
             
         call_msg = message
         func = call_msg.func
@@ -188,15 +185,14 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
 
             match msg_type:
                 case "yield":
-                    yield_msg = YieldMessage(type="yield", value=value)
+                    yield_msg = YieldMessage(value=value)
                     await ws.send_bytes(pickle.dumps(yield_msg))
                 case "return":
-                    return_msg = ReturnMessage(type="return", value=value)
+                    return_msg = ReturnMessage(value=value)
                     await ws.send_bytes(pickle.dumps(return_msg))
                     break
                 case "error":
                     error_response = ErrorMessage(
-                        type="error",
                         error_type=value["error_type"],
                         error_message=value["error_message"],
                         traceback=value["traceback"],
@@ -215,7 +211,6 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
     except Exception as e:
         # エラーをクライアントに送信
         error_msg = ErrorMessage(
-            type="error",
             error_type=type(e).__name__,
             error_message=str(e),
             traceback=tb.format_exc(),

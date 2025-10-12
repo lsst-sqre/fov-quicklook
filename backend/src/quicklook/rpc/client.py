@@ -102,7 +102,6 @@ class Rpc:
 
             # CallMessageを送信
             call_msg = CallMessage(
-                type="call",
                 func=self.func,
                 args=tuple(processed_args),
                 kwargs=processed_kwargs,
@@ -129,7 +128,6 @@ class Rpc:
                 if item is None:
                     # 終了メッセージを送信
                     done_msg = QueueDoneMessage(
-                        type="queue_done",
                         queue_id=queue_id,
                     )
                     await ws.send(pickle.dumps(done_msg))
@@ -137,7 +135,6 @@ class Rpc:
                 else:
                     # putメッセージを送信
                     put_msg = QueuePutMessage(
-                        type="queue_put",
                         queue_id=queue_id,
                         value=item,
                     )

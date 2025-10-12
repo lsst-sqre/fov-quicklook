@@ -185,7 +185,7 @@ async def test_invalid_message_type(rpc_app):
     try:
         async with websockets.connect("ws://127.0.0.1:8766/rpc") as ws:
             # 無効なメッセージを送信
-            invalid_msg = YieldMessage(type="yield", value=123)
+            invalid_msg = YieldMessage(value=123)
             await ws.send(pickle.dumps(invalid_msg))
             
             # エラーメッセージを受信
@@ -193,7 +193,7 @@ async def test_invalid_message_type(rpc_app):
             if isinstance(data, bytes):
                 message = pickle.loads(data)
                 assert isinstance(message, ErrorMessage)
-                assert "Expected 'call' message" in message.error_message
+                assert "Expected CallMessage" in message.error_message
     finally:
         server.should_exit = True
         await task

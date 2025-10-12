@@ -16,7 +16,6 @@ class RpcRemoteError(Exception):
 class CallMessage:
     """関数呼び出しメッセージ"""
 
-    type: str  # "call"
     func: Any  # pickle化された関数
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
@@ -26,7 +25,6 @@ class CallMessage:
 class YieldMessage:
     """ジェネレータからのyieldメッセージ"""
 
-    type: str  # "yield"
     value: Any
 
 
@@ -34,7 +32,6 @@ class YieldMessage:
 class ReturnMessage:
     """関数の戻り値メッセージ"""
 
-    type: str  # "return"
     value: Any
 
 
@@ -42,7 +39,6 @@ class ReturnMessage:
 class ErrorMessage:
     """エラーメッセージ"""
 
-    type: str  # "error"
     error_type: str
     error_message: str
     traceback: str
@@ -52,7 +48,6 @@ class ErrorMessage:
 class QueuePutMessage:
     """キューへのput操作メッセージ"""
 
-    type: str  # "queue_put"
     queue_id: int
     value: Any
 
@@ -61,7 +56,6 @@ class QueuePutMessage:
 class QueueDoneMessage:
     """キューの終了メッセージ"""
 
-    type: str  # "queue_done"
     queue_id: int
 
 
