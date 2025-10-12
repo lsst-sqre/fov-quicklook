@@ -222,7 +222,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         )
         try:
             await ws.send_bytes(pickle.dumps(error_msg))
-        except:  # pragma: no cover
+        except Exception:  # pragma: no cover
             pass
 
     finally:

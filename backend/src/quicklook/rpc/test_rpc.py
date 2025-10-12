@@ -1,10 +1,13 @@
 import asyncio
+import pickle
 
 import pytest
+import uvicorn
+from fastapi import FastAPI, WebSocket
 
 from quicklook.rpc import Rpc, RpcQueue, RpcRemoteError, create_rpc_endpoint, rpc_lifespan
-from fastapi import FastAPI, WebSocket
-import uvicorn
+from quicklook.rpc.lifespan import AppState
+from quicklook.rpc.types import ErrorMessage, YieldMessage
 
 
 def simple_function(x: int, y: int) -> int:
@@ -166,3 +169,55 @@ async def test_mixed_args_kwargs(rpc_server):
     """位置引数とキーワード引数を混ぜたRPC呼び出しをテスト"""
     result = await Rpc(rpc_server, simple_function, 15, y=25).run()
     assert result == 40
+
+
+@pytest.mark.timeout(10)
+async def test_invalid_message_type(rpc_app):
+    """無効なメッセージタイプをテスト"""
+    import websockets
+    
+    # サーバーを起動
+    config = uvicorn.Config(rpc_app, host="127.0.0.1", port=8766, log_level="error")
+    server = uvicorn.Server(config)
+    task = asyncio.create_task(server.serve())
+    await asyncio.sleep(0.5)
+    
+    try:
+        async with websockets.connect("ws://127.0.0.1:8766/rpc") as ws:
+            # 無効なメッセージを送信
+            invalid_msg = YieldMessage(type="yield", value=123)
+            await ws.send(pickle.dumps(invalid_msg))
+            
+            # エラーメッセージを受信
+            data = await ws.recv()
+            if isinstance(data, bytes):
+                message = pickle.loads(data)
+                assert isinstance(message, ErrorMessage)
+                assert "Expected 'call' message" in message.error_message
+    finally:
+        server.should_exit = True
+        await task
+
+
+@pytest.mark.timeout(10)
+async def test_connection_error_handling(rpc_app):
+    """接続エラー時の処理をテスト"""
+    # 存在しないサーバーに接続を試みる
+    with pytest.raises(Exception):  # websockets.exceptions.* or OSError
+        await Rpc("ws://127.0.0.1:19999/rpc", simple_function, 1, 2).run()
+
+
+@pytest.mark.timeout(10)
+async def test_lifespan_error_handling():
+    """lifespanのエラーハンドリングをテスト"""
+    from quicklook.rpc.lifespan import get_process_pool, get_manager
+    
+    # 初期化されていない状態でアクセス
+    app = FastAPI()
+    app.state.rpc = AppState()
+    
+    with pytest.raises(RuntimeError, match="Process pool is not initialized"):
+        get_process_pool(app)
+    
+    with pytest.raises(RuntimeError, match="Manager is not initialized"):
+        get_manager(app)
