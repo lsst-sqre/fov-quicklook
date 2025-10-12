@@ -166,20 +166,17 @@ class Rpc:
                     continue
                 message: Message = pickle.loads(data)
 
-                if isinstance(message, YieldMessage):
-                    is_generator = True
-                    results.append(message.value)
-                elif isinstance(message, ReturnMessage):
-                    if not is_generator:
-                        return message.value
-                    # ジェネレータの場合は終了
-                    break
-                elif isinstance(message, ErrorMessage):
-                    raise RpcRemoteError(
-                        message.error_type,
-                        message.error_message,
-                        message.traceback,
-                    )
+                match message:
+                    case YieldMessage(value=value):
+                        is_generator = True
+                        results.append(value)
+                    case ReturnMessage(value=value):
+                        if not is_generator:
+                            return value
+                        # ジェネレータの場合は終了
+                        break
+                    case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
+                        raise RpcRemoteError(error_type, error_message, traceback)
 
         finally:
             # キューのタスクをキャンセル

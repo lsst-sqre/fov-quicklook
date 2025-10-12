@@ -240,13 +240,14 @@ async def _handle_queue_messages(
             data = await ws.receive_bytes()
             message: Message = pickle.loads(data)
 
-            if isinstance(message, QueuePutMessage):
-                if message.queue_id == queue_id:
-                    pipe.put(message.value)
-            elif isinstance(message, QueueDoneMessage):
-                if message.queue_id == queue_id:
-                    pipe.put(None)
-                    return
+            match message:
+                case QueuePutMessage(queue_id=msg_queue_id, value=value):
+                    if msg_queue_id == queue_id:
+                        pipe.put(value)
+                case QueueDoneMessage(queue_id=msg_queue_id):
+                    if msg_queue_id == queue_id:
+                        pipe.put(None)
+                        return
 
         except asyncio.CancelledError:
             raise
