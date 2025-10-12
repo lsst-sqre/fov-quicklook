@@ -10,6 +10,8 @@ from quicklook.comm.generator import lifespan as generator_lifespan
 from quicklook.comm.generator import router as comm_generator_router
 from quicklook.config import config
 from quicklook.job.job import Job
+from quicklook.rpc.lifespan import rpc_lifespan
+from quicklook.rpc.server import create_rpc_endpoint
 from quicklook.types import TilePos
 from quicklook.utils.async_process_generator import create_async_process_pool
 from quicklook.utils.numpyutils import ndarray2npybytes
@@ -23,19 +25,26 @@ async def lifespan(app: fastapi.FastAPI):
     global _process_pool
 
     async with generator_lifespan(app):
-        async with create_async_process_pool(
-            max_workers=config.generator_max_concurrent_jobs,
-            initializers=[GeneratorIdInitializer()],
-        ) as pool:
-            _process_pool = pool
-            try:
-                yield
-            finally:
-                _process_pool = None
+        async with rpc_lifespan(app):
+            async with create_async_process_pool(
+                max_workers=config.generator_max_concurrent_jobs,
+                initializers=[GeneratorIdInitializer()],
+            ) as pool:
+                _process_pool = pool
+                try:
+                    yield
+                finally:
+                    _process_pool = None
 
 
 app = fastapi.FastAPI(lifespan=lifespan)
 app.include_router(comm_generator_router)
+
+
+@app.websocket("/rpc")
+async def websocket_rpc_endpoint(websocket: fastapi.WebSocket):
+    """WebSocketベースのRPCエンドポイント"""
+    await create_rpc_endpoint(app, websocket)
 
 
 @app.get("/healthz")

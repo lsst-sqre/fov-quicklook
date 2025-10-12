@@ -1,5 +1,5 @@
 import aiohttp
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
@@ -7,6 +7,8 @@ import pytest
 
 from quicklook.comm.rpc import Rpc, create_rpc_caller_endpoint, run_rpc, run_rpc_stream, RpcRemoteError
 from quicklook.dev.run_uvicorn import run_uvicorn_app
+from quicklook.rpc.lifespan import rpc_lifespan
+from quicklook.rpc.server import create_rpc_endpoint as create_ws_rpc_endpoint
 
 
 def square(x: int) -> int:
@@ -30,15 +32,21 @@ def error_generator(n: int):
         yield i
 
 
-app = FastAPI()
+app = FastAPI(lifespan=rpc_lifespan)
 client = TestClient(app)
 
 
 @app.post("/rpc")
 async def rpc_endpoint(request: Request):
-    """RPCエンドポイント: リクエストボディをcreate_rpc_caller_endpointに渡す。"""
+    """RPCエンドポイント (HTTP): リクエストボディをcreate_rpc_caller_endpointに渡す。"""
     body = await request.body()
     return StreamingResponse(create_rpc_caller_endpoint(body), media_type="application/octet-stream")
+
+
+@app.websocket("/rpc")
+async def websocket_rpc_endpoint(websocket: WebSocket):
+    """RPCエンドポイント (WebSocket): 新しいRPC実装"""
+    await create_ws_rpc_endpoint(app, websocket)
 
 
 @app.get("/healthz")
@@ -48,7 +56,7 @@ async def healthcheck():
 
 
 # テスト用のFastAPIアプリ文字列（uvicorn用）
-TEST_APP_MODULE = "tests.test_server_app:app"
+TEST_APP_MODULE = "quicklook.comm.test_rpc:app"
 
 
 @pytest.mark.asyncio
@@ -127,5 +135,7 @@ async def test_rpc_server_error_handling():
         rpc = Rpc.create(square, 5)
 
         # 存在しないエンドポイントへのリクエスト
-        with pytest.raises(aiohttp.ClientResponseError):
+        # WebSocketベースのRPCではwebsockets.exceptions.InvalidStatusが発生
+        import websockets.exceptions
+        with pytest.raises(websockets.exceptions.InvalidStatus):
             await run_rpc(f"{app_runner.base_url}/nonexistent", rpc)

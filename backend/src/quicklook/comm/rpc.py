@@ -4,6 +4,8 @@ RPC (Remote Procedure Call) モジュール。
 このモジュールは、ネットワーク経由で関数を呼び出すためのRPC機能を提供します。
 クライアント側ではRPCリクエストを作成し、サーバーに送信して結果を受け取ります。
 サーバー側では受信したRPCをローカルで実行し、結果をストリームで返します。
+
+WebSocketベースのRPC実装を使用しています。
 """
 
 import pickle
@@ -14,7 +16,8 @@ from typing import Any, AsyncGenerator, Callable, Generator, Generic, ParamSpec,
 
 import aiohttp
 
-from quicklook.utils.iterutils import async_bytes_iterator_to_stream
+from quicklook.rpc.client import Rpc as RpcClient
+from quicklook.rpc.types import RpcRemoteError as _RpcRemoteError
 from quicklook.config import config
 
 timeout_total = config.rpc_timeout_total
@@ -45,14 +48,14 @@ class Rpc(Generic[T]):
 
 
 async def run_rpc(
-    url,
+    url: str,
     rpc: Rpc[T],
     *,
-    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=timeout_total),
+    timeout: aiohttp.ClientTimeout | None = None,
 ) -> T:
     """RPCを実行し、単一の結果を返す。
 
-    指定されたURLのRPCサーバー、TestClient、またはendpointにリクエストを送信し、
+    指定されたURLのRPCサーバーにリクエストを送信し、
     ストリームから最初の結果を取得して返します。
     結果がない場合はRuntimeErrorを発生させます。
     """
@@ -65,34 +68,90 @@ async def run_rpc_stream(
     url: str,
     rpc: Rpc[T],
     *,
-    timeout: aiohttp.ClientTimeout = aiohttp.ClientTimeout(total=timeout_total),
+    timeout: aiohttp.ClientTimeout | None = None,
 ) -> AsyncGenerator[T, None]:
     """RPCを実行し、結果をストリームで返す。
 
-    外部のRPCサーバー、TestClient、またはendpointに接続し、RPCを実行して結果をストリームで受け取ります。
+    WebSocketベースのRPCを使用して関数を実行し、結果をストリームで受け取ります。
     結果は非同期ジェネレータとしてyieldされます。
+    
+    エラーが発生した場合でも、それまでにyieldされた値は取得できます。
     """
-    # RPCリクエストをpickleでシリアライズ
-    pickled_rpc = pickle.dumps(rpc)
+    import websockets
+    import pickle as pkl
+    from quicklook.rpc.types import CallMessage, YieldMessage, ReturnMessage, ErrorMessage
+    
+    # HTTPのURLをWebSocketのURLに変換
+    ws_url = _convert_http_to_ws_url(url)
+    
+    kwargs = rpc.kwargs or {}
+    
+    try:
+        async with websockets.connect(ws_url) as ws:
+            # CallMessageを送信
+            call_msg = CallMessage(
+                func=rpc.function,
+                args=rpc.args,
+                kwargs=kwargs,
+            )
+            await ws.send(pkl.dumps(call_msg))
+            
+            # 結果を受信してyield
+            async for data in ws:
+                if isinstance(data, str):  # pragma: no cover
+                    continue
+                message = pkl.loads(data)
+                
+                match message:
+                    case YieldMessage(value=value):
+                        yield value
+                    case ReturnMessage(value=value):
+                        # ジェネレーターでない場合は単一の値を返す
+                        if value is not None:
+                            yield value
+                        return
+                    case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
+                        # エラーが発生した場合、それまでyieldした値は既に送信されている
+                        # 互換性のためにException型を再構築
+                        try:
+                            exception_class = eval(error_type, {"__builtins__": __builtins__})
+                            if not issubclass(exception_class, Exception):
+                                raise TypeError()
+                        except (NameError, TypeError):
+                            exception_class = Exception
+                        
+                        original_exception: Exception = exception_class(error_message)
+                        raise RpcRemoteError(original_exception)
+    except RpcRemoteError:
+        # すでに適切な例外型なので再raiseする
+        raise
+    except Exception as e:
+        # その他のエラー（接続エラーなど）
+        if isinstance(e, _RpcRemoteError):
+            try:
+                exception_class = eval(e.error_type, {"__builtins__": __builtins__})
+                if not issubclass(exception_class, Exception):
+                    raise TypeError()
+            except (NameError, TypeError):
+                exception_class = Exception
+            
+            original_exception: Exception = exception_class(e.error_message)
+            raise RpcRemoteError(original_exception)
+        raise
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            url,
-            data=pickled_rpc,
-            timeout=timeout,
-        ) as response:
-            response.raise_for_status()
-            read = async_bytes_iterator_to_stream(response.content.iter_chunked(8192))
-            while True:
-                size_bytes = await read(4)
-                if len(size_bytes) < 4:
-                    break
-                size = int.from_bytes(size_bytes, 'big')
-                data = await read(size)
-                result = pickle.loads(data)
-                if isinstance(result, Exception):
-                    raise RpcRemoteError(result)
-                yield result
+
+def _convert_http_to_ws_url(url: str) -> str:
+    """HTTPのURLをWebSocketのURLに変換する。
+    
+    例: http://localhost:8000/rpc -> ws://localhost:8000/rpc
+    """
+    if url.startswith('http://'):
+        return 'ws://' + url[7:]
+    elif url.startswith('https://'):
+        return 'wss://' + url[8:]
+    else:
+        # すでにws://またはwss://の場合はそのまま
+        return url
 
 
 class RpcRemoteError(RuntimeError):
@@ -107,6 +166,10 @@ def create_rpc_caller_endpoint(body: bytes) -> Generator[bytes, None, None]:
     受信したバイトデータをRPCリクエストとしてデシリアライズし、
     ローカルで関数を実行して結果をシリアライズしてyieldします。
     ジェネレータの場合は各アイテムを個別にyieldします。
+    
+    注: この関数は後方互換性のために残されていますが、
+    新しいWebSocketベースのRPCではサーバー側の実装は
+    quicklook.rpc.server.create_rpc_endpoint を使用してください。
     """
     rpc: Rpc = pickle.loads(body)
 
