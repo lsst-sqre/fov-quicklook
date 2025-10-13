@@ -4,7 +4,6 @@ from typing import Annotated
 import fastapi
 from fastapi.responses import StreamingResponse
 
-from quicklook.comm import rpc
 from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.comm.generator import lifespan as generator_lifespan
 from quicklook.comm.generator import router as comm_generator_router
@@ -50,22 +49,6 @@ async def websocket_rpc_endpoint(websocket: fastapi.WebSocket):
 @app.get("/healthz")
 async def route_healthz():
     return {"status": "ok"}
-
-
-@app.post('/rpc')
-async def route_rpc(request: fastapi.Request):
-    if _process_pool is None:  # pragma: no cover
-        raise RuntimeError("Process pool not initialized")
-
-    return StreamingResponse(
-        _process_pool.run_async_process_generator(_rpc_worker, await request.body()),
-        media_type='application/octet-stream',
-    )
-
-
-def _rpc_worker(body: bytes):
-    for progress in rpc.create_rpc_caller_endpoint(body):
-        yield progress
 
 
 def dep_job(job_id: str):
