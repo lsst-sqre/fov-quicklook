@@ -2,8 +2,10 @@ import asyncio
 import inspect
 import multiprocessing as mp
 import pickle
+import queue
 import traceback as tb
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import anyio.to_thread
@@ -20,6 +22,32 @@ from .types import (
     ReturnMessage,
     YieldMessage,
 )
+
+
+@dataclass
+class _ProcessYieldResult:
+    """プロセスからのyield結果"""
+
+    value: Any
+
+
+@dataclass
+class _ProcessReturnResult:
+    """プロセスからのreturn結果"""
+
+    value: Any
+
+
+@dataclass
+class _ProcessErrorResult:
+    """プロセスからのエラー結果"""
+
+    error_type: str
+    error_message: str
+    traceback: str
+
+
+_ProcessResult = _ProcessYieldResult | _ProcessReturnResult | _ProcessErrorResult
 
 
 class _QueueProxy:
@@ -39,8 +67,8 @@ def _execute_function_in_process(
     func: Callable[..., Any],
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
-    queue_map: dict[int, Any],  # dict[int, mp.Queue]
-    result_queue: Any,  # mp.Queue
+    queue_map: dict[int, "queue.Queue[Any]"],
+    result_queue: "queue.Queue[_ProcessResult]",
 ) -> None:
     """
     プロセス内で関数を実行し、結果をresult_queueに送信する
@@ -55,13 +83,10 @@ def _execute_function_in_process(
     # 非同期関数はサポートしない
     if inspect.iscoroutinefunction(func):  # pragma: no branch
         result_queue.put(
-            (
-                "error",
-                {
-                    "error_type": "TypeError",
-                    "error_message": "Async functions are not supported in RPC",
-                    "traceback": "",
-                },
+            _ProcessErrorResult(
+                error_type="TypeError",
+                error_message="Async functions are not supported in RPC",
+                traceback="",
             )
         )
         return
@@ -87,20 +112,17 @@ def _execute_function_in_process(
         # ジェネレータの場合
         if inspect.isgenerator(result):
             for item in result:
-                result_queue.put(("yield", item))
-            result_queue.put(("return", None))
+                result_queue.put(_ProcessYieldResult(value=item))
+            result_queue.put(_ProcessReturnResult(value=None))
         else:
-            result_queue.put(("return", result))
+            result_queue.put(_ProcessReturnResult(value=result))
 
     except Exception as e:
         result_queue.put(
-            (
-                "error",
-                {
-                    "error_type": type(e).__name__,
-                    "error_message": str(e),
-                    "traceback": tb.format_exc(),
-                },
+            _ProcessErrorResult(
+                error_type=type(e).__name__,
+                error_message=str(e),
+                traceback=tb.format_exc(),
             )
         )
 
@@ -132,7 +154,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         manager = get_manager(app)
         
         # RpcQueueのマッピングを作成
-        queue_map: dict[int, Any] = {}  # dict[int, mp.Queue]
+        queue_map: dict[int, "queue.Queue[Any]"] = {}
         queue_tasks: list[asyncio.Task[None]] = []
 
         # argsとkwargsからRpcQueueを抽出してキューIDに置き換え
@@ -141,7 +163,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
             if isinstance(arg, _RpcQueue):
                 queue_id = arg.queue_id
                 assert queue_id is not None, "queue_id must be set by client"
-                pipe: Any = manager.Queue()  # type: ignore[attr-defined]
+                pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
                 queue_map[queue_id] = pipe
                 processed_args.append(queue_id)
                 # キューメッセージを受信するタスクを作成
@@ -156,7 +178,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
             if isinstance(v, _RpcQueue):
                 queue_id = v.queue_id
                 assert queue_id is not None, "queue_id must be set by client"
-                pipe: Any = manager.Queue()  # type: ignore[attr-defined]
+                pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
                 queue_map[queue_id] = pipe
                 processed_kwargs[k] = queue_id
                 queue_tasks.append(
@@ -166,7 +188,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
                 processed_kwargs[k] = v
 
         # 結果を受信するキュー
-        result_queue: Any = manager.Queue()  # type: ignore[attr-defined]
+        result_queue: "queue.Queue[_ProcessResult]" = manager.Queue()  # type: ignore[attr-defined]
 
         # プロセスプールで関数を実行
         pool = get_process_pool(app)
@@ -184,21 +206,21 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         # result_queueから結果を受信してクライアントに送信
         while True:
             # anyio.to_thread.run_syncを使って非ブロッキングで結果を取得
-            msg_type, value = await anyio.to_thread.run_sync(result_queue.get)
+            result: _ProcessResult = await anyio.to_thread.run_sync(result_queue.get)
 
-            match msg_type:
-                case "yield":
+            match result:
+                case _ProcessYieldResult(value=value):
                     yield_msg = YieldMessage(value=value)
                     await ws.send_bytes(pickle.dumps(yield_msg))
-                case "return":
+                case _ProcessReturnResult(value=value):
                     return_msg = ReturnMessage(value=value)
                     await ws.send_bytes(pickle.dumps(return_msg))
                     break
-                case "error":
+                case _ProcessErrorResult(error_type=error_type, error_message=error_message, traceback=traceback):
                     error_response = ErrorMessage(
-                        error_type=value["error_type"],
-                        error_message=value["error_message"],
-                        traceback=value["traceback"],
+                        error_type=error_type,
+                        error_message=error_message,
+                        traceback=traceback,
                     )
                     await ws.send_bytes(pickle.dumps(error_response))
                     break
@@ -228,7 +250,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
 
 
 async def _handle_queue_messages(
-    ws: WebSocket, queue_id: int, pipe: Any  # mp.Queue
+    ws: WebSocket, queue_id: int, pipe: "queue.Queue[Any]"
 ) -> None:
     """
     クライアントからのキューメッセージを処理してmultiprocessing.Queueにputする
