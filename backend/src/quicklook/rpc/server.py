@@ -63,6 +63,96 @@ class _QueueProxy:
         self._mq.put(item, block=block, timeout=timeout)
 
 
+def _process_args_kwargs_with_queue_map(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    queue_map: dict[int, "queue.Queue[Any]"],
+) -> tuple[list[Any], dict[str, Any]]:
+    """
+    argsとkwargsの中のキューIDをqueue.Queueに置き換え
+    
+    Args:
+        args: 位置引数
+        kwargs: キーワード引数
+        queue_map: キューIDとqueueのマッピング
+    
+    Returns:
+        処理済みのargs, kwargs
+    """
+    processed_args = []
+    for arg in args:
+        if isinstance(arg, int) and arg in queue_map:
+            processed_args.append(_QueueProxy(queue_map[arg]))
+        else:
+            processed_args.append(arg)
+    
+    processed_kwargs = {}
+    for k, v in kwargs.items():
+        if isinstance(v, int) and v in queue_map:
+            processed_kwargs[k] = _QueueProxy(queue_map[v])
+        else:
+            processed_kwargs[k] = v
+    
+    return processed_args, processed_kwargs
+
+
+def _extract_rpc_queues(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    manager: Any,
+    ws: WebSocket,
+) -> tuple[
+    list[Any],
+    dict[str, Any],
+    dict[int, "queue.Queue[Any]"],
+    list[asyncio.Task[None]],
+]:
+    """
+    argsとkwargsからRpcQueueを抽出してキューIDに置き換え
+    
+    Args:
+        args: 位置引数
+        kwargs: キーワード引数
+        manager: multiprocessingのManager
+        ws: WebSocketコネクション
+    
+    Returns:
+        処理済みのargs, kwargs, queue_map, queue_tasks
+    """
+    queue_map: dict[int, "queue.Queue[Any]"] = {}
+    queue_tasks: list[asyncio.Task[None]] = []
+
+    processed_args = []
+    for arg in args:
+        if isinstance(arg, _RpcQueue):
+            queue_id = arg.queue_id
+            assert queue_id is not None, "queue_id must be set by client"
+            pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
+            queue_map[queue_id] = pipe
+            processed_args.append(queue_id)
+            queue_tasks.append(
+                asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe))
+            )
+        else:
+            processed_args.append(arg)
+
+    processed_kwargs = {}
+    for k, v in kwargs.items():
+        if isinstance(v, _RpcQueue):
+            queue_id = v.queue_id
+            assert queue_id is not None, "queue_id must be set by client"
+            pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
+            queue_map[queue_id] = pipe
+            processed_kwargs[k] = queue_id
+            queue_tasks.append(
+                asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe))
+            )
+        else:
+            processed_kwargs[k] = v
+
+    return processed_args, processed_kwargs, queue_map, queue_tasks
+
+
 def _execute_function_in_process(
     func: Callable[..., Any],
     args: tuple[Any, ...],
@@ -93,19 +183,9 @@ def _execute_function_in_process(
 
     try:
         # argsとkwargsの中のキューIDインデックスをqueue.Queueに置き換え
-        processed_args = []
-        for arg in args:
-            if isinstance(arg, int) and arg in queue_map:
-                processed_args.append(_QueueProxy(queue_map[arg]))
-            else:
-                processed_args.append(arg)
-        
-        processed_kwargs = {}
-        for k, v in kwargs.items():
-            if isinstance(v, int) and v in queue_map:
-                processed_kwargs[k] = _QueueProxy(queue_map[v])
-            else:
-                processed_kwargs[k] = v
+        processed_args, processed_kwargs = _process_args_kwargs_with_queue_map(
+            args, kwargs, queue_map
+        )
 
         result = func(*processed_args, **processed_kwargs)
 
@@ -153,39 +233,10 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         # managerを取得
         manager = get_manager(app)
         
-        # RpcQueueのマッピングを作成
-        queue_map: dict[int, "queue.Queue[Any]"] = {}
-        queue_tasks: list[asyncio.Task[None]] = []
-
         # argsとkwargsからRpcQueueを抽出してキューIDに置き換え
-        processed_args = []
-        for arg in args:
-            if isinstance(arg, _RpcQueue):
-                queue_id = arg.queue_id
-                assert queue_id is not None, "queue_id must be set by client"
-                pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
-                queue_map[queue_id] = pipe
-                processed_args.append(queue_id)
-                # キューメッセージを受信するタスクを作成
-                queue_tasks.append(
-                    asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe))
-                )
-            else:
-                processed_args.append(arg)
-
-        processed_kwargs = {}
-        for k, v in kwargs.items():
-            if isinstance(v, _RpcQueue):
-                queue_id = v.queue_id
-                assert queue_id is not None, "queue_id must be set by client"
-                pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
-                queue_map[queue_id] = pipe
-                processed_kwargs[k] = queue_id
-                queue_tasks.append(
-                    asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe))
-                )
-            else:
-                processed_kwargs[k] = v
+        processed_args, processed_kwargs, queue_map, queue_tasks = _extract_rpc_queues(
+            args, kwargs, manager, ws
+        )
 
         # 結果を受信するキュー
         result_queue: "queue.Queue[_ProcessResult]" = manager.Queue()  # type: ignore[attr-defined]

@@ -34,6 +34,78 @@ def _get_next_queue_id() -> int:
     return _next_queue_id
 
 
+def _process_args_and_kwargs(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    ws: "ClientConnection",
+    queue_tasks: list[asyncio.Task[None]],
+) -> tuple[list[Any], dict[str, Any]]:
+    """
+    argsとkwargsを処理し、RpcQueueを設定する
+    
+    Args:
+        args: 位置引数
+        kwargs: キーワード引数
+        ws: WebSocketコネクション
+        queue_tasks: キュータスクのリスト（このリストに新しいタスクが追加される）
+    
+    Returns:
+        処理済みのargs, kwargs
+    """
+    processed_args = []
+    for arg in args:
+        if isinstance(arg, _RpcQueue):
+            queue_id = _get_next_queue_id()
+            arg.queue_id = queue_id
+            processed_args.append(arg)
+            queue_tasks.append(
+                asyncio.create_task(_send_queue_messages_helper(ws, queue_id, arg.queue))
+            )
+        else:
+            processed_args.append(arg)
+
+    processed_kwargs = {}
+    for k, v in kwargs.items():
+        if isinstance(v, _RpcQueue):
+            queue_id = _get_next_queue_id()
+            v.queue_id = queue_id
+            processed_kwargs[k] = v
+            queue_tasks.append(
+                asyncio.create_task(_send_queue_messages_helper(ws, queue_id, v.queue))
+            )
+        else:
+            processed_kwargs[k] = v
+
+    return processed_args, processed_kwargs
+
+
+async def _send_queue_messages_helper(
+    ws: "ClientConnection", queue_id: int, q: asyncio.Queue[Any]
+) -> None:
+    """
+    asyncio.Queueからアイテムを取得してWebSocketで送信する
+    
+    Args:
+        ws: WebSocketコネクション
+        queue_id: キューのID
+        q: asyncio.Queue
+    """
+    try:
+        while True:
+            item = await q.get()
+            if item is None:
+                done_msg = QueueDoneMessage(queue_id=queue_id)
+                await ws.send(pickle.dumps(done_msg))
+                break
+            else:
+                put_msg = QueuePutMessage(queue_id=queue_id, value=item)
+                await ws.send(pickle.dumps(put_msg))
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # pragma: no cover
+        pass
+
+
 class Rpc(Generic[P, R]):
     """
     リモート関数呼び出しを行うクライアントクラス
@@ -96,34 +168,9 @@ class Rpc(Generic[P, R]):
         """
         async with websockets.connect(self.endpoint_url) as ws:
             # RpcQueueの処理
-            processed_args = []
-            for arg in self.args:
-                if isinstance(arg, _RpcQueue):
-                    queue_id = _get_next_queue_id()
-                    arg.queue_id = queue_id
-                    processed_args.append(arg)
-                    # キューからメッセージを送信するタスクを作成
-                    self._queue_tasks.append(
-                        asyncio.create_task(
-                            self._send_queue_messages(ws, queue_id, arg.queue)
-                        )
-                    )
-                else:
-                    processed_args.append(arg)
-
-            processed_kwargs = {}
-            for k, v in self.kwargs.items():
-                if isinstance(v, _RpcQueue):
-                    queue_id = _get_next_queue_id()
-                    v.queue_id = queue_id
-                    processed_kwargs[k] = v
-                    self._queue_tasks.append(
-                        asyncio.create_task(
-                            self._send_queue_messages(ws, queue_id, v.queue)
-                        )
-                    )
-                else:
-                    processed_kwargs[k] = v
+            processed_args, processed_kwargs = _process_args_and_kwargs(
+                self.args, self.kwargs, ws, self._queue_tasks
+            )
 
             # CallMessageを送信
             call_msg = CallMessage(
@@ -135,39 +182,6 @@ class Rpc(Generic[P, R]):
 
             # 結果を受信
             return await self._receive_results(ws)
-
-    async def _send_queue_messages(
-        self, ws: "ClientConnection", queue_id: int, q: asyncio.Queue[Any]
-    ) -> None:
-        """
-        asyncio.Queueからアイテムを取得してWebSocketで送信する
-        
-        Args:
-            ws: WebSocketコネクション
-            queue_id: キューのID
-            q: asyncio.Queue
-        """
-        try:
-            while True:
-                item = await q.get()
-                if item is None:
-                    # 終了メッセージを送信
-                    done_msg = QueueDoneMessage(
-                        queue_id=queue_id,
-                    )
-                    await ws.send(pickle.dumps(done_msg))
-                    break
-                else:
-                    # putメッセージを送信
-                    put_msg = QueuePutMessage(
-                        queue_id=queue_id,
-                        value=item,
-                    )
-                    await ws.send(pickle.dumps(put_msg))
-        except asyncio.CancelledError:
-            raise
-        except Exception:  # pragma: no cover
-            pass
 
     async def _receive_results(self, ws: "ClientConnection") -> AsyncIterator[R] | R:
         """
