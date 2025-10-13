@@ -4,8 +4,8 @@ from typing import cast
 
 import quicklook.logging
 from quicklook.comm.coordinator import get_available_generators
-# from quicklook.comm.rpc import Rpc
 from quicklook.comm.types import GeneratorId
+from quicklook.comm.rpc_worker import YieledValue, adaptive_map_rpc, rpc_endpoint, rpc_scatter
 from quicklook.config import config
 from quicklook.datasource import get_datasource
 from quicklook.db import Quicklook, get_db_session
@@ -17,28 +17,10 @@ from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
-from quicklook.comm.rpc_worker import Rpc, YieledValue, adaptive_map_rpc, rpc_endpoint, rpc_scatter
 
 logger = quicklook.logging.getLogger(__name__)
 
 ds = get_datasource()
-
-
-async def create_quicklook(job: Job):  # pragma: no cover
-    '''
-    テスト用。
-    本番ではパイプラインでquicklookを作成する。
-    '''
-    visit = job.visit
-    ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
-    try:
-        ccd_metadata_list = await _generate_single_fits_tiles(job, ccd_refs)
-        await _merge_tiles(job)
-        await _transfer_quicklook_metadata(job, ccd_metadata_list)
-        await _transfer_tiles(job)
-        await _transfer_fits_headers(job)
-    finally:
-        await _finalize_error(job)
 
 
 @dataclass
@@ -79,9 +61,8 @@ def quicklook_pipeline():
         job = result.job
         try:
             uploaded_size = await _transfer_tiles(job)
-            uploaded_size += (
-                + await _transfer_fits_headers(job)
-                + await _transfer_quicklook_metadata(job, result.ccd_metadata_list)
+            uploaded_size += +await _transfer_fits_headers(job) + await _transfer_quicklook_metadata(
+                job, result.ccd_metadata_list
             )
             result.uploaded_size = uploaded_size
             return result
@@ -137,7 +118,8 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
     ccd_generator_map: dict[CcdName, GeneratorId] = {}
     ccd_metadata_list: list[CcdMetadata] = []
 
-    rpcs = [Rpc.create(generate_single_fits_tiles, job, ccd_ref) for ccd_ref in ccd_refs]
+    # 各CCDに対するRPCタスクの引数リストを作成
+    items = [(job, ccd_ref) for ccd_ref in ccd_refs]
 
     async def on_yield(msg: YieledValue):
         match msg:
@@ -150,7 +132,7 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
-    async for result in adaptive_map_rpc(rpcs, stream=True, on_yield=on_yield):
+    async for result in adaptive_map_rpc(generate_single_fits_tiles, items, stream=True, on_yield=on_yield):
         ccd_generator_map[result.args[1].ccd] = rpc_endpoint(result.generator_id)
 
     dist_config = CcdDistributionConfig(ccd_generator_map, get_available_generators())
@@ -158,8 +140,8 @@ async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
         job.shared_large_status.dist_config = dist_config
         job.shared_large_status.ccd_metadata_list = ccd_metadata_list
 
-    await rpc_scatter(Rpc.create(_save_job_metadata_rpc, job))
-    await rpc_scatter(Rpc.create(_save_ccd_distribution_config_rpc, job, dist_config))
+    await rpc_scatter(_save_job_metadata_rpc, args=(job,))
+    await rpc_scatter(_save_ccd_distribution_config_rpc, args=(job, dist_config))
 
     return ccd_metadata_list
 
@@ -182,7 +164,7 @@ async def _merge_tiles(job: Job):
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
-    await rpc_scatter(Rpc.create(merge_single_fits_tiles, job), stream=True, on_yield=on_yield)
+    await rpc_scatter(merge_single_fits_tiles, args=(job,), stream=True, on_yield=on_yield)
 
 
 def _clear_single_fits_tiles_rpc(job: Job):
@@ -201,7 +183,7 @@ async def _transfer_tiles(job: Job):
 
     # TODO: 本当はディスク節約のため_merge_tilesの最後でやりたいのだが
     # 先にstageをupload_to_object_storageに変更する必要がある。
-    await rpc_scatter(Rpc.create(_clear_single_fits_tiles_rpc, job))
+    await rpc_scatter(_clear_single_fits_tiles_rpc, args=(job,))
 
     uploaded_size = 0
 
@@ -216,7 +198,7 @@ async def _transfer_tiles(job: Job):
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
-    await rpc_scatter(Rpc.create(transfer_tiles, job), stream=True, on_yield=on_yield)
+    await rpc_scatter(transfer_tiles, args=(job,), stream=True, on_yield=on_yield)
     return uploaded_size
 
 
@@ -227,7 +209,7 @@ async def _transfer_quicklook_metadata(job: Job, ccd_metadata_list: list[CcdMeta
 
 async def _transfer_fits_headers(job: Job) -> int:
     """FITS headerをobject storageにアップロードする"""
-    uploaded_sizes = cast(list[int], await rpc_scatter(Rpc.create(transfer_fits_headers, job)))
+    uploaded_sizes = cast(list[int], await rpc_scatter(transfer_fits_headers, args=(job,)))
     return sum(uploaded_sizes)
 
 
@@ -266,7 +248,7 @@ async def _finalize_success(result: _PipelineResult):
         await session.commit()
         logger.info(f"Updated quicklook record for {job.visit}: ready=True, disk_usage={total_uploaded_size}")
 
-    await rpc_scatter(Rpc.create(_cleanup_rpc, job))
+    await rpc_scatter(_cleanup_rpc, args=(job,))
     return job
 
 
@@ -288,7 +270,7 @@ async def _finalize_error(job: Job):
         await session.commit()
         logger.info(f"Deleted quicklook record for {job.visit} due to error")
 
-    await rpc_scatter(Rpc.create(_cleanup_rpc, job))
+    await rpc_scatter(_cleanup_rpc, args=(job,))
     return job
 
 

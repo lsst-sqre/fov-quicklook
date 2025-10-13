@@ -11,7 +11,7 @@ import uvicorn
 from sqlalchemy import delete
 
 from quicklook.config import config
-from quicklook.coordinator.create_quicklook import create_quicklook, quicklook_pipeline
+from quicklook.coordinator.create_quicklook import quicklook_pipeline
 from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.dev.run_uvicorn import find_free_tcp_port, run_uvicorn_app
 from quicklook.job.job import Job
@@ -49,13 +49,6 @@ async def test_create_quicklook_pipeline():
     async with quicklook_pipeline().run() as ph:
         await ph.push(job)
         await ev.wait()
-
-
-# @pytest.mark.skip("Skipping test_create_quicklook")
-async def test_create_quicklook():
-    job = Job(VisitName('raw:broccoli'))
-    job.watcher.on_change_status(print_job_status)
-    await create_quicklook(job)
 
 
 printer = JobStatusPrinter()
