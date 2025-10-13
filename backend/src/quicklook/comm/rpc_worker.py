@@ -4,10 +4,61 @@ from functools import lru_cache
 from typing import Any, Awaitable, Callable, Generic, TypeVar
 
 from quicklook.comm.coordinator import get_available_generators, remove_generator
-from quicklook.comm.rpc import Rpc, run_rpc, run_rpc_stream
 from quicklook.comm.types import GeneratorId, GeneratorInfo
 from quicklook.config import config
+from quicklook.rpc import Rpc as RpcClient
 from quicklook.utils.adaptive_map import MapResult, Worker, WorkerDown, adaptive_map, create_worker
+
+
+T = TypeVar("T")
+
+
+@dataclass
+class Rpc(Generic[T]):
+    """RPCリクエストを表すデータクラス"""
+
+    function: Callable[..., T]
+    args: tuple = ()
+    kwargs: dict | None = None
+
+    @classmethod
+    def create(cls, target: Callable, *args, **kwargs) -> "Rpc":
+        return cls(function=target, args=args, kwargs=kwargs)
+
+
+async def run_rpc(url: str, rpc: Rpc[T]) -> T:
+    """RPCを実行し、結果を返す"""
+    kwargs = rpc.kwargs or {}
+    ws_url = _convert_http_to_ws_url(url)
+    result = await RpcClient(ws_url, rpc.function, *rpc.args, **kwargs).run()
+    if hasattr(result, "__aiter__"):
+        # ジェネレータの場合は最初の値を返す（ただし通常は run_rpc_stream を使うべき）
+        async for item in result:  # type: ignore[union-attr]
+            return item  # type: ignore[return-value]
+        raise RuntimeError("No result returned from RPC")
+    return result  # type: ignore[return-value]
+
+
+async def run_rpc_stream(url: str, rpc: Rpc[T]):
+    """RPCを実行し、結果をストリームで返す"""
+    kwargs = rpc.kwargs or {}
+    ws_url = _convert_http_to_ws_url(url)
+    result = await RpcClient(ws_url, rpc.function, *rpc.args, **kwargs).run()
+    if hasattr(result, "__aiter__"):
+        async for item in result:  # type: ignore[union-attr]
+            yield item
+    else:
+        if result is not None:
+            yield result
+
+
+def _convert_http_to_ws_url(url: str) -> str:
+    """HTTPのURLをWebSocketのURLに変換"""
+    if url.startswith("http://"):
+        return "ws://" + url[7:]
+    elif url.startswith("https://"):
+        return "wss://" + url[8:]
+    return url
 
 
 async def adaptive_map_rpc(
@@ -64,9 +115,6 @@ class _Context:
 class _Item:
     rpc: Rpc
     ctx: _Context
-
-
-T = TypeVar('T')
 
 
 @dataclass
