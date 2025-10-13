@@ -94,7 +94,8 @@ async def test_simple_function(rpc_server):
 async def test_generator_function(rpc_server):
     """ジェネレータ関数のRPC呼び出しをテスト"""
     results = []
-    async for item in await Rpc(rpc_server, generator_function, 5).run():
+    result = await Rpc(rpc_server, generator_function, 5).run()
+    async for item in result:  # type: ignore[union-attr]
         results.append(item)
     assert results == [0, 1, 2, 3, 4]
 

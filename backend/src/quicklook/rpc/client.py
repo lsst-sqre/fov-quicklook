@@ -1,7 +1,7 @@
 import asyncio
 import pickle
-from collections.abc import AsyncIterator, Callable
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
+from collections.abc import AsyncIterator, Callable, Generator
+from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, overload
 
 import websockets.client
 
@@ -22,6 +22,7 @@ from .types import (
 
 P = ParamSpec("P")
 T = TypeVar("T")
+R = TypeVar("R")
 
 _next_queue_id = 0
 
@@ -33,7 +34,7 @@ def _get_next_queue_id() -> int:
     return _next_queue_id
 
 
-class Rpc:
+class Rpc(Generic[P, R]):
     """
     リモート関数呼び出しを行うクライアントクラス
     
@@ -46,10 +47,28 @@ class Rpc:
             print(item)
     """
 
+    @overload
     def __init__(
         self,
         endpoint_url: str,
-        func: Callable[P, T],
+        func: Callable[P, Generator[R, Any, Any]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        endpoint_url: str,
+        func: Callable[P, R],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        endpoint_url: str,
+        func: Callable[P, R] | Callable[P, Generator[R, Any, Any]],
         *args: P.args,
         **kwargs: P.kwargs,
     ):
@@ -59,7 +78,13 @@ class Rpc:
         self.kwargs = kwargs
         self._queue_tasks: list[asyncio.Task[None]] = []
 
-    async def run(self) -> AsyncIterator[T] | T:
+    @overload
+    async def run(self: "Rpc[P, Generator[R, Any, Any]]") -> AsyncIterator[R]: ...
+
+    @overload
+    async def run(self: "Rpc[P, R]") -> R: ...
+
+    async def run(self) -> AsyncIterator[R] | R:
         """
         リモート関数を実行する
         
@@ -144,7 +169,7 @@ class Rpc:
         except Exception:  # pragma: no cover
             pass
 
-    async def _receive_results(self, ws: "ClientConnection") -> AsyncIterator[T] | T:
+    async def _receive_results(self, ws: "ClientConnection") -> AsyncIterator[R] | R:
         """
         WebSocketから結果を受信する
         
@@ -157,7 +182,7 @@ class Rpc:
         Raises:
             RpcRemoteError: リモート実行でエラーが発生した場合
         """
-        async def _stream_generator(first_value: T) -> AsyncIterator[T]:
+        async def _stream_generator(first_value: R) -> AsyncIterator[R]:
             """ジェネレータとして結果をストリーミングする"""
             yield first_value
             try:
