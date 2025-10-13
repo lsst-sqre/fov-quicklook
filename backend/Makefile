@@ -82,5 +82,8 @@ db/docker:
 		-e POSTGRES_PASSWORD=quicklook \
 		-e POSTGRES_DB=quicklook \
 		-p 5432:5432 \
-		-v $(PWD)/docker-volumes/postgres:/var/lib/postgresql/data \
-		postgres:16
+		-v "$(PWD)/docker-volumes/postgres:/var/lib/postgresql/data" \
+		postgres:16 \
+		-c log_statement=all \
+		-c log_destination=stderr \
+		-c log_line_prefix='%m [%p] %u@%d %r %a '

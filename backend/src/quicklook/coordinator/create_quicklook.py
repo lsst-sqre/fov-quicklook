@@ -17,8 +17,7 @@ from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
-
-from ..comm.rpc_worker import YieledValue, adaptive_map_rpc, rpc_endpoint, rpc_scatter
+from quicklook.comm.rpc_worker import Rpc, YieledValue, adaptive_map_rpc, rpc_endpoint, rpc_scatter
 
 logger = quicklook.logging.getLogger(__name__)
 

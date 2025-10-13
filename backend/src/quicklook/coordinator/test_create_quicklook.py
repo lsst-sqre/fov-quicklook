@@ -48,7 +48,7 @@ async def test_create_quicklook_pipeline():
         await ev.wait()
 
 
-@pytest.mark.skip("Skipping test_create_quicklook")
+# @pytest.mark.skip("Skipping test_create_quicklook")
 async def test_create_quicklook():
     job = Job(VisitName('raw:broccoli'))
     job.watcher.on_change_status(print_job_status)
