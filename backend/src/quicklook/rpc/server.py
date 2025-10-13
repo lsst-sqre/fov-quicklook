@@ -137,7 +137,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         # argsとkwargsからRpcQueueを抽出してキューIDに置き換え
         processed_args = []
         for arg in args:
-            if hasattr(arg, "__class__") and arg.__class__.__name__ == "RpcQueue":
+            if hasattr(arg, "__class__") and arg.__class__.__name__ == "_RpcQueue":
                 queue_id = arg.queue_id
                 pipe: Any = manager.Queue()  # type: ignore[attr-defined]
                 queue_map[queue_id] = pipe
@@ -151,7 +151,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
 
         processed_kwargs = {}
         for k, v in kwargs.items():
-            if hasattr(v, "__class__") and v.__class__.__name__ == "RpcQueue":
+            if hasattr(v, "__class__") and v.__class__.__name__ == "_RpcQueue":
                 queue_id = v.queue_id
                 pipe: Any = manager.Queue()  # type: ignore[attr-defined]
                 queue_map[queue_id] = pipe

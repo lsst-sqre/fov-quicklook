@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
 
 import websockets.client
 
-from .queue import RpcQueue
+from .queue import _RpcQueue
 
 if TYPE_CHECKING:
     from websockets.asyncio.client import ClientConnection
@@ -73,7 +73,7 @@ class Rpc:
             # RpcQueueの処理
             processed_args = []
             for arg in self.args:
-                if isinstance(arg, RpcQueue):
+                if isinstance(arg, _RpcQueue):
                     queue_id = _get_next_queue_id()
                     arg.queue_id = queue_id
                     processed_args.append(arg)
@@ -88,7 +88,7 @@ class Rpc:
 
             processed_kwargs = {}
             for k, v in self.kwargs.items():
-                if isinstance(v, RpcQueue):
+                if isinstance(v, _RpcQueue):
                     queue_id = _get_next_queue_id()
                     v.queue_id = queue_id
                     processed_kwargs[k] = v
@@ -157,8 +157,29 @@ class Rpc:
         Raises:
             RpcRemoteError: リモート実行でエラーが発生した場合
         """
-        is_generator = False
-        results: list[T] = []
+        async def _stream_generator(first_value: T) -> AsyncIterator[T]:
+            """ジェネレータとして結果をストリーミングする"""
+            yield first_value
+            try:
+                async for data in ws:
+                    if isinstance(data, str):  # pragma: no cover
+                        continue
+                    message: Message = pickle.loads(data)
+
+                    match message:
+                        case YieldMessage(value=value):
+                            yield value
+                        case ReturnMessage():
+                            break
+                        case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
+                            raise RpcRemoteError(error_type, error_message, traceback)
+            finally:
+                for task in self._queue_tasks:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
 
         try:
             async for data in ws:
@@ -167,34 +188,18 @@ class Rpc:
                 message: Message = pickle.loads(data)
 
                 match message:
-                    case YieldMessage(value=value):
-                        is_generator = True
-                        results.append(value)
+                    case YieldMessage(value=first_value):
+                        return _stream_generator(first_value)
                     case ReturnMessage(value=value):
-                        if not is_generator:
-                            return value
-                        # ジェネレータの場合は終了
-                        break
+                        return value
                     case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
                         raise RpcRemoteError(error_type, error_message, traceback)
-
         finally:
-            # キューのタスクをキャンセル
             for task in self._queue_tasks:
                 task.cancel()
                 try:
                     await task
                 except asyncio.CancelledError:
                     pass
-
-        # ジェネレータの場合は結果をイテレート
-        if is_generator:
-            return self._async_iterator(results)
         
-        # ここには到達しないはずだが、型チェッカーのために
         return None  # type: ignore
-
-    async def _async_iterator(self, results: list[T]) -> AsyncIterator[T]:
-        """リストからAsyncIteratorを作成する"""
-        for item in results:
-            yield item

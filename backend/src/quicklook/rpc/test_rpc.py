@@ -1,12 +1,14 @@
 import asyncio
 import pickle
+import queue
 
 import pytest
 import uvicorn
 from fastapi import FastAPI, WebSocket
 
-from quicklook.rpc import Rpc, RpcQueue, RpcRemoteError, create_rpc_endpoint, rpc_lifespan
+from quicklook.rpc import Rpc, _RpcQueue, RpcRemoteError, create_rpc_endpoint, rpc_lifespan
 from quicklook.rpc.lifespan import AppState
+from quicklook.rpc.queue import RpcQueue
 from quicklook.rpc.types import ErrorMessage, YieldMessage
 
 
@@ -32,7 +34,7 @@ async def async_function():
     return "async result"
 
 
-def queue_consumer_function(q) -> list[int]:
+def queue_consumer_function(q: queue.Queue) -> list[int]:
     """キューから値を受け取る関数"""
     results = []
     while True:
@@ -43,7 +45,7 @@ def queue_consumer_function(q) -> list[int]:
     return results
 
 
-def queue_generator_function(q):
+def queue_generator_function(q: queue.Queue):
     """キューから値を受け取ってyieldする関数"""
     while True:
         item = q.get()
@@ -101,7 +103,7 @@ async def test_error_function(rpc_server):
     """エラーが発生する関数のRPC呼び出しをテスト"""
     with pytest.raises(RpcRemoteError) as exc_info:
         await Rpc(rpc_server, error_function).run()
-    
+
     assert exc_info.value.error_type == "ValueError"
     assert "Test error" in exc_info.value.error_message
 
@@ -110,7 +112,7 @@ async def test_async_function_not_supported(rpc_server):
     """非同期関数がサポートされないことをテスト"""
     with pytest.raises(RpcRemoteError) as exc_info:
         await Rpc(rpc_server, async_function).run()
-    
+
     assert exc_info.value.error_type == "TypeError"
     assert "Async functions are not supported" in exc_info.value.error_message
 
@@ -118,15 +120,15 @@ async def test_async_function_not_supported(rpc_server):
 async def test_queue_consumer(rpc_server):
     """キューを使った関数のRPC呼び出しをテスト"""
     client_queue = asyncio.Queue()
-    
+
     async def produce():
         for i in range(3):
             await client_queue.put(i)
         await client_queue.put(None)
-    
+
     task = asyncio.create_task(produce())
     result = await Rpc(rpc_server, queue_consumer_function, RpcQueue(client_queue)).run()
-    
+
     await task
     assert result == [0, 2, 4]
 
@@ -134,19 +136,19 @@ async def test_queue_consumer(rpc_server):
 async def test_queue_generator(rpc_server):
     """キューを使ったジェネレータのRPC呼び出しをテスト"""
     client_queue = asyncio.Queue()
-    
+
     async def produce():
         for i in range(3):
             await client_queue.put(i)
             await asyncio.sleep(0.01)
         await client_queue.put(None)
-    
+
     task = asyncio.create_task(produce())
-    
+
     results = []
     async for item in await Rpc(rpc_server, queue_generator_function, RpcQueue(client_queue)).run():
         results.append(item)
-    
+
     await task
     assert results == [0, 2, 4]
 
@@ -166,19 +168,19 @@ async def test_mixed_args_kwargs(rpc_server):
 async def test_invalid_message_type(rpc_app):
     """無効なメッセージタイプをテスト"""
     import websockets
-    
+
     # サーバーを起動
     config = uvicorn.Config(rpc_app, host="127.0.0.1", port=8766, log_level="error")
     server = uvicorn.Server(config)
     task = asyncio.create_task(server.serve())
     await asyncio.sleep(0.5)
-    
+
     try:
         async with websockets.connect("ws://127.0.0.1:8766/rpc") as ws:
             # 無効なメッセージを送信
             invalid_msg = YieldMessage(value=123)
             await ws.send(pickle.dumps(invalid_msg))
-            
+
             # エラーメッセージを受信
             data = await ws.recv()
             if isinstance(data, bytes):
@@ -200,13 +202,13 @@ async def test_connection_error_handling(rpc_app):
 async def test_lifespan_error_handling():
     """lifespanのエラーハンドリングをテスト"""
     from quicklook.rpc.lifespan import get_process_pool, get_manager
-    
+
     # 初期化されていない状態でアクセス
     app = FastAPI()
     app.state.rpc = AppState()
-    
+
     with pytest.raises(RuntimeError, match="Process pool is not initialized"):
         get_process_pool(app)
-    
+
     with pytest.raises(RuntimeError, match="Manager is not initialized"):
         get_manager(app)
