@@ -6,9 +6,11 @@ import queue
 import traceback as tb
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import anyio.to_thread
+
+T = TypeVar("T")
 from fastapi import FastAPI, WebSocket
 
 from .lifespan import get_manager, get_process_pool
@@ -52,16 +54,16 @@ class _ProcessErrorResult:
 _ProcessResult = _ProcessYieldResult | _ProcessReturnResult | _ProcessErrorResult
 
 
-class _QueueProxy:
+class _QueueProxy(Generic[T]):
     """multiprocessing.Queueをqueue.Queueインターフェースでラップする"""
-    
+
     def __init__(self, mq: Any):  # mp.Queue type
         self._mq = mq
-    
-    def get(self, block: bool = True, timeout: float | None = None) -> Any:
-        return self._mq.get(block=block, timeout=timeout)
-    
-    def put(self, item: Any, block: bool = True, timeout: float | None = None) -> None:
+
+    def get(self, block: bool = True, timeout: float | None = None) -> T:
+        return self._mq.get(block=block, timeout=timeout)  # type: ignore[no-any-return]
+
+    def put(self, item: T, block: bool = True, timeout: float | None = None) -> None:
         self._mq.put(item, block=block, timeout=timeout)
 
 
