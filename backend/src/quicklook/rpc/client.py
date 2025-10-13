@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, overload
 import websockets.client
 
 from .queue import _RpcQueue
-from .queue_processor import process_args_kwargs_with_rpc_queue
 
 if TYPE_CHECKING:
     from websockets.asyncio.client import ClientConnection
@@ -44,16 +43,27 @@ def _process_args_and_kwargs(
     Returns:
         処理済みのargs, kwargs
     """
-
-    def process_queue(rpc_queue: _RpcQueue, is_kwarg: bool) -> _RpcQueue:
-        queue_tasks.append(
-            asyncio.create_task(
-                _send_queue_messages_helper(ws, rpc_queue.queue_id, rpc_queue.queue)
+    processed_args = []
+    for arg in args:
+        if isinstance(arg, _RpcQueue):
+            processed_args.append(arg)
+            queue_tasks.append(
+                asyncio.create_task(_send_queue_messages_helper(ws, arg.queue_id, arg.queue))
             )
-        )
-        return rpc_queue
+        else:
+            processed_args.append(arg)
 
-    return process_args_kwargs_with_rpc_queue(args, kwargs, process_queue)
+    processed_kwargs = {}
+    for k, v in kwargs.items():
+        if isinstance(v, _RpcQueue):
+            processed_kwargs[k] = v
+            queue_tasks.append(
+                asyncio.create_task(_send_queue_messages_helper(ws, v.queue_id, v.queue))
+            )
+        else:
+            processed_kwargs[k] = v
+
+    return processed_args, processed_kwargs
 
 
 async def _send_queue_messages_helper(
