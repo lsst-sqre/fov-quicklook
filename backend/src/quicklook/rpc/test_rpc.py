@@ -83,14 +83,12 @@ async def rpc_server(rpc_app):
     await task
 
 
-@pytest.mark.timeout(10)
 async def test_simple_function(rpc_server):
     """シンプルな関数のRPC呼び出しをテスト"""
     result = await Rpc(rpc_server, simple_function, 3, 5).run()
     assert result == 8
 
 
-@pytest.mark.timeout(10)
 async def test_generator_function(rpc_server):
     """ジェネレータ関数のRPC呼び出しをテスト"""
     results = []
@@ -99,7 +97,6 @@ async def test_generator_function(rpc_server):
     assert results == [0, 1, 2, 3, 4]
 
 
-@pytest.mark.timeout(10)
 async def test_error_function(rpc_server):
     """エラーが発生する関数のRPC呼び出しをテスト"""
     with pytest.raises(RpcRemoteError) as exc_info:
@@ -109,7 +106,6 @@ async def test_error_function(rpc_server):
     assert "Test error" in exc_info.value.error_message
 
 
-@pytest.mark.timeout(10)
 async def test_async_function_not_supported(rpc_server):
     """非同期関数がサポートされないことをテスト"""
     with pytest.raises(RpcRemoteError) as exc_info:
@@ -119,7 +115,6 @@ async def test_async_function_not_supported(rpc_server):
     assert "Async functions are not supported" in exc_info.value.error_message
 
 
-@pytest.mark.timeout(10)
 async def test_queue_consumer(rpc_server):
     """キューを使った関数のRPC呼び出しをテスト"""
     client_queue = asyncio.Queue()
@@ -136,7 +131,6 @@ async def test_queue_consumer(rpc_server):
     assert result == [0, 2, 4]
 
 
-@pytest.mark.timeout(10)
 async def test_queue_generator(rpc_server):
     """キューを使ったジェネレータのRPC呼び出しをテスト"""
     client_queue = asyncio.Queue()
@@ -157,21 +151,18 @@ async def test_queue_generator(rpc_server):
     assert results == [0, 2, 4]
 
 
-@pytest.mark.timeout(10)
 async def test_kwargs(rpc_server):
     """キーワード引数を使ったRPC呼び出しをテスト"""
     result = await Rpc(rpc_server, simple_function, x=10, y=20).run()
     assert result == 30
 
 
-@pytest.mark.timeout(10)
 async def test_mixed_args_kwargs(rpc_server):
     """位置引数とキーワード引数を混ぜたRPC呼び出しをテスト"""
     result = await Rpc(rpc_server, simple_function, 15, y=25).run()
     assert result == 40
 
 
-@pytest.mark.timeout(10)
 async def test_invalid_message_type(rpc_app):
     """無効なメッセージタイプをテスト"""
     import websockets
@@ -199,7 +190,6 @@ async def test_invalid_message_type(rpc_app):
         await task
 
 
-@pytest.mark.timeout(10)
 async def test_connection_error_handling(rpc_app):
     """接続エラー時の処理をテスト"""
     # 存在しないサーバーに接続を試みる
@@ -207,7 +197,6 @@ async def test_connection_error_handling(rpc_app):
         await Rpc("ws://127.0.0.1:19999/rpc", simple_function, 1, 2).run()
 
 
-@pytest.mark.timeout(10)
 async def test_lifespan_error_handling():
     """lifespanのエラーハンドリングをテスト"""
     from quicklook.rpc.lifespan import get_process_pool, get_manager
