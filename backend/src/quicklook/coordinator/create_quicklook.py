@@ -4,7 +4,7 @@ from typing import cast
 
 import quicklook.logging
 from quicklook.comm.coordinator import get_available_generators
-from quicklook.comm.rpc import Rpc
+# from quicklook.comm.rpc import Rpc
 from quicklook.comm.types import GeneratorId
 from quicklook.config import config
 from quicklook.datasource import get_datasource

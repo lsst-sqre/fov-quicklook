@@ -171,6 +171,33 @@ class Rpc(Generic[P, R]):
         # 結果を受信
         return await self._receive_results(ws)
 
+    async def iterate(self) -> AsyncIterator[R]:
+        """
+        ジェネレータ関数専用のイテレーションメソッド
+        
+        このメソッドはジェネレータ関数を実行し、結果を非同期イテレータとして返します。
+        通常の関数に対して使用すると、実行時エラーが発生します。
+        
+        Returns:
+            AsyncIterator[R]: ジェネレータからの値を順次yield
+        
+        Raises:
+            RpcRemoteError: リモート実行でエラーが発生した場合
+            RuntimeError: ジェネレータでない関数に対して呼び出された場合
+        
+        使用例:
+            async for item in await Rpc(url, generator_func, arg).iterate():
+                print(item)
+        """
+        result = await self.run()
+        if not hasattr(result, "__aiter__"):
+            raise RuntimeError(
+                f"iterate() can only be used with generator functions. "
+                f"The function {self.func.__name__} returned a non-generator result."
+            )
+        async for item in result:  # type: ignore[union-attr]
+            yield item
+
     async def _receive_results(self, ws: "ClientConnection") -> AsyncIterator[R] | R:
         """
         WebSocketから結果を受信する

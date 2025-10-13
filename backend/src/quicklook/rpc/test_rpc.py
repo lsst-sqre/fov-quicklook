@@ -100,8 +100,7 @@ async def test_simple_function(rpc_server):
 async def test_generator_function(rpc_server):
     """ジェネレータ関数のRPC呼び出しをテスト"""
     results = []
-    result = await Rpc(rpc_server, generator_function, 5).run()
-    async for item in result:  # type: ignore[union-attr]
+    async for item in Rpc(rpc_server, generator_function, 5).iterate():
         results.append(item)
     assert results == [0, 1, 2, 3, 4]
 
@@ -153,8 +152,7 @@ async def test_queue_generator(rpc_server):
     task = asyncio.create_task(produce())
 
     results = []
-    result = await Rpc(rpc_server, queue_generator_function, RpcQueue(client_queue)).run()
-    async for item in result:  # type: ignore[union-attr]
+    async for item in Rpc(rpc_server, queue_generator_function, RpcQueue(client_queue)).iterate():
         results.append(item)
 
     await task
