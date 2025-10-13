@@ -10,6 +10,7 @@ import anyio.to_thread
 from fastapi import FastAPI, WebSocket
 
 from .lifespan import get_manager, get_process_pool
+from .queue import _RpcQueue
 from .types import (
     CallMessage,
     ErrorMessage,
@@ -137,8 +138,9 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         # argsとkwargsからRpcQueueを抽出してキューIDに置き換え
         processed_args = []
         for arg in args:
-            if hasattr(arg, "__class__") and arg.__class__.__name__ == "_RpcQueue":
+            if isinstance(arg, _RpcQueue):
                 queue_id = arg.queue_id
+                assert queue_id is not None, "queue_id must be set by client"
                 pipe: Any = manager.Queue()  # type: ignore[attr-defined]
                 queue_map[queue_id] = pipe
                 processed_args.append(queue_id)
@@ -151,8 +153,9 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
 
         processed_kwargs = {}
         for k, v in kwargs.items():
-            if hasattr(v, "__class__") and v.__class__.__name__ == "_RpcQueue":
+            if isinstance(v, _RpcQueue):
                 queue_id = v.queue_id
+                assert queue_id is not None, "queue_id must be set by client"
                 pipe: Any = manager.Queue()  # type: ignore[attr-defined]
                 queue_map[queue_id] = pipe
                 processed_kwargs[k] = queue_id
