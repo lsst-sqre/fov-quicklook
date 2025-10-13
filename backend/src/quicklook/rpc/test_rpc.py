@@ -153,8 +153,8 @@ async def test_queue_generator(rpc_server):
     task = asyncio.create_task(produce())
 
     results = []
-    
-    async for item in await Rpc(rpc_server, queue_generator_function, RpcQueue(client_queue)).run():
+    result = await Rpc(rpc_server, queue_generator_function, RpcQueue(client_queue)).run()
+    async for item in result:  # type: ignore[union-attr]
         results.append(item)
 
     await task
