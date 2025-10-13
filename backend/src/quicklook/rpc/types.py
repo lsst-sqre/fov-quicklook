@@ -59,6 +59,18 @@ class QueueDoneMessage:
     queue_id: int
 
 
+@dataclass(frozen=True)
+class QueueRef:
+    """
+    キューへの参照を表すマーカークラス
+    
+    整数のqueue_idではなくこのクラスを使うことで、
+    通常の整数引数とキューを区別できる
+    """
+
+    queue_id: int
+
+
 Message = (
     CallMessage
     | YieldMessage

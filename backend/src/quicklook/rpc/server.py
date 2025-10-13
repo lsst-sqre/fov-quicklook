@@ -19,6 +19,7 @@ from .types import (
     Message,
     QueueDoneMessage,
     QueuePutMessage,
+    QueueRef,
     ReturnMessage,
     YieldMessage,
 )
@@ -69,7 +70,7 @@ def _process_args_kwargs_with_queue_map(
     queue_map: dict[int, "queue.Queue[Any]"],
 ) -> tuple[list[Any], dict[str, Any]]:
     """
-    argsとkwargsの中のキューIDをqueue.Queueに置き換え
+    argsとkwargsの中のQueueRefをqueue.Queueに置き換え
     
     Args:
         args: 位置引数
@@ -81,15 +82,15 @@ def _process_args_kwargs_with_queue_map(
     """
     processed_args = []
     for arg in args:
-        if isinstance(arg, int) and arg in queue_map:
-            processed_args.append(_QueueProxy(queue_map[arg]))
+        if isinstance(arg, QueueRef):
+            processed_args.append(_QueueProxy(queue_map[arg.queue_id]))
         else:
             processed_args.append(arg)
     
     processed_kwargs = {}
     for k, v in kwargs.items():
-        if isinstance(v, int) and v in queue_map:
-            processed_kwargs[k] = _QueueProxy(queue_map[v])
+        if isinstance(v, QueueRef):
+            processed_kwargs[k] = _QueueProxy(queue_map[v.queue_id])
         else:
             processed_kwargs[k] = v
     
@@ -108,7 +109,7 @@ def _extract_rpc_queues(
     list[asyncio.Task[None]],
 ]:
     """
-    argsとkwargsからRpcQueueを抽出してキューIDに置き換え
+    argsとkwargsからRpcQueueを抽出してQueueRefに置き換え
     
     Args:
         args: 位置引数
@@ -129,7 +130,7 @@ def _extract_rpc_queues(
             assert queue_id is not None, "queue_id must be set by client"
             pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
             queue_map[queue_id] = pipe
-            processed_args.append(queue_id)
+            processed_args.append(QueueRef(queue_id=queue_id))
             queue_tasks.append(
                 asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe))
             )
@@ -143,7 +144,7 @@ def _extract_rpc_queues(
             assert queue_id is not None, "queue_id must be set by client"
             pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
             queue_map[queue_id] = pipe
-            processed_kwargs[k] = queue_id
+            processed_kwargs[k] = QueueRef(queue_id=queue_id)
             queue_tasks.append(
                 asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe))
             )
@@ -165,8 +166,8 @@ def _execute_function_in_process(
     
     Args:
         func: 実行する関数
-        args: 位置引数 (キューIDは整数として含まれる)
-        kwargs: キーワード引数 (キューIDは整数として含まれる)
+        args: 位置引数 (QueueRefはqueue.Queueに置き換えられる)
+        kwargs: キーワード引数 (QueueRefはqueue.Queueに置き換えられる)
         queue_map: キューIDとmultiprocessing.Queueのマッピング
         result_queue: 結果を送信するmultiprocessing.Queue
     """

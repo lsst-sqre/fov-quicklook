@@ -1,6 +1,7 @@
 import asyncio
 import pickle
 import queue
+from typing import Generator
 
 import pytest
 import uvicorn
@@ -45,13 +46,18 @@ def queue_consumer_function(q: queue.Queue) -> list[int]:
     return results
 
 
-def queue_generator_function(q: queue.Queue):
+def queue_generator_function(q: queue.Queue[int]) -> Generator[int]:
     """キューから値を受け取ってyieldする関数"""
     while True:
         item = q.get()
         if item is None:
             break
         yield item * 2
+
+
+def function_with_int_arg(value: int) -> int:
+    """整数を受け取って2倍にする関数"""
+    return value * 2
 
 
 @pytest.fixture
@@ -147,6 +153,7 @@ async def test_queue_generator(rpc_server):
     task = asyncio.create_task(produce())
 
     results = []
+    
     async for item in await Rpc(rpc_server, queue_generator_function, RpcQueue(client_queue)).run():
         results.append(item)
 
@@ -164,6 +171,19 @@ async def test_mixed_args_kwargs(rpc_server):
     """位置引数とキーワード引数を混ぜたRPC呼び出しをテスト"""
     result = await Rpc(rpc_server, simple_function, 15, y=25).run()
     assert result == 40
+
+
+async def test_integer_argument_not_confused_with_queue(rpc_server):
+    """整数引数がキュー参照と混同されないことをテスト"""
+    # queue_idと同じ値の整数を渡しても正しく処理される
+    result = await Rpc(rpc_server, function_with_int_arg, 0).run()
+    assert result == 0
+
+    result = await Rpc(rpc_server, function_with_int_arg, 1).run()
+    assert result == 2
+
+    result = await Rpc(rpc_server, function_with_int_arg, 100).run()
+    assert result == 200
 
 
 async def test_invalid_message_type(rpc_app):
