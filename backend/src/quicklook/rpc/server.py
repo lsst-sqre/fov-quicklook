@@ -127,7 +127,6 @@ def _extract_rpc_queues(
     for arg in args:
         if isinstance(arg, _RpcQueue):
             queue_id = arg.queue_id
-            assert queue_id is not None, "queue_id must be set by client"
             pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
             queue_map[queue_id] = pipe
             processed_args.append(QueueRef(queue_id=queue_id))
@@ -141,7 +140,6 @@ def _extract_rpc_queues(
     for k, v in kwargs.items():
         if isinstance(v, _RpcQueue):
             queue_id = v.queue_id
-            assert queue_id is not None, "queue_id must be set by client"
             pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
             queue_map[queue_id] = pipe
             processed_kwargs[k] = QueueRef(queue_id=queue_id)

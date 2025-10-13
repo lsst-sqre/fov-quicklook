@@ -24,15 +24,6 @@ P = ParamSpec("P")
 T = TypeVar("T")
 R = TypeVar("R")
 
-_next_queue_id = 0
-
-
-def _get_next_queue_id() -> int:
-    """次のキューIDを取得する"""
-    global _next_queue_id
-    _next_queue_id += 1
-    return _next_queue_id
-
 
 def _process_args_and_kwargs(
     args: tuple[Any, ...],
@@ -55,11 +46,9 @@ def _process_args_and_kwargs(
     processed_args = []
     for arg in args:
         if isinstance(arg, _RpcQueue):
-            queue_id = _get_next_queue_id()
-            arg.queue_id = queue_id
             processed_args.append(arg)
             queue_tasks.append(
-                asyncio.create_task(_send_queue_messages_helper(ws, queue_id, arg.queue))
+                asyncio.create_task(_send_queue_messages_helper(ws, arg.queue_id, arg.queue))
             )
         else:
             processed_args.append(arg)
@@ -67,11 +56,9 @@ def _process_args_and_kwargs(
     processed_kwargs = {}
     for k, v in kwargs.items():
         if isinstance(v, _RpcQueue):
-            queue_id = _get_next_queue_id()
-            v.queue_id = queue_id
             processed_kwargs[k] = v
             queue_tasks.append(
-                asyncio.create_task(_send_queue_messages_helper(ws, queue_id, v.queue))
+                asyncio.create_task(_send_queue_messages_helper(ws, v.queue_id, v.queue))
             )
         else:
             processed_kwargs[k] = v
