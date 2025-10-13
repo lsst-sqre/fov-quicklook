@@ -13,6 +13,7 @@ from fastapi import FastAPI, WebSocket
 
 from .lifespan import get_manager, get_process_pool
 from .queue import _RpcQueue
+from .queue_processor import process_args_kwargs_with_rpc_queue
 from .types import (
     CallMessage,
     ErrorMessage,
@@ -123,31 +124,16 @@ def _extract_rpc_queues(
     queue_map: dict[int, "queue.Queue[Any]"] = {}
     queue_tasks: list[asyncio.Task[None]] = []
 
-    processed_args = []
-    for arg in args:
-        if isinstance(arg, _RpcQueue):
-            queue_id = arg.queue_id
-            pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
-            queue_map[queue_id] = pipe
-            processed_args.append(QueueRef(queue_id=queue_id))
-            queue_tasks.append(
-                asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe))
-            )
-        else:
-            processed_args.append(arg)
+    def process_queue(rpc_queue: _RpcQueue, is_kwarg: bool) -> QueueRef:
+        queue_id = rpc_queue.queue_id
+        pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
+        queue_map[queue_id] = pipe
+        queue_tasks.append(asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe)))
+        return QueueRef(queue_id=queue_id)
 
-    processed_kwargs = {}
-    for k, v in kwargs.items():
-        if isinstance(v, _RpcQueue):
-            queue_id = v.queue_id
-            pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
-            queue_map[queue_id] = pipe
-            processed_kwargs[k] = QueueRef(queue_id=queue_id)
-            queue_tasks.append(
-                asyncio.create_task(_handle_queue_messages(ws, queue_id, pipe))
-            )
-        else:
-            processed_kwargs[k] = v
+    processed_args, processed_kwargs = process_args_kwargs_with_rpc_queue(
+        args, kwargs, process_queue
+    )
 
     return processed_args, processed_kwargs, queue_map, queue_tasks
 
