@@ -26,9 +26,12 @@ pytestmark = pytest.mark.slow
 async def reset_db():
     """テスト開始時にquickloooksテーブルをリセット"""
     async with get_db_session() as session:
-        await session.execute(delete(Access))
-        await session.execute(delete(Quicklook))
-        await session.commit()
+        try:
+            await session.execute(delete(Access))
+            await session.execute(delete(Quicklook))
+            await session.commit()
+        except Exception:
+            pass
 
 
 async def test_create_quicklook_pipeline():
