@@ -6,6 +6,9 @@ RPC (Remote Procedure Call) モジュール。
 サーバー側では受信したRPCをローカルで実行し、結果をストリームで返します。
 
 WebSocketベースのRPC実装を使用しています。
+
+注: このモジュールは後方互換性のために残されており、
+内部では quicklook.rpc モジュールを使用しています。
 """
 
 import pickle
@@ -77,67 +80,35 @@ async def run_rpc_stream(
     
     エラーが発生した場合でも、それまでにyieldされた値は取得できます。
     """
-    import websockets
-    import pickle as pkl
-    from quicklook.rpc.types import CallMessage, YieldMessage, ReturnMessage, ErrorMessage
-    
     # HTTPのURLをWebSocketのURLに変換
     ws_url = _convert_http_to_ws_url(url)
     
     kwargs = rpc.kwargs or {}
     
     try:
-        async with websockets.connect(ws_url) as ws:
-            # CallMessageを送信
-            call_msg = CallMessage(
-                func=rpc.function,
-                args=rpc.args,
-                kwargs=kwargs,
-            )
-            await ws.send(pkl.dumps(call_msg))
-            
-            # 結果を受信してyield
-            async for data in ws:
-                if isinstance(data, str):  # pragma: no cover
-                    continue
-                message = pkl.loads(data)
-                
-                match message:
-                    case YieldMessage(value=value):
-                        yield value
-                    case ReturnMessage(value=value):
-                        # ジェネレーターでない場合は単一の値を返す
-                        if value is not None:
-                            yield value
-                        return
-                    case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
-                        # エラーが発生した場合、それまでyieldした値は既に送信されている
-                        # 互換性のためにException型を再構築
-                        try:
-                            exception_class = eval(error_type, {"__builtins__": __builtins__})
-                            if not issubclass(exception_class, Exception):
-                                raise TypeError()
-                        except (NameError, TypeError):
-                            exception_class = Exception
-                        
-                        original_exception: Exception = exception_class(error_message)
-                        raise RpcRemoteError(original_exception)
-    except RpcRemoteError:
-        # すでに適切な例外型なので再raiseする
-        raise
-    except Exception as e:
-        # その他のエラー（接続エラーなど）
-        if isinstance(e, _RpcRemoteError):
-            try:
-                exception_class = eval(e.error_type, {"__builtins__": __builtins__})
-                if not issubclass(exception_class, Exception):
-                    raise TypeError()
-            except (NameError, TypeError):
-                exception_class = Exception
-            
-            original_exception: Exception = exception_class(e.error_message)
-            raise RpcRemoteError(original_exception)
-        raise
+        # 新しいrpcモジュールを使用
+        rpc_client = RpcClient(ws_url, rpc.function, *rpc.args, **kwargs)
+        result = await rpc_client.run()
+        
+        # 結果がAsyncIteratorの場合
+        if hasattr(result, '__aiter__'):
+            async for item in result:  # type: ignore[union-attr]
+                yield item
+        else:
+            # 単一の値の場合
+            if result is not None:
+                yield result  # type: ignore[misc]
+    except _RpcRemoteError as e:
+        # 新しいrpcモジュールのRpcRemoteErrorを互換性のある形式に変換
+        try:
+            exception_class = eval(e.error_type, {"__builtins__": __builtins__})
+            if not issubclass(exception_class, Exception):
+                raise TypeError()
+        except (NameError, TypeError):
+            exception_class = Exception
+        
+        original_exception: Exception = exception_class(e.error_message)
+        raise RpcRemoteError(original_exception) from e
 
 
 def _convert_http_to_ws_url(url: str) -> str:

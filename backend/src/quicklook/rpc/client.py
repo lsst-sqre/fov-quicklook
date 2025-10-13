@@ -166,22 +166,23 @@ class Rpc(Generic[P, R]):
         Raises:
             RpcRemoteError: リモート実行でエラーが発生した場合
         """
-        async with websockets.connect(self.endpoint_url) as ws:
-            # RpcQueueの処理
-            processed_args, processed_kwargs = _process_args_and_kwargs(
-                self.args, self.kwargs, ws, self._queue_tasks
-            )
+        ws = await websockets.connect(self.endpoint_url)
+        
+        # RpcQueueの処理
+        processed_args, processed_kwargs = _process_args_and_kwargs(
+            self.args, self.kwargs, ws, self._queue_tasks
+        )
 
-            # CallMessageを送信
-            call_msg = CallMessage(
-                func=self.func,
-                args=tuple(processed_args),
-                kwargs=processed_kwargs,
-            )
-            await ws.send(pickle.dumps(call_msg))
+        # CallMessageを送信
+        call_msg = CallMessage(
+            func=self.func,
+            args=tuple(processed_args),
+            kwargs=processed_kwargs,
+        )
+        await ws.send(pickle.dumps(call_msg))
 
-            # 結果を受信
-            return await self._receive_results(ws)
+        # 結果を受信
+        return await self._receive_results(ws)
 
     async def _receive_results(self, ws: "ClientConnection") -> AsyncIterator[R] | R:
         """
@@ -196,49 +197,82 @@ class Rpc(Generic[P, R]):
         Raises:
             RpcRemoteError: リモート実行でエラーが発生した場合
         """
-        async def _stream_generator(first_value: R) -> AsyncIterator[R]:
-            """ジェネレータとして結果をストリーミングする"""
-            yield first_value
-            try:
-                async for data in ws:
-                    if isinstance(data, str):  # pragma: no cover
-                        continue
-                    message: Message = pickle.loads(data)
-
-                    match message:
-                        case YieldMessage(value=value):
-                            yield value
-                        case ReturnMessage():
-                            break
-                        case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
-                            raise RpcRemoteError(error_type, error_message, traceback)
-            finally:
-                for task in self._queue_tasks:
-                    task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-
+        # WebSocketストリームをイテレータに変換
+        ws_iterator = ws.__aiter__()
+        
         try:
-            async for data in ws:
+            # 最初のメッセージを取得
+            data = await ws_iterator.__anext__()
+            while isinstance(data, str):  # pragma: no cover
+                data = await ws_iterator.__anext__()
+            
+            message: Message = pickle.loads(data)  # type: ignore[arg-type]
+            
+            match message:
+                case YieldMessage(value=first_value):
+                    # ジェネレータの場合（WebSocketとキューはジェネレータが管理）
+                    return self._stream_remaining_results(ws, ws_iterator, first_value)
+                case ReturnMessage(value=value):
+                    # 単一の値の場合
+                    await self._cleanup_and_close(ws)
+                    return value
+                case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
+                    # エラーの場合
+                    await self._cleanup_and_close(ws)
+                    raise RpcRemoteError(error_type, error_message, traceback)
+            
+            # ここには到達しないはずだが型チェッカーのために
+            raise RuntimeError("No message received from server")  # pragma: no cover
+        except Exception:
+            await self._cleanup_and_close(ws)
+            raise
+    
+    def _cleanup_queue_tasks(self) -> None:
+        """キュータスクをクリーンアップする（同期的にキャンセルのみ）"""
+        for task in self._queue_tasks:
+            task.cancel()
+    
+    async def _cleanup_and_close(self, ws: "ClientConnection") -> None:
+        """WebSocketを閉じてキュータスクをクリーンアップする"""
+        try:
+            await ws.close()
+        except Exception:  # pragma: no cover
+            pass
+        
+        for task in self._queue_tasks:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    async def _stream_remaining_results(
+        self, ws: "ClientConnection", ws_iterator: Any, first_value: R
+    ) -> AsyncIterator[R]:
+        """
+        最初のyield後の残りの結果をストリーミングで受信する
+        
+        Args:
+            ws_iterator: WebSocketのイテレータ
+            first_value: 最初にyieldされた値
+        """
+        try:
+            yield first_value
+            
+            async for data in ws_iterator:
                 if isinstance(data, str):  # pragma: no cover
                     continue
                 message: Message = pickle.loads(data)
 
                 match message:
-                    case YieldMessage(value=first_value):
-                        return _stream_generator(first_value)
-                    case ReturnMessage(value=value):
-                        return value
+                    case YieldMessage(value=value):
+                        yield value
+                    case ReturnMessage():
+                        return
                     case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
                         raise RpcRemoteError(error_type, error_message, traceback)
+        except StopAsyncIteration:  # pragma: no cover
+            return
         finally:
-            for task in self._queue_tasks:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-        
-        return None  # type: ignore
+            # ジェネレータが終了したらWebSocketを閉じてキューをクリーンアップ
+            await self._cleanup_and_close(ws)

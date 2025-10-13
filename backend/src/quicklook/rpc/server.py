@@ -297,7 +297,11 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
             pass
 
     finally:
-        await ws.close()
+        try:
+            await ws.close()
+        except RuntimeError:  # pragma: no cover
+            # WebSocketが既に閉じられている場合
+            pass
 
 
 async def _handle_queue_messages(
