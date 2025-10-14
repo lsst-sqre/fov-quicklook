@@ -1,6 +1,5 @@
 import asyncio
 import queue
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import AsyncExitStack, ExitStack, asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -257,16 +256,11 @@ class _GenerateSingleFitsTilesPipelineWorker:
 def _generate_single_fits_tiles_rpc(
     job: Job, ccd_refs_q: queue.Queue[CcdDataRef | None]
 ) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
-
-
     def ccd_refs():
         while ccd_ref := ccd_refs_q.get():
             yield ccd_ref
 
-    with ThreadPoolExecutor(1) as executor:
-        fut = executor.submit(ccd_refs)
-        yield from generate_single_fits_tiles_pipeline(job, ccd_refs())
-        fut.result()
+    yield from generate_single_fits_tiles_pipeline(job, ccd_refs())
 
 
 async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):
