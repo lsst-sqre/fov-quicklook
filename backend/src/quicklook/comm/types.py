@@ -22,6 +22,11 @@ class GeneratorInfo:
     def url(self) -> str:
         return f"http://{self.host}:{self.port}"
 
+    @cached_property
+    def ws_url(self) -> str:
+        assert self.url.startswith("http://")
+        return "ws://" + self.url[7:]
+
 
 class GeneratorRegistrationRequest(BaseModel):
     generator_id: GeneratorId

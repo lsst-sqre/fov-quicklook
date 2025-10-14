@@ -1,20 +1,28 @@
+import asyncio
+import queue
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import AsyncExitStack, ExitStack, asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import cast
+from typing import Generator, cast
+
+from fastapi import Body
 
 import quicklook.logging
 from quicklook.comm.coordinator import get_available_generators
-from quicklook.comm.types import GeneratorId
 from quicklook.comm.rpc_worker import YieledValue, adaptive_map_rpc, rpc_endpoint, rpc_scatter
+from quicklook.comm.types import GeneratorId, GeneratorInfo
 from quicklook.config import config
 from quicklook.datasource import get_datasource
 from quicklook.db import Quicklook, get_db_session
-from quicklook.generator.generate_single_fits_tiles import CcdMetadata, generate_single_fits_tiles
+from quicklook.generator.generate_single_fits_tiles import CcdMetadata, GenerateSingleFitsTilesProgress, generate_single_fits_tiles, generate_single_fits_tiles_pipeline
 from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_fits_headers import transfer_fits_headers
 from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
+from quicklook.rpc.client import Rpc
+from quicklook.rpc.queue import RpcQueue
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
 
@@ -107,6 +115,158 @@ def quicklook_pipeline():
 def _ensure_users_exist_for_job(job: Job):
     if job.priority.user_count <= 0:  # pragma: no cover
         raise RuntimeError(f'No users for job {job.id} (visit={job.visit}), so skipping.')
+
+
+async def _generate_single_fits_tiles_pipeline(job: Job, ccd_refs: list[CcdDataRef]):
+    _ensure_users_exist_for_job(job)
+
+    async with job.watcher.watch_status():
+        job.status.stage = 'generate_single_fits_tiles'
+
+    ccd_generator_map: dict[CcdName, GeneratorId] = {}
+    ccd_metadata_list: list[CcdMetadata] = []
+
+    generators = get_available_generators()
+    workers = [_GenerateSingleFitsTilesPipelineWorker(generator, job) for generator in generators.values()]
+
+    max_concurrent_per_worker = config.generator_max_concurrent_jobs
+    worker_in_progress: dict[_GenerateSingleFitsTilesPipelineWorker, set[CcdName]] = {worker: set() for worker in workers}
+    completed_ccds: set[CcdName] = set()
+    dispatched_ccds: set[CcdName] = set()
+    
+    remaining_ccd_refs = list(ccd_refs)
+    all_dispatched = False
+    redispatch_timeout = 30.0  # 再dispatchのタイムアウト（秒）
+    last_progress_time: dict[CcdName, float] = {}
+    
+    import time
+
+    stack = AsyncExitStack()
+    async with stack:
+        for worker in workers:
+            await stack.enter_async_context(worker.activate())
+
+        async def dispatch_to_worker(worker: _GenerateSingleFitsTilesPipelineWorker, ccd_ref: CcdDataRef):
+            await worker.submit(ccd_ref)
+            worker_in_progress[worker].add(ccd_ref.ccd)
+            dispatched_ccds.add(ccd_ref.ccd)
+            ccd_generator_map[ccd_ref.ccd] = worker.generator.id
+            last_progress_time[ccd_ref.ccd] = time.time()
+
+        async def process_output():
+            while True:
+                # 各workerのoutput_queueから非ブロッキングで取得
+                for worker in workers:
+                    try:
+                        msg = worker._output_queue.get_nowait()
+                        
+                        match msg:
+                            case GenerateSingleFitsTilesProgress(ccd_name=ccd_name, progress=progress):
+                                async with job.watcher.watch_status():
+                                    job.status.generate_single_fits_tiles[ccd_name] = progress
+                                last_progress_time[ccd_name] = time.time()
+                            
+                            case CcdMetadata() as ccd_metadata:
+                                ccd_metadata_list.append(ccd_metadata)
+                                completed_ccds.add(ccd_metadata.ccd_name)
+                                worker_in_progress[worker].discard(ccd_metadata.ccd_name)
+                    except asyncio.QueueEmpty:
+                        pass
+                
+                # 全てのCCDが完了したら終了
+                if len(completed_ccds) == len(ccd_refs):
+                    break
+                
+                # 空いているworkerに新しいccd_refを割り当て
+                if remaining_ccd_refs:
+                    for worker in workers:
+                        if len(worker_in_progress[worker]) < max_concurrent_per_worker and remaining_ccd_refs:
+                            ccd_ref = remaining_ccd_refs.pop(0)
+                            await dispatch_to_worker(worker, ccd_ref)
+                
+                # 全てdispatchした後、遅いworkerのタスクを再dispatch
+                if not remaining_ccd_refs and not all_dispatched:
+                    all_dispatched = True
+                
+                if all_dispatched:
+                    current_time = time.time()
+                    # 処理中だが長時間進捗がないCCDを検出
+                    for worker in workers:
+                        for ccd_name in list(worker_in_progress[worker]):
+                            if ccd_name not in completed_ccds:
+                                elapsed = current_time - last_progress_time.get(ccd_name, current_time)
+                                if elapsed > redispatch_timeout:
+                                    # 再dispatchのために該当ccd_refを探す
+                                    for ccd_ref in ccd_refs:
+                                        if ccd_ref.ccd == ccd_name:
+                                            # 空いているworkerを探す
+                                            for target_worker in workers:
+                                                if target_worker != worker and len(worker_in_progress[target_worker]) < max_concurrent_per_worker:
+                                                    logger.warning(f"Re-dispatching {ccd_name} from {worker.generator.id} to {target_worker.generator.id} due to timeout")
+                                                    await dispatch_to_worker(target_worker, ccd_ref)
+                                                    break
+                                            break
+                
+                await asyncio.sleep(0.1)
+
+        await process_output()
+
+    dist_config = CcdDistributionConfig(ccd_generator_map, generators)
+    async with job.watcher.notify_shared_large_status():
+        job.shared_large_status.dist_config = dist_config
+        job.shared_large_status.ccd_metadata_list = ccd_metadata_list
+
+    await rpc_scatter(_save_job_metadata_rpc, args=(job,))
+    await rpc_scatter(_save_ccd_distribution_config_rpc, args=(job, dist_config))
+
+    return ccd_metadata_list
+
+
+@dataclass
+class _GenerateSingleFitsTilesPipelineWorker:
+    generator: GeneratorInfo
+    job: Job
+
+    _input_queue: asyncio.Queue[CcdDataRef | None] = field(default_factory=asyncio.Queue)
+    _output_queue: asyncio.Queue[CcdMetadata | GenerateSingleFitsTilesProgress] = field(default_factory=asyncio.Queue)
+
+    @asynccontextmanager
+    async def activate(self):
+        async def consume_rpc():
+            rpc = Rpc(
+                f'{self.generator.ws_url}/rpc',
+                _generate_single_fits_tiles_rpc,
+                self.job,
+                RpcQueue(self._input_queue),
+            )
+            async for msg in rpc.iterate():
+                await self._output_queue.put(msg)
+
+        async with asyncio.TaskGroup() as tg:
+            t = tg.create_task(consume_rpc())
+            try:
+                yield
+            finally:
+                await self._input_queue.put(None)
+                t.result()
+
+    async def submit(self, ccd_ref: CcdDataRef):
+        await self._input_queue.put(ccd_ref)
+
+
+def _generate_single_fits_tiles_rpc(
+    job: Job, ccd_refs_q: queue.Queue[CcdDataRef | None]
+) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
+
+
+    def ccd_refs():
+        while ccd_ref := ccd_refs_q.get():
+            yield ccd_ref
+
+    with ThreadPoolExecutor(1) as executor:
+        fut = executor.submit(ccd_refs)
+        yield from generate_single_fits_tiles_pipeline(job, ccd_refs())
+        fut.result()
 
 
 async def _generate_single_fits_tiles(job: Job, ccd_refs: list[CcdDataRef]):

@@ -1,20 +1,25 @@
 import contextlib
 import multiprocessing
+import queue
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Generator, Iterable, cast
 
 from quicklook.config import config
 from quicklook.datasource import get_datasource
 from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import AmpMetadata, ImageStat, PreProcessedCcd, preprocess_ccd
+from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue, Tile
 from quicklook.utils.geom import BBox
+from quicklook.utils.imap_unordered_threadpool import imap_unordered_threadpool
 from quicklook.utils.timer import Timer
 
-from quicklook.job.job import Job
-
 ds = get_datasource()
+
 
 def generate_single_fits_tiles(
     job: Job,
@@ -29,7 +34,7 @@ def generate_single_fits_tiles(
         with _bytes_to_file(data_bytes) as path:
             ppccd = preprocess_ccd(ref, path)
             yield progress.update()
-        
+
         generate_tiles(ppccd, job)
         yield progress.update()
 
@@ -54,11 +59,104 @@ def generate_single_fits_tiles(
 
 
 @dataclass
+class GenerateSingleFitsTilesProgress:
+    ccd_name: CcdName
+    progress: Progress
+
+
+@dataclass
 class CcdMetadata:
     ccd_name: CcdName
     image_stat: ImageStat
     amps: list[AmpMetadata]
     bbox: BBox
+
+
+def generate_single_fits_tiles_pipeline(
+    job: Job,
+    refs: Iterable[CcdDataRef],
+) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
+    with tempfile.TemporaryDirectory() as tmpdir, multiprocessing.Manager() as manager:
+        q = cast(
+            queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata | None],
+            manager.Queue(),
+        )
+
+        def ccd_paths():
+            with ThreadPoolExecutor(2) as executor:
+                for path in imap_unordered_threadpool(executor, download, refs, max_in_flight=2):
+                    yield path
+
+        def download(ref: CcdDataRef):
+            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(3, 0)))
+            data_bytes = ds.get_data_sync(ref)
+            outpath = Path(tmpdir) / f"{ref.ccd_name}.fits"
+            outpath.write_bytes(data_bytes)
+            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(3, 1)))
+            return outpath
+
+        def main():
+            try:
+                with multiprocessing.Pool(8) as pool:
+                    for ccd_metadata in pool.imap_unordered(
+                        _process_ccd,
+                        (
+                            ProcessCcdArgs(
+                                job,
+                                ref,
+                                path,
+                                q,  # type:ignore
+                            )
+                            for ref, path in zip(refs, ccd_paths())
+                        ),
+                    ):
+                        q.put(ccd_metadata)
+            finally:
+                q.put(None)  # type: ignore
+
+        with ThreadPoolExecutor(1) as executor:
+            fut = executor.submit(main)
+            while msg := q.get():
+                yield msg
+            fut.result()
+
+
+@dataclass
+class ProcessCcdArgs:
+    job: Job
+    ref: CcdDataRef
+    path: Path
+    progress: queue.Queue[GenerateSingleFitsTilesProgress]
+
+
+def _process_ccd(args: ProcessCcdArgs):
+    try:
+        ppccd = preprocess_ccd(args.ref, args.path)
+        args.progress.put(
+            GenerateSingleFitsTilesProgress(
+                ccd_name=ppccd.data_ref.ccd_name,
+                progress=Progress(3, 2),
+            )
+        )
+    finally:
+        args.path.unlink(missing_ok=True)
+
+    generate_tiles(ppccd, args.job)
+    args.progress.put(
+        GenerateSingleFitsTilesProgress(
+            ccd_name=ppccd.data_ref.ccd_name,
+            progress=Progress(3, 3),
+        )
+    )
+
+    args.job.local_storage.fits_header.save(args.ref, ppccd.headers)
+
+    return CcdMetadata(
+        ccd_name=ppccd.data_ref.ccd,
+        image_stat=ppccd.stat,
+        amps=ppccd.amps,
+        bbox=ppccd.bbox,
+    )
 
 
 def generate_tiles(
