@@ -13,7 +13,7 @@ import anyio.to_thread
 T = TypeVar("T")
 from fastapi import FastAPI, WebSocket
 
-from .lifespan import get_manager, get_process_pool
+from .lifespan import get_process_pool
 from .queue import _RpcQueue
 from .types import (
     CallMessage,
@@ -69,15 +69,15 @@ class _QueueProxy(Generic[T]):
 def _process_args_kwargs_with_queue_map(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
-    queue_map: dict[int, "queue.Queue[Any]"],
+    queue_map: dict[int, Any],
 ) -> tuple[list[Any], dict[str, Any]]:
     """
-    argsとkwargsの中のQueueRefをqueue.Queueに置き換え
+    argsとkwargsの中のQueueRefをmultiprocessing.Queueに置き換え
     
     Args:
         args: 位置引数
         kwargs: キーワード引数
-        queue_map: キューIDとqueueのマッピング
+        queue_map: キューIDとmultiprocessing.Queueのマッピング
     
     Returns:
         処理済みのargs, kwargs
@@ -102,12 +102,11 @@ def _process_args_kwargs_with_queue_map(
 def _extract_rpc_queues(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
-    manager: Any,
     ws: WebSocket,
 ) -> tuple[
     list[Any],
     dict[str, Any],
-    dict[int, "queue.Queue[Any]"],
+    dict[int, Any],
     list[asyncio.Task[None]],
 ]:
     """
@@ -116,20 +115,19 @@ def _extract_rpc_queues(
     Args:
         args: 位置引数
         kwargs: キーワード引数
-        manager: multiprocessingのManager
         ws: WebSocketコネクション
     
     Returns:
         処理済みのargs, kwargs, queue_map, queue_tasks
     """
-    queue_map: dict[int, "queue.Queue[Any]"] = {}
+    queue_map: dict[int, Any] = {}
     queue_tasks: list[asyncio.Task[None]] = []
 
     processed_args = []
     for arg in args:
         if isinstance(arg, _RpcQueue):
             queue_id = arg.queue_id
-            pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
+            pipe = mp.Queue()
             queue_map[queue_id] = pipe
             processed_args.append(QueueRef(queue_id=queue_id))
             queue_tasks.append(
@@ -142,7 +140,7 @@ def _extract_rpc_queues(
     for k, v in kwargs.items():
         if isinstance(v, _RpcQueue):
             queue_id = v.queue_id
-            pipe: "queue.Queue[Any]" = manager.Queue()  # type: ignore[attr-defined]
+            pipe = mp.Queue()
             queue_map[queue_id] = pipe
             processed_kwargs[k] = QueueRef(queue_id=queue_id)
             queue_tasks.append(
@@ -158,16 +156,16 @@ def _execute_function_in_process(
     func: Callable[..., Any],
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
-    queue_map: dict[int, "queue.Queue[Any]"],
-    result_queue: "queue.Queue[_ProcessResult]",
+    queue_map: dict[int, Any],
+    result_queue: Any,
 ) -> None:
     """
     プロセス内で関数を実行し、結果をresult_queueに送信する
     
     Args:
         func: 実行する関数
-        args: 位置引数 (QueueRefはqueue.Queueに置き換えられる)
-        kwargs: キーワード引数 (QueueRefはqueue.Queueに置き換えられる)
+        args: 位置引数 (QueueRefはmultiprocessing.Queueに置き換えられる)
+        kwargs: キーワード引数 (QueueRefはmultiprocessing.Queueに置き換えられる)
         queue_map: キューIDとmultiprocessing.Queueのマッピング
         result_queue: 結果を送信するmultiprocessing.Queue
     """
@@ -230,17 +228,14 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         func = call_msg.func
         args = call_msg.args
         kwargs = call_msg.kwargs
-
-        # managerを取得
-        manager = get_manager(app)
         
         # argsとkwargsからRpcQueueを抽出してキューIDに置き換え
         processed_args, processed_kwargs, queue_map, queue_tasks = _extract_rpc_queues(
-            args, kwargs, manager, ws
+            args, kwargs, ws
         )
 
         # 結果を受信するキュー
-        result_queue: "queue.Queue[_ProcessResult]" = manager.Queue()  # type: ignore[attr-defined]
+        result_queue = mp.Queue()
 
         # プロセスプールで関数を実行
         pool = get_process_pool(app)
@@ -306,7 +301,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
 
 
 async def _handle_queue_messages(
-    ws: WebSocket, queue_id: int, pipe: "queue.Queue[Any]"
+    ws: WebSocket, queue_id: int, pipe: Any
 ) -> None:
     """
     クライアントからのキューメッセージを処理してmultiprocessing.Queueにputする
