@@ -1,5 +1,6 @@
 import asyncio
 import queue
+import time
 from contextlib import AsyncExitStack, ExitStack, asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -135,10 +136,8 @@ async def _generate_single_fits_tiles_pipeline(job: Job, ccd_refs: list[CcdDataR
     
     remaining_ccd_refs = list(ccd_refs)
     all_dispatched = False
-    redispatch_timeout = 30.0  # 再dispatchのタイムアウト（秒）
+    redispatch_timeout = 30.0
     last_progress_time: dict[CcdName, float] = {}
-    
-    import time
 
     stack = AsyncExitStack()
     async with stack:
