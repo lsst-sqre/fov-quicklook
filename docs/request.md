@@ -15,7 +15,7 @@
 * [x] `./src/quicklook/comm/types.py`
 * [x] `./src/quicklook/comm/coordinator.py`
 * [x] `./src/quicklook/comm/rpc_worker.py`
-* [ ] `./src/quicklook/comm/__init__.py`
+* [x] `./src/quicklook/comm/__init__.py`
 * [ ] `./src/quicklook/comm/generator.py`
 * [ ] `./src/quicklook/frontend/api/storage_explorer.py`
 * [ ] `./src/quicklook/frontend/api/use_route_names_as_operation_ids.py`
