@@ -82,27 +82,27 @@
 * [x] `./src/quicklook/utils/zstd.py`
 * [x] `./src/quicklook/utils/throttle/__init__.py`
 * [x] `./src/quicklook/utils/throttle/test_throttle.py`
-* [ ] `./src/quicklook/logging.py`
-* [ ] `./src/quicklook/dev/psstat.py`
-* [ ] `./src/quicklook/dev/commapp.py`
-* [ ] `./src/quicklook/dev/debuglog.py`
-* [ ] `./src/quicklook/dev/run_uvicorn.py`
-* [ ] `./src/quicklook/config/__init__.py`
-* [ ] `./src/quicklook/tileinfo/test_tileinfo.py`
-* [ ] `./src/quicklook/tileinfo/__init__.py`
-* [ ] `./src/quicklook/generator/merge_single_tile_fits.py`
-* [ ] `./src/quicklook/generator/transfer_tiles.py`
-* [ ] `./src/quicklook/generator/api/app.py`
-* [ ] `./src/quicklook/generator/api/__main__.py`
-* [ ] `./src/quicklook/generator/retry_on_error.py`
-* [ ] `./src/quicklook/generator/generate_single_fits_tiles.py`
-* [ ] `./src/quicklook/generator/iteratetiles.py`
-* [ ] `./src/quicklook/generator/generator_assignment.py`
-* [ ] `./src/quicklook/generator/preprocess_ccd/isr.py`
-* [ ] `./src/quicklook/generator/preprocess_ccd/__init__.py`
-* [ ] `./src/quicklook/generator/preprocess_ccd/test_preprocess_ccd.py`
-* [ ] `./src/quicklook/generator/transfer_fits_headers.py`
-* [ ] `./src/quicklook/generator/test_generate_single_fits_tiles.py`
+* [x] `./src/quicklook/logging.py`
+* [x] `./src/quicklook/dev/psstat.py`
+* [x] `./src/quicklook/dev/commapp.py`
+* [x] `./src/quicklook/dev/debuglog.py`
+* [x] `./src/quicklook/dev/run_uvicorn.py`
+* [x] `./src/quicklook/config/__init__.py`
+* [x] `./src/quicklook/tileinfo/test_tileinfo.py`
+* [x] `./src/quicklook/tileinfo/__init__.py`
+* [x] `./src/quicklook/generator/merge_single_tile_fits.py`
+* [x] `./src/quicklook/generator/transfer_tiles.py`
+* [x] `./src/quicklook/generator/api/app.py`
+* [x] `./src/quicklook/generator/api/__main__.py`
+* [x] `./src/quicklook/generator/retry_on_error.py`
+* [x] `./src/quicklook/generator/generate_single_fits_tiles.py`
+* [x] `./src/quicklook/generator/iteratetiles.py`
+* [x] `./src/quicklook/generator/generator_assignment.py`
+* [x] `./src/quicklook/generator/preprocess_ccd/isr.py`
+* [x] `./src/quicklook/generator/preprocess_ccd/__init__.py`
+* [x] `./src/quicklook/generator/preprocess_ccd/test_preprocess_ccd.py`
+* [x] `./src/quicklook/generator/transfer_fits_headers.py`
+* [x] `./src/quicklook/generator/test_generate_single_fits_tiles.py`
 * [ ] `./src/quicklook/scripts/bootstrap_db.py`
 * [ ] `./src/quicklook/object_storage/__init__.py`
 * [ ] `./src/quicklook/job/test_job_status_printer.py`
