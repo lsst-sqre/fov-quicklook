@@ -13,7 +13,7 @@
 
 * [x] `./src/quicklook/comm/test_coordinator_generator.py`
 * [x] `./src/quicklook/comm/types.py`
-* [ ] `./src/quicklook/comm/coordinator.py`
+* [x] `./src/quicklook/comm/coordinator.py`
 * [ ] `./src/quicklook/comm/rpc_worker.py`
 * [ ] `./src/quicklook/comm/__init__.py`
 * [ ] `./src/quicklook/comm/generator.py`
