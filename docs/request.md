@@ -38,14 +38,14 @@
 * [x] `./src/quicklook/db/session.py`
 * [x] `./src/quicklook/db/__init__.py`
 * [x] `./src/quicklook/db/models.py`
-* [ ] `./src/quicklook/coordinator/api/types.py`
-* [ ] `./src/quicklook/coordinator/api/app.py`
-* [ ] `./src/quicklook/coordinator/api/__main__.py`
-* [ ] `./src/quicklook/coordinator/housekeeping/test_housekeeping.py`
-* [ ] `./src/quicklook/coordinator/housekeeping/__init__.py`
-* [ ] `./src/quicklook/coordinator/create_quicklook/test_create_quicklook.py`
-* [ ] `./src/quicklook/coordinator/create_quicklook/__init__.py`
-* [ ] `./src/quicklook/coordinator/create_quicklook/generate_single_fits_tiles_coordinator.py`
+* [x] `./src/quicklook/coordinator/api/types.py`
+* [x] `./src/quicklook/coordinator/api/app.py`
+* [x] `./src/quicklook/coordinator/api/__main__.py`
+* [x] `./src/quicklook/coordinator/housekeeping/test_housekeeping.py`
+* [x] `./src/quicklook/coordinator/housekeeping/__init__.py`
+* [x] `./src/quicklook/coordinator/create_quicklook/test_create_quicklook.py`
+* [x] `./src/quicklook/coordinator/create_quicklook/__init__.py`
+* [x] `./src/quicklook/coordinator/create_quicklook/generate_single_fits_tiles_coordinator.py`
 * [ ] `./src/quicklook/utils/geom/__init__.py`
 * [ ] `./src/quicklook/utils/stacklib/test_stacklib.py`
 * [ ] `./src/quicklook/utils/stacklib/__init__.py`
