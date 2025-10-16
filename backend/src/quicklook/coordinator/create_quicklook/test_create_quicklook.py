@@ -11,7 +11,7 @@ import uvicorn
 from sqlalchemy import delete
 
 from quicklook.config import config
-from quicklook.coordinator.create_quicklook import quicklook_pipeline
+from . import quicklook_pipeline
 from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.dev.run_uvicorn import find_free_tcp_port, run_uvicorn_app
 from quicklook.job.job import Job

@@ -76,7 +76,6 @@ def generate_single_fits_tiles_pipeline(
     job: Job,
     refs: Iterable[CcdDataRef],
 ) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
-    refs_list = list(refs)
     with tempfile.TemporaryDirectory() as tmpdir, multiprocessing.Manager() as manager:
         q = cast(
             queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata | None],
@@ -85,7 +84,7 @@ def generate_single_fits_tiles_pipeline(
 
         def ccd_paths():
             with ThreadPoolExecutor(2) as executor:
-                for path in imap_unordered_threadpool(executor, download, refs_list, max_in_flight=2):
+                for path in imap_unordered_threadpool(executor, download, refs, max_in_flight=2):
                     yield path
 
         def download(ref: CcdDataRef):

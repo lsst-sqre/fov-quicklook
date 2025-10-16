@@ -1,5 +1,5 @@
 # for frontend
-FROM node:23 as frontend
+FROM node:24 AS frontend
 
 COPY ./frontend/ /frontend
 
@@ -24,7 +24,6 @@ RUN \
   pip install -e .
 
 COPY ./backend/lib /app/lib
-RUN pip install ./lib/mineo-fits-decompress
   
 COPY ./backend/ /app/
 

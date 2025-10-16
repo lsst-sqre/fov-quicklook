@@ -98,7 +98,7 @@ def test_cache_clear():
     assert test_func(2) == 8
     assert call_count == 1
 
-        # Second call should use cache
+    # Second call should use cache
     assert test_func(2) == 8
     assert call_count == 1
 
@@ -118,7 +118,7 @@ def test_cache_info():
         return x * 5
 
     # Check initial cache info
-    info = test_func.cache_info()
+    info = test_func.cache_info()  # type: ignore
     assert info["currsize"] == 0
     assert info["ttl"] == 30
 
@@ -127,13 +127,13 @@ def test_cache_info():
     test_func(5)
 
     # Check updated cache info
-    info = test_func.cache_info()
+    info = test_func.cache_info()  # type: ignore
     assert info["currsize"] == 2
     assert info["ttl"] == 30
 
     # Clear cache and check info again
     test_func.cache_clear()  #  type: ignore
-    info = test_func.cache_info()
+    info = test_func.cache_info()  # type: ignore
     assert info["currsize"] == 0
 
 
