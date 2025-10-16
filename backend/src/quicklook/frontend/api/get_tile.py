@@ -101,12 +101,18 @@ async def _gather_single_fits_tiles(
     )
 
     pool: numpy.ndarray | None = None
-    for fut in asyncio.as_completed([get_npy(g) for g in generators]):
-        arr = await fut
-        if pool is None:
-            pool = arr
-        else:
-            pool += arr
+    tasks = [asyncio.create_task(get_npy(g)) for g in generators]
+    try:
+        for fut in asyncio.as_completed(tasks):
+            arr = await fut
+            if pool is None:
+                pool = arr
+            else:
+                pool += arr
+    except Exception:
+        for task in tasks:
+            task.cancel()
+        raise
 
     headers = get_cache_headers()
 
