@@ -19,20 +19,20 @@
 * [x] `./src/quicklook/comm/generator.py`
 * [x] `./src/quicklook/frontend/api/storage_explorer.py`
 * [x] `./src/quicklook/frontend/api/use_route_names_as_operation_ids.py`
-* [ ] `./src/quicklook/frontend/api/get_tile.py`
+* [x] `./src/quicklook/frontend/api/get_tile.py`
 * [x] `./src/quicklook/frontend/api/health.py`
-* [ ] `./src/quicklook/frontend/api/get_fits_header.py`
+* [x] `./src/quicklook/frontend/api/get_fits_header.py`
 * [x] `./src/quicklook/frontend/api/openapi.py`
 * [x] `./src/quicklook/frontend/api/compression.py`
 * [x] `./src/quicklook/frontend/api/app.py`
 * [x] `./src/quicklook/frontend/api/get_fits_file.py`
-* [ ] `./src/quicklook/frontend/api/deps.py`
-* [ ] `./src/quicklook/frontend/api/visits.py`
-* [ ] `./src/quicklook/frontend/api/quicklooks.py`
-* [ ] `./src/quicklook/frontend/api/systeminfo.py`
-* [ ] `./src/quicklook/frontend/api/__main__.py`
-* [ ] `./src/quicklook/frontend/api/cache_entries.py`
-* [ ] `./src/quicklook/frontend/api/staticassets.py`
+* [x] `./src/quicklook/frontend/api/deps.py`
+* [x] `./src/quicklook/frontend/api/visits.py`
+* [x] `./src/quicklook/frontend/api/quicklooks.py`
+* [x] `./src/quicklook/frontend/api/systeminfo.py`
+* [x] `./src/quicklook/frontend/api/__main__.py`
+* [x] `./src/quicklook/frontend/api/cache_entries.py`
+* [x] `./src/quicklook/frontend/api/staticassets.py`
 * [ ] `./src/quicklook/types.py`
 * [ ] `./src/quicklook/db/test_db.py`
 * [ ] `./src/quicklook/db/session.py`
