@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import cast
 
 import quicklook.logging
-from quicklook.comm.rpc_worker import YieledValue, rpc_scatter
+from quicklook.comm.rpc_worker import YieledValue, rpc_scatter, rpc_scatter_stream
 from quicklook.config import config
 from quicklook.datasource import get_datasource
 from quicklook.db import Quicklook, get_db_session
@@ -122,7 +122,7 @@ async def _merge_tiles(job: Job):
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
-    await rpc_scatter(merge_single_fits_tiles, args=(job,), stream=True, on_yield=on_yield)
+    await rpc_scatter_stream(on_yield, merge_single_fits_tiles, job)
 
 
 def _clear_single_fits_tiles_rpc(job: Job):
@@ -137,7 +137,7 @@ async def _transfer_tiles(job: Job):
 
     # TODO: 本当はディスク節約のため_merge_tilesの最後でやりたいのだが
     # 先にstageをupload_to_object_storageに変更する必要がある。
-    await rpc_scatter(_clear_single_fits_tiles_rpc, args=(job,))
+    await rpc_scatter(_clear_single_fits_tiles_rpc, job)
 
     uploaded_size = 0
 
@@ -152,7 +152,7 @@ async def _transfer_tiles(job: Job):
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
-    await rpc_scatter(transfer_tiles, args=(job,), stream=True, on_yield=on_yield)
+    await rpc_scatter_stream(on_yield, transfer_tiles, job)
     return uploaded_size
 
 
@@ -163,7 +163,7 @@ async def _transfer_quicklook_metadata(job: Job, ccd_metadata_list: list[CcdMeta
 
 async def _transfer_fits_headers(job: Job) -> int:
     """FITS headerをobject storageにアップロードする"""
-    uploaded_sizes = cast(list[int], await rpc_scatter(transfer_fits_headers, args=(job,)))
+    uploaded_sizes = await rpc_scatter(transfer_fits_headers, job)
     return sum(uploaded_sizes)
 
 
@@ -202,7 +202,7 @@ async def _finalize_success(result: _PipelineResult):
         await session.commit()
         logger.info(f"Updated quicklook record for {job.visit}: ready=True, disk_usage={total_uploaded_size}")
 
-    await rpc_scatter(_cleanup_rpc, args=(job,))
+    await rpc_scatter(_cleanup_rpc, job)
     return job
 
 
@@ -224,7 +224,7 @@ async def _finalize_error(job: Job):
         await session.commit()
         logger.info(f"Deleted quicklook record for {job.visit} due to error")
 
-    await rpc_scatter(_cleanup_rpc, args=(job,))
+    await rpc_scatter(_cleanup_rpc, job)
     return job
 
 

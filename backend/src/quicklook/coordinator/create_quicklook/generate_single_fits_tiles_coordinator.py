@@ -19,6 +19,18 @@ from quicklook.rpc.queue import RpcQueue
 from quicklook.types import CcdDataRef, CcdName
 
 
+def enable_faulthandler():
+    # Enable faulthandler for easier debugging
+    import faulthandler, signal, sys
+
+    faulthandler.enable(sys.stderr, all_threads=True)
+    faulthandler.register(signal.SIGUSR1, file=sys.stderr, all_threads=True)
+    print('Enabled faulthandler')
+
+
+enable_faulthandler() # TODO: Remove this line in production
+
+
 async def generate_single_fits_tile(job: Job, ccd_refs: list[CcdDataRef]) -> list[CcdMetadata]:
     ccd_generator_map: dict[CcdName, GeneratorId] = {}
     ccd_metadata_dict: dict[CcdName, CcdMetadata] = {}
@@ -66,8 +78,8 @@ async def generate_single_fits_tile(job: Job, ccd_refs: list[CcdDataRef]) -> lis
         job.shared_large_status.dist_config = dist_config
         job.shared_large_status.ccd_metadata_list = [*ccd_metadata_dict.values()]
 
-    await rpc_scatter(_save_job_metadata_rpc, args=(job,))
-    await rpc_scatter(_save_ccd_distribution_config_rpc, args=(job, dist_config))
+    await rpc_scatter(_save_job_metadata_rpc, job)
+    await rpc_scatter(_save_ccd_distribution_config_rpc, job, dist_config)
 
     return [*ccd_metadata_dict.values()]
 
