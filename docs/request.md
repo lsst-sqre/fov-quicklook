@@ -103,31 +103,31 @@
 * [x] `./src/quicklook/generator/preprocess_ccd/test_preprocess_ccd.py`
 * [x] `./src/quicklook/generator/transfer_fits_headers.py`
 * [x] `./src/quicklook/generator/test_generate_single_fits_tiles.py`
-* [ ] `./src/quicklook/scripts/bootstrap_db.py`
-* [ ] `./src/quicklook/object_storage/__init__.py`
-* [ ] `./src/quicklook/job/test_job_status_printer.py`
-* [ ] `./src/quicklook/job/local_storage.py`
-* [ ] `./src/quicklook/job/status.py`
-* [ ] `./src/quicklook/job/job.py`
-* [ ] `./src/quicklook/job/priority.py`
-* [ ] `./src/quicklook/job/test_job_local_storage.py`
-* [ ] `./src/quicklook/job/shared_large_status.py`
-* [ ] `./src/quicklook/job/status_printer.py`
-* [ ] `./src/quicklook/job/watcher.py`
-* [ ] `./src/quicklook/rpc/types.py`
-* [ ] `./src/quicklook/rpc/server.py`
-* [ ] `./src/quicklook/rpc/client.py`
-* [ ] `./src/quicklook/rpc/test_rpc.py`
-* [ ] `./src/quicklook/rpc/__init__.py`
-* [ ] `./src/quicklook/rpc/lifespan.py`
-* [ ] `./src/quicklook/rpc/queue.py`
-* [ ] `./src/quicklook/devserver.py`
-* [ ] `./src/quicklook/datasource/types.py`
-* [ ] `./src/quicklook/datasource/dummy_datasource/test_dummy_datasource.py`
-* [ ] `./src/quicklook/datasource/dummy_datasource/__init__.py`
-* [ ] `./src/quicklook/datasource/butler_datasource/butlerutils.py`
-* [ ] `./src/quicklook/datasource/butler_datasource/test_butler_datasource.py`
-* [ ] `./src/quicklook/datasource/butler_datasource/retrieve_data.py`
-* [ ] `./src/quicklook/datasource/butler_datasource/__init__.py`
-* [ ] `./src/quicklook/datasource/butler_datasource/instrument.py`
-* [ ] `./src/quicklook/datasource/__init__.py`
+* [x] `./src/quicklook/scripts/bootstrap_db.py`
+* [x] `./src/quicklook/object_storage/__init__.py`
+* [x] `./src/quicklook/job/test_job_status_printer.py`
+* [x] `./src/quicklook/job/local_storage.py`
+* [x] `./src/quicklook/job/status.py`
+* [x] `./src/quicklook/job/job.py`
+* [x] `./src/quicklook/job/priority.py`
+* [x] `./src/quicklook/job/test_job_local_storage.py`
+* [x] `./src/quicklook/job/shared_large_status.py`
+* [x] `./src/quicklook/job/status_printer.py`
+* [x] `./src/quicklook/job/watcher.py`
+* [x] `./src/quicklook/rpc/types.py`
+* [x] `./src/quicklook/rpc/server.py`
+* [x] `./src/quicklook/rpc/client.py`
+* [x] `./src/quicklook/rpc/test_rpc.py`
+* [x] `./src/quicklook/rpc/__init__.py`
+* [x] `./src/quicklook/rpc/lifespan.py`
+* [x] `./src/quicklook/rpc/queue.py`
+* [x] `./src/quicklook/devserver.py`
+* [x] `./src/quicklook/datasource/types.py`
+* [x] `./src/quicklook/datasource/dummy_datasource/test_dummy_datasource.py`
+* [x] `./src/quicklook/datasource/dummy_datasource/__init__.py`
+* [x] `./src/quicklook/datasource/butler_datasource/butlerutils.py`
+* [x] `./src/quicklook/datasource/butler_datasource/test_butler_datasource.py`
+* [x] `./src/quicklook/datasource/butler_datasource/retrieve_data.py`
+* [x] `./src/quicklook/datasource/butler_datasource/__init__.py`
+* [x] `./src/quicklook/datasource/butler_datasource/instrument.py`
+* [x] `./src/quicklook/datasource/__init__.py`
