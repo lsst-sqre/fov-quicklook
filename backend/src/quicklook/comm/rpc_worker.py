@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
@@ -47,9 +48,10 @@ async def rpc_scatter(
 
         if stream:
             if hasattr(result, "__aiter__"):
-                async for value in result:  # type: ignore[union-attr]
-                    if on_yield:  # pragma: no branch
-                        await on_yield(YieledValue(value, g.id, args))
+                async with aclosing(result):  # type: ignore[arg-type]
+                    async for value in result:  # type: ignore[union-attr]
+                        if on_yield:  # pragma: no branch
+                            await on_yield(YieledValue(value, g.id, args))
             else:
                 # 単一の値の場合もon_yieldで返す
                 if result is not None and on_yield:
@@ -58,9 +60,10 @@ async def rpc_scatter(
             # 非ストリームモードでは結果を返す
             if hasattr(result, "__aiter__"):
                 # ジェネレータの場合は最初の値を返す
-                async for item in result:  # type: ignore[union-attr]
-                    return item
-                raise RuntimeError("No result returned from RPC")
+                async with aclosing(result):  # type: ignore[arg-type]
+                    async for item in result:  # type: ignore[union-attr]
+                        return item
+                    raise RuntimeError("No result returned from RPC")
             return result
 
     return await asyncio.gather(*[single(g) for g in get_available_generators().values()])

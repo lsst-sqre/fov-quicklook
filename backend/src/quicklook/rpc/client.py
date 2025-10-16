@@ -155,21 +155,26 @@ class Rpc(Generic[P, R]):
         """
         ws = await websockets.connect(self.endpoint_url)
         
-        # RpcQueueの処理
-        processed_args, processed_kwargs = _process_args_and_kwargs(
-            self.args, self.kwargs, ws, self._queue_tasks
-        )
+        try:
+            # RpcQueueの処理
+            processed_args, processed_kwargs = _process_args_and_kwargs(
+                self.args, self.kwargs, ws, self._queue_tasks
+            )
 
-        # CallMessageを送信
-        call_msg = CallMessage(
-            func=self.func,
-            args=tuple(processed_args),
-            kwargs=processed_kwargs,
-        )
-        await ws.send(pickle.dumps(call_msg))
+            # CallMessageを送信
+            call_msg = CallMessage(
+                func=self.func,
+                args=tuple(processed_args),
+                kwargs=processed_kwargs,
+            )
+            await ws.send(pickle.dumps(call_msg))
 
-        # 結果を受信
-        return await self._receive_results(ws)
+            # 結果を受信
+            return await self._receive_results(ws)
+        except Exception:
+            # 接続開設後、_receive_results実行前の例外に対するクリーンアップ
+            await self._cleanup_and_close(ws)
+            raise
 
     async def iterate(self) -> AsyncIterator[R]:
         """
