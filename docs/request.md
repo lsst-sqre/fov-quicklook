@@ -33,11 +33,11 @@
 * [x] `./src/quicklook/frontend/api/__main__.py`
 * [x] `./src/quicklook/frontend/api/cache_entries.py`
 * [x] `./src/quicklook/frontend/api/staticassets.py`
-* [ ] `./src/quicklook/types.py`
-* [ ] `./src/quicklook/db/test_db.py`
-* [ ] `./src/quicklook/db/session.py`
-* [ ] `./src/quicklook/db/__init__.py`
-* [ ] `./src/quicklook/db/models.py`
+* [x] `./src/quicklook/types.py`
+* [x] `./src/quicklook/db/test_db.py`
+* [x] `./src/quicklook/db/session.py`
+* [x] `./src/quicklook/db/__init__.py`
+* [x] `./src/quicklook/db/models.py`
 * [ ] `./src/quicklook/coordinator/api/types.py`
 * [ ] `./src/quicklook/coordinator/api/app.py`
 * [ ] `./src/quicklook/coordinator/api/__main__.py`
