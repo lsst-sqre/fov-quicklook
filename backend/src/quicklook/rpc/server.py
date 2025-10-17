@@ -103,7 +103,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         rpc_state = await _setup_rpc_call(app, ws)
 
         # 結果を受信してクライアントに送信
-        await _handle_rpc_results(ws, rpc_state.result_queue, rpc_state.dispatcher_task)
+        await _handle_rpc_results(ws, rpc_state)
 
     except Exception as e:
         # エラーをクライアントに送信
@@ -134,6 +134,7 @@ class _RpcState:
     func: Callable[..., Any]
     result_queue: "queue.Queue[_ProcessResult]"
     dispatcher_task: asyncio.Task
+    future: Any
 
 
 async def _setup_rpc_call(
@@ -184,8 +185,8 @@ async def _setup_rpc_call(
     response_type_msg = ResponseTypeMessage(is_generator=is_generator)
     await ws.send_bytes(pickle.dumps(response_type_msg))
 
-    # 関数をプロセスで実行
-    pool.submit(
+    # 関数をプロセスで実行し、Futureを取得
+    future = pool.submit(
         _execute_function_in_process,
         func,
         tuple(processed_args),
@@ -194,14 +195,19 @@ async def _setup_rpc_call(
         result_queue,
     )
 
-    return _RpcState(func=func, result_queue=result_queue, dispatcher_task=dispatcher_task)
+    return _RpcState(func=func, result_queue=result_queue, dispatcher_task=dispatcher_task, future=future)
 
 
-async def _handle_rpc_results(
-    ws: WebSocket,
-    result_queue: "queue.Queue[_ProcessResult]",
-    dispatcher_task: asyncio.Task,
-) -> None:
+async def _handle_rpc_results(ws: WebSocket, rpc_state: _RpcState) -> None:
+    """
+    プロセスからの結果を受信してクライアントに送信
+
+    Args:
+        ws: WebSocketコネクション
+        rpc_state: RPC呼び出しの状態情報（result_queue, dispatcher_task, futureを含む）
+    """
+    result_queue = rpc_state.result_queue
+    dispatcher_task = rpc_state.dispatcher_task
     """
     プロセスからの結果を受信してクライアントに送信
 
@@ -244,6 +250,13 @@ async def _handle_rpc_results(
 
         # ディスパッチャーをキャンセル
         await _cancel_task(dispatcher_task)
+
+    # プロセスプールのFutureを待機し、例外があれば再送出する
+    try:
+        await anyio.to_thread.run_sync(rpc_state.future.result)
+    except Exception:
+        # 上位で捕らえてクライアントへエラーを送信させるため再送出
+        raise
 
 
 def _replace_queue_refs_with_proxies(
