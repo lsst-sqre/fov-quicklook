@@ -7,6 +7,7 @@ import pytest
 import uvicorn
 from fastapi import FastAPI, WebSocket
 
+from quicklook.comm.generator import set_generator_id_for_test
 from quicklook.rpc import Rpc, _RpcQueue, RpcRemoteError, create_rpc_endpoint, rpc_lifespan
 from quicklook.rpc.lifespan import AppState
 from quicklook.rpc.queue import RpcQueue
@@ -16,13 +17,14 @@ from quicklook.rpc.types import ErrorMessage, YieldMessage
 # テスト用のsentinel値クラス（pickleで同一性を保持）
 class _QueueEndSentinel:
     """キュー終了を示すsentinelクラス（シングルトン）"""
+
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __reduce__(self):
         # pickle時にシングルトンを保持
         return (self.__class__, ())
@@ -82,26 +84,25 @@ def multiple_queue_consumer(q1: queue.Queue[int], q2: queue.Queue[int]) -> dict[
     """複数のキューから値を受け取る関数"""
     results1 = []
     results2 = []
-    
+
     # 両方のキューから値を受け取る
     while True:
         item = q1.get()
         if item is _QUEUE_END:
             break
         results1.append(item * 2)
-    
+
     while True:
         item = q2.get()
         if item is _QUEUE_END:
             break
         results2.append(item * 3)
-    
+
     return {"queue1": results1, "queue2": results2}
 
 
 @pytest.fixture
 async def rpc_app():
-    """テスト用のFastAPIアプリケーション"""
     app = FastAPI(lifespan=rpc_lifespan)
 
     @app.websocket("/rpc")
@@ -114,20 +115,21 @@ async def rpc_app():
 @pytest.fixture
 async def rpc_server(rpc_app):
     """テスト用のサーバーを起動"""
-    config = uvicorn.Config(rpc_app, host="127.0.0.1", port=8765, log_level="error")
-    server = uvicorn.Server(config)
+    with set_generator_id_for_test():
+        config = uvicorn.Config(rpc_app, host="127.0.0.1", port=8765, log_level="error")
+        server = uvicorn.Server(config)
 
-    # サーバーをバックグラウンドで起動
-    task = asyncio.create_task(server.serve())
+        # サーバーをバックグラウンドで起動
+        task = asyncio.create_task(server.serve())
 
-    # サーバーが起動するまで待機
-    await asyncio.sleep(0.5)
+        # サーバーが起動するまで待機
+        await asyncio.sleep(0.5)
 
-    yield "ws://127.0.0.1:8765/rpc"
+        yield "ws://127.0.0.1:8765/rpc"
 
-    # サーバーをシャットダウン
-    server.should_exit = True
-    await task
+        # サーバーをシャットダウン
+        server.should_exit = True
+        await task
 
 
 async def test_simple_function(rpc_server):
@@ -302,17 +304,11 @@ async def test_multiple_queues(rpc_server):
 
     task1 = asyncio.create_task(produce1())
     task2 = asyncio.create_task(produce2())
-    
-    result = await Rpc(
-        rpc_server, 
-        multiple_queue_consumer, 
-        RpcQueue(client_queue1), 
-        RpcQueue(client_queue2)
-    ).run()
+
+    result = await Rpc(rpc_server, multiple_queue_consumer, RpcQueue(client_queue1), RpcQueue(client_queue2)).run()
 
     await task1
     await task2
-    
+
     assert result["queue1"] == [0, 2, 4, 6, 8]
     assert result["queue2"] == [30, 33, 36]
-

@@ -8,7 +8,7 @@ import numpy
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 
-import quicklook.logging
+import quicklook.mylogging
 from quicklook.comm.types import GeneratorInfo
 from quicklook.config import config
 from quicklook.db.models import Quicklook
@@ -24,7 +24,7 @@ from quicklook.utils.s3 import NoSuchKey
 from .deps import dep_tile_pos, dep_visit_name
 from .quicklooks import QuicklookSharedStatus
 
-logger = quicklook.logging.getLogger(__name__)
+logger = quicklook.mylogging.getLogger(__name__)
 
 router = APIRouter()
 

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import cast
 
-import quicklook.logging
+import quicklook.mylogging
 from quicklook.comm.rpc_worker import YieledValue, rpc_scatter, rpc_scatter_stream
 from quicklook.config import config
 from quicklook.datasource import get_datasource
@@ -15,9 +15,9 @@ from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
 
-from .generate_single_fits_tiles_coordinator import generate_single_fits_tile
+from .generate_single_fits_tiles_coordinator import generate_single_fits_tiles_coordinator
 
-logger = quicklook.logging.getLogger(__name__)
+logger = quicklook.mylogging.getLogger(__name__)
 
 ds = get_datasource()
 
@@ -40,7 +40,7 @@ def quicklook_pipeline():
             # DBに初期レコードを作成
             await _create_quicklook_record(job)
             ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
-            ccd_metadata_list = await generate_single_fits_tile(job, ccd_refs)
+            ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)
             result.ccd_metadata_list = ccd_metadata_list
             return result
         except Exception:  # pragma: no cover
@@ -85,20 +85,20 @@ def quicklook_pipeline():
                 item_picker=select_next_result,
             )
         )
-        # .append(
-        #     Stage(
-        #         merge_tiles,
-        #         parallel=config.pipeline_merge_tiles,
-        #     )
-        # )
-        # .append(
-        #     Stage(
-        #         upload_to_object_storage,
-        #         parallel=config.pipeline_transfer_queue_size,
-        #         queue_capacity=config.pipeline_transfer_queue_size,
-        #         item_picker=select_next_result,
-        #     )
-        # )
+        .append(
+            Stage(
+                merge_tiles,
+                parallel=config.pipeline_merge_tiles,
+            )
+        )
+        .append(
+            Stage(
+                upload_to_object_storage,
+                parallel=config.pipeline_transfer_queue_size,
+                queue_capacity=config.pipeline_transfer_queue_size,
+                item_picker=select_next_result,
+            )
+        )
         .append(Stage(finalize_success))
     )
 

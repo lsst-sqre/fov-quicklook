@@ -1,10 +1,32 @@
+import atexit
 import multiprocessing as mp
 from collections.abc import AsyncIterator
 from concurrent.futures import ProcessPoolExecutor
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, ExitStack
 from typing import Any
 
 from fastapi import FastAPI
+
+from quicklook.comm.generator import GeneratorIdInitializer, self_generator_id
+from quicklook.config import config
+
+
+_exit_stacks: set[ExitStack] = set()
+
+
+def _initialize_rpc_worker(initializers: list):
+    """RPC ProcessPoolExecutorのワーカープロセス初期化"""
+    stack = ExitStack()
+    for init in initializers:
+        stack.enter_context(init())
+    
+    _exit_stacks.add(stack)
+    
+    def exit_handler():  # pragma: no cover
+        _exit_stacks.remove(stack)
+        stack.close()
+    
+    atexit.register(exit_handler)
 
 
 class AppState:
@@ -22,10 +44,24 @@ async def rpc_lifespan(app: FastAPI) -> AsyncIterator[None]:
     
     アプリケーション起動時にProcessPoolExecutorとManagerを作成し、
     終了時にクリーンアップを行う。
+    
+    ProcessPoolExecutorはspawnで起動し、各ワーカーでGeneratorIDを初期化する。
+    これにより、ワーカープロセスはクリーンな状態で開始され、
+    その中でmultiprocessing.Poolをforkで作成しても安全。
     """
     state = AppState()
     state.manager = mp.Manager()
-    state.process_pool = ProcessPoolExecutor()
+    ctx = mp.get_context('spawn')
+    
+    # GeneratorIDをワーカープロセスで初期化
+    initializers = [GeneratorIdInitializer()]
+    
+    state.process_pool = ProcessPoolExecutor(
+        max_workers=config.rpc_process_pool_workers,
+        mp_context=ctx,
+        initializer=_initialize_rpc_worker,
+        initargs=(initializers,),
+    )
     app.state.rpc = state
     
     try:

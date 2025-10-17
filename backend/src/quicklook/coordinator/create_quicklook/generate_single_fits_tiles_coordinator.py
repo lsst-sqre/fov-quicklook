@@ -1,13 +1,16 @@
 import asyncio
 import queue
-from contextlib import AsyncExitStack, asynccontextmanager
-from dataclasses import dataclass, field
-from typing import Awaitable, Callable, Generator
+from collections import deque
 
 from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.rpc_worker import rpc_scatter
 from quicklook.comm.types import GeneratorId, GeneratorInfo
-from quicklook.generator.generate_single_fits_tiles import CcdMetadata, GenerateSingleFitsTilesProgress, generate_single_fits_tiles_pipeline
+from quicklook.config import config
+from quicklook.generator.generate_single_fits_tiles import (
+    CcdMetadata,
+    GenerateSingleFitsTilesProgress,
+    generate_single_fits_tiles_pipeline,
+)
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
 from quicklook.rpc.client import Rpc
@@ -15,64 +18,83 @@ from quicklook.rpc.queue import RpcQueue
 from quicklook.types import CcdDataRef, CcdName
 
 
-def enable_faulthandler():
-    # Enable faulthandler for easier debugging
-    import faulthandler
-    import signal
-    import sys
+async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDataRef]) -> list[CcdMetadata]:
+    """
+    FITS データから単一タイルを生成する協調処理。
 
-    faulthandler.enable(sys.stderr, all_threads=True)
-    faulthandler.register(signal.SIGUSR1, file=sys.stderr, all_threads=True)
-    print('Enabled faulthandler')
+    各ジェネレータに対して1つのRPC呼び出しを行い、
+    queue.Queue を通じて動的にCCDを割り当てる。
+    各ジェネレータは設定された数のCCDを同時に処理できる。
 
-
-enable_faulthandler()  # TODO: Remove this line in production
-
-
-async def generate_single_fits_tile(job: Job, ccd_refs: list[CcdDataRef]) -> list[CcdMetadata]:
-    ccd_generator_map: dict[CcdName, GeneratorId] = {}
-    ccd_metadata_dict: dict[CcdName, CcdMetadata] = {}
-    ccd_refs_to_process = [*ccd_refs]
-    done = asyncio.Event()
-
-    async def on_message(msg: CcdMetadata | GenerateSingleFitsTilesProgress, generator: GeneratorInfo):
-        match msg:
-            case GenerateSingleFitsTilesProgress(ccd_name=ccd_name, progress=progress):
-                async with job.watcher.watch_status():
-                    job.status.generate_single_fits_tiles[ccd_name] = progress
-            case CcdMetadata(ccd_name=ccd_name):
-                ccd_generator_map[ccd_name] = generator.id
-                ccd_metadata_dict[ccd_name] = msg
-                if len(ccd_metadata_dict) == len(ccd_refs):
-                    done.set()
-
+    動的割り当ての利点:
+      - 高速なジェネレータがより多くのCCDを処理
+      - 低速なジェネレータがボトルネックにならない
+      - 自動的に最適な負荷分散を実現
+    """
     generators = get_available_generators()
-    workers = [
-        _GenerateSingleFitsTilesPipelineWorker(
-            generator,
+    if not generators:
+        raise RuntimeError("No generators available")
+
+    generator_list = list(generators.values())
+    remaining_ccds = deque(ccd_refs)
+    ccd_metadata_dict: dict[CcdName, CcdMetadata] = {}
+    ccd_generator_map: dict[CcdName, GeneratorId] = {}
+    lock = asyncio.Lock()
+    max_concurrent_ccds = config.generator_max_concurrent_ccds_per_job
+
+    async def worker(generator: GeneratorInfo):
+        """
+        各ジェネレータのワーカー。
+        単一のRPC呼び出しでRpcQueue経由で動的にCCDを供給する。
+        """
+        client_queue: asyncio.Queue[CcdDataRef | None] = asyncio.Queue()
+
+        async with lock:
+            initial_batch: list[CcdDataRef] = []
+            for _ in range(max_concurrent_ccds):
+                if remaining_ccds:
+                    ccd_ref = remaining_ccds.popleft()
+                    initial_batch.append(ccd_ref)
+                    await client_queue.put(ccd_ref)
+
+        if not initial_batch:
+            return
+
+        rpc_queue = RpcQueue(client_queue)
+
+        rpc = Rpc(
+            f'{generator.ws_url}/rpc',
+            _generate_tiles_with_queue,
             job,
-            on_message=on_message,
+            rpc_queue,
         )
-        for generator in generators.values()
-    ]
 
-    stack = AsyncExitStack()
-    async with stack:
-        for worker in workers:
-            await stack.enter_async_context(worker.activate())
-        while len(ccd_refs_to_process) > 0:
-            ccd_ref = ccd_refs_to_process.pop(0)
-            async with asyncio.TaskGroup() as tg:
-                available_workers, pending = await asyncio.wait(
-                    [tg.create_task(worker.wait_until_available()) for worker in workers],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                for t in pending:
-                    t.cancel()
-            worker = sorted([await w for w in available_workers], key=lambda w: w.running_jobs)[0]
-            await worker.submit(ccd_ref)
+        all_sent = False
+        async for msg in rpc.iterate():
+            match msg:
+                case GenerateSingleFitsTilesProgress(progress=progress, ccd_name=ccd_name):
+                    async with job.watcher.watch_status():
+                        job.status.generate_single_fits_tiles[ccd_name] = progress
+                case CcdMetadata(ccd_name=ccd_name):
+                    async with lock:
+                        ccd_metadata_dict[ccd_name] = msg
+                        ccd_generator_map[ccd_name] = generator.id
 
-    await done.wait()
+                    async with lock:
+                        if remaining_ccds:
+                            next_ccd = remaining_ccds.popleft()
+                            await client_queue.put(next_ccd)
+                        elif not all_sent:
+                            await client_queue.put(None)
+                            all_sent = True
+
+    # すべてのジェネレータに対して並行処理
+    async with asyncio.TaskGroup() as tg:
+        for generator in generator_list:
+            tg.create_task(worker(generator))
+
+    if len(ccd_metadata_dict) != len(ccd_refs):
+        raise RuntimeError(f"Not all CCDs processed: got {len(ccd_metadata_dict)}/{len(ccd_refs)} metadata")
 
     dist_config = CcdDistributionConfig(ccd_generator_map, generators)
     async with job.watcher.notify_shared_large_status():
@@ -85,82 +107,38 @@ async def generate_single_fits_tile(job: Job, ccd_refs: list[CcdDataRef]) -> lis
     return [*ccd_metadata_dict.values()]
 
 
-@dataclass
-class _GenerateSingleFitsTilesPipelineWorker:
-    generator: GeneratorInfo
-    job: Job
-    on_message: Callable[[CcdMetadata | GenerateSingleFitsTilesProgress, GeneratorInfo], Awaitable[None]]
-    max_jobs: int = 8
+def _generate_tiles_with_queue(job: Job, ccd_queue: queue.Queue[CcdDataRef | None]):
+    """
+    ジェネレータプロセスで実行される RPC 関数。
+    queueから動的にCCDを取得して処理する。
 
-    _running_jobs: int = 0
-    _available_event: asyncio.Event = field(default_factory=asyncio.Event)
-    _input_queue: asyncio.Queue[CcdDataRef | None] = field(default_factory=asyncio.Queue)
+    Args:
+        job: ジョブオブジェクト
+        ccd_queue: CCDを供給するキュー。Noneが送られると終了。
 
-    @asynccontextmanager
-    async def activate(self):
-        self._available_event.set()
+    Yields:
+        CcdMetadata: 処理完了したCCDのメタデータ
 
-        async def consume_rpc():
-            rpc = Rpc(
-                f'{self.generator.ws_url}/rpc',
-                _generate_single_fits_tiles_rpc,
-                self.job,
-                RpcQueue(self._input_queue),
-            )
-            async for msg in rpc.iterate():
-                match msg:
-                    case CcdMetadata():
-                        self._running_jobs -= 1
-                        if self._running_jobs < self.max_jobs:
-                            self._available_event.set()
-                await self.on_message(msg, self.generator)
+    Note:
+        GeneratorIDはRPC ProcessPoolExecutorのinitializerで設定済み
+    """
 
-        async with asyncio.TaskGroup() as tg:
-            t = tg.create_task(consume_rpc())
-            try:
-                yield
-            finally:
-                await self._input_queue.put(None)
-        t.result()
-
-    async def submit(self, ccd_ref: CcdDataRef):
-        self._running_jobs += 1
-        if not self.available():
-            self._available_event.clear()
-        await self._input_queue.put(ccd_ref)
-
-    def available(self):
-        return self._running_jobs < self.max_jobs
-
-    async def wait_until_available(self):
-        await self._available_event.wait()
-        return self
-
-    @property
-    def running_jobs(self):
-        return self._running_jobs
-
-
-def _generate_single_fits_tiles_rpc(
-    job: Job,
-    ccd_refs_q: queue.Queue[CcdDataRef | None],
-) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
-    def ccd_refs():
-        while ccd_ref := ccd_refs_q.get():
+    def ccd_refs_generator():
+        """キューからCCDを取得するジェネレータ"""
+        while True:
+            ccd_ref = ccd_queue.get()
+            if ccd_ref is None:
+                break
             yield ccd_ref
 
-    gen = generate_single_fits_tiles_pipeline(job, ccd_refs())
-    try:
-        for msg in gen:
-            yield msg
-    finally:
-        # ジェネレータを明示的にクローズして、内部のリソース(Manager, Pool等)を解放
-        gen.close()
+    yield from generate_single_fits_tiles_pipeline(job, ccd_refs_generator())
 
 
-def _save_job_metadata_rpc(job: Job):
+def _save_job_metadata_rpc(job: Job) -> None:
+    """ジョブのメタデータをローカルストレージに保存。"""
     job.local_storage.metadata.save()
 
 
-def _save_ccd_distribution_config_rpc(job: Job, dist_config: CcdDistributionConfig):
+def _save_ccd_distribution_config_rpc(job: Job, dist_config: CcdDistributionConfig) -> None:
+    """CCD とジェネレータの対応関係をローカルストレージに保存。"""
     job.local_storage.ccd_distribution_config.save(dist_config)

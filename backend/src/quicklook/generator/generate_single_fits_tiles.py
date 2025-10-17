@@ -3,11 +3,14 @@ import multiprocessing
 import queue
 import tempfile
 import threading
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator, Iterable, cast
+from typing import ContextManager, Generator, Iterable, cast
 
+from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.config import config
 from quicklook.datasource import get_datasource
 from quicklook.generator.iteratetiles import iterate_tiles
@@ -72,6 +75,17 @@ class CcdMetadata:
     bbox: BBox
 
 
+def _initialize_pool_worker(initializers: list[Callable[[], ContextManager]]) -> None:
+    """multiprocessing.Pool用のワーカー初期化関数"""
+    global _pool_exit_stack
+    _pool_exit_stack = ExitStack()
+    for init in initializers:
+        _pool_exit_stack.enter_context(init())
+
+
+_pool_exit_stack: ExitStack | None = None
+
+
 def generate_single_fits_tiles_pipeline(
     job: Job,
     refs: Iterable[CcdDataRef],
@@ -97,7 +111,12 @@ def generate_single_fits_tiles_pipeline(
 
         def main():
             try:
-                with multiprocessing.Pool(8) as pool:
+                initializers = [GeneratorIdInitializer()]
+                with multiprocessing.Pool(
+                    8, 
+                    initializer=_initialize_pool_worker, 
+                    initargs=(initializers,)
+                ) as pool:
                     for ccd_metadata in pool.imap_unordered(
                         _process_ccd,
                         (

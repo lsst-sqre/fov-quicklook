@@ -1,10 +1,10 @@
 import gzip
-import quicklook.logging
+import quicklook.mylogging
 from typing import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 
-logger = quicklook.logging.getLogger(f"uvicorn.{__name__}")
+logger = quicklook.mylogging.getLogger(f"uvicorn.{__name__}")
 
 
 def setup_compression(app: FastAPI, static_prefix: str) -> None:  # pragma: no cover

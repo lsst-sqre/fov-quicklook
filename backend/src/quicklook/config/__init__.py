@@ -68,9 +68,11 @@ class Config(BaseSettings):
     comm_heartbeat_timeout: int = 2  # seconds
     comm_registration_interval: int = 10  # seconds
     rpc_timeout_total: float = 600  # seconds
+    rpc_process_pool_workers: int = 4
 
     # Job settings
     generator_max_concurrent_jobs: int = 8
+    generator_max_concurrent_ccds_per_job: int = 8
     merge_tile_parallel: int = 8
     transfer_tile_parallel: int = 8
 

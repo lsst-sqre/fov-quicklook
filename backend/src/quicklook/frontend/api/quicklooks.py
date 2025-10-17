@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, FastAPI, WebSocket
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
-import quicklook.logging
+import quicklook.mylogging
 from quicklook.config import config
 from quicklook.coordinator.api.types import (
     CreateQuicklookRequest,
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
 
 router = APIRouter()
 
-logger = quicklook.logging.getLogger(__name__)
+logger = quicklook.mylogging.getLogger(__name__)
 
 
 @router.post('/api/quicklooks', description='Create a quicklook')
