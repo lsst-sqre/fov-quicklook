@@ -241,26 +241,27 @@ async def test_invalid_message_type(rpc_app):
     import websockets
 
     # サーバーを起動
-    config = uvicorn.Config(rpc_app, host="127.0.0.1", port=8766, log_level="error")
-    server = uvicorn.Server(config)
-    task = asyncio.create_task(server.serve())
-    await asyncio.sleep(0.5)
+    with set_generator_id_for_test():
+        config = uvicorn.Config(rpc_app, host="127.0.0.1", port=8766, log_level="error")
+        server = uvicorn.Server(config)
+        task = asyncio.create_task(server.serve())
+        await asyncio.sleep(0.5)
 
-    try:
-        async with websockets.connect("ws://127.0.0.1:8766/rpc") as ws:
-            # 無効なメッセージを送信
-            invalid_msg = YieldMessage(value=123)
-            await ws.send(pickle.dumps(invalid_msg))
+        try:
+            async with websockets.connect("ws://127.0.0.1:8766/rpc") as ws:
+                # 無効なメッセージを送信
+                invalid_msg = YieldMessage(value=123)
+                await ws.send(pickle.dumps(invalid_msg))
 
-            # エラーメッセージを受信
-            data = await ws.recv()
-            if isinstance(data, bytes):
-                message = pickle.loads(data)
-                assert isinstance(message, ErrorMessage)
-                assert "Expected CallMessage" in message.error_message
-    finally:
-        server.should_exit = True
-        await task
+                # エラーメッセージを受信
+                data = await ws.recv()
+                if isinstance(data, bytes):
+                    message = pickle.loads(data)
+                    assert isinstance(message, ErrorMessage)
+                    assert "Expected CallMessage" in message.error_message
+        finally:
+            server.should_exit = True
+            await task
 
 
 async def test_connection_error_handling(rpc_app):
