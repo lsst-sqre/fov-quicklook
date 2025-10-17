@@ -17,7 +17,6 @@ from quicklook.dev.run_uvicorn import find_free_tcp_port, run_uvicorn_app
 from quicklook.job.job import Job
 from quicklook.job.status_printer import JobStatusPrinter
 from quicklook.types import VisitName
-from quicklook.utils.pipeline import Stage
 
 pytestmark = pytest.mark.slow
 

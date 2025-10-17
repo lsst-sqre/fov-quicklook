@@ -7,11 +7,7 @@ from typing import Awaitable, Callable, Generator
 from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.rpc_worker import rpc_scatter
 from quicklook.comm.types import GeneratorId, GeneratorInfo
-from quicklook.generator.generate_single_fits_tiles import (
-    CcdMetadata,
-    GenerateSingleFitsTilesProgress,
-    generate_single_fits_tiles_pipeline,
-)
+from quicklook.generator.generate_single_fits_tiles import CcdMetadata, GenerateSingleFitsTilesProgress, generate_single_fits_tiles_pipeline
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
 from quicklook.rpc.client import Rpc
@@ -21,14 +17,16 @@ from quicklook.types import CcdDataRef, CcdName
 
 def enable_faulthandler():
     # Enable faulthandler for easier debugging
-    import faulthandler, signal, sys
+    import faulthandler
+    import signal
+    import sys
 
     faulthandler.enable(sys.stderr, all_threads=True)
     faulthandler.register(signal.SIGUSR1, file=sys.stderr, all_threads=True)
     print('Enabled faulthandler')
 
 
-enable_faulthandler() # TODO: Remove this line in production
+enable_faulthandler()  # TODO: Remove this line in production
 
 
 async def generate_single_fits_tile(job: Job, ccd_refs: list[CcdDataRef]) -> list[CcdMetadata]:
@@ -64,10 +62,13 @@ async def generate_single_fits_tile(job: Job, ccd_refs: list[CcdDataRef]) -> lis
             await stack.enter_async_context(worker.activate())
         while len(ccd_refs_to_process) > 0:
             ccd_ref = ccd_refs_to_process.pop(0)
-            available_workers, _ = await asyncio.wait(
-                [asyncio.create_task(worker.wait_until_available()) for worker in workers],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            async with asyncio.TaskGroup() as tg:
+                available_workers, pending = await asyncio.wait(
+                    [tg.create_task(worker.wait_until_available()) for worker in workers],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for t in pending:
+                    t.cancel()
             worker = sorted([await w for w in available_workers], key=lambda w: w.running_jobs)[0]
             await worker.submit(ccd_ref)
 

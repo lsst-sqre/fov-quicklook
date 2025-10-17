@@ -1,0 +1,57 @@
+================================================================================
+                    FOV-QUICKLOOK デッドロック調査サマリー
+                           Date: October 17, 2025
+================================================================================
+
+【問題】
+- PID 2968184 (pytest メインプロセス) でデッドロック
+- 51個のプロセスがハング状態
+
+【調査方法】
+1. pstree -p で現在のプロセスツリーを記録 → backtrace_pstree.txt
+2. log ファイルを truncate
+3. SIGUSR1 シグナルで各プロセスからバックトレース取得
+4. ログとバックトレースを分析
+
+【成果物】
+✓ backtrace_pstree.txt              - プロセスツリー
+✓ log                                - SIGUSR1 ダンプ (849KB)
+✓ collect_backtraces.sh             - バックトレース取得スクリプト
+✓ backtrace_pid_*.txt               - 個別プロセスバックトレース (66個)
+✓ DEADLOCK_ANALYSIS.md              - 概要分析
+✓ DEADLOCK_DETAILED_ANALYSIS.md     - 詳細分析と修正策
+
+【根本原因】
+
+ProcessPoolExecutor ワーカー内での multiprocessing.Manager/Pool のネスティング
+
+呼び出し階層:
+  pytest (ProcessPoolExecutor 5workers)
+    ↓ ワーカー内
+  _execute_function_in_process
+    ↓
+  _generate_single_fits_tiles_rpc
+    ↓
+  generate_single_fits_tiles_pipeline ← ★ここで Manager() と Pool(8) 作成
+
+プロセス数計算:
+  1 (pytest) + 5 (ProcessPoolExecutor) + 5 (Manager) + 40 (Pool) = 51
+
+【ロック分析】
+- Manager 起動時に fork が発生
+- 複数ワーカーが同時に Manager 起動を試みる
+- リソース(fd, メモリ)枯渇によるロック競合
+- asyncio + multiprocessing の fork 安全性問題
+
+【推奨修正】
+
+1. 短期: Manager を外部で作成し、引数で渡す
+   - generate_single_fits_tiles_pipeline(job, refs, manager=...)
+
+2. 中期: ProcessPoolExecutor をリプレイス
+   - asyncio ネイティブ設計に移行
+
+3. テスト: 並列度制限
+   - pytest -n 2 (xdist ワーカー数制限)
+
+================================================================================

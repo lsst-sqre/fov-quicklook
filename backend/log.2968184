@@ -1,0 +1,92 @@
+Thread 0x00007bfb1e3e26c0 (most recent call first):
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 359 in wait
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/queue.py", line 202 in get
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/anyio/_backends/_asyncio.py", line 965 in run
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 1041 in _bootstrap_inner
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 1012 in _bootstrap
+
+Thread 0x00007bfb1dbe16c0 (most recent call first):
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/connection.py", line 395 in _recv
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/connection.py", line 430 in _recv_bytes
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/connection.py", line 250 in recv
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/managers.py", line 824 in _callmethod
+  File "<string>", line 2 in get
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/anyio/_backends/_asyncio.py", line 976 in run
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 1041 in _bootstrap_inner
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 1012 in _bootstrap
+
+Thread 0x00007bfb1b4076c0 (most recent call first):
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 359 in wait
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/queues.py", line 249 in _feed
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 992 in run
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 1041 in _bootstrap_inner
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 1012 in _bootstrap
+
+Thread 0x00007bfb1ac066c0 (most recent call first):
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/selectors.py", line 398 in select
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/connection.py", line 1148 in wait
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/concurrent/futures/process.py", line 417 in wait_result_broken_or_wakeup
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/concurrent/futures/process.py", line 344 in run
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 1041 in _bootstrap_inner
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/threading.py", line 1012 in _bootstrap
+
+Current thread 0x00007bfb7327b740 (most recent call first):
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/selectors.py", line 452 in select
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/asyncio/base_events.py", line 1989 in _run_once
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/asyncio/base_events.py", line 679 in run_forever
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/asyncio/base_events.py", line 708 in run_until_complete
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/asyncio/runners.py", line 118 in run
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/asyncio/runners.py", line 194 in run
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/uvicorn/server.py", line 67 in run
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/uvicorn/main.py", line 582 in run
+  File "/home/michitaro/fov-quicklook2/backend/src/quicklook/dev/run_uvicorn.py", line 78 in _uvicorn_run
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/process.py", line 108 in run
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/process.py", line 313 in _bootstrap
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/popen_fork.py", line 74 in _launch
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/popen_fork.py", line 20 in __init__
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/context.py", line 282 in _Popen
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/context.py", line 224 in _Popen
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/multiprocessing/process.py", line 121 in start
+  File "/home/michitaro/fov-quicklook2/backend/src/quicklook/dev/run_uvicorn.py", line 46 in run_uvicorn_app
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/contextlib.py", line 141 in __enter__
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/contextlib.py", line 530 in enter_context
+  File "/home/michitaro/fov-quicklook2/backend/src/quicklook/coordinator/create_quicklook/test_create_quicklook.py", line 117 in run_generators
+  File "/home/michitaro/miniconda3/envs/py3_13/lib/python3.13/contextlib.py", line 141 in __enter__
+  File "/home/michitaro/fov-quicklook2/backend/src/quicklook/coordinator/create_quicklook/test_create_quicklook.py", line 63 in running_app
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/fixtures.py", line 923 in call_fixture_func
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/fixtures.py", line 1196 in pytest_fixture_setup
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 121 in _multicall
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_manager.py", line 120 in _hookexec
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_hooks.py", line 512 in __call__
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/fixtures.py", line 1128 in execute
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/fixtures.py", line 640 in _get_active_fixturedef
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/fixtures.py", line 549 in getfixturevalue
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/fixtures.py", line 720 in _fillfixtures
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/python.py", line 1674 in setup
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pytest_asyncio/plugin.py", line 463 in setup
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/runner.py", line 514 in setup
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/runner.py", line 164 in pytest_runtest_setup
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 121 in _multicall
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_manager.py", line 120 in _hookexec
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_hooks.py", line 512 in __call__
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/runner.py", line 246 in <lambda>
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/runner.py", line 344 in from_call
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/runner.py", line 245 in call_and_report
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/runner.py", line 130 in runtestprotocol
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/runner.py", line 117 in pytest_runtest_protocol
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 121 in _multicall
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_manager.py", line 120 in _hookexec
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_hooks.py", line 512 in __call__
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/main.py", line 367 in pytest_runtestloop
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 121 in _multicall
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_manager.py", line 120 in _hookexec
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_hooks.py", line 512 in __call__
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/main.py", line 343 in _main
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/main.py", line 289 in wrap_session
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/main.py", line 336 in pytest_cmdline_main
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_callers.py", line 121 in _multicall
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_manager.py", line 120 in _hookexec
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/pluggy/_hooks.py", line 512 in __call__
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py", line 175 in main
+  File "/home/michitaro/fov-quicklook2/backend/.venv/lib/python3.13/site-packages/_pytest/config/__init__.py", line 201 in console_main
+  File "/home/michitaro/fov-quicklook2/backend/./.venv/bin/pytest", line 8 in <module>
