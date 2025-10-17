@@ -148,14 +148,13 @@ def _generate_single_fits_tiles_rpc(
         while ccd_ref := ccd_refs_q.get():
             yield ccd_ref
 
+    gen = generate_single_fits_tiles_pipeline(job, ccd_refs())
     try:
-        for msg in generate_single_fits_tiles_pipeline(job, ccd_refs()):
+        for msg in gen:
             yield msg
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-        raise
+    finally:
+        # ジェネレータを明示的にクローズして、内部のリソース(Manager, Pool等)を解放
+        gen.close()
 
 
 def _save_job_metadata_rpc(job: Job):

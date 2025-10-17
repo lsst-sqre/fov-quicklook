@@ -11,6 +11,9 @@ class _RpcQueue(Generic[T]):
 
     クライアント側ではasyncio.Queueを受け取り、
     リモート側ではqueue.Queueとして扱われる。
+    
+    注意: キューの終了処理はこのモジュールでは行わない。
+    キューはRPC実行が終了したときに自動的にクリーンアップされる。
     """
 
     _next_id: ClassVar[int] = 0

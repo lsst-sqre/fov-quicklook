@@ -13,6 +13,24 @@ from quicklook.rpc.queue import RpcQueue
 from quicklook.rpc.types import ErrorMessage, YieldMessage
 
 
+# テスト用のsentinel値クラス（pickleで同一性を保持）
+class _QueueEndSentinel:
+    """キュー終了を示すsentinelクラス（シングルトン）"""
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def __reduce__(self):
+        # pickle時にシングルトンを保持
+        return (self.__class__, ())
+
+
+_QUEUE_END = _QueueEndSentinel()
+
+
 def simple_function(x: int, y: int) -> int:
     """シンプルな関数"""
     return x + y
@@ -40,7 +58,7 @@ def queue_consumer_function(q: queue.Queue) -> list[int]:
     results = []
     while True:
         item = q.get()
-        if item is None:
+        if item is _QUEUE_END:
             break
         results.append(item * 2)
     return results
@@ -50,7 +68,7 @@ def queue_generator_function(q: queue.Queue[int]) -> Generator[int]:
     """キューから値を受け取ってyieldする関数"""
     while True:
         item = q.get()
-        if item is None:
+        if item is _QUEUE_END:
             break
         yield item * 2
 
@@ -58,6 +76,27 @@ def queue_generator_function(q: queue.Queue[int]) -> Generator[int]:
 def function_with_int_arg(value: int) -> int:
     """整数を受け取って2倍にする関数"""
     return value * 2
+
+
+def multiple_queue_consumer(q1: queue.Queue[int], q2: queue.Queue[int]) -> dict[str, list[int]]:
+    """複数のキューから値を受け取る関数"""
+    results1 = []
+    results2 = []
+    
+    # 両方のキューから値を受け取る
+    while True:
+        item = q1.get()
+        if item is _QUEUE_END:
+            break
+        results1.append(item * 2)
+    
+    while True:
+        item = q2.get()
+        if item is _QUEUE_END:
+            break
+        results2.append(item * 3)
+    
+    return {"queue1": results1, "queue2": results2}
 
 
 @pytest.fixture
@@ -130,7 +169,7 @@ async def test_queue_consumer(rpc_server):
     async def produce():
         for i in range(3):
             await client_queue.put(i)
-        await client_queue.put(None)
+        await client_queue.put(_QUEUE_END)
 
     task = asyncio.create_task(produce())
     result = await Rpc(rpc_server, queue_consumer_function, RpcQueue(client_queue)).run()
@@ -147,7 +186,7 @@ async def test_queue_generator(rpc_server):
         for i in range(3):
             await client_queue.put(i)
             await asyncio.sleep(0.01)
-        await client_queue.put(None)
+        await client_queue.put(_QUEUE_END)
 
     task = asyncio.create_task(produce())
 
@@ -231,3 +270,38 @@ async def test_lifespan_error_handling():
 
     with pytest.raises(RuntimeError, match="Manager is not initialized"):
         get_manager(app)
+
+
+async def test_multiple_queues(rpc_server):
+    """複数のキューを同時に使用するテスト（デッドロック防止の確認）"""
+    client_queue1 = asyncio.Queue()
+    client_queue2 = asyncio.Queue()
+
+    async def produce1():
+        for i in range(5):
+            await client_queue1.put(i)
+            await asyncio.sleep(0.01)
+        await client_queue1.put(_QUEUE_END)
+
+    async def produce2():
+        for i in range(3):
+            await client_queue2.put(i + 10)
+            await asyncio.sleep(0.015)
+        await client_queue2.put(_QUEUE_END)
+
+    task1 = asyncio.create_task(produce1())
+    task2 = asyncio.create_task(produce2())
+    
+    result = await Rpc(
+        rpc_server, 
+        multiple_queue_consumer, 
+        RpcQueue(client_queue1), 
+        RpcQueue(client_queue2)
+    ).run()
+
+    await task1
+    await task2
+    
+    assert result["queue1"] == [0, 2, 4, 6, 8]
+    assert result["queue2"] == [30, 33, 36]
+

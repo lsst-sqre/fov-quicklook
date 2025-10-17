@@ -39,26 +39,33 @@ async for j in Rpc(f).run():
 ```python
 import asyncio
 import queue
+from quicklook.rpc import Rpc, RpcQueue
+
+# キュー終了のためのsentinel値（アプリケーション側で定義）
+QUEUE_END = object()
 
 client_queue = asyncio.Queue()
 
 def f(q: queue.Queue):
     while True:
-        item = await q.get()
-        if item is None:
+        item = q.get()
+        if item is QUEUE_END:
             break
         yield item
 
 async def produce():
     for i in range(5):
         await client_queue.put(i)
-    await client_queue.put(None)
+    await client_queue.put(QUEUE_END)
 
 task = asyncio.create_task(produce())
 
 async for i in Rpc(rpc_endpoint_url, f, RpcQueue(client_queue)).run():
     print(i)
 ```
+
+注意: キューの終了処理はRPCモジュールではなく、アプリケーション側で管理してください。
+上記の例では、`QUEUE_END` というsentinel値を使ってキューの終了を示しています。
 
 以上のコードはクライアントからの利用時のものである。
 
@@ -103,3 +110,10 @@ async def rpc_endpoint(ws: WebSocket):
         * この手のモジュールはデッドロックに陥ることがある。テストにタイムアウトを指定すること。
             * `timeout 10 ./.venv/bin/pytest ...` のような使い方が良いだろう。
         * テストのカバレッジは100%を目指す。例外を送出するだけのブランチは通らなくても良い。(そのようなブランチは`#pragma: no branch`を使って良い。)
+
+## 実装詳細
+
+* client, server間のメッセージはCall, ResponseType, Return, Error, Exit, Yieldの5種類がある。
+* ResponseTypeは、サーバーで呼び出された関数がgeneratorかどうかを返す。
+* clientからのCallで始まり、serverからのExitで終わる。
+* clietnはReturnやErrorを受信した後もExitがくるまで接続を消費する。

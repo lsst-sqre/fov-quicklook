@@ -85,20 +85,20 @@ def quicklook_pipeline():
                 item_picker=select_next_result,
             )
         )
-        .append(
-            Stage(
-                merge_tiles,
-                parallel=config.pipeline_merge_tiles,
-            )
-        )
-        .append(
-            Stage(
-                upload_to_object_storage,
-                parallel=config.pipeline_transfer_queue_size,
-                queue_capacity=config.pipeline_transfer_queue_size,
-                item_picker=select_next_result,
-            )
-        )
+        # .append(
+        #     Stage(
+        #         merge_tiles,
+        #         parallel=config.pipeline_merge_tiles,
+        #     )
+        # )
+        # .append(
+        #     Stage(
+        #         upload_to_object_storage,
+        #         parallel=config.pipeline_transfer_queue_size,
+        #         queue_capacity=config.pipeline_transfer_queue_size,
+        #         item_picker=select_next_result,
+        #     )
+        # )
         .append(Stage(finalize_success))
     )
 

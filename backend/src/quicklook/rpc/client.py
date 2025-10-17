@@ -1,20 +1,23 @@
 import asyncio
 import pickle
 from collections.abc import AsyncIterator, Callable, Generator
-from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, overload
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar
 
-import websockets.client
+import websockets
 
 from .queue import _RpcQueue
 
 if TYPE_CHECKING:
     from websockets.asyncio.client import ClientConnection
+
 from .types import (
     CallMessage,
     ErrorMessage,
+    ExitMessage,
     Message,
-    QueueDoneMessage,
     QueuePutMessage,
+    ResponseTypeMessage,
     ReturnMessage,
     RpcRemoteError,
     YieldMessage,
@@ -25,104 +28,18 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 
-def _process_args_and_kwargs(
-    args: tuple[Any, ...],
-    kwargs: dict[str, Any],
-    ws: "ClientConnection",
-    queue_tasks: list[asyncio.Task[None]],
-) -> tuple[list[Any], dict[str, Any]]:
-    """
-    argsとkwargsを処理し、RpcQueueを設定する
-    
-    Args:
-        args: 位置引数
-        kwargs: キーワード引数
-        ws: WebSocketコネクション
-        queue_tasks: キュータスクのリスト（このリストに新しいタスクが追加される）
-    
-    Returns:
-        処理済みのargs, kwargs
-    """
-    processed_args = []
-    for arg in args:
-        if isinstance(arg, _RpcQueue):
-            processed_args.append(arg)
-            queue_tasks.append(
-                asyncio.create_task(_send_queue_messages_helper(ws, arg.queue_id, arg.queue))
-            )
-        else:
-            processed_args.append(arg)
-
-    processed_kwargs = {}
-    for k, v in kwargs.items():
-        if isinstance(v, _RpcQueue):
-            processed_kwargs[k] = v
-            queue_tasks.append(
-                asyncio.create_task(_send_queue_messages_helper(ws, v.queue_id, v.queue))
-            )
-        else:
-            processed_kwargs[k] = v
-
-    return processed_args, processed_kwargs
-
-
-async def _send_queue_messages_helper(
-    ws: "ClientConnection", queue_id: int, q: asyncio.Queue[Any]
-) -> None:
-    """
-    asyncio.Queueからアイテムを取得してWebSocketで送信する
-    
-    Args:
-        ws: WebSocketコネクション
-        queue_id: キューのID
-        q: asyncio.Queue
-    """
-    try:
-        while True:
-            item = await q.get()
-            if item is None:
-                done_msg = QueueDoneMessage(queue_id=queue_id)
-                await ws.send(pickle.dumps(done_msg))
-                break
-            else:
-                put_msg = QueuePutMessage(queue_id=queue_id, value=item)
-                await ws.send(pickle.dumps(put_msg))
-    except asyncio.CancelledError:
-        raise
-    except Exception:  # pragma: no cover
-        pass
-
-
 class Rpc(Generic[P, R]):
     """
     リモート関数呼び出しを行うクライアントクラス
-    
+
     使用例:
         # 通常の関数
         result = await Rpc(endpoint_url, func, arg1, arg2).run()
-        
+
         # ジェネレータ関数
-        async for item in Rpc(endpoint_url, func, arg1, arg2).run():
+        async for item in Rpc(endpoint_url, func, arg1, arg2).iterate():
             print(item)
     """
-
-    @overload
-    def __init__(
-        self,
-        endpoint_url: str,
-        func: Callable[P, Generator[R, Any, Any]],
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        endpoint_url: str,
-        func: Callable[P, R],
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> None: ...
 
     def __init__(
         self,
@@ -135,163 +52,174 @@ class Rpc(Generic[P, R]):
         self.func = func
         self.args = args
         self.kwargs = kwargs
-        self._queue_tasks: list[asyncio.Task[None]] = []
 
-    @overload
-    async def run(self: "Rpc[P, Generator[R, Any, Any]]") -> AsyncIterator[R]: ...
-
-    @overload
-    async def run(self: "Rpc[P, R]") -> R: ...
-
-    async def run(self) -> AsyncIterator[R] | R:
-        """
-        リモート関数を実行する
-        
-        Returns:
-            ジェネレータの場合はAsyncIterator、通常の関数の場合は結果の値
-        
-        Raises:
-            RpcRemoteError: リモート実行でエラーが発生した場合
-        """
+    async def run(self) -> R:
         ws = await websockets.connect(self.endpoint_url)
-        
+
         try:
-            # RpcQueueの処理
-            processed_args, processed_kwargs = _process_args_and_kwargs(
-                self.args, self.kwargs, ws, self._queue_tasks
-            )
+            async with _handle_rpc_arguments(self.args, self.kwargs, ws):
+                call_msg = CallMessage(
+                    func=self.func,
+                    args=self.args,
+                    kwargs=self.kwargs,
+                )
+                await ws.send(pickle.dumps(call_msg))
 
-            # CallMessageを送信
-            call_msg = CallMessage(
-                func=self.func,
-                args=tuple(processed_args),
-                kwargs=processed_kwargs,
-            )
-            await ws.send(pickle.dumps(call_msg))
+                # 最初のメッセージを受信（ResponseType or Error）
+                data = await ws.recv()
+                if isinstance(data, str):  # pragma: no cover
+                    raise RuntimeError("Unexpected string message")
+                message: Message = pickle.loads(data)  # type: ignore[arg-type]
+                
+                # 最初のメッセージがErrorの場合（ResponseType送信前のエラー）
+                if isinstance(message, ErrorMessage):
+                    error = RpcRemoteError(message.error_type, message.error_message, message.traceback)
+                    # Exitを待つ
+                    async for data in ws:
+                        if isinstance(data, str):  # pragma: no cover
+                            continue
+                        msg: Message = pickle.loads(data)  # type: ignore[arg-type]
+                        if isinstance(msg, ExitMessage):
+                            break
+                    raise error
+                
+                # ResponseTypeMessage以外は期待しない
+                if not isinstance(message, ResponseTypeMessage):  # pragma: no branch
+                    raise RuntimeError(f"Expected ResponseTypeMessage, got {type(message).__name__}")
 
-            # 結果を受信
-            return await self._receive_results(ws)
-        except Exception:
-            # 接続開設後、_receive_results実行前の例外に対するクリーンアップ
-            await self._cleanup_and_close(ws)
-            raise
+                if message.is_generator:  # pragma: no branch
+                    raise RuntimeError(f"Expected non-generator function, but {self.func.__name__} is a generator")
+
+                # 結果を受信
+                return_value: R | None = None
+                error: RpcRemoteError | None = None
+
+                async for data in ws:
+                    if isinstance(data, str):  # pragma: no cover
+                        continue
+                    msg: Message = pickle.loads(data)  # type: ignore[arg-type]
+                    match msg:
+                        case ReturnMessage(value=value):
+                            return_value = value  # type: ignore[assignment]
+                        case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
+                            error = RpcRemoteError(error_type, error_message, traceback)
+                        case ExitMessage():
+                            break
+                        case _:  # pragma: no cover
+                            raise RuntimeError(f"Unexpected message type: {type(msg).__name__}")
+
+                # Exitを受信した後にエラーまたは戻り値を返す
+                if error is not None:
+                    raise error
+                if return_value is not None:
+                    return return_value  # type: ignore[return-value]
+                raise RuntimeError(f"No return value received from {self.func.__name__}")
+        finally:
+            await self._close(ws)
 
     async def iterate(self) -> AsyncIterator[R]:
-        """
-        ジェネレータ関数専用のイテレーションメソッド
-        
-        このメソッドはジェネレータ関数を実行し、結果を非同期イテレータとして返します。
-        通常の関数に対して使用すると、実行時エラーが発生します。
-        
-        Returns:
-            AsyncIterator[R]: ジェネレータからの値を順次yield
-        
-        Raises:
-            RpcRemoteError: リモート実行でエラーが発生した場合
-            RuntimeError: ジェネレータでない関数に対して呼び出された場合
-        
-        使用例:
-            async for item in await Rpc(url, generator_func, arg).iterate():
-                print(item)
-        """
-        result = await self.run()
-        if not hasattr(result, "__aiter__"):
-            raise RuntimeError(
-                f"iterate() can only be used with generator functions. "
-                f"The function {self.func.__name__} returned a non-generator result."
-            )
-        async for item in result:  # type: ignore[union-attr]
-            yield item
+        ws = await websockets.connect(self.endpoint_url)
 
-    async def _receive_results(self, ws: "ClientConnection") -> AsyncIterator[R] | R:
-        """
-        WebSocketから結果を受信する
-        
-        Args:
-            ws: WebSocketコネクション
-        
-        Returns:
-            ジェネレータの場合はAsyncIterator、通常の関数の場合は結果の値
-        
-        Raises:
-            RpcRemoteError: リモート実行でエラーが発生した場合
-        """
-        # WebSocketストリームをイテレータに変換
-        ws_iterator = ws.__aiter__()
-        
         try:
-            # 最初のメッセージを取得
-            data = await ws_iterator.__anext__()
-            while isinstance(data, str):  # pragma: no cover
-                data = await ws_iterator.__anext__()
-            
-            message: Message = pickle.loads(data)  # type: ignore[arg-type]
-            
-            match message:
-                case YieldMessage(value=first_value):
-                    # ジェネレータの場合（WebSocketとキューはジェネレータが管理）
-                    return self._stream_remaining_results(ws, ws_iterator, first_value)
-                case ReturnMessage(value=value):
-                    # 単一の値の場合
-                    await self._cleanup_and_close(ws)
-                    return value
-                case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
-                    # エラーの場合
-                    await self._cleanup_and_close(ws)
-                    raise RpcRemoteError(error_type, error_message, traceback)
-            
-            # ここには到達しないはずだが型チェッカーのために
-            raise RuntimeError("No message received from server")  # pragma: no cover
-        except Exception:
-            await self._cleanup_and_close(ws)
-            raise
-    
-    def _cleanup_queue_tasks(self) -> None:
-        """キュータスクをクリーンアップする（同期的にキャンセルのみ）"""
-        for task in self._queue_tasks:
-            task.cancel()
-    
-    async def _cleanup_and_close(self, ws: "ClientConnection") -> None:
-        """WebSocketを閉じてキュータスクをクリーンアップする"""
+            async with _handle_rpc_arguments(self.args, self.kwargs, ws):
+                call_msg = CallMessage(
+                    func=self.func,
+                    args=self.args,
+                    kwargs=self.kwargs,
+                )
+                await ws.send(pickle.dumps(call_msg))
+
+                # 最初のメッセージを受信（ResponseType or Error）
+                data = await ws.recv()
+                if isinstance(data, str):  # pragma: no cover
+                    raise RuntimeError("Unexpected string message")
+                message: Message = pickle.loads(data)  # type: ignore[arg-type]
+                
+                # 最初のメッセージがErrorの場合（ResponseType送信前のエラー）
+                if isinstance(message, ErrorMessage):
+                    error = RpcRemoteError(message.error_type, message.error_message, message.traceback)
+                    # Exitを待つ
+                    async for data in ws:
+                        if isinstance(data, str):  # pragma: no cover
+                            continue
+                        msg: Message = pickle.loads(data)  # type: ignore[arg-type]
+                        if isinstance(msg, ExitMessage):
+                            break
+                    raise error
+                
+                # ResponseTypeMessage以外は期待しない
+                if not isinstance(message, ResponseTypeMessage):  # pragma: no branch
+                    raise RuntimeError(f"Expected ResponseTypeMessage, got {type(message).__name__}")
+
+                if not message.is_generator:  # pragma: no branch
+                    raise RuntimeError(f"Expected generator function, but {self.func.__name__} is not a generator")
+
+                # 結果を受信
+                error: RpcRemoteError | None = None
+
+                async for data in ws:
+                    if isinstance(data, str):  # pragma: no cover
+                        continue
+
+                    msg: Message = pickle.loads(data)  # type: ignore[arg-type]
+
+                    match msg:
+                        case YieldMessage(value=value):
+                            yield value
+                        case ReturnMessage(value=value):
+                            yield value
+                        case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
+                            error = RpcRemoteError(error_type, error_message, traceback)
+                        case ExitMessage():
+                            break
+                        case _:  # pragma: no cover
+                            raise RuntimeError(f"Unexpected message type: {type(msg).__name__}")
+
+                # Exitを受信した後にエラーがあれば発生させる
+                if error is not None:
+                    raise error
+        finally:
+            await self._close(ws)
+
+    async def _close(self, ws: "ClientConnection") -> None:
         try:
             await ws.close()
         except Exception:  # pragma: no cover
             pass
-        
-        for task in self._queue_tasks:
+
+
+@asynccontextmanager
+async def _handle_rpc_arguments(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    ws: "ClientConnection",
+) -> AsyncIterator[None]:
+    tasks: list[asyncio.Task] = []
+    try:
+        # キュー送信タスクを起動
+        for arg in args:
+            if isinstance(arg, _RpcQueue):
+                task = asyncio.create_task(_send_queue_messages_helper(ws, arg.queue_id, arg.queue))
+                tasks.append(task)
+
+        for v in kwargs.values():
+            if isinstance(v, _RpcQueue):
+                task = asyncio.create_task(_send_queue_messages_helper(ws, v.queue_id, v.queue))
+                tasks.append(task)
+
+        yield
+    finally:
+        # タスクをキャンセル
+        for task in tasks:
             task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-
-    async def _stream_remaining_results(
-        self, ws: "ClientConnection", ws_iterator: Any, first_value: R
-    ) -> AsyncIterator[R]:
-        """
-        最初のyield後の残りの結果をストリーミングで受信する
         
-        Args:
-            ws_iterator: WebSocketのイテレータ
-            first_value: 最初にyieldされた値
-        """
-        try:
-            yield first_value
-            
-            async for data in ws_iterator:
-                if isinstance(data, str):  # pragma: no cover
-                    continue
-                message: Message = pickle.loads(data)
+        # キャンセル完了を待つ
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
-                match message:
-                    case YieldMessage(value=value):
-                        yield value
-                    case ReturnMessage():
-                        return
-                    case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
-                        raise RpcRemoteError(error_type, error_message, traceback)
-        except StopAsyncIteration:  # pragma: no cover
-            return
-        finally:
-            # ジェネレータが終了したらWebSocketを閉じてキューをクリーンアップ
-            await self._cleanup_and_close(ws)
+
+async def _send_queue_messages_helper(ws: "ClientConnection", queue_id: int, q: asyncio.Queue[Any]) -> None:
+    while True:
+        item = await q.get()
+        put_msg = QueuePutMessage(queue_id=queue_id, value=item)
+        await ws.send(pickle.dumps(put_msg))

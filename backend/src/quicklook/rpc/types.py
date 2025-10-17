@@ -22,6 +22,13 @@ class CallMessage:
 
 
 @dataclass
+class ResponseTypeMessage:
+    """関数の戻り値の型を示すメッセージ"""
+
+    is_generator: bool
+
+
+@dataclass
 class YieldMessage:
     """ジェネレータからのyieldメッセージ"""
 
@@ -45,6 +52,13 @@ class ErrorMessage:
 
 
 @dataclass
+class ExitMessage:
+    """通信終了メッセージ"""
+
+    pass
+
+
+@dataclass
 class QueuePutMessage:
     """キューへのput操作メッセージ"""
 
@@ -52,18 +66,11 @@ class QueuePutMessage:
     value: Any
 
 
-@dataclass
-class QueueDoneMessage:
-    """キューの終了メッセージ"""
-
-    queue_id: int
-
-
 @dataclass(frozen=True)
 class QueueRef:
     """
     キューへの参照を表すマーカークラス
-    
+
     整数のqueue_idではなくこのクラスを使うことで、
     通常の整数引数とキューを区別できる
     """
@@ -73,9 +80,10 @@ class QueueRef:
 
 Message = (
     CallMessage
+    | ResponseTypeMessage
     | YieldMessage
     | ReturnMessage
     | ErrorMessage
+    | ExitMessage
     | QueuePutMessage
-    | QueueDoneMessage
 )
