@@ -63,12 +63,14 @@ class Rpc(Generic[P, R]):
 
                 # 結果を受信
                 return_value: R | None = None
+                received_return: bool = False
                 error: RpcRemoteError | None = None
 
                 async for msg in self._receive_messages(ws):
                     match msg:
                         case ReturnMessage(value=value):
                             return_value = value  # type: ignore[assignment]
+                            received_return = True
                         case ErrorMessage(error_type=error_type, error_message=error_message, traceback=traceback):
                             error = RpcRemoteError(error_type, error_message, traceback)
                         case ExitMessage():
@@ -77,7 +79,7 @@ class Rpc(Generic[P, R]):
                 # Exitを受信した後にエラーまたは戻り値を返す
                 if error is not None:
                     raise error
-                if return_value is not None:
+                if received_return:
                     return return_value  # type: ignore[return-value]
                 raise RuntimeError(f"No return value received from {self.func.__name__}")
         finally:

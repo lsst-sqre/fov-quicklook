@@ -162,6 +162,17 @@ async def test_async_function_not_supported(rpc_server):
     assert "Async functions are not supported" in exc_info.value.error_message
 
 
+def none_returning_function() -> None:
+    """Noneを返す関数"""
+    return None
+
+
+async def test_none_return_value(rpc_server):
+    """関数がNoneを返すことをテスト"""
+    result = await Rpc(rpc_server, none_returning_function).run()
+    assert result is None
+
+
 async def test_queue_consumer(rpc_server):
     """キューを使った関数のRPC呼び出しをテスト"""
     client_queue = asyncio.Queue()
