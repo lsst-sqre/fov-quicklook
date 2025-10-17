@@ -99,86 +99,11 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
     await ws.accept()
 
     try:
-        # CallMessageを受信
-        data = await ws.receive_bytes()
-        message: Message = pickle.loads(data)
+        # RPC呼び出しをセットアップ
+        rpc_state = await _setup_rpc_call(app, ws)
 
-        if not isinstance(message, CallMessage):  # pragma: no branch
-            raise ValueError(f"Expected CallMessage, got {type(message).__name__}")
-
-        call_msg = message
-        func = call_msg.func
-        args = call_msg.args
-        kwargs = call_msg.kwargs
-
-        # managerを取得
-        manager = get_manager(app)
-
-        # argsとkwargsからRpcQueueを抽出してQueueRefに置き換え
-        queue_map: dict[int, "queue.Queue[Any]"] = {}
-
-        processed_args = [_convert_rpc_queue_to_ref(arg, manager, queue_map) for arg in args]
-        processed_kwargs = {k: _convert_rpc_queue_to_ref(v, manager, queue_map) for k, v in kwargs.items()}
-
-        # メッセージディスパッチャーを起動
-        dispatcher_task = asyncio.create_task(_message_dispatcher(ws, queue_map))
-
-        # 結果を受信するキュー
-        result_queue: "queue.Queue[_ProcessResult]" = manager.Queue()  # type: ignore[attr-defined]
-
-        # プロセスプールで関数を実行
-        pool = get_process_pool(app)
-
-        # 最初にResponseTypeを送信
-        is_generator = inspect.isgeneratorfunction(func)
-        response_type_msg = ResponseTypeMessage(is_generator=is_generator)
-        await ws.send_bytes(pickle.dumps(response_type_msg))
-
-        # 関数をプロセスで実行（非同期で実行、結果はresult_queueに送信される）
-        pool.submit(
-            _execute_function_in_process,
-            func,
-            tuple(processed_args),
-            processed_kwargs,
-            queue_map,
-            result_queue,
-        )
-
-        # result_queueから結果を受信してクライアントに送信
-        try:
-            while True:
-                # anyio.to_thread.run_syncを使って非ブロッキングで結果を取得
-                result: _ProcessResult = await anyio.to_thread.run_sync(result_queue.get)
-
-                match result:
-                    case _ProcessYieldResult(value=value):
-                        yield_msg = YieldMessage(value=value)
-                        await ws.send_bytes(pickle.dumps(yield_msg))
-                    case _ProcessReturnResult(value=value):
-                        return_msg = ReturnMessage(value=value)
-                        await ws.send_bytes(pickle.dumps(return_msg))
-                    case _ProcessErrorResult(error_type=error_type, error_message=error_message, traceback=traceback):
-                        error_response = ErrorMessage(
-                            error_type=error_type,
-                            error_message=error_message,
-                            traceback=traceback,
-                        )
-                        await ws.send_bytes(pickle.dumps(error_response))
-                    case _ProcessExitResult():
-                        break
-        except Exception:  # pragma: no cover
-            # ディスパッチャーを早めにキャンセル
-            dispatcher_task.cancel()
-            raise
-        finally:
-            # ReturnやErrorの後も必ずExitを送信
-            try:
-                await ws.send_bytes(pickle.dumps(ExitMessage()))
-            except Exception:  # pragma: no cover
-                pass
-
-            # ディスパッチャーをキャンセル
-            await _cancel_task(dispatcher_task)
+        # 結果を受信してクライアントに送信
+        await _handle_rpc_results(ws, rpc_state.result_queue, rpc_state.dispatcher_task)
 
     except Exception as e:
         # エラーをクライアントに送信
@@ -200,6 +125,125 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         except RuntimeError:  # pragma: no cover
             # WebSocketが既に閉じられている場合
             pass
+
+
+@dataclass
+class _RpcState:
+    """RPC呼び出しの状態情報"""
+
+    func: Callable[..., Any]
+    result_queue: "queue.Queue[_ProcessResult]"
+    dispatcher_task: asyncio.Task
+
+
+async def _setup_rpc_call(
+    app: FastAPI,
+    ws: WebSocket,
+) -> _RpcState:
+    """
+    RPC呼び出しをセットアップし、プロセスを起動する
+
+    Args:
+        app: FastAPIアプリケーション
+        ws: WebSocketコネクション
+
+    Returns:
+        RPC呼び出しの状態情報
+    """
+    # CallMessageを受信
+    data = await ws.receive_bytes()
+    message: Message = pickle.loads(data)
+
+    if not isinstance(message, CallMessage):  # pragma: no branch
+        raise ValueError(f"Expected CallMessage, got {type(message).__name__}")
+
+    call_msg = message
+    func = call_msg.func
+    args = call_msg.args
+    kwargs = call_msg.kwargs
+
+    # managerを取得
+    manager = get_manager(app)
+
+    # argsとkwargsからRpcQueueを抽出してQueueRefに置き換え
+    queue_map: dict[int, "queue.Queue[Any]"] = {}
+    processed_args = [_convert_rpc_queue_to_ref(arg, manager, queue_map) for arg in args]
+    processed_kwargs = {k: _convert_rpc_queue_to_ref(v, manager, queue_map) for k, v in kwargs.items()}
+
+    # メッセージディスパッチャーを起動
+    dispatcher_task = asyncio.create_task(_message_dispatcher(ws, queue_map))
+
+    # 結果を受信するキュー
+    result_queue: "queue.Queue[_ProcessResult]" = manager.Queue()  # type: ignore[attr-defined]
+
+    # プロセスプールで関数を実行
+    pool = get_process_pool(app)
+
+    # 最初にResponseTypeを送信
+    is_generator = inspect.isgeneratorfunction(func)
+    response_type_msg = ResponseTypeMessage(is_generator=is_generator)
+    await ws.send_bytes(pickle.dumps(response_type_msg))
+
+    # 関数をプロセスで実行
+    pool.submit(
+        _execute_function_in_process,
+        func,
+        tuple(processed_args),
+        processed_kwargs,
+        queue_map,
+        result_queue,
+    )
+
+    return _RpcState(func=func, result_queue=result_queue, dispatcher_task=dispatcher_task)
+
+
+async def _handle_rpc_results(
+    ws: WebSocket,
+    result_queue: "queue.Queue[_ProcessResult]",
+    dispatcher_task: asyncio.Task,
+) -> None:
+    """
+    プロセスからの結果を受信してクライアントに送信
+
+    Args:
+        ws: WebSocketコネクション
+        result_queue: プロセスからの結果キュー
+        dispatcher_task: メッセージディスパッチャータスク
+    """
+    try:
+        while True:
+            # anyio.to_thread.run_syncを使って非ブロッキングで結果を取得
+            result: _ProcessResult = await anyio.to_thread.run_sync(result_queue.get)
+
+            match result:
+                case _ProcessYieldResult(value=value):
+                    yield_msg = YieldMessage(value=value)
+                    await ws.send_bytes(pickle.dumps(yield_msg))
+                case _ProcessReturnResult(value=value):
+                    return_msg = ReturnMessage(value=value)
+                    await ws.send_bytes(pickle.dumps(return_msg))
+                case _ProcessErrorResult(error_type=error_type, error_message=error_message, traceback=traceback):
+                    error_response = ErrorMessage(
+                        error_type=error_type,
+                        error_message=error_message,
+                        traceback=traceback,
+                    )
+                    await ws.send_bytes(pickle.dumps(error_response))
+                case _ProcessExitResult():
+                    break
+    except Exception:  # pragma: no cover
+        # ディスパッチャーを早めにキャンセル
+        dispatcher_task.cancel()
+        raise
+    finally:
+        # ReturnやErrorの後も必ずExitを送信
+        try:
+            await ws.send_bytes(pickle.dumps(ExitMessage()))
+        except Exception:  # pragma: no cover
+            pass
+
+        # ディスパッチャーをキャンセル
+        await _cancel_task(dispatcher_task)
 
 
 def _replace_queue_refs_with_proxies(
