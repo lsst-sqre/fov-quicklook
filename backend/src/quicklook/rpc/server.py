@@ -72,6 +72,22 @@ class _QueueProxy(Generic[T]):
         self._mq.put(item, block=block, timeout=timeout)
 
 
+async def _cancel_task(task: asyncio.Task) -> None:
+    """
+    非同期タスクをキャンセルし、完了を待つ
+
+    Args:
+        task: キャンセルするタスク
+    """
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    except Exception:  # pragma: no cover
+        pass
+
+
 async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
     """
     WebSocketエンドポイントでRPCリクエストを処理する
@@ -129,7 +145,6 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         )
 
         # result_queueから結果を受信してクライアントに送信
-        dispatcher_task_cancelled = False
         try:
             while True:
                 # anyio.to_thread.run_syncを使って非ブロッキングで結果を取得
@@ -154,7 +169,6 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
         except Exception:  # pragma: no cover
             # ディスパッチャーを早めにキャンセル
             dispatcher_task.cancel()
-            dispatcher_task_cancelled = True
             raise
         finally:
             # ReturnやErrorの後も必ずExitを送信
@@ -164,14 +178,7 @@ async def create_rpc_endpoint(app: FastAPI, ws: WebSocket) -> None:
                 pass
 
             # ディスパッチャーをキャンセル
-            if not dispatcher_task_cancelled:
-                dispatcher_task.cancel()
-            try:
-                await dispatcher_task
-            except asyncio.CancelledError:
-                pass
-            except Exception:  # pragma: no cover
-                pass
+            await _cancel_task(dispatcher_task)
 
     except Exception as e:
         # エラーをクライアントに送信
@@ -211,19 +218,12 @@ def _replace_queue_refs_with_proxies(
     Returns:
         処理済みのargs, kwargs
     """
-    processed_args = []
-    for arg in args:
-        if isinstance(arg, QueueRef):
-            processed_args.append(_QueueProxy(queue_map[arg.queue_id]))
-        else:
-            processed_args.append(arg)
 
-    processed_kwargs = {}
-    for k, v in kwargs.items():
-        if isinstance(v, QueueRef):
-            processed_kwargs[k] = _QueueProxy(queue_map[v.queue_id])
-        else:
-            processed_kwargs[k] = v
+    def replace_ref(value: Any) -> Any:
+        return _QueueProxy(queue_map[value.queue_id]) if isinstance(value, QueueRef) else value
+
+    processed_args = [replace_ref(arg) for arg in args]
+    processed_kwargs = {k: replace_ref(v) for k, v in kwargs.items()}
 
     return processed_args, processed_kwargs
 

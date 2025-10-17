@@ -58,46 +58,14 @@ class Rpc(Generic[P, R]):
 
         try:
             async with _handle_rpc_arguments(self.args, self.kwargs, ws):
-                call_msg = CallMessage(
-                    func=self.func,
-                    args=self.args,
-                    kwargs=self.kwargs,
-                )
-                await ws.send(pickle.dumps(call_msg))
-
-                # 最初のメッセージを受信（ResponseType or Error）
-                data = await ws.recv()
-                if isinstance(data, str):  # pragma: no cover
-                    raise RuntimeError("Unexpected string message")
-                message: Message = pickle.loads(data)  # type: ignore[arg-type]
-                
-                # 最初のメッセージがErrorの場合（ResponseType送信前のエラー）
-                if isinstance(message, ErrorMessage):
-                    error = RpcRemoteError(message.error_type, message.error_message, message.traceback)
-                    # Exitを待つ
-                    async for data in ws:
-                        if isinstance(data, str):  # pragma: no cover
-                            continue
-                        msg: Message = pickle.loads(data)  # type: ignore[arg-type]
-                        if isinstance(msg, ExitMessage):
-                            break
-                    raise error
-                
-                # ResponseTypeMessage以外は期待しない
-                if not isinstance(message, ResponseTypeMessage):  # pragma: no branch
-                    raise RuntimeError(f"Expected ResponseTypeMessage, got {type(message).__name__}")
-
-                if message.is_generator:  # pragma: no branch
-                    raise RuntimeError(f"Expected non-generator function, but {self.func.__name__} is a generator")
+                await self._send_call(ws)
+                await self._validate_response_type(ws, is_generator=False)
 
                 # 結果を受信
                 return_value: R | None = None
                 error: RpcRemoteError | None = None
 
-                async for data in ws:
-                    if isinstance(data, str):  # pragma: no cover
-                        continue
-                    msg: Message = pickle.loads(data)  # type: ignore[arg-type]
+                async for msg in self._receive_messages(ws):
                     match msg:
                         case ReturnMessage(value=value):
                             return_value = value  # type: ignore[assignment]
@@ -105,8 +73,6 @@ class Rpc(Generic[P, R]):
                             error = RpcRemoteError(error_type, error_message, traceback)
                         case ExitMessage():
                             break
-                        case _:  # pragma: no cover
-                            raise RuntimeError(f"Unexpected message type: {type(msg).__name__}")
 
                 # Exitを受信した後にエラーまたは戻り値を返す
                 if error is not None:
@@ -122,47 +88,13 @@ class Rpc(Generic[P, R]):
 
         try:
             async with _handle_rpc_arguments(self.args, self.kwargs, ws):
-                call_msg = CallMessage(
-                    func=self.func,
-                    args=self.args,
-                    kwargs=self.kwargs,
-                )
-                await ws.send(pickle.dumps(call_msg))
-
-                # 最初のメッセージを受信（ResponseType or Error）
-                data = await ws.recv()
-                if isinstance(data, str):  # pragma: no cover
-                    raise RuntimeError("Unexpected string message")
-                message: Message = pickle.loads(data)  # type: ignore[arg-type]
-                
-                # 最初のメッセージがErrorの場合（ResponseType送信前のエラー）
-                if isinstance(message, ErrorMessage):
-                    error = RpcRemoteError(message.error_type, message.error_message, message.traceback)
-                    # Exitを待つ
-                    async for data in ws:
-                        if isinstance(data, str):  # pragma: no cover
-                            continue
-                        msg: Message = pickle.loads(data)  # type: ignore[arg-type]
-                        if isinstance(msg, ExitMessage):
-                            break
-                    raise error
-                
-                # ResponseTypeMessage以外は期待しない
-                if not isinstance(message, ResponseTypeMessage):  # pragma: no branch
-                    raise RuntimeError(f"Expected ResponseTypeMessage, got {type(message).__name__}")
-
-                if not message.is_generator:  # pragma: no branch
-                    raise RuntimeError(f"Expected generator function, but {self.func.__name__} is not a generator")
+                await self._send_call(ws)
+                await self._validate_response_type(ws, is_generator=True)
 
                 # 結果を受信
                 error: RpcRemoteError | None = None
 
-                async for data in ws:
-                    if isinstance(data, str):  # pragma: no cover
-                        continue
-
-                    msg: Message = pickle.loads(data)  # type: ignore[arg-type]
-
+                async for msg in self._receive_messages(ws):
                     match msg:
                         case YieldMessage(value=value):
                             yield value
@@ -172,8 +104,6 @@ class Rpc(Generic[P, R]):
                             error = RpcRemoteError(error_type, error_message, traceback)
                         case ExitMessage():
                             break
-                        case _:  # pragma: no cover
-                            raise RuntimeError(f"Unexpected message type: {type(msg).__name__}")
 
                 # Exitを受信した後にエラーがあれば発生させる
                 if error is not None:
@@ -186,6 +116,74 @@ class Rpc(Generic[P, R]):
             await ws.close()
         except Exception:  # pragma: no cover
             pass
+
+    async def _send_call(self, ws: "ClientConnection") -> None:
+        """
+        Callメッセージを作成して送信
+
+        Args:
+            ws: WebSocketコネクション
+        """
+        call_msg = CallMessage(
+            func=self.func,
+            args=self.args,
+            kwargs=self.kwargs,
+        )
+        await ws.send(pickle.dumps(call_msg))
+
+    async def _validate_response_type(
+        self,
+        ws: "ClientConnection",
+        is_generator: bool,
+    ) -> None:
+        """
+        最初のメッセージを受信してResponseTypeを検証
+
+        ResponseType送信前のエラーの場合も処理
+
+        Args:
+            ws: WebSocketコネクション
+            is_generator: 期待するジェネレータフラグ
+        """
+        data = await ws.recv()
+        if isinstance(data, str):  # pragma: no cover
+            raise RuntimeError("Unexpected string message")
+        message: Message = pickle.loads(data)  # type: ignore[arg-type]
+
+        # 最初のメッセージがErrorの場合（ResponseType送信前のエラー）
+        if isinstance(message, ErrorMessage):
+            error = RpcRemoteError(message.error_type, message.error_message, message.traceback)
+            # Exitを待つ
+            async for msg in self._receive_messages(ws):
+                if isinstance(msg, ExitMessage):
+                    break
+            raise error
+
+        # ResponseTypeMessage以外は期待しない
+        if not isinstance(message, ResponseTypeMessage):  # pragma: no branch
+            raise RuntimeError(f"Expected ResponseTypeMessage, got {type(message).__name__}")
+
+        # ジェネレータフラグを検証
+        if message.is_generator != is_generator:  # pragma: no branch
+            func_type = "generator" if is_generator else "non-generator"
+            actual_type = "generator" if message.is_generator else "non-generator"
+            raise RuntimeError(f"Expected {func_type} function, got {actual_type}: {self.func.__name__}")
+
+    async def _receive_messages(self, ws: "ClientConnection") -> AsyncIterator[Message]:
+        """
+        WebSocketからメッセージを受信し、デコードして返す
+
+        Args:
+            ws: WebSocketコネクション
+
+        Yields:
+            デコードされたメッセージ
+        """
+        async for data in ws:
+            if isinstance(data, str):  # pragma: no cover
+                continue
+            message: Message = pickle.loads(data)  # type: ignore[arg-type]
+            yield message
 
 
 @asynccontextmanager
