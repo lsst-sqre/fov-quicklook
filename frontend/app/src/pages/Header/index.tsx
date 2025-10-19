@@ -17,8 +17,7 @@ export const Header = memo(() => {
         <>
           <DeleteAllCacheEntries />
           <div style={{ width: '1em' }} />
-          {/* <LinkButton to="/admin/pod_status">PodStatus</LinkButton> */}
-          {/* <LinkButton to="/admin/jobs">Jobs</LinkButton> */}
+          <LinkButton to="/admin/jobs">Jobs</LinkButton>
           <LinkButton to="/admin/cache-entries">Cache Entries</LinkButton>
           <LinkButton to="/admin/storage">Storage</LinkButton>
           <div style={{ width: '1em' }} />

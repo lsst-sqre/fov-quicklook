@@ -15,6 +15,10 @@
 * [x] housekeepingが呼び出されているか確認
 * [ ] adminページ
   * job一覧
+* [ ] エラー対応検討
+  * たとえばユーザーがページを離れてwaiting userが0になったquicklookはエラーになる。
+  * エラーが起きるとstatge=errorになり、データの削除が起こり、レコードが削除される。
+  * エラーの終了処理中にそのページにアクセスすると`QuicklookMetadata`はエラー状態でクライアントに
 * [ ] queueページ
   * 現在の待ち行列表示
 * [ ] ページを離れた時にwaiting_userを減らす

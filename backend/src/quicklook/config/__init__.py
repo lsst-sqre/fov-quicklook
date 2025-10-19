@@ -71,7 +71,7 @@ class Config(BaseSettings):
     rpc_process_pool_workers: int = 4
 
     # Job settings
-    generator_max_concurrent_jobs: int = 8
+    generator_max_concurrent_jobs: int = 4
     generator_max_concurrent_ccds_per_job: int = 16
     merge_tile_parallel: int = 8
     transfer_tile_parallel: int = 8
@@ -79,7 +79,7 @@ class Config(BaseSettings):
     # Pipeline settings
     pipeline_queue_size: int = 64
     pipeline_transfer_queue_size: int = 16
-    pipeline_generate_single_fits_tiles: int = 4
+    pipeline_generate_single_fits_tiles: int = 1
     pipeline_merge_tiles: int = 2
     pipeline_transfer_tiles: int = 2
 

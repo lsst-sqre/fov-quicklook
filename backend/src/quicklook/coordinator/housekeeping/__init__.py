@@ -1,5 +1,6 @@
 """Housekeeping functions for managing object storage capacity."""
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -92,7 +93,15 @@ async def get_total_disk_usage() -> int:
         return total if total is not None else 0
 
 
+_housekeeping_lock = asyncio.Lock()
+
+
 async def run_housekeeping(max_usage: int | None = None) -> None:
+    async with _housekeeping_lock:
+        await run_housekeeping_without_lock(max_usage)
+
+
+async def run_housekeeping_without_lock(max_usage: int | None = None) -> None:
     """
     object storage容量管理のためのハウスキーピング。
     設定された上限を超えている場合、古いquicklookを削除する。
