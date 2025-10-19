@@ -72,7 +72,7 @@ class Config(BaseSettings):
 
     # Job settings
     generator_max_concurrent_jobs: int = 8
-    generator_max_concurrent_ccds_per_job: int = 8
+    generator_max_concurrent_ccds_per_job: int = 16
     merge_tile_parallel: int = 8
     transfer_tile_parallel: int = 8
 

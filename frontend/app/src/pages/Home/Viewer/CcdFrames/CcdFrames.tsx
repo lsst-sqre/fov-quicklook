@@ -95,10 +95,9 @@ export const HighlitedCcds: React.FC = memo(() => {
 
   useEffect(() => {
     ifLayerReady(layer => {
-      // TODO: revive
-      // if (metadata?.ccd_meta && wcs) {
-      //   layer.update(metadata.ccd_meta.filter(c => ccds.includes(c.ccd_id.ccd_name)).map(r => r.bbox).flat(), wcs)
-      // }
+      if (metadata?.type === 'ready' && wcs) {
+        layer.update(metadata.ccd_metadata_list.filter(c => ccds.includes(c.ccd_name)).map(r => r.bbox).flat(), wcs)
+      }
     })
   }, [ccds, ifLayerReady, metadata, wcs])
 

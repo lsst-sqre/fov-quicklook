@@ -12,6 +12,7 @@ import { Info } from './Info'
 import styles from './styles.module.scss'
 import { ViewerContextMenu } from './ViewerContextMenu'
 import { GenerateSingleFitsTilesVisualizer } from '../../../components/JobStatusVisualizer/JobStatusVisualizer'
+import { LoadingSpinner } from '../../../components/Loading'
 
 type ViewerProps = {
   style?: React.CSSProperties
@@ -73,7 +74,9 @@ export const Viewer = memo(({ style }: ViewerProps) => {
       <Info />
       {currentQuicklook.metadata?.type === 'progress' && (
         <div className={styles.viewerBlock}>
-          <GenerateSingleFitsTilesVisualizer tiles={currentQuicklook.metadata.progress} />
+          {Object.keys(currentQuicklook.metadata.progress).length === 0 ? <LoadingSpinner /> : (
+            <GenerateSingleFitsTilesVisualizer tiles={currentQuicklook.metadata.progress} />
+          )}
         </div>
       )}
     </div>

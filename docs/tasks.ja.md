@@ -6,8 +6,28 @@
 
 ## 未完了タスク
 
-* [ ] 省メモリ化
+* [x] 省メモリ化
+  * １プロセス < 0.4GB
+* [ ] phalanx調整
+  * [x] storage-prefix
+* [x] ハイライト
+* [ ] FITSファイルヘッダー表示
+* [ ] housekeepingが呼び出されているか確認
+* [ ] queueページ
+  * 現在の待ち行列表示
+* [ ] adminページ
+  * job一覧
 * [ ] ページを離れた時にwaiting_userを減らす
+* [ ] dynamic priority
+* [ ] 進捗表示を大きく
+* [ ] liveness/readiness probe
+* [ ] raw以外のtype対応
+
+  ```lsst.daf.butler._exceptions.MissingCollectionError: No collection with name 'LSSTCam/runs/nightlyValidation' found.```
+
+* [ ] セキュリティ
+  * k8sのnetwork policy以外のセキュリティ対策
+* [ ] commのheartbeatをwebsocketにする
 * [ ] generatorへの接続を使い回す
   * src/quicklook/frontend/api/get_tile.py
   * life_spanで接続オブジェクトを作る

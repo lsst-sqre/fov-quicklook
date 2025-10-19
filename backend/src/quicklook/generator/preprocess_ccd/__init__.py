@@ -39,7 +39,8 @@ def preprocess_ccd_calexp(
         # header = hdul[0].header  # type: ignore
         # assert ccd_name == f'{header["RAFTNAME"]}_{header["SENSNAME"]}'
         bbox = ccds_by_name()[ccd_name].bbox
-        pool: numpy.ndarray = numpy.array(hdul[1].data, dtype='<f4')  # type: ignore
+        # メモリ効率: hdul[1].data を直接 astype で変換してコピーを避ける
+        pool: numpy.ndarray = hdul[1].data.astype('<f4', copy=False)  # type: ignore
         with timeit(f'image-stat-{ccd_ref.fullname}'):
             stat = image_stat(pool)
         return PreProcessedCcd(

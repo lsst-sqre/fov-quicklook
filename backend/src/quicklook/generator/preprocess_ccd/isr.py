@@ -18,7 +18,7 @@ def bias_correction(data: numpy.ndarray, datasec: DataSection, config: IsrConfig
     assert x1 < x2
     assert y1 < y2
     # h, w = hdu.data.shape
-    data = numpy.array(data, dtype=numpy.float32)
+    data = data.astype(dtype=numpy.float32, copy=False)
     # assert config.do_row_bias is False
     if config.do_row_bias:  # pragma: no branch
         row_bias = data[:, x2:].mean(axis=1)

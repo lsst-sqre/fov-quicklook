@@ -31,6 +31,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
       - 低速なジェネレータがボトルネックにならない
       - 自動的に最適な負荷分散を実現
     """
+    ccd_refs.sort(key=lambda ref: ref.ccd_name)
     generators = get_available_generators()
     if not generators:
         raise RuntimeError("No generators available")

@@ -2,7 +2,6 @@ import contextlib
 import multiprocessing
 import queue
 import tempfile
-import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -22,43 +21,6 @@ from quicklook.utils.imap_unordered_threadpool import imap_unordered_threadpool
 from quicklook.utils.timer import Timer
 
 ds = get_datasource()
-
-
-def generate_single_fits_tiles(
-    job: Job,
-    ref: CcdDataRef,
-):
-    yield (progress := Progress(total=3))
-
-    data_bytes = ds.get_data_sync(ref)
-    yield progress.update()
-
-    try:
-        with _bytes_to_file(data_bytes) as path:
-            ppccd = preprocess_ccd(ref, path)
-            yield progress.update()
-
-        generate_tiles(ppccd, job)
-        yield progress.update()
-
-        job.local_storage.fits_header.save(ref, ppccd.headers)
-
-        yield ReturnValue(
-            CcdMetadata(
-                ccd_name=ppccd.data_ref.ccd,
-                image_stat=ppccd.stat,
-                amps=ppccd.amps,
-                bbox=ppccd.bbox,
-            )
-        )
-    finally:
-        # 遅いgeneratorでこの関数が実行された時
-        # coordinatorのcleanupの後にまだこの関数が実行されている可能性がるので
-        # ここでもcleanupする。
-        #
-        # from threading import Timer
-        # なぜかPython標準のTimerを使うとgenerator全体が停止してしまう。
-        Timer(600, job.local_storage.clear_all).start()
 
 
 @dataclass
@@ -102,21 +64,17 @@ def generate_single_fits_tiles_pipeline(
                     yield path
 
         def download(ref: CcdDataRef):
-            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(3, 0)))
+            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 1)))
             data_bytes = ds.get_data_sync(ref)
             outpath = Path(tmpdir) / f"{ref.ccd_name}.fits"
             outpath.write_bytes(data_bytes)
-            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(3, 1)))
+            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 2)))
             return (ref, outpath)
 
         def main():
             try:
                 initializers = [GeneratorIdInitializer()]
-                with multiprocessing.Pool(
-                    8, 
-                    initializer=_initialize_pool_worker, 
-                    initargs=(initializers,)
-                ) as pool:
+                with multiprocessing.Pool(16, initializer=_initialize_pool_worker, initargs=(initializers,)) as pool:
                     for ccd_metadata in pool.imap_unordered(
                         _process_ccd,
                         (
@@ -154,7 +112,7 @@ def _process_ccd(args: ProcessCcdArgs):
         args.progress.put(
             GenerateSingleFitsTilesProgress(
                 ccd_name=ppccd.data_ref.ccd_name,
-                progress=Progress(3, 2),
+                progress=Progress(4, 3),
             )
         )
     finally:
@@ -164,7 +122,7 @@ def _process_ccd(args: ProcessCcdArgs):
     args.progress.put(
         GenerateSingleFitsTilesProgress(
             ccd_name=ppccd.data_ref.ccd_name,
-            progress=Progress(3, 3),
+            progress=Progress(4, 4),
         )
     )
 
@@ -190,10 +148,51 @@ def generate_tiles(
     iterate_tiles(ppccd, cb)
 
 
-@contextlib.contextmanager
-def _bytes_to_file(data: bytes, dir=config.fitsio_tmpdir):
-    dir.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=dir) as f:
-        f.write(data)
-        f.flush()
-        yield Path(f.name)
+if False:
+    # これは以前使っていた並列度の低い遅い実装
+
+    import threading
+
+    def generate_single_fits_tiles(
+        job: Job,
+        ref: CcdDataRef,
+    ):
+        yield (progress := Progress(total=3))
+
+        data_bytes = ds.get_data_sync(ref)
+        yield progress.update()
+
+        try:
+            with _bytes_to_file(data_bytes) as path:
+                ppccd = preprocess_ccd(ref, path)
+                yield progress.update()
+
+            generate_tiles(ppccd, job)
+            yield progress.update()
+
+            job.local_storage.fits_header.save(ref, ppccd.headers)
+
+            yield ReturnValue(
+                CcdMetadata(
+                    ccd_name=ppccd.data_ref.ccd,
+                    image_stat=ppccd.stat,
+                    amps=ppccd.amps,
+                    bbox=ppccd.bbox,
+                )
+            )
+        finally:
+            # 遅いgeneratorでこの関数が実行された時
+            # coordinatorのcleanupの後にまだこの関数が実行されている可能性がるので
+            # ここでもcleanupする。
+            #
+            # from threading import Timer
+            # なぜかPython標準のTimerを使うとgenerator全体が停止してしまう。
+            Timer(600, job.local_storage.clear_all).start()
+
+    @contextlib.contextmanager
+    def _bytes_to_file(data: bytes, dir=config.fitsio_tmpdir):
+        dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=dir) as f:
+            f.write(data)
+            f.flush()
+            yield Path(f.name)

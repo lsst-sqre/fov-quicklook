@@ -23,21 +23,21 @@ export default ({ mode }) => {
     ],
     server: {
       proxy: {
-        [`${base}/api/`]: {
-          target: 'http://127.0.0.1:9500',
-          ws: true,
-          // rewrite: (path) => path.replace(/\/api\//, '/fov-quicklook/api/'),
-        },
         // [`${base}/api/`]: {
-        //   target: 'https://usdf-rsp-dev.slac.stanford.edu',
-        //   secure: true,
-        //   changeOrigin: true,
-        //   cookieDomainRewrite: 'localhost',
-        //   headers: {
-        //     Cookie: `gafaelfawr=${getGafaelfawrToken()}`,
-        //   },
+        //   target: 'http://127.0.0.1:9500',
         //   ws: true,
+        //   // rewrite: (path) => path.replace(/\/api\//, '/fov-quicklook/api/'),
         // },
+        [`${base}/api/`]: {
+          target: 'https://usdf-rsp-dev.slac.stanford.edu',
+          secure: true,
+          changeOrigin: true,
+          cookieDomainRewrite: 'localhost',
+          headers: {
+            Cookie: `gafaelfawr=${getGafaelfawrToken()}`,
+          },
+          ws: true,
+        },
       },
       watch: {
         ignored: ['**/node_modules/**'],
