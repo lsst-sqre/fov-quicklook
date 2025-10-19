@@ -11,7 +11,7 @@ from quicklook.config import config
 from quicklook.job.job import Job
 from quicklook.rpc.lifespan import rpc_lifespan
 from quicklook.rpc.server import create_rpc_endpoint
-from quicklook.types import TilePos
+from quicklook.types import CcdName, TilePos
 from quicklook.utils.async_process_generator import create_async_process_pool
 from quicklook.utils.numpyutils import ndarray2npybytes
 
@@ -59,6 +59,10 @@ def dep_tile_pos(level: int, i: int, j: int):
     return TilePos(level=level, i=i, j=j)
 
 
+def dep_ccd_name(ccd_name: str):
+    return CcdName(ccd_name)
+
+
 @app.get('/jobs/{job_id}/tiles/{level}/{i}/{j}')
 def route_get_single_fits_tile(
     job: Annotated[Job, fastapi.Depends(dep_job)],
@@ -80,3 +84,15 @@ def route_get_merged_tile(
     except FileNotFoundError:  # pragma: no cover
         raise fastapi.HTTPException(status_code=404)
     return fastapi.Response(data_bytes, media_type='application/npy+zstd')
+
+
+@app.get('/jobs/{job_id}/fits-headers/{ccd_name}.pickle')
+def route_get_fits_headers(
+    job: Annotated[Job, fastapi.Depends(dep_job)],
+    ccd_name: Annotated[CcdName, fastapi.Depends(dep_ccd_name)],
+):
+    data_bytes = job.local_storage.fits_header.load_pickle_bytes(ccd_name)
+    return fastapi.Response(
+        data_bytes,
+        media_type='application/python-pickle',
+    )

@@ -5,7 +5,7 @@ from sqlalchemy import delete, select
 from quicklook.coordinator.housekeeping import (
     cleanup_at_startup,
     delete_one_quicklook,
-    housekeeping,
+    run_housekeeping,
     select_quicklook_to_delete,
 )
 from quicklook.db import Access, Quicklook, get_db_session
@@ -166,7 +166,7 @@ async def test_housekeeping_with_limit():
         await session.commit()
     
     # 制限を6000バイトに設定してhousekeepingを実行
-    await housekeeping(max_usage=6000)
+    await run_housekeeping(max_usage=6000)
     
     # 削除後、合計が6000バイト以下になっているはず
     async with get_db_session() as session:

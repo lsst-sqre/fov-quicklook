@@ -11,12 +11,12 @@
 * [ ] phalanx調整
   * [x] storage-prefix
 * [x] ハイライト
-* [ ] FITSファイルヘッダー表示
-* [ ] housekeepingが呼び出されているか確認
-* [ ] queueページ
-  * 現在の待ち行列表示
+* [x] FITSファイルヘッダー表示
+* [x] housekeepingが呼び出されているか確認
 * [ ] adminページ
   * job一覧
+* [ ] queueページ
+  * 現在の待ち行列表示
 * [ ] ページを離れた時にwaiting_userを減らす
 * [ ] dynamic priority
 * [ ] 進捗表示を大きく
@@ -27,6 +27,7 @@
 
 * [ ] セキュリティ
   * k8sのnetwork policy以外のセキュリティ対策
+  * object storageにpickleをいれない
 * [ ] commのheartbeatをwebsocketにする
 * [ ] generatorへの接続を使い回す
   * src/quicklook/frontend/api/get_tile.py

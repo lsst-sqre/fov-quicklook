@@ -6,13 +6,10 @@ from typing import Annotated
 import aiohttp
 import numpy
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import select
 
 import quicklook.mylogging
 from quicklook.comm.types import GeneratorInfo
 from quicklook.config import config
-from quicklook.db.models import Quicklook
-from quicklook.db.session import get_db_session
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
 from quicklook.object_storage import VisitObjectStorage
 from quicklook.tileinfo import TileInfo
@@ -41,13 +38,12 @@ async def get_tile(
         return await _get_tile_from_object_storage(visit, tile_pos)
 
     match job_status.stage:
-        case 'ready':
-            # 'ready'になるとすぐにshared_statusは消えるので'ready'でここに来ることは普通ない
-            return await _get_tile_from_object_storage(visit, tile_pos)
         case 'merge_tiles':
             return await _gather_single_fits_tiles(visit, tile_pos, shared_status)
         case 'upload_to_object_storage':
             return await _fetch_merged_tile(visit, tile_pos, shared_status)
+        case 'ready':
+            return await _get_tile_from_object_storage(visit, tile_pos)
         case _:
             raise HTTPException(404)
 

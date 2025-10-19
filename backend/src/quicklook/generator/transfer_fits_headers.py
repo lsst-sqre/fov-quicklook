@@ -24,7 +24,7 @@ def transfer_fits_headers(job: Job):
         ref = CcdDataRef(visit=job.visit, ccd=ccd_name)
 
         # ローカルストレージからheaderを読み込む
-        headers = job.local_storage.fits_header.load(ref)
+        headers = job.local_storage.fits_header.load(ref.ccd_name)
 
         # object storageにアップロード
         size = job.object_storage.put_fits_headers_sync(ccd_name, headers)

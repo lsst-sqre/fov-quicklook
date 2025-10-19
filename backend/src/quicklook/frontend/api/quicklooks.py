@@ -57,7 +57,6 @@ async def create_quicklook(params: CreateQuicklookRequest):
 
 @router.get('/api/quicklooks/*/status', response_model=JobStatusList)
 async def get_all_quicklook_jobs():
-    # 開発用途
     async for jobs in _job_status_dict.subscribe():
         return jobs
 
@@ -67,7 +66,6 @@ type_adapter_JsonStatus = TypeAdapter(JobStatus | None)
 
 @router.websocket('/api/quicklooks/*/status.ws')
 async def websocket_quicklooks_status(ws: WebSocket):
-    # 開発用途
     async with safe_websocket(ws):
 
         async def send_job_updates():

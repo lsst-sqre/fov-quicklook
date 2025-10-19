@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import cast
 
+from quicklook.coordinator.housekeeping import run_housekeeping
 import quicklook.mylogging
 from quicklook.comm.rpc_worker import YieledValue, rpc_scatter, rpc_scatter_stream
 from quicklook.config import config
@@ -203,6 +204,7 @@ async def _finalize_success(result: _PipelineResult):
         logger.info(f"Updated quicklook record for {job.visit}: ready=True, disk_usage={total_uploaded_size}")
 
     await rpc_scatter(_cleanup_rpc, job)
+    await run_housekeeping()
     return job
 
 
@@ -225,6 +227,7 @@ async def _finalize_error(job: Job):
         logger.info(f"Deleted quicklook record for {job.visit} due to error")
 
     await rpc_scatter(_cleanup_rpc, job)
+    await run_housekeeping()
     return job
 
 

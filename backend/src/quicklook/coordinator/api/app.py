@@ -1,17 +1,24 @@
 import asyncio
-import quicklook.mylogging
 import pickle
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Awaitable, Callable
+from typing import AsyncIterator, Awaitable, Callable
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
+import quicklook.mylogging
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
-from quicklook.coordinator.api.types import CreateQuicklookRequest, JobStatusList, SharedStatusMessage, SharedStatusMessageJobSharedLargeStatus, SharedStatusMessageJobStatusList
+from quicklook.coordinator.api.types import (
+    CreateQuicklookRequest,
+    JobStatusList,
+    SharedStatusMessage,
+    SharedStatusMessageJobSharedLargeStatus,
+    SharedStatusMessageJobStatusList,
+)
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
+from quicklook.coordinator.housekeeping import cleanup_at_startup
 from quicklook.db import Quicklook, get_db_session
 from quicklook.job.job import Job
 from quicklook.types import VisitName
@@ -24,6 +31,8 @@ logger = quicklook.mylogging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global running_pipeline
+
+    await cleanup_at_startup()
 
     async with coordinator_lifespan(app):
         async with run_quicklook_pipeline() as running_pipeline:

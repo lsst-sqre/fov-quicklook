@@ -126,7 +126,7 @@ def _process_ccd(args: ProcessCcdArgs):
         )
     )
 
-    args.job.local_storage.fits_header.save(args.ref, ppccd.headers)
+    args.job.local_storage.fits_header.save(args.ref.ccd_name, ppccd.headers)
 
     return CcdMetadata(
         ccd_name=ppccd.data_ref.ccd,

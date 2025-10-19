@@ -84,19 +84,21 @@ class JobLocalStorage:
 class _FitsHeaderStorage:
     storage: JobLocalStorage
 
-    def _path(self, ccd_ref: CcdDataRef):
-        return Path(f'{self.storage.base_dir}/fits_header/{ccd_ref.ccd}.pickle')
+    def _path(self, ccd_name: CcdName):
+        return Path(f'{self.storage.base_dir}/fits_header/{ccd_name}.pickle')
 
-    def save(self, ccd_ref: CcdDataRef, headers: list[HeaderType]):
-        path = self._path(ccd_ref)
+    def save(self, ccd_name: CcdName, headers: list[HeaderType]):
+        path = self._path(ccd_name)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('wb') as f:
             pickle.dump(headers, f)
 
-    def load(self, ccd_ref: CcdDataRef) -> list[HeaderType]:
-        path = self._path(ccd_ref)
-        with path.open('rb') as f:
-            return pickle.load(f)
+    def load_pickle_bytes(self, ccd_name: CcdName) -> bytes:
+        path = self._path(ccd_name)
+        return path.read_bytes()
+
+    def load(self, ccd_name: CcdName):
+        return pickle.loads(self.load_pickle_bytes(ccd_name))
 
 
 @dataclass

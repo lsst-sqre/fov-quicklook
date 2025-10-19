@@ -5,19 +5,13 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Iterable, Literal
 
 from quicklook.config import config
-from quicklook.types import PackedTilePos, TilePos, VisitName
+from quicklook.types import CcdName, PackedTilePos, TilePos, VisitName
 
 if TYPE_CHECKING:
     from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 
 from quicklook.utils.fitsheader import HeaderType
-from quicklook.utils.s3 import (
-    s3_delete_object,
-    s3_delete_objects_with_prefix,
-    s3_download_object,
-    s3_list_objects,
-    s3_upload_object,
-)
+from quicklook.utils.s3 import s3_delete_object, s3_delete_objects_with_prefix, s3_download_object, s3_list_objects, s3_upload_object
 
 
 def put_object(key: str, value: bytes) -> int:
@@ -87,11 +81,17 @@ class VisitObjectStorage:
         """このvisitに関連するすべてのオブジェクトを削除"""
         delete_objects_by_prefix(f'quicklooks/{self.visit}/')
 
-    def put_fits_headers_sync(self, ccd_name: str, headers: list[HeaderType]) -> int:
+    def put_fits_headers_sync(self, ccd_name: CcdName, headers: list[HeaderType]) -> int:
         """FITS headerをobject storageに保存"""
 
         data = pickle.dumps(headers)
         return self._put_sync(f'fits-headers/{ccd_name}.pickle', data)
+
+    def get_fits_headers_sync(self, ccd_name: CcdName) -> list[HeaderType]:
+        """FITS headerをobject storageから取得"""
+
+        data = self._get_sync(f'fits-headers/{ccd_name}.pickle')
+        return pickle.loads(data)
 
     def put_ccd_metadata_list_sync(self, metadata_list: list['CcdMetadata']) -> int:
         """CCD metadata listをobject storageに保存"""
@@ -116,8 +116,11 @@ class VisitObjectStorage:
     async def delete_all(self) -> None:
         await asyncio.to_thread(self.delete_all_sync)
 
-    async def put_fits_headers(self, ccd_name: str, headers: list[HeaderType]) -> int:
+    async def put_fits_headers(self, ccd_name: CcdName, headers: list[HeaderType]) -> int:
         return await asyncio.to_thread(self.put_fits_headers_sync, ccd_name, headers)
+
+    async def get_fits_headers(self, ccd_name: CcdName) -> list[HeaderType]:
+        return await asyncio.to_thread(self.get_fits_headers_sync, ccd_name)
 
     async def put_ccd_metadata_list(self, metadata_list: list['CcdMetadata']) -> int:
         return await asyncio.to_thread(self.put_ccd_metadata_list_sync, metadata_list)
