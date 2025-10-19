@@ -7,9 +7,18 @@
   }
 }
 
-.generateSingleFitsTiles {
-  margin-bottom: 2rem;
+.container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
 
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.generateSingleFitsTiles {
   h3 {
     margin: 0 0 1rem 0;
     font-size: 1rem;
@@ -48,7 +57,6 @@
   position: relative;
   background: #033;
   border: 1px solid #044;
-  border-radius: 2px;
 }
 
 .progressBar {
@@ -72,34 +80,21 @@
 }
 
 .workerNodes {
-  margin-bottom: 2rem;
-
   h3 {
     margin: 0 0 1rem 0;
     font-size: 1rem;
   }
 }
 
-.workerList {
+.workerStack {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  border-radius: 2px;
+  overflow: hidden;
 }
 
-.workerItem {
-  display: grid;
-  grid-template-columns: 150px 1fr 100px;
-  gap: 1rem;
-  align-items: center;
-}
-
-.workerName {
-  font-size: 0.9rem;
-}
-
-.workerProgress {
-  font-size: 0.85rem;
-  text-align: right;
+.workerBar {
+  border-radius: 0;
 }
 
 .hidden {

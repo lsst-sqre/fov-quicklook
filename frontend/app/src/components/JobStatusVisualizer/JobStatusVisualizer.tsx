@@ -7,15 +7,23 @@ export function JobStatusVisualizer({ status }: { status: JobStatus} ) {
   return (
     <div className={styles.jobStatus}>
       <h2>Job: {status.job.visit} - Stage: {status.stage}</h2>
-      {status.generate_single_fits_tiles && (
-        <GenerateSingleFitsTilesVisualizer tiles={status.generate_single_fits_tiles} />
-      )}
-      {status.merge_tiles && (
-        <WorkerNodesVisualizer title="Merge Tiles" workers={status.merge_tiles} />
-      )}
-      {status.transfer_tiles && (
-        <WorkerNodesVisualizer title="Transfer Tiles" workers={status.transfer_tiles} />
-      )}
+      <div className={styles.container}>
+        {status.generate_single_fits_tiles && (
+          <div className={styles.section}>
+            <GenerateSingleFitsTilesVisualizer tiles={status.generate_single_fits_tiles} />
+          </div>
+        )}
+        {status.merge_tiles && (
+          <div className={styles.section}>
+            <WorkerNodesVisualizer title="Merge Tiles" workers={status.merge_tiles} />
+          </div>
+        )}
+        {status.transfer_tiles && (
+          <div className={styles.section}>
+            <WorkerNodesVisualizer title="Transfer Tiles" workers={status.transfer_tiles} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -118,14 +126,10 @@ function WorkerNodesVisualizer({ title, workers }: { title: string; workers: Rec
   return (
     <div className={styles.workerNodes}>
       <h3>{title}</h3>
-      <div className={styles.workerList}>
+      <div className={styles.workerStack}>
         {Object.entries(workers).map(([workerName, progress]) => (
-          <div key={workerName} className={styles.workerItem}>
-            <div className={styles.workerName}>{workerName}</div>
+          <div key={workerName} className={styles.workerBar} title={workerName}>
             <Progress count={progress.count ?? 0} total={progress.total} width="100%" />
-            <div className={styles.workerProgress}>
-              {progress.count ?? 0} / {progress.total}
-            </div>
           </div>
         ))}
       </div>

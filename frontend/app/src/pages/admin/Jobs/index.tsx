@@ -1,6 +1,5 @@
 import { JobStatusVisualizer } from '../../../components/JobStatusVisualizer/JobStatusVisualizer'
 import { useGetQuicklooksStatusQuery } from '../../../store/api/base'
-import { useGetAllQuicklookJobsQuery } from '../../../store/api/openapi'
 import styles from './styles.module.scss'
 
 export function Jobs() {
