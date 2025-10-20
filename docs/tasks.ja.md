@@ -13,13 +13,10 @@
 * [x] ハイライト
 * [x] FITSファイルヘッダー表示
 * [x] housekeepingが呼び出されているか確認
-* [ ] adminページ
+* [x] adminページ
   * job一覧
-* [ ] エラー対応検討
-  * たとえばユーザーがページを離れてwaiting userが0になったquicklookはエラーになる。
-  * エラーが起きるとstatge=errorになり、データの削除が起こり、レコードが削除される。
-  * エラーの終了処理中にそのページにアクセスすると`QuicklookMetadata`はエラー状態でクライアントに
 * [ ] queueページ
+  * 順番の保証
   * 現在の待ち行列表示
 * [ ] ページを離れた時にwaiting_userを減らす
 * [ ] dynamic priority
@@ -29,6 +26,10 @@
 
   ```lsst.daf.butler._exceptions.MissingCollectionError: No collection with name 'LSSTCam/runs/nightlyValidation' found.```
 
+* [ ] エラー対応検討
+  * たとえばユーザーがページを離れてwaiting userが0になったquicklookはエラーになる。
+  * エラーが起きるとstatge=errorになり、データの削除が起こり、レコードが削除される。
+  * エラーの終了処理中にそのページにアクセスすると`QuicklookMetadata`はエラー状態でクライアントに
 * [ ] セキュリティ
   * k8sのnetwork policy以外のセキュリティ対策
   * object storageにpickleをいれない

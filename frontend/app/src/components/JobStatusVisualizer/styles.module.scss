@@ -1,13 +1,35 @@
 .jobStatus {
-  margin-bottom: 3rem;
+  position: relative;
+  margin: 0;
+  padding: 1.5rem;
+  border-radius: 16px;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 16px;
+  }
+
+  &.highlighted::before {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.15) 100%);
+  }
 
   h2 {
+    position: relative;
+    z-index: 1;
     margin: 0 0 1.5rem 0;
     font-size: 1.2rem;
   }
 }
 
 .container {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
@@ -28,12 +50,12 @@
 .tileGrid {
   display: flex;
   flex-direction: column-reverse;
-  gap: 2px;
+  gap: var(--tile-gap, 0px);
 }
 
 .raftRow {
   display: flex;
-  gap: 2px;
+  gap: var(--tile-gap, 0px);
 }
 
 .raft {
@@ -43,20 +65,24 @@
 .sensorGrid {
   display: flex;
   flex-direction: column-reverse;
-  gap: 1px;
+  gap: var(--tile-gap, 0px);
 }
 
 .sensorRow {
   display: flex;
-  gap: 1px;
+  gap: var(--tile-gap, 0px);
 }
 
 .sensor {
-  width: 24px;
-  height: 24px;
+  width: calc(var(--tile-height) / 3);
+  height: calc(var(--tile-height) / 3);
   position: relative;
   background: #033;
   border: 1px solid #044;
+
+  &.gapless {
+    border: none;
+  }
 }
 
 .progressBar {

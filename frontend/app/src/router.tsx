@@ -2,7 +2,7 @@ import { useStore } from 'react-redux'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useHashSync } from './hooks/useHashSync'
 import { CacheEntries } from './pages/admin/CacheEntries'
-import { Jobs } from './pages/admin/Jobs'
+import { JobList } from './components/JobList'
 import { StorageExplorer } from './pages/admin/StorageExplorer'
 import { ConfigPage } from './pages/ConfigPage'
 import { FItsHeaderPage } from './pages/FitsHeader'
@@ -27,7 +27,7 @@ export const AppRouter = () => {
         <Route path="admin">
           <Route path="storage" element={<StorageExplorer />} />
           <Route path="cache-entries" element={<CacheEntries />} />
-          <Route path="jobs" element={<Jobs />} />
+          <Route path="jobs" element={<JobList />} />
         </Route>
       </Route>
     </Routes>

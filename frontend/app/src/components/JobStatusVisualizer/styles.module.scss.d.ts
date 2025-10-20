@@ -1,7 +1,9 @@
 export declare const completed: string;
 export declare const container: string;
+export declare const gapless: string;
 export declare const generateSingleFitsTiles: string;
 export declare const hidden: string;
+export declare const highlighted: string;
 export declare const jobStatus: string;
 export declare const progressBar: string;
 export declare const progressFill: string;

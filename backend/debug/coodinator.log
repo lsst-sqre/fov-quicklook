@@ -1,0 +1,52 @@
+Task exception was never retrieved
+future: <Task finished name='Task-104668' coro=<ws_route_quicklook_shared_status.<locals>.send_progress() done, defined at /app/src/quicklook/coordinator/api/app.py:83> exception=WebSocketDisconnect()>
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/uvicorn/protocols/websockets/websockets_impl.py", line 332, in asgi_send
+    await self.send(data)  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/websockets/legacy/protocol.py", line 620, in send
+    await self.ensure_open()
+  File "/usr/local/lib/python3.13/site-packages/websockets/legacy/protocol.py", line 930, in ensure_open
+    raise self.connection_closed_exc()
+websockets.exceptions.ConnectionClosedOK: received 1000 (OK); then sent 1000 (OK)
+The above exception was the direct cause of the following exception:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/starlette/websockets.py", line 86, in send
+    await self._send(message)
+  File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 39, in sender
+    await send(message)
+  File "/usr/local/lib/python3.13/site-packages/uvicorn/protocols/websockets/websockets_impl.py", line 345, in asgi_send
+    raise ClientDisconnected from exc
+uvicorn.protocols.utils.ClientDisconnected
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/app/src/quicklook/coordinator/api/app.py", line 85, in send_progress
+    await ws.send_bytes(pickle.dumps(msg))
+  File "/usr/local/lib/python3.13/site-packages/starlette/websockets.py", line 169, in send_bytes
+    await self.send({"type": "websocket.send", "bytes": data})
+  File "/usr/local/lib/python3.13/site-packages/starlette/websockets.py", line 89, in send
+    raise WebSocketDisconnect(code=1006)
+starlette.websockets.WebSocketDisconnect
+Task exception was never retrieved
+future: <Task finished name='Task-104677' coro=<run_until_disconnect.<locals>.monitor_disconnect() done, defined at /app/src/quicklook/utils/websocket.py:22> exception=WebSocketDisconnect(1000, '')>
+Traceback (most recent call last):
+  File "/app/src/quicklook/utils/websocket.py", line 23, in monitor_disconnect
+    await ws.receive_text()
+  File "/usr/local/lib/python3.13/site-packages/starlette/websockets.py", line 120, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/starlette/websockets.py", line 114, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (1000, '')
+Task exception was never retrieved
+future: <Task finished name='Task-104693' coro=<run_until_disconnect.<locals>.monitor_disconnect() done, defined at /app/src/quicklook/utils/websocket.py:22> exception=WebSocketDisconnect(1000, '')>
+Traceback (most recent call last):
+  File "/app/src/quicklook/utils/websocket.py", line 23, in monitor_disconnect
+    await ws.receive_text()
+  File "/usr/local/lib/python3.13/site-packages/starlette/websockets.py", line 120, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/starlette/websockets.py", line 114, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (1000, '')
+INFO:     Created quicklook record for raw:2025101900014 (job_id=j-1a44b686e072455db4fa3a45d351c064)

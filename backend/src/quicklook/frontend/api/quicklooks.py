@@ -26,7 +26,7 @@ from quicklook.db import Quicklook, get_db_session
 from quicklook.frontend.api.deps import dep_visit_name
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.job.shared_large_status import JobSharedLargeStatus
-from quicklook.job.status import JobStage, JobStatus
+from quicklook.job.status import JobStatus
 from quicklook.object_storage import VisitObjectStorage
 from quicklook.types import CcdName, Progress, VisitName
 from quicklook.utils.broadcast import Broadcast
@@ -206,7 +206,7 @@ class QuicklookSharedStatus:
     @cached_property
     def job_status(self) -> JobStatus | None:
         jobs = _job_status_dict.last_value()
-        if jobs and (job_status := jobs[self.visit_name]):
+        if jobs and (job_status := jobs.get(self.visit_name)):
             return job_status
 
     @cached_property
@@ -257,6 +257,7 @@ async def _status_relay_main_loop():
                             if jobs:
                                 _job_shared_large_status_dict = {
                                     visit: _job_shared_large_status_dict[visit] for visit in jobs
+                                    if visit in _job_shared_large_status_dict
                                 }
 
         except Exception as e:

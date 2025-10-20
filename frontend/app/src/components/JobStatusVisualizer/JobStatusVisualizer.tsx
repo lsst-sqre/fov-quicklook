@@ -3,14 +3,14 @@ import { Progress } from '../Progress'
 import { JobStatus, Progress as ProgressType } from '../../store/api/openapi'
 import styles from './styles.module.scss'
 
-export function JobStatusVisualizer({ status }: { status: JobStatus} ) {
+export function JobStatusVisualizer({ status, isHighlighted = false }: { status: JobStatus; isHighlighted?: boolean }) {
   return (
-    <div className={styles.jobStatus}>
-      <h2>Job: {status.job.visit} - Stage: {status.stage}</h2>
+    <div className={classNames(styles.jobStatus, isHighlighted && styles.highlighted)}>
+      <h2>Job: {status.job.visit}</h2>
       <div className={styles.container}>
         {status.generate_single_fits_tiles && (
           <div className={styles.section}>
-            <GenerateSingleFitsTilesVisualizer tiles={status.generate_single_fits_tiles} />
+            <GenerateSingleFitsTilesVisualizer tiles={status.generate_single_fits_tiles} height="20px" gap={false} />
           </div>
         )}
         {status.merge_tiles && (
@@ -68,8 +68,14 @@ function parseTileKey(key: string): TilePosition | null {
   }
 }
 
-export function GenerateSingleFitsTilesVisualizer({ tiles }: { tiles: Record<string, ProgressType>} ) {
-  const tileData: Array<{ key: string; pos: TilePosition; ratio: number} > = []
+type GenerateSingleFitsTilesVisualizerProps = {
+  tiles: Record<string, ProgressType>
+  height?: string
+  gap?: boolean
+}
+
+export function GenerateSingleFitsTilesVisualizer({ tiles, height = '100px', gap = false }: GenerateSingleFitsTilesVisualizerProps) {
+  const tileData: Array<{ key: string; pos: TilePosition; ratio: number }> = []
 
   for (const [key, progress] of Object.entries(tiles)) {
     const pos = parseTileKey(key)
@@ -79,7 +85,7 @@ export function GenerateSingleFitsTilesVisualizer({ tiles }: { tiles: Record<str
   }
 
   return (
-    <div className={styles.generateSingleFitsTiles}>
+    <div className={styles.generateSingleFitsTiles} style={{ '--tile-height': height, '--tile-gap': gap ? '2px' : '0px' } as React.CSSProperties} data-gap={gap}>
       <h3>Generate Single FITS Tiles</h3>
       <div className={styles.tileGrid}>
         {Array.from({ length: 5 }, (_, raftY) => (
@@ -102,7 +108,7 @@ export function GenerateSingleFitsTilesVisualizer({ tiles }: { tiles: Record<str
                         const isSpecial = ['R00', 'R40', 'R04', 'R44'].includes(raftKey) && !SPECIAL_SENSOR_POSITIONS.has(`${raftKey}_${sensorKey}`)
                         const isCompleted = tile && tile.ratio === 1
                         return (
-                          <div key={sensorX} className={classNames(styles.sensor, isSpecial && styles.hidden)} title={tile?.key}>
+                          <div key={sensorX} className={classNames(styles.sensor, isSpecial && styles.hidden, !gap && styles.gapless)} title={tile?.key}>
                             <div className={styles.progressBar}>
                               <div
                                 className={classNames(styles.progressFill, isCompleted && styles.completed)}
@@ -122,7 +128,7 @@ export function GenerateSingleFitsTilesVisualizer({ tiles }: { tiles: Record<str
     </div>
   )
 }
-function WorkerNodesVisualizer({ title, workers }: { title: string; workers: Record<string, ProgressType>} ) {
+function WorkerNodesVisualizer({ title, workers }: { title: string; workers: Record<string, ProgressType> }) {
   return (
     <div className={styles.workerNodes}>
       <h3>{title}</h3>

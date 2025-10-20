@@ -1,15 +1,8 @@
-import { JobStatusVisualizer } from '../../../components/JobStatusVisualizer/JobStatusVisualizer'
-import { useGetQuicklooksStatusQuery } from '../../../store/api/base'
-import styles from './styles.module.scss'
+import { JobList } from "../../../components/JobList"
+
 
 export function Jobs() {
-  const { data: statusList } = useGetQuicklooksStatusQuery()
-
   return (
-    <div className={styles.container}>
-      {statusList && Object.entries(statusList).map(([key, status]) => (
-        <JobStatusVisualizer key={key} status={status} />
-      ))}
-    </div>
+    <JobList />
   )
 }

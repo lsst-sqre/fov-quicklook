@@ -34,7 +34,7 @@ class Config(BaseSettings):
     tile_pack: int = 2  # (1<<tile_pack) ** 2 個のタイルがまとめてオブジェクトストレージにアップロードされる。
     # 例えばtile_pack==2のときは、16個のタイルがまとめてアップロードされる。
     fitsio_decompress_parallel: int = 4
-    fitsio_tmpdir: Path = Path('/dev/shm/quicklook/fitsio')
+    fitsio_tmpdir: Path = Path('/tmp/quicklook/fitsio')
     fitsio_memory_saving_mode: bool = True
 
     data_source: Literal['butler', 'dummy'] = 'butler'
@@ -72,14 +72,14 @@ class Config(BaseSettings):
 
     # Job settings
     generator_max_concurrent_jobs: int = 4
-    generator_max_concurrent_ccds_per_job: int = 16
+    generator_max_concurrent_ccds_per_job: int = 20
     merge_tile_parallel: int = 8
     transfer_tile_parallel: int = 8
 
     # Pipeline settings
     pipeline_queue_size: int = 64
-    pipeline_transfer_queue_size: int = 16
     pipeline_generate_single_fits_tiles: int = 1
+    pipeline_transfer_queue_size: int = 2
     pipeline_merge_tiles: int = 2
     pipeline_transfer_tiles: int = 2
 

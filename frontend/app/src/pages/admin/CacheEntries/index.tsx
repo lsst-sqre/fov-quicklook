@@ -4,7 +4,7 @@ import styles from './styles.module.scss'
 
 
 export function CacheEntries() {
-  const { data: entries, refetch } = useListCacheEntriesQuery(undefined, { refetchOnMountOrArgChange: true })
+  const { data: entries, refetch, isLoading } = useListCacheEntriesQuery(undefined, { refetchOnMountOrArgChange: true })
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -26,7 +26,12 @@ export function CacheEntries() {
           </tr>
         </thead>
         <tbody>
-          {entries?.map(entry => (
+          {isLoading && (
+            <tr>
+              <td colSpan={5}>Loading...</td>
+            </tr>
+          )}
+          {entries?.slice().sort((a, b) => -a.created_at.localeCompare(b.created_at)).map(entry => (
             <CacheEntryRow key={entry.visit_name} entry={entry} onDelete={refetch} />
           ))}
         </tbody>
@@ -34,6 +39,7 @@ export function CacheEntries() {
     </div>
   )
 }
+
 interface CacheEntryRowProps {
   entry: CacheEntry
   onDelete: () => void

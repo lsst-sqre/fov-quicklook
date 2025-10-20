@@ -116,12 +116,13 @@ class DataTypeSpecificDataSource:
         return [CcdName(i.detector_2_ccd[ref.dataId['detector']]) for ref in refs]  # type: ignore
 
     def exposure_exists(self, exposure_id: int) -> bool:
-        from lsst.daf.butler._exceptions import EmptyQueryResultError
+        from lsst.daf.butler._exceptions import EmptyQueryResultError, MissingCollectionError
 
         b = self._butler
         try:
             refs = b.query_datasets(self.data_type, where=f"{self.data_id_key}={exposure_id}", limit=1)
-        except EmptyQueryResultError:
+
+        except (EmptyQueryResultError, MissingCollectionError):
             return False
         return len(refs) > 0
 

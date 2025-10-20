@@ -9,10 +9,8 @@ import { useHomeContext } from "../context"
 import { CcdFrames, HighlitedCcds } from './CcdFrames/CcdFrames'
 import { CursorLine } from './CursorLine'
 import { Info } from './Info'
-import styles from './styles.module.scss'
 import { ViewerContextMenu } from './ViewerContextMenu'
-import { GenerateSingleFitsTilesVisualizer } from '../../../components/JobStatusVisualizer/JobStatusVisualizer'
-import { LoadingSpinner } from '../../../components/Loading'
+import { QuicklookJobMonitor } from './QuicklookJobMonitor'
 
 type ViewerProps = {
   style?: React.CSSProperties
@@ -72,13 +70,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
       </Globe$>
       <CursorLine />
       <Info />
-      {currentQuicklook.metadata?.type === 'progress' && (
-        <div className={styles.viewerBlock}>
-          {Object.keys(currentQuicklook.metadata.progress).length === 0 ? <LoadingSpinner /> : (
-            <GenerateSingleFitsTilesVisualizer tiles={currentQuicklook.metadata.progress} />
-          )}
-        </div>
-      )}
+      <QuicklookJobMonitor />
     </div>
   )
 })
