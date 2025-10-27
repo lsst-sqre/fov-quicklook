@@ -74,7 +74,11 @@ def generate_single_fits_tiles_pipeline(
         def main():
             try:
                 initializers = [GeneratorIdInitializer()]
-                with multiprocessing.Pool(16, initializer=_initialize_pool_worker, initargs=(initializers,)) as pool:
+                with multiprocessing.Pool(
+                    config.generator_max_concurrent_ccds_per_job,
+                    initializer=_initialize_pool_worker,
+                    initargs=(initializers,),
+                ) as pool:
                     for ccd_metadata in pool.imap_unordered(
                         _process_ccd,
                         (

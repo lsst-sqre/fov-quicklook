@@ -3,6 +3,7 @@ from typing import Annotated
 
 import fastapi
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.comm.generator import lifespan as generator_lifespan
@@ -14,6 +15,7 @@ from quicklook.rpc.server import create_rpc_endpoint
 from quicklook.types import CcdName, TilePos
 from quicklook.utils.async_process_generator import create_async_process_pool
 from quicklook.utils.numpyutils import ndarray2npybytes
+from quicklook.utils.system_status import ContainerStatus, get_container_status
 
 # グローバルなプロセスプール
 _process_pool = None
@@ -49,6 +51,12 @@ async def websocket_rpc_endpoint(websocket: fastapi.WebSocket):
 @app.get("/healthz")
 async def route_healthz():
     return {"status": "ok"}
+
+
+@app.get("/status", response_model=ContainerStatus)
+async def route_get_status():
+    """Get the current container status."""
+    return get_container_status()
 
 
 def dep_job(job_id: str):

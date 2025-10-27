@@ -6,13 +6,14 @@ type PropgressProps = {
   count: number
   total: number
   width?: string
+  rounded?: boolean
 }
 
-export const Progress = memo(({ count, total, width: boxWidth = '600px' }: PropgressProps) => {
+export const Progress = memo(({ count, total, width: boxWidth = '600px', rounded = false }: PropgressProps) => {
   const width = total === 0 ? '0' : `${(count / total) * 100}%`
   return (
-    <div className={styles.background} style={{ width: boxWidth }} >
-      <div className={classNames(styles.bar, count > 0 && count === total && styles.completed)} style={{ width }} />
+    <div className={classNames(styles.background, rounded && styles.rounded)} style={{ width: boxWidth }} >
+      <div className={classNames(styles.bar, count > 0 && count === total && styles.completed, rounded && styles.rounded)} style={{ width }} />
     </div>
   )
 })

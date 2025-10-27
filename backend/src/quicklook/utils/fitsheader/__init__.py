@@ -11,7 +11,10 @@ def fitsheader_to_list(hdul: Iterable[Any]) -> list[HeaderType]:
     for hdu in hdul:
         cards: HeaderType = []
         for card in hdu.header.cards:  # type: ignore
-            keyword, value, comment = card
+            try:
+                keyword, value, comment = card
+            except Exception as e:
+                keyword, value, comment = 'QL-ERROR', f'{e}: {card}', ''
             cards.append((keyword, value.__class__.__name__, stringify(value), comment))
         headers.append(cards)
     return headers

@@ -52,14 +52,21 @@ def postorder(tree: dict[int, list[int]], root: int) -> Iterator[int]:
 
 def wait_for_output(start: int, timeout: float = 5.0) -> int:
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+
+    def get_log_size():
         try:
-            size = LOG_PATH.stat().st_size
+            return LOG_PATH.stat().st_size
         except FileNotFoundError:
-            size = 0
+            return 0
+
+    size = get_log_size()
+
+    while time.monotonic() < deadline:
+        size = get_log_size()
         if size > start:
             return size
         time.sleep(0.1)
+
     return size
 
 

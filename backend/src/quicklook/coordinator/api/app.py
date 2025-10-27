@@ -10,6 +10,7 @@ from sqlalchemy import select
 import quicklook.mylogging
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
+from quicklook.coordinator.api.status import router as status_router
 from quicklook.coordinator.api.types import (
     CreateQuicklookRequest,
     JobStatusList,
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(comm_coordinator_router)
+app.include_router(status_router)
 
 
 @app.get("/healthz")

@@ -23,6 +23,25 @@
                 }
             }
         },
+        "/api/status": {
+            "get": {
+                "summary": "Route Get Status",
+                "description": "Get system status including frontend, coordinator, and generators.",
+                "operationId": "route_get_status",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SystemStatus"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/healthz": {
             "get": {
                 "summary": "Healthz",
@@ -804,6 +823,63 @@
                 ],
                 "title": "CcdMetadata"
             },
+            "ContainerStatus": {
+                "properties": {
+                    "container_name": {
+                        "type": "string",
+                        "title": "Container Name",
+                        "description": "Container hostname"
+                    },
+                    "memory_max": {
+                        "type": "integer",
+                        "title": "Memory Max",
+                        "description": "Memory limit in bytes (0 if unlimited)"
+                    },
+                    "memory_current": {
+                        "type": "integer",
+                        "title": "Memory Current",
+                        "description": "Current total memory usage in bytes"
+                    },
+                    "memory_stats": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/MemoryStats"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Detailed memory breakdown from cgroup memory.stat"
+                    },
+                    "cpu_max": {
+                        "type": "integer",
+                        "title": "Cpu Max",
+                        "description": "CPU quota in microseconds per period (0 if unlimited)"
+                    },
+                    "cpu_current": {
+                        "type": "integer",
+                        "title": "Cpu Current",
+                        "description": "Accumulated CPU usage time in microseconds since container start"
+                    },
+                    "uptime": {
+                        "type": "number",
+                        "title": "Uptime",
+                        "description": "Container uptime in seconds since boot"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "container_name",
+                    "memory_max",
+                    "memory_current",
+                    "memory_stats",
+                    "cpu_max",
+                    "cpu_current",
+                    "uptime"
+                ],
+                "title": "ContainerStatus",
+                "description": "System status of a container."
+            },
             "ContextMenuTemplate": {
                 "properties": {
                     "name": {
@@ -999,8 +1075,7 @@
                             "queued",
                             "generate_single_fits_tiles",
                             "merge_tiles",
-                            "transfer_fits_headers",
-                            "transfer_tiles",
+                            "upload_to_object_storage",
                             "ready",
                             "error"
                         ],
@@ -1040,6 +1115,99 @@
                     "$ref": "#/components/schemas/JobStatus"
                 },
                 "type": "object"
+            },
+            "MemoryStats": {
+                "properties": {
+                    "anon": {
+                        "type": "integer",
+                        "title": "Anon",
+                        "description": "Anonymous memory usage in bytes (private memory not backed by files)"
+                    },
+                    "file": {
+                        "type": "integer",
+                        "title": "File",
+                        "description": "File-backed memory usage in bytes (page cache)"
+                    },
+                    "kernel": {
+                        "type": "integer",
+                        "title": "Kernel",
+                        "description": "Kernel memory usage in bytes"
+                    },
+                    "slab": {
+                        "type": "integer",
+                        "title": "Slab",
+                        "description": "Slab memory usage in bytes (kernel data structures)"
+                    },
+                    "sock": {
+                        "type": "integer",
+                        "title": "Sock",
+                        "description": "Socket buffer memory usage in bytes"
+                    },
+                    "shmem": {
+                        "type": "integer",
+                        "title": "Shmem",
+                        "description": "Shared memory usage in bytes"
+                    },
+                    "file_mapped": {
+                        "type": "integer",
+                        "title": "File Mapped",
+                        "description": "Memory-mapped file pages in bytes"
+                    },
+                    "file_dirty": {
+                        "type": "integer",
+                        "title": "File Dirty",
+                        "description": "Dirty file-backed pages waiting to be written in bytes"
+                    },
+                    "file_writeback": {
+                        "type": "integer",
+                        "title": "File Writeback",
+                        "description": "File-backed pages currently being written back in bytes"
+                    },
+                    "inactive_anon": {
+                        "type": "integer",
+                        "title": "Inactive Anon",
+                        "description": "Inactive anonymous memory in bytes (candidates for swapping)"
+                    },
+                    "active_anon": {
+                        "type": "integer",
+                        "title": "Active Anon",
+                        "description": "Active anonymous memory in bytes (recently accessed)"
+                    },
+                    "inactive_file": {
+                        "type": "integer",
+                        "title": "Inactive File",
+                        "description": "Inactive file-backed memory in bytes (candidates for reclaim)"
+                    },
+                    "active_file": {
+                        "type": "integer",
+                        "title": "Active File",
+                        "description": "Active file-backed memory in bytes (recently accessed)"
+                    },
+                    "unevictable": {
+                        "type": "integer",
+                        "title": "Unevictable",
+                        "description": "Unevictable memory in bytes (locked, cannot be swapped)"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "anon",
+                    "file",
+                    "kernel",
+                    "slab",
+                    "sock",
+                    "shmem",
+                    "file_mapped",
+                    "file_dirty",
+                    "file_writeback",
+                    "inactive_anon",
+                    "active_anon",
+                    "inactive_file",
+                    "active_file",
+                    "unevictable"
+                ],
+                "title": "MemoryStats",
+                "description": "Detailed memory statistics from cgroup memory.stat."
             },
             "Progress": {
                 "properties": {
@@ -1171,6 +1339,31 @@
                     "context_menu_templates"
                 ],
                 "title": "SystemInfo"
+            },
+            "SystemStatus": {
+                "properties": {
+                    "frontend": {
+                        "$ref": "#/components/schemas/ContainerStatus"
+                    },
+                    "coordinator": {
+                        "$ref": "#/components/schemas/ContainerStatus"
+                    },
+                    "generators": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/ContainerStatus"
+                        },
+                        "type": "object",
+                        "title": "Generators"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "frontend",
+                    "coordinator",
+                    "generators"
+                ],
+                "title": "SystemStatus",
+                "description": "System status including frontend, coordinator, and generators."
             },
             "ValidationError": {
                 "properties": {

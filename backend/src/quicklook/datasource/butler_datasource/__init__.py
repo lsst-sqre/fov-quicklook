@@ -113,7 +113,11 @@ class DataTypeSpecificDataSource:
         b = self._butler
         refs = b.query_datasets(visit.data_type, where=f"{self.data_id_key}={visit.name}")
         i = Instrument.get(default_instrument)
-        return [CcdName(i.detector_2_ccd[ref.dataId['detector']]) for ref in refs]  # type: ignore
+        ccd_names = [CcdName(i.detector_2_ccd[ref.dataId['detector']]) for ref in refs]  # type: ignore
+        if visit.data_type == 'post_isr_image':
+            # ４隅のraftは位置情報がrawと違うため除外する
+            ccd_names = [ccd_name for ccd_name in ccd_names if ccd_name[:3] not in {'R00', 'R40', 'R04', 'R44'}]
+        return ccd_names
 
     def exposure_exists(self, exposure_id: int) -> bool:
         from lsst.daf.butler._exceptions import EmptyQueryResultError, MissingCollectionError

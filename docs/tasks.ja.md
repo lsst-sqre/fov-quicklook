@@ -1,44 +1,44 @@
-## 今回のタスク
-
-* 高速FITSローダーの実装
-  * C言語拡張で実装
-  * 詳細は`src/quicklook/utils/fits_loader/README.md`を参照
-
 ## 未完了タスク
 
 * [x] 省メモリ化
-  * １プロセス < 0.4GB
-* [ ] phalanx調整
+  * [ ] １プロセス < 0.4GB
+  * [ ] process poolをやめる
+* [x] phalanx調整
   * [x] storage-prefix
 * [x] ハイライト
 * [x] FITSファイルヘッダー表示
 * [x] housekeepingが呼び出されているか確認
 * [x] adminページ
-  * job一覧
+  * [x] job一覧
+* [ ] バグ修正
+  * [x] post isrがうまく処理できない
+  * [ ] ジョブがいつまでも終わらないことがある
+    * [ ] タイムアウトを設ける
 * [ ] queueページ
   * 順番の保証
   * 現在の待ち行列表示
+  * [ ] 進捗表示を大きく
 * [ ] ページを離れた時にwaiting_userを減らす
 * [ ] dynamic priority
-* [ ] 進捗表示を大きく
 * [ ] liveness/readiness probe
-* [ ] raw以外のtype対応
-
+* [x] raw以外のtype対応
   ```lsst.daf.butler._exceptions.MissingCollectionError: No collection with name 'LSSTCam/runs/nightlyValidation' found.```
 
 * [ ] エラー対応検討
   * たとえばユーザーがページを離れてwaiting userが0になったquicklookはエラーになる。
   * エラーが起きるとstatge=errorになり、データの削除が起こり、レコードが削除される。
   * エラーの終了処理中にそのページにアクセスすると`QuicklookMetadata`はエラー状態でクライアントに
-* [ ] セキュリティ
-  * k8sのnetwork policy以外のセキュリティ対策
-  * object storageにpickleをいれない
-* [ ] commのheartbeatをwebsocketにする
-* [ ] generatorへの接続を使い回す
-  * src/quicklook/frontend/api/get_tile.py
-  * life_spanで接続オブジェクトを作る
-  * retryを考慮
-    * src/quicklook/generator/retry_on_error.py
+
+* [ ] 次回
+  * [ ] commのheartbeatをwebsocketにする
+  * [ ] generatorへの接続を使い回す
+    * src/quicklook/frontend/api/get_tile.py
+    * life_spanで接続オブジェクトを作る
+    * retryを考慮
+      * src/quicklook/generator/retry_on_error.py
+  * [ ] セキュリティ
+    * k8sのnetwork policy以外のセキュリティ対策
+    * object storageにpickleをいれない
 
 ## webappとの繋ぎ検討
 

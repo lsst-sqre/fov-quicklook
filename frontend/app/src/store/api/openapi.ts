@@ -4,6 +4,12 @@ const injectedRtkApi = api.injectEndpoints({
     getSystemInfo: build.query<GetSystemInfoApiResponse, GetSystemInfoApiArg>({
       query: () => ({ url: `/api/system_info` }),
     }),
+    routeGetStatus: build.query<
+      RouteGetStatusApiResponse,
+      RouteGetStatusApiArg
+    >({
+      query: () => ({ url: `/api/status` }),
+    }),
     healthz: build.query<HealthzApiResponse, HealthzApiArg>({
       query: () => ({ url: `/api/healthz` }),
     }),
@@ -134,6 +140,9 @@ export { injectedRtkApi as api };
 export type GetSystemInfoApiResponse =
   /** status 200 Successful Response */ SystemInfo;
 export type GetSystemInfoApiArg = void;
+export type RouteGetStatusApiResponse =
+  /** status 200 Successful Response */ SystemStatus;
+export type RouteGetStatusApiArg = void;
 export type HealthzApiResponse = /** status 200 Successful Response */ any;
 export type HealthzApiArg = void;
 export type GetTileApiResponse = /** status 200 Successful Response */ any;
@@ -225,6 +234,59 @@ export type SystemInfo = {
   admin_page: boolean;
   context_menu_templates: ContextMenuTemplate[];
 };
+export type MemoryStats = {
+  /** Anonymous memory usage in bytes (private memory not backed by files) */
+  anon: number;
+  /** File-backed memory usage in bytes (page cache) */
+  file: number;
+  /** Kernel memory usage in bytes */
+  kernel: number;
+  /** Slab memory usage in bytes (kernel data structures) */
+  slab: number;
+  /** Socket buffer memory usage in bytes */
+  sock: number;
+  /** Shared memory usage in bytes */
+  shmem: number;
+  /** Memory-mapped file pages in bytes */
+  file_mapped: number;
+  /** Dirty file-backed pages waiting to be written in bytes */
+  file_dirty: number;
+  /** File-backed pages currently being written back in bytes */
+  file_writeback: number;
+  /** Inactive anonymous memory in bytes (candidates for swapping) */
+  inactive_anon: number;
+  /** Active anonymous memory in bytes (recently accessed) */
+  active_anon: number;
+  /** Inactive file-backed memory in bytes (candidates for reclaim) */
+  inactive_file: number;
+  /** Active file-backed memory in bytes (recently accessed) */
+  active_file: number;
+  /** Unevictable memory in bytes (locked, cannot be swapped) */
+  unevictable: number;
+};
+export type ContainerStatus = {
+  /** Container hostname */
+  container_name: string;
+  /** Memory limit in bytes (0 if unlimited) */
+  memory_max: number;
+  /** Current total memory usage in bytes */
+  memory_current: number;
+  /** Detailed memory breakdown from cgroup memory.stat */
+  memory_stats: MemoryStats | null;
+  /** CPU quota in microseconds per period (0 if unlimited) */
+  cpu_max: number;
+  /** Accumulated CPU usage time in microseconds since container start */
+  cpu_current: number;
+  /** Container uptime in seconds since boot */
+  uptime: number;
+};
+export type SystemStatus = {
+  frontend: ContainerStatus;
+  coordinator: ContainerStatus;
+  generators: {
+    [key: string]: ContainerStatus;
+  };
+};
 export type ValidationError = {
   loc: (string | number)[];
   msg: string;
@@ -252,8 +314,7 @@ export type JobStatus = {
     | "queued"
     | "generate_single_fits_tiles"
     | "merge_tiles"
-    | "transfer_fits_headers"
-    | "transfer_tiles"
+    | "upload_to_object_storage"
     | "ready"
     | "error";
   generate_single_fits_tiles?: {
@@ -345,6 +406,7 @@ export type Entry = {
 };
 export const {
   useGetSystemInfoQuery,
+  useRouteGetStatusQuery,
   useHealthzQuery,
   useGetTileQuery,
   useGetFitsHeaderQuery,

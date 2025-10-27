@@ -73,15 +73,15 @@ class Config(BaseSettings):
     # Job settings
     generator_max_concurrent_jobs: int = 4
     generator_max_concurrent_ccds_per_job: int = 20
-    merge_tile_parallel: int = 8
-    transfer_tile_parallel: int = 8
+    merge_tile_parallel: int = 4
+    transfer_tile_parallel: int = 4
 
     # Pipeline settings
     pipeline_queue_size: int = 64
     pipeline_generate_single_fits_tiles: int = 1
-    pipeline_transfer_queue_size: int = 2
-    pipeline_merge_tiles: int = 2
-    pipeline_transfer_tiles: int = 2
+    pipeline_transfer_queue_size: int = 8
+    pipeline_merge_tiles: int = 1
+    pipeline_transfer_tiles: int = 1
 
     # Logging settings
     log_level: Literal['debug', 'info', 'warning', 'error', 'critical'] = 'info'
@@ -95,7 +95,7 @@ class Config(BaseSettings):
 
     # Database settings
     db_url: str = 'postgresql+asyncpg://quicklook:quicklook@localhost:5432/quicklook'
-    
+
     # Housekeeping settings
     max_object_storage_usage: int = 1024 * 1024 * 1024 * 45  # 45GB in bytes
 

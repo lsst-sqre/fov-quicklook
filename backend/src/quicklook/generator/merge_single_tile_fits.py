@@ -110,7 +110,6 @@ def _get_external_tile(generator: GeneratorInfo, job_id: str, pos: TilePos) -> n
         lambda: session.get(f'{generator.url}/jobs/{job_id}/tiles/{pos.level}/{pos.i}/{pos.j}'),
         requests.exceptions.ConnectionError,
     )
-
     response.raise_for_status()
     return npybytes2ndarray(response.content)
 
