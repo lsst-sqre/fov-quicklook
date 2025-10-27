@@ -1,8 +1,23 @@
 ## 未完了タスク
 
 * [x] 省メモリ化
-  * [ ] １プロセス < 0.4GB
-  * [ ] process poolをやめる
+  * １プロセス < 0.4GB程度
+  * アイドル状態
+    - 700MB
+  - single fits tile generation
+    - 20並列
+      - 4GB程度。瞬間的に5GBを超えることも
+    - 16並列
+      - 3GB程度
+    - CPU使用率は高々20ほど
+  - merge tile
+    - 1GB程度
+    - 4並列
+    - 1プロセス100MB程度？
+  - transfer tile
+    - 1GB程度
+    - 4並列
+    - 1プロセス100MB程度？
 * [x] phalanx調整
   * [x] storage-prefix
 * [x] ハイライト
@@ -10,14 +25,13 @@
 * [x] housekeepingが呼び出されているか確認
 * [x] adminページ
   * [x] job一覧
-* [ ] バグ修正
+* [ ] 遅いノード対応
+* [x] バグ修正
   * [x] post isrがうまく処理できない
-  * [ ] ジョブがいつまでも終わらないことがある
-    * [ ] タイムアウトを設ける
+* [ ] ジョブがいつまでも終わらないことがある
+  * [ ] タイムアウトを設ける
 * [ ] queueページ
-  * 順番の保証
-  * 現在の待ち行列表示
-  * [ ] 進捗表示を大きく
+  * 表示の改良
 * [ ] ページを離れた時にwaiting_userを減らす
 * [ ] dynamic priority
 * [ ] liveness/readiness probe
