@@ -1178,6 +1178,17 @@
                         },
                         "type": "object",
                         "title": "Transfer Tiles"
+                    },
+                    "error_message": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Error Message"
                     }
                 },
                 "type": "object",
@@ -1407,12 +1418,17 @@
                         },
                         "type": "array",
                         "title": "Context Menu Templates"
+                    },
+                    "max_object_storage_usage": {
+                        "type": "integer",
+                        "title": "Max Object Storage Usage"
                     }
                 },
                 "type": "object",
                 "required": [
                     "admin_page",
-                    "context_menu_templates"
+                    "context_menu_templates",
+                    "max_object_storage_usage"
                 ],
                 "title": "SystemInfo"
             },

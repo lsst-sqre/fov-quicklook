@@ -261,6 +261,7 @@ export type ContextMenuTemplate = {
 export type SystemInfo = {
   admin_page: boolean;
   context_menu_templates: ContextMenuTemplate[];
+  max_object_storage_usage: number;
 };
 export type MemoryStats = {
   /** Anonymous memory usage in bytes (private memory not backed by files) */
@@ -354,6 +355,7 @@ export type JobStatus = {
   transfer_tiles?: {
     [key: string]: Progress;
   };
+  error_message?: string | null;
 };
 export type JobStatusList = {
   [key: string]: JobStatus;

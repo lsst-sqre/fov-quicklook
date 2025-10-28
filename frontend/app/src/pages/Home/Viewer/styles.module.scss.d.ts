@@ -1,5 +1,7 @@
+export declare const centerContent: string;
 export declare const errorContainer: string;
 export declare const errorMessage: string;
+export declare const fullWidth: string;
 export declare const info: string;
 export declare const retryButton: string;
 export declare const rough: string;
