@@ -25,15 +25,15 @@
 * [x] housekeepingが呼び出されているか確認
 * [x] adminページ
   * [x] job一覧
-* [ ] 遅いpod対応
+* [x] 遅いpod対応
   * 遅いpodは再起動させるようにする。
 * [x] バグ修正
   * [x] post isrがうまく処理できない
-* [ ] ジョブがいつまでも終わらないことがある
+* [x] ジョブがいつまでも終わらないことがある
 * [ ] queueページ
   * 表示の改良
-* [ ] ページを離れた時にwaiting_userを減らす
-* [ ] liveness/readiness probe
+* [x] ページを離れた時にwaiting_userを減らす
+* [x] liveness/readiness probe
 * [x] raw以外のtype対応
   ```lsst.daf.butler._exceptions.MissingCollectionError: No collection with name 'LSSTCam/runs/nightlyValidation' found.```
 

@@ -7,41 +7,60 @@
 
 以下を順に実施してください。
 
-* [x] k8sのliveness, readiness probeの設定
+* [ ] `pyright`の実行と修正
 
-  `./k8s/helmchart/templates`の`db.yaml`, `coordinator.yaml`, `frontend.yaml`, `generator.yaml`にliveness, readiness probeの設定を追加する。最後の3者はこのアプリケーションで実装した各コンポーネントである。
-  frontendは`{{Values.config.pathPrefix}}/api/healthz`、coordinatorは`/comm/healthz`、generatorは`/comm/healthz`が利用可能。
+  `cd backend && make pyright` してエラーがあれば修正してください。
 
-* [x] vote, unvote周りのリファクタリング
+* [ ] `backend/src/quicklook/utils/timeout.py`の移動。
 
-  `backend/src/quicklook/coordinator/api/app.py`でrouteのパスに`{visit_name}`を使っている箇所は`Depends`を使ってください。
-  `backend/src/quicklook/frontend/api/deps.py`が参考になります。
-  coordinatorでは対応するjobがない場合は404を返すのではなく、特に何もせず終了するので良いです。
+  このファイルの内容は`utils`内にあるのは相応しくないですね。（汎用的でない。）
+  `backend/src/quicklook/coordinator/create_quicklook`に移動させてください。
+  名前ももう少し具体的にしましょう。
 
-* [x] `QuicklookMetadataProvider`のリファクタリング
+* [ ] キャッシュ一覧からquicklookを閲覧可能にする
 
-  `frontend/app/src/pages/Home/context/quicklook.tsx`周辺のコードです。
-  `QuicklookMetadataProvider`が長くなって見通しが悪いです。
-  vote, unvoteに関する処理を1つのフックに切り出してそれを呼び出すようにしてください。
+  `frontend/app/src/pages/admin/CacheEntries/index.tsx`でキャッシュデータの一覧が見える。
+  visit nameをクリックするとそのデータが見えるようにする。(`src/router.tsx`参照。`/visits/:visitId`に飛ばす。)
 
-  引数の値が変わった時に登録されたコールバック関数を呼び出すフックを作りそれを使うようにしてください。
-  次のようなシグネチャになると思います。
-  ```typescript
-  useWatch<T>(watchedValue: T, callback: (before: T, after: T) => void)
-  ```
+* [ ] ジョブ一覧ページからもquicklookを閲覧可能にする
 
-* [x] `JobStatus`のエラー情報の追加
+  上記依頼と同様`frontend/app/src/components/JobStatusVisualizer/JobStatusVisualizer.tsx`からquicklook閲覧ページをリンクする。
 
-  `backend/src/quicklook/coordinator/create_quicklook/__init__.py`では`job.status.stage = 'error'`のように`JobStatus`にエラー状態にすることがある。`JobStatus`にエラー情報を保持するフィールドを追加しエラーが起きた時はエラー内容を保持させてください。
+* [ ] システムステータスの改善
 
-* [x] ジョブのタイムアウト制限
+  * 表示
 
-  何らかの原因でquicklookの作成がいつまで経っても終わらないことがある（かもしれない）。
-  `backend/src/quicklook/coordinator/create_quicklook/__init__.py`の`quicklook_pipeline`の各ステージに60秒（設定可能）のタイムアウトを設ける。新しくその目的のdecoratorをつくり各ステージの処理関数にそのデコレーターを作用させると良いだろう。
-  タイムアウトを超えたら全てのgeneratorを再起動させる。`backend/src/quicklook/comm/coordinator.py`を参考。`shutdown_all_generators()`のような関数を作ると良いだろう。
+    `frontend/app/src/pages/admin/Status/index.tsx`にステータス表示のコードがあります。
+    これは画面全体を使って表示するものですが、`<Home />`画面の端に表示できると良いです。
+    そのための小型版も作って`<Home/>`内の`<Viewer/>`枠の左下に小型版を表示するようにしてください。
+    小型版は各コンテナの名前、Unrecoverable Memory、CPU Usageだけ表示してください。
+    メモリ、CPUは`<Progress />`でバーで表示してください。
+    コンテナ名かなり長くなるのでcoordinatorは`coordinator`、frontendは`frontend`、generatorは先頭の6文字だけを表示してください。
 
-* [x] `frontend/app/src/pages/Home/Viewer/QuicklookJobMonitor.tsx`のリファクタリング
+  * 無駄の削減
 
-  * このコンポーネントで表示されるジョブのリストの上部が隠れて表示されていないようです。修正してください。
-  * 現在表示しているvisitがまだリストにない時は`<LoadingSpinner/>`を表示してください。
-  * quicklookがエラーステータスになったらエラーメッセージを表示してください。エラーメッセージの後に再リクエストボタンも配してください。
+    現在、クライアントからリクエストがあると`backend/src/quicklook/frontend/api/status.py`のAPIが呼ばれてそこからcoordinator, generatorへとリクエストがリレーされていきます。これが複数のクライアントから来ると無視できないトラフィックになります。
+    frontendでは結果を`backend/src/quicklook/utils/ttlcache/__init__.py`を使って１秒間キャッシュし何度もバックエンドにリクエストをしないようにしてください。
+    また`backend/src/quicklook/frontend/api/status.py`にwebsocketのエンドポイントも作って、クライアントのとのやりとりはそれを使うようにしましょう。
+    クライアントサイドがwebsocketと通信するには`frontend/app/src/store/api/base.ts`に新しくエンドポイントを追加してください。既存のコードがwebsocketの使いかたの参考になります。
+    バックエンド側にwebsocketでない通常のAPIは残しておいてください。（これを残しておくとOpenAPIの型情報がクライアントで利用できる。）
+
+* [ ] アクセス記録の作成
+
+  現在`backend/src/quicklook/coordinator/housekeeping/__init__.py`で古いキャッシュを削除している。
+  １週間以内の`accesses`テーブルのエントリー数が少ないものから順に消しています。
+  しかし、現在アクセス時に`accesses`テーブルのレコードを作る処理がありません。
+  `backend/src/quicklook/frontend/api/quicklooks.py`の`vote`された時に`accesses`テーブルにレコードを作成する処理を追加するようにしてください。
+
+* [ ] フロントエンドのジョブ表示の問題
+
+  `src/pages/Home/Viewer/QuicklookJobMonitor.tsx`周辺についてです。
+  `<LoadingSpinner/>`は表示領域の中央に表示してください。
+  リストが表示された時、自分の今見ているvisitに対応するジョブを画面中央にスクロールさせてください。
+
+* [ ] DBのyamlファイルの見直し
+
+  `k8s/helmchart/templates/db.yaml`が作るdeploymentがrestartできません。
+  （ずっと古いpodが残り続けます。）
+  可能なら修正してください。
+  （これは別のリポジトリにあります。cdするときはこのタスクが終わった時のcurrent directoryには注意してください。）
