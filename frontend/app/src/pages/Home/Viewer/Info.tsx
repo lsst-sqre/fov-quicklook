@@ -35,7 +35,7 @@ export function Info() {
               CCD
             </th>
             <td>
-              {/* {focusedCcd?.ccd_id.ccd_name} */}
+              {focusedCcd?.ccd_name}
             </td>
           </tr>
           <tr>
@@ -43,7 +43,7 @@ export function Info() {
               amp
             </th>
             <td>
-              {/* {focusedAmp?.amp_id} */}
+              {focusedAmp?.amp_id}
             </td>
           </tr>
         </tbody>
