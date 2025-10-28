@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { ContainerStatus } from '../../../../store/api/openapi'
 import { useGetSystemStatus_WS_Query } from '../../../../store/api/base'
 import { Progress } from '../../../../components/Progress'
+import { useAppSelector } from '../../../../store/hooks'
 import styles from './styles.module.scss'
 
 export function CompactStatus() {
   const { data: status } = useGetSystemStatus_WS_Query()
+  const showCompactStatus = useAppSelector(state => state.home.showCompactStatus)
 
-  if (!status) {
+  if (!status || !showCompactStatus) {
     return null
   }
 
@@ -52,13 +54,14 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
       const deltaCpu = container.cpu_current - prev.cpu
       const deltaTime = container.uptime - prev.uptime
       let percent: number | null = null
-      if (deltaTime > 0) {
-        percent = (deltaCpu / (deltaTime * 1_000_000)) * 100
+      if (deltaTime > 0 && container.cpu_max > 0) {
+        const cpuMaxPerSecond = container.cpu_max
+        percent = (deltaCpu / (deltaTime * 1_000_000)) / (cpuMaxPerSecond / 100_000) * 100
       }
       setCpuPercent(percent)
     }
     prevRef.current = { cpu: container.cpu_current, uptime: container.uptime }
-  }, [container.cpu_current, container.uptime])
+  }, [container.cpu_current, container.uptime, container.cpu_max])
 
   const unrecoverableMemory = calculateUnrecoverableMemory()
   const memoryRatio = unrecoverableMemory / container.memory_max

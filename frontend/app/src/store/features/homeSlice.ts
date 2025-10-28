@@ -18,6 +18,7 @@ type State = {
   searchString: string
   dataSource: CcdDataType
   showFrame: boolean
+  showCompactStatus: boolean
   hilightedCcdId: string[]
   listGroupingTimeToleranceDigits: number
 }
@@ -51,6 +52,7 @@ function initialState(): State {
     searchString: '',
     dataSource: 'raw',
     showFrame: true,
+    showCompactStatus: true,
     cameraParams: initialSearchParams.cameraParams ?? initialCameraParams,
     hilightedCcdId: initialHightlightCcds(),
     listGroupingTimeToleranceDigits: 2,
@@ -88,6 +90,9 @@ export const homeSlice = createSlice({
     },
     setShowFrame: (state, action: PayloadAction<boolean>) => {
       state.showFrame = action.payload
+    },
+    setShowCompactStatus: (state, action: PayloadAction<boolean>) => {
+      state.showCompactStatus = action.payload
     },
     toggleHighlightCcd: (state, action: PayloadAction<string>) => {
       const idx = state.hilightedCcdId.indexOf(action.payload)
