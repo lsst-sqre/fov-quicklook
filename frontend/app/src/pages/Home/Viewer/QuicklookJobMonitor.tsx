@@ -54,7 +54,7 @@ export function QuicklookJobMonitor() {
             Retry Request
           </button>
         </div>
-      ) : metadata?.type === 'progress' && Object.keys(metadata.progress).length > 0 ? (
+      ) : metadata?.type === 'progress' ? (
         <GenerateSingleFitsTilesVisualizer tiles={metadata.progress} height="10vh" gap={true} />
       ) : (
         <div ref={jobListRef} className={styles.fullWidth}>

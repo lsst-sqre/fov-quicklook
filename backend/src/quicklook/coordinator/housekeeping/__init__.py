@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 
 from quicklook.config import config
 from quicklook.db import Access, Quicklook, get_db_session
@@ -74,12 +74,16 @@ async def delete_one_quicklook(visit_name: str) -> int:
     await storage.delete_all()
     logger.info(f"Deleted object storage data for {visit_name}")
 
-    # DBエントリーを削除
+    # DBエントリーを削除（ORMを使ってカスケード削除）
     async with get_db_session() as session:
-        stmt = delete(Quicklook).where(Quicklook.visit_name == visit_name)
-        await session.execute(stmt)
-        await session.commit()
-        logger.info(f"Deleted quicklook record for {visit_name}")
+        stmt = select(Quicklook).where(Quicklook.visit_name == visit_name)
+        result = await session.execute(stmt)
+        quicklook_to_delete = result.scalar_one_or_none()
+        
+        if quicklook_to_delete:
+            await session.delete(quicklook_to_delete)
+            await session.commit()
+            logger.info(f"Deleted quicklook record for {visit_name}")
 
     return disk_usage
 
