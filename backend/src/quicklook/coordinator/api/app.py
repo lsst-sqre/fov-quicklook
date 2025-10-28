@@ -2,14 +2,15 @@ import asyncio
 import pickle
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Awaitable, Callable
+from typing import Annotated, AsyncIterator, Awaitable, Callable
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 import quicklook.mylogging
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
+from quicklook.coordinator.api.deps import dep_visit_name
 from quicklook.coordinator.api.status import router as status_router
 from quicklook.coordinator.api.types import (
     CreateQuicklookRequest,
@@ -79,11 +80,10 @@ async def route_quicklook_status():
 
 
 @app.post('/quicklooks/{visit_name}/vote')
-async def route_vote_quicklook(visit_name: str):
-    visit = VisitName(visit_name)
+async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_name)]):
     jobs = running_pipeline.jobs()
     if visit not in jobs:
-        raise HTTPException(status_code=404, detail=f"Visit {visit} not found")
+        return {"user_count": 0}
     
     job = jobs[visit]
     priority = job.priority
@@ -93,11 +93,10 @@ async def route_vote_quicklook(visit_name: str):
 
 
 @app.post('/quicklooks/{visit_name}/unvote')
-async def route_unvote_quicklook(visit_name: str):
-    visit = VisitName(visit_name)
+async def route_unvote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_name)]):
     jobs = running_pipeline.jobs()
     if visit not in jobs:
-        raise HTTPException(status_code=404, detail=f"Visit {visit} not found")
+        return {"user_count": 0}
     
     job = jobs[visit]
     priority = job.priority
