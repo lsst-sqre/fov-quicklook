@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { CacheEntry, useDeleteCacheEntryMutation, useListCacheEntriesQuery } from "../../../store/api/openapi"
 import styles from './styles.module.scss'
 
@@ -55,7 +56,11 @@ function CacheEntryRow({ entry, onDelete }: CacheEntryRowProps) {
 
   return (
     <tr>
-      <td>{entry.visit_name}</td>
+      <td>
+        <Link to={`/visits/${encodeURIComponent(entry.visit_name)}`}>
+          {entry.visit_name}
+        </Link>
+      </td>
       <td>{entry.ready ? 'Yes' : 'No'}</td>
       <td>{humanReadableSize(entry.disk_usage)}</td>
       <td>{entry.created_at}</td>
