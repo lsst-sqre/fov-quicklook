@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef } from "react"
 import { useGetQuicklookMetadata_WS_Query } from "../../../store/api/base"
-import { QuicklookMetadata, useCreateQuicklookMutation } from "../../../store/api/openapi"
+import { QuicklookMetadata, useCreateQuicklookMutation, useVoteQuicklookMutation, useUnvoteQuicklookMutation } from "../../../store/api/openapi"
 import { useAppSelector } from "../../../store/hooks"
 
 type QuicklookContextType = {
@@ -35,13 +35,15 @@ function useQuicklookContext() {
   return context
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useQuicklookMetadata() {
   const currentId = useAppSelector(state => state.home.currentQuicklook)
   const { metadata, ready } = useQuicklookContext()
   const changeCount = useRef(0)
+  const previousId = useRef<string | undefined>(undefined)
 
   const [createQuicklook] = useCreateQuicklookMutation()
+  const [voteQuicklook] = useVoteQuicklookMutation()
+  const [unvoteQuicklook] = useUnvoteQuicklookMutation()
 
   const initializeQuicklook = useCallback(async () => {
     if (currentId) {
@@ -49,15 +51,43 @@ export function useQuicklookMetadata() {
     }
   }, [createQuicklook, currentId])
 
-  // 初期化
   useEffect(() => {
     initializeQuicklook()
   }, [initializeQuicklook])
 
-  // IDが変更されたらカウントを増やす
   useEffect(() => {
     if (currentId) {
       changeCount.current += 1
+    }
+  }, [currentId])
+
+  useEffect(() => {
+    if (previousId.current && previousId.current !== currentId) {
+      unvoteQuicklook({ visitName: previousId.current }).catch(err => {
+        console.warn(`Failed to unvote ${previousId.current}:`, err)
+      })
+    }
+
+    if (currentId) {
+      voteQuicklook({ visitName: currentId }).catch(err => {
+        console.warn(`Failed to vote ${currentId}:`, err)
+      })
+    }
+
+    previousId.current = currentId
+  }, [currentId, voteQuicklook, unvoteQuicklook])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (currentId) {
+        const blob = new Blob([JSON.stringify({})], { type: 'application/json' })
+        navigator.sendBeacon(`/api/quicklooks/${currentId}/unvote`, blob)
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
     }
   }, [currentId])
 

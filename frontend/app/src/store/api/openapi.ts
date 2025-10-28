@@ -33,6 +33,24 @@ const injectedRtkApi = api.injectEndpoints({
         body: queryArg.createQuicklookRequest,
       }),
     }),
+    voteQuicklook: build.mutation<
+      VoteQuicklookApiResponse,
+      VoteQuicklookApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/vote`,
+        method: "POST",
+      }),
+    }),
+    unvoteQuicklook: build.mutation<
+      UnvoteQuicklookApiResponse,
+      UnvoteQuicklookApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/unvote`,
+        method: "POST",
+      }),
+    }),
     getAllQuicklookJobs: build.query<
       GetAllQuicklookJobsApiResponse,
       GetAllQuicklookJobsApiArg
@@ -162,6 +180,16 @@ export type CreateQuicklookApiResponse =
   /** status 200 Successful Response */ any;
 export type CreateQuicklookApiArg = {
   createQuicklookRequest: CreateQuicklookRequest;
+};
+export type VoteQuicklookApiResponse =
+  /** status 200 Successful Response */ any;
+export type VoteQuicklookApiArg = {
+  visitName: string;
+};
+export type UnvoteQuicklookApiResponse =
+  /** status 200 Successful Response */ any;
+export type UnvoteQuicklookApiArg = {
+  visitName: string;
 };
 export type GetAllQuicklookJobsApiResponse =
   /** status 200 Successful Response */ JobStatusList;
@@ -411,6 +439,8 @@ export const {
   useGetTileQuery,
   useGetFitsHeaderQuery,
   useCreateQuicklookMutation,
+  useVoteQuicklookMutation,
+  useUnvoteQuicklookMutation,
   useGetAllQuicklookJobsQuery,
   useGetQuicklookMetadataQuery,
   useListVisitsQuery,
