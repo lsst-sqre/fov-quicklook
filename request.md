@@ -71,3 +71,8 @@
   これにキャッシュの使用量のlimitの何%が使われているか表示するようにしてください。
   上限値は`backend/src/quicklook/config/__init__.py`の`max_object_storage_usage`です。
   この値を`backend/src/quicklook/frontend/api/systeminfo.py`経由でクライアントに渡すと良いでしょう。
+
+* [ ] ミニシステムモニターの
+
+  `frontend/app/src/pages/Home/Viewer/index.tsx`の`CompactStatus`のCPU使用率の値がおかしい？
+  サーバーサイドの実装`backend/src/quicklook/utils/system_status.py`とも見比べてCPU使用率がlimitに達した時に100%になるように修正してください。

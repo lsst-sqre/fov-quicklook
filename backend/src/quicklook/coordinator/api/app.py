@@ -89,6 +89,14 @@ async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_nam
     priority = job.priority
     priority.user_count += 1
     logger.info(f"Vote for {visit}: user_count={priority.user_count}")
+    
+    from quicklook.db import Access, get_db_session
+    from datetime import datetime
+    async with get_db_session() as session:
+        access = Access(visit_name=visit, accessed_at=datetime.now())
+        session.add(access)
+        await session.commit()
+    
     return {"user_count": priority.user_count}
 
 
