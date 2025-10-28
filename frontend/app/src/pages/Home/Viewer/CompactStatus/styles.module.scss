@@ -1,0 +1,56 @@
+.compactStatus {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+  padding: 8px;
+  color: white;
+  font-size: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+  min-width: 200px;
+}
+
+.containerList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.containerItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.containerName {
+  font-weight: bold;
+  font-size: 11px;
+  color: #4fc3f7;
+}
+
+.metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metricRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metricLabel {
+  font-size: 10px;
+  color: #aaa;
+  min-width: 30px;
+}
+
+.metricValue {
+  font-size: 10px;
+  min-width: 35px;
+  text-align: right;
+}

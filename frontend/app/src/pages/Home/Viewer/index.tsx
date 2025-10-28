@@ -11,6 +11,7 @@ import { CursorLine } from './CursorLine'
 import { Info } from './Info'
 import { ViewerContextMenu } from './ViewerContextMenu'
 import { QuicklookJobMonitor } from './QuicklookJobMonitor'
+import { CompactStatus } from './CompactStatus'
 
 type ViewerProps = {
   style?: React.CSSProperties
@@ -71,6 +72,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
       <CursorLine />
       <Info />
       <QuicklookJobMonitor />
+      <CompactStatus />
     </div>
   )
 })
