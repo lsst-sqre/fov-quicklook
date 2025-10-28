@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { JobList } from '../../../components/JobList'
 import { GenerateSingleFitsTilesVisualizer } from '../../../components/JobStatusVisualizer/JobStatusVisualizer'
 import { LoadingSpinner } from '../../../components/Loading'
@@ -10,9 +11,19 @@ export function QuicklookJobMonitor() {
   const { currentQuicklook } = useHomeContext()
   const { data: statusList } = useGetQuicklooksStatusQuery()
   const [createQuicklook] = useCreateQuicklookMutation()
+  const jobListRef = useRef<HTMLDivElement>(null)
   
   const showMonitor = !currentQuicklook.ready
   const metadata = currentQuicklook.metadata
+
+  useEffect(() => {
+    if (jobListRef.current && currentQuicklook.id && statusList) {
+      const element = jobListRef.current.querySelector(`[data-visit="${currentQuicklook.id}"]`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+  }, [currentQuicklook.id, statusList])
 
   if (!showMonitor) {
     return null
@@ -31,7 +42,9 @@ export function QuicklookJobMonitor() {
   return (
     <div className={styles.viewerBlock}>
       {!isInList && !isError ? (
-        <LoadingSpinner />
+        <div className={styles.centerContent}>
+          <LoadingSpinner />
+        </div>
       ) : isError ? (
         <div className={styles.errorContainer}>
           <div className={styles.errorMessage}>
@@ -44,7 +57,9 @@ export function QuicklookJobMonitor() {
       ) : metadata?.type === 'progress' && Object.keys(metadata.progress).length > 0 ? (
         <GenerateSingleFitsTilesVisualizer tiles={metadata.progress} height="10vh" gap={true} />
       ) : (
-        <JobList highlightKey={currentQuicklook.id} />
+        <div ref={jobListRef} className={styles.fullWidth}>
+          <JobList highlightKey={currentQuicklook.id} />
+        </div>
       )}
     </div>
   )

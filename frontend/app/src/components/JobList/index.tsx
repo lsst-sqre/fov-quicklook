@@ -30,7 +30,7 @@ export function JobList({ highlightKey }: { highlightKey?: string } = {}) {
             }}
             nodeRef={getNodeRef(key)}
           >
-            <div ref={getNodeRef(key)}>
+            <div ref={getNodeRef(key)} data-visit={key}>
               <JobStatusVisualizer status={status} isHighlighted={key === highlightKey} />
               <div className={styles.spacer} />
             </div>
