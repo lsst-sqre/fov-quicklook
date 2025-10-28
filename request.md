@@ -7,26 +7,26 @@
 
 以下を順に実施してください。
 
-* [x] `pyright`の実行と修正
+* [ ] `pyright`の実行と修正
 
   `cd backend && make pyright` してエラーがあれば修正してください。
 
-* [x] `backend/src/quicklook/utils/timeout.py`の移動。
+* [ ] `backend/src/quicklook/utils/timeout.py`の移動。
 
   このファイルの内容は`utils`内にあるのは相応しくないですね。（汎用的でない。）
   `backend/src/quicklook/coordinator/create_quicklook`に移動させてください。
   名前ももう少し具体的にしましょう。
 
-* [x] キャッシュ一覧からquicklookを閲覧可能にする
+* [ ] キャッシュ一覧からquicklookを閲覧可能にする
 
   `frontend/app/src/pages/admin/CacheEntries/index.tsx`でキャッシュデータの一覧が見える。
   visit nameをクリックするとそのデータが見えるようにする。(`src/router.tsx`参照。`/visits/:visitId`に飛ばす。)
 
-* [x] ジョブ一覧ページからもquicklookを閲覧可能にする
+* [ ] ジョブ一覧ページからもquicklookを閲覧可能にする
 
   上記依頼と同様`frontend/app/src/components/JobStatusVisualizer/JobStatusVisualizer.tsx`からquicklook閲覧ページをリンクする。
 
-* [x] システムステータスの改善
+* [ ] システムステータスの改善
 
   * 表示
 
@@ -45,20 +45,20 @@
     クライアントサイドがwebsocketと通信するには`frontend/app/src/store/api/base.ts`に新しくエンドポイントを追加してください。既存のコードがwebsocketの使いかたの参考になります。
     バックエンド側にwebsocketでない通常のAPIは残しておいてください。（これを残しておくとOpenAPIの型情報がクライアントで利用できる。）
 
-* [x] アクセス記録の作成
+* [ ] アクセス記録の作成
 
   現在`backend/src/quicklook/coordinator/housekeeping/__init__.py`で古いキャッシュを削除している。
   １週間以内の`accesses`テーブルのエントリー数が少ないものから順に消しています。
   しかし、現在アクセス時に`accesses`テーブルのレコードを作る処理がありません。
   `backend/src/quicklook/frontend/api/quicklooks.py`の`vote`された時に`accesses`テーブルにレコードを作成する処理を追加するようにしてください。
 
-* [x] フロントエンドのジョブ表示の問題
+* [ ] フロントエンドのジョブ表示の問題
 
   `src/pages/Home/Viewer/QuicklookJobMonitor.tsx`周辺についてです。
   `<LoadingSpinner/>`は表示領域の中央に表示してください。
   リストが表示された時、自分の今見ているvisitに対応するジョブを画面中央にスクロールさせてください。
 
-* [x] DBのyamlファイルの見直し
+* [ ] DBのyamlファイルの見直し
 
   `k8s/helmchart/templates/db.yaml`が作るdeploymentがrestartできません。
   （ずっと古いpodが残り続けます。）
