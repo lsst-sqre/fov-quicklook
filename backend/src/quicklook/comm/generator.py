@@ -28,12 +28,23 @@ logger = quicklook.mylogging.getLogger(__name__)
 
 router = APIRouter()
 
+_shutdown_requested = False
+
 
 @router.get("/comm/healthz")
 async def generator_heartbeat(fail_for_test: bool = False):
     if config.environment == 'test' and fail_for_test:
         raise HTTPException(status_code=500, detail="Simulated failure for test")
     return {"status": "alive"}
+
+
+@router.post("/comm/shutdown")
+async def shutdown_generator():
+    global _shutdown_requested
+    _shutdown_requested = True
+    logger.info(f"Shutdown requested for generator {self_generator_id()}")
+    asyncio.create_task(_immediate_shutdown())
+    return {"status": "shutting_down"}
 
 
 _generator_id: GeneratorId | None = None
@@ -113,6 +124,9 @@ async def _register_to_coordinator():
 
 async def _registration_loop():
     while True:
+        if _shutdown_requested:
+            logger.info("Registration loop stopped due to shutdown request")
+            break
         await asyncio.sleep(config.comm_registration_interval)
         try:
             await _register_to_coordinator()
@@ -122,11 +136,18 @@ async def _registration_loop():
             await _shutdown()
 
 
+async def _immediate_shutdown():
+    logger.info(f'Immediately shutting down generator {self_generator_id()}')
+    await asyncio.sleep(0.1)
+    os.kill(os.getpid(), signal.SIGINT)
+    await asyncio.sleep(1)
+    os.kill(os.getpid(), signal.SIGKILL)
+
+
 async def _shutdown():  # pragma: no cover
     logger.error(f'Shutting down generator {self_generator_id()}')
-    await asyncio.sleep(10)  # 繰り返しの再起動を防ぐために少し待つ
+    await asyncio.sleep(10)
     os.kill(os.getpid(), signal.SIGINT)
-    # さらに待って強制終了
     await asyncio.sleep(10)
     os.kill(os.getpid(), signal.SIGKILL)
 

@@ -104,6 +104,21 @@ def remove_generator(generator_info: GeneratorInfo) -> None:
         logger.info(f"Generator removed: {generator_info.id}")
 
 
+async def kill_generator(generator_info: GeneratorInfo) -> None:
+    timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
+    url = f"{generator_info.url}/comm/shutdown"
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, timeout=timeout) as response:
+                response.raise_for_status()
+                logger.info(f"Shutdown request sent to generator {generator_info.id}")
+    except Exception as e:
+        logger.warning(f"Failed to send shutdown request to {generator_info.id}: {e}")
+    
+    remove_generator(generator_info)
+
+
 async def _heartbeat_checker_loop():
     while True:
         await asyncio.sleep(config.comm_heartbeat_interval)
