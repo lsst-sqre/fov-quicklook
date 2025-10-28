@@ -17,8 +17,6 @@
 2. **MergeSingleFitsTiles**: ジェネレータ間のタイルマージ
 3. **TransferPackedTiles**: 4×4 タイルをパック → S3 にアップロード
 
-**重要な設計パターン**:
-- **Adaptive Dispatch** (`src/quicklook/utils/adaptive_map/`): Pod 性能のばらつきに対応するための適応的な作業分配。アルゴリズムは `README.ja.md` を参照してください。
 - **RPC 通信** (`src/quicklook/comm/`): Coordinator→Generator は HTTP ストリーミング上で pickle 化した関数呼び出しで行われます
   - ジェネレータは定期的なハートビートで Coordinator に登録します
   - Coordinator はジェネレータの可用性とキャパシティを追跡します
@@ -99,7 +97,6 @@ make pyright/watch  # Watch mode
 
 ## よくある落とし穴
 
-- ジェネレータ性能が均一でないことを前提としてください → `adaptive_map` を使ってください
 - RPC 関数は coordinator と generator の両方から import 可能でなければなりません
 - ジェネレータは再起動することがある（k8s OOM）→ 状態はデータベースに保存し、ジェネレータのメモリに頼らないでください
 - テストでは `config.data_source=dummy` を使って Butler 依存を避けてください
