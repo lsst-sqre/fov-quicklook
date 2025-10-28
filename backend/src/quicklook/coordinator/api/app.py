@@ -78,6 +78,35 @@ async def route_quicklook_status():
     return _job_status_list(jobs)
 
 
+@app.post('/quicklooks/{visit_name}/vote')
+async def route_vote_quicklook(visit_name: str):
+    visit = VisitName(visit_name)
+    jobs = running_pipeline.jobs()
+    if visit not in jobs:
+        raise HTTPException(status_code=404, detail=f"Visit {visit} not found")
+    
+    job = jobs[visit]
+    priority = job.priority
+    priority.user_count += 1
+    logger.info(f"Vote for {visit}: user_count={priority.user_count}")
+    return {"user_count": priority.user_count}
+
+
+@app.post('/quicklooks/{visit_name}/unvote')
+async def route_unvote_quicklook(visit_name: str):
+    visit = VisitName(visit_name)
+    jobs = running_pipeline.jobs()
+    if visit not in jobs:
+        raise HTTPException(status_code=404, detail=f"Visit {visit} not found")
+    
+    job = jobs[visit]
+    priority = job.priority
+    if priority.user_count > 0:
+        priority.user_count -= 1
+        logger.info(f"Unvote for {visit}: user_count={priority.user_count}")
+    return {"user_count": priority.user_count}
+
+
 @app.websocket('/quicklooks/*/shared_status.ws')
 async def ws_route_quicklook_shared_status(ws: WebSocket):
     async with safe_websocket(ws):

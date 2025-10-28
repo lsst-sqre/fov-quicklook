@@ -55,6 +55,22 @@ async def create_quicklook(params: CreateQuicklookRequest):
     )
 
 
+@router.post('/api/quicklooks/{visit_name}/vote')
+async def vote_quicklook(visit_name: Annotated[VisitName, Depends(dep_visit_name)]):
+    return await http_request(
+        'post',
+        f'{config.coordinator_base_url}/quicklooks/{visit_name}/vote',
+    )
+
+
+@router.post('/api/quicklooks/{visit_name}/unvote')
+async def unvote_quicklook(visit_name: Annotated[VisitName, Depends(dep_visit_name)]):
+    return await http_request(
+        'post',
+        f'{config.coordinator_base_url}/quicklooks/{visit_name}/unvote',
+    )
+
+
 @router.get('/api/quicklooks/*/status', response_model=JobStatusList)
 async def get_all_quicklook_jobs():
     async for jobs in _job_status_dict.subscribe():
