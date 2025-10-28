@@ -16,6 +16,7 @@ class JobStatus:
     generate_single_fits_tiles: dict[CcdName, Progress] = field(default_factory=dict)
     merge_tiles: dict[GeneratorId, Progress] = field(default_factory=dict)
     transfer_tiles: dict[GeneratorId, Progress] = field(default_factory=dict)
+    error_message: str | None = None
 
     @classmethod
     def from_job(cls, job: Job) -> 'JobStatus':

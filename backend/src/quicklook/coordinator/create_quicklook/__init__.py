@@ -44,8 +44,8 @@ def quicklook_pipeline():
             ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)
             result.ccd_metadata_list = ccd_metadata_list
             return result
-        except Exception:  # pragma: no cover
-            await _finalize_error(job)
+        except Exception as e:  # pragma: no cover
+            await _finalize_error(job, str(e))
             raise
 
     async def merge_tiles(result: _PipelineResult):
@@ -53,8 +53,8 @@ def quicklook_pipeline():
         try:
             await _merge_tiles(job)
             return result
-        except Exception:  # pragma: no cover
-            await _finalize_error(job)
+        except Exception as e:  # pragma: no cover
+            await _finalize_error(job, str(e))
             raise
 
     async def upload_to_object_storage(result: _PipelineResult):
@@ -66,8 +66,8 @@ def quicklook_pipeline():
             )
             result.uploaded_size = uploaded_size
             return result
-        except Exception:  # pragma: no cover
-            await _finalize_error(job)
+        except Exception as e:  # pragma: no cover
+            await _finalize_error(job, str(e))
             raise
 
     async def finalize_success(result: _PipelineResult):
@@ -208,10 +208,12 @@ async def _finalize_success(result: _PipelineResult):
     return job
 
 
-async def _finalize_error(job: Job):
+async def _finalize_error(job: Job, error_message: str | None = None):
     """エラー時の処理：DBレコードとobject storageを削除"""
     async with job.watcher.watch_status():
         job.status.stage = 'error'
+        if error_message:
+            job.status.error_message = error_message
 
     # エラー時はobject storageのデータを削除
     logger.info(f"Deleting object storage data for {job.visit} due to error")
