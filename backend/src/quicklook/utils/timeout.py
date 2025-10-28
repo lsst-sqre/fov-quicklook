@@ -1,6 +1,7 @@
 import asyncio
 import functools
-from typing import Callable, TypeVar, ParamSpec
+from typing import Callable, TypeVar, ParamSpec, Awaitable, Coroutine
+from collections.abc import Awaitable as AwaitableABC
 
 import quicklook.mylogging
 from quicklook.comm.coordinator import shutdown_all_generators
@@ -16,7 +17,7 @@ class StageTimeoutError(Exception):
     pass
 
 
-def with_timeout(func: Callable[P, T]) -> Callable[P, T]:
+def with_timeout(func: Callable[P, Coroutine[None, None, T]]) -> Callable[P, Coroutine[None, None, T]]:
     @functools.wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         try:
@@ -33,4 +34,4 @@ def with_timeout(func: Callable[P, T]) -> Callable[P, T]:
                 "All generators have been restarted."
             )
     
-    return wrapper  # type: ignore
+    return wrapper
