@@ -1,3 +1,6 @@
+export declare const errorContainer: string;
+export declare const errorMessage: string;
 export declare const info: string;
+export declare const retryButton: string;
 export declare const rough: string;
 export declare const viewerBlock: string;
