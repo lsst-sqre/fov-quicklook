@@ -5,8 +5,8 @@
   right: 0;
   left: 0;
   display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
+  justify-content: center;
+  align-items: center;
   background-color: rgba(31, 31, 31, 0.75);
   overflow-y: auto;
   overflow-x: hidden;
@@ -73,3 +73,24 @@
     background-color: #3d8b40;
   }
 }
+
+.visualizerWrapper {
+  position: relative;
+  width: fit-content;
+  max-width: 90%;
+}
+
+.visualizerOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  pointer-events: none;
+}
+

@@ -6,3 +6,5 @@ export declare const info: string;
 export declare const retryButton: string;
 export declare const rough: string;
 export declare const viewerBlock: string;
+export declare const visualizerOverlay: string;
+export declare const visualizerWrapper: string;

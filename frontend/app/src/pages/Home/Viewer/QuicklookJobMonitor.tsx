@@ -46,16 +46,27 @@ export function QuicklookJobMonitor() {
           <LoadingSpinner />
         </div>
       ) : isError ? (
-        <div className={styles.errorContainer}>
-          <div className={styles.errorMessage}>
-            Error loading quicklook
+        <div className={styles.centerContent}>
+          <div className={styles.errorContainer}>
+            <div className={styles.errorMessage}>
+              Error loading quicklook
+            </div>
+            <button className={styles.retryButton} onClick={handleRetry}>
+              Retry Request
+            </button>
           </div>
-          <button className={styles.retryButton} onClick={handleRetry}>
-            Retry Request
-          </button>
         </div>
       ) : metadata?.type === 'progress' ? (
-        <GenerateSingleFitsTilesVisualizer tiles={metadata.progress} height="10vh" gap={true} />
+        <div className={styles.centerContent}>
+          <div className={styles.visualizerWrapper}>
+            {Object.keys(metadata.progress).length === 0 && (
+              <div className={styles.visualizerOverlay}>
+                <LoadingSpinner />
+              </div>
+            )}
+            <GenerateSingleFitsTilesVisualizer tiles={metadata.progress} height="10vh" gap={true} />
+          </div>
+        </div>
       ) : (
         <div ref={jobListRef} className={styles.fullWidth}>
           <JobList highlightKey={currentQuicklook.id} />
