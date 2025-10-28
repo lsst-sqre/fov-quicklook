@@ -119,6 +119,14 @@ async def kill_generator(generator_info: GeneratorInfo) -> None:
     remove_generator(generator_info)
 
 
+async def shutdown_all_generators() -> None:
+    """すべてのgeneratorに停止リクエストを送信する"""
+    logger.warning("Shutting down all generators")
+    generators = list(_available_generators.values())
+    tasks = [kill_generator(g) for g in generators]
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+
 async def _heartbeat_checker_loop():
     while True:
         await asyncio.sleep(config.comm_heartbeat_interval)

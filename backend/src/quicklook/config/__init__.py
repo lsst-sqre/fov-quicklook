@@ -99,6 +99,9 @@ class Config(BaseSettings):
     # Housekeeping settings
     max_object_storage_usage: int = 1024 * 1024 * 1024 * 45  # 45GB in bytes
 
+    # Pipeline stage timeout settings (in seconds)
+    pipeline_stage_timeout: int = 60
+
 
 config = Config(
     _env_file=os.environ.get('ENV_FILE'),  # type: ignore

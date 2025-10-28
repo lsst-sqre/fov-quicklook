@@ -15,6 +15,7 @@ from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
+from quicklook.utils.timeout import with_timeout
 
 from .generate_single_fits_tiles_coordinator import generate_single_fits_tiles_coordinator
 
@@ -34,6 +35,7 @@ def quicklook_pipeline():
     async def arg_adapter(job: Job):
         return _PipelineResult(job=job)
 
+    @with_timeout
     async def generate_single_fits_tiles(result: _PipelineResult):
         job = result.job
         visit = job.visit
@@ -48,6 +50,7 @@ def quicklook_pipeline():
             await _finalize_error(job, str(e))
             raise
 
+    @with_timeout
     async def merge_tiles(result: _PipelineResult):
         job = result.job
         try:
@@ -57,6 +60,7 @@ def quicklook_pipeline():
             await _finalize_error(job, str(e))
             raise
 
+    @with_timeout
     async def upload_to_object_storage(result: _PipelineResult):
         job = result.job
         try:
