@@ -1,4 +1,5 @@
 import classNames from 'classnames'
+import { Link } from 'react-router-dom'
 import { Progress } from '../Progress'
 import { JobStatus, Progress as ProgressType } from '../../store/api/openapi'
 import styles from './styles.module.scss'
@@ -6,7 +7,9 @@ import styles from './styles.module.scss'
 export function JobStatusVisualizer({ status, isHighlighted = false }: { status: JobStatus; isHighlighted?: boolean }) {
   return (
     <div className={classNames(styles.jobStatus, isHighlighted && styles.highlighted)}>
-      <h2>Job: {status.job.visit}</h2>
+      <h2>
+        Job: <Link to={`/visits/${encodeURIComponent(status.job.visit)}`}>{status.job.visit}</Link>
+      </h2>
       <div className={styles.container}>
         {status.generate_single_fits_tiles && (
           <div className={styles.section}>
