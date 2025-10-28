@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { useRouteGetStatusQuery, ContainerStatus } from '../../../../store/api/openapi'
+import { ContainerStatus } from '../../../../store/api/openapi'
+import { useGetSystemStatus_WS_Query } from '../../../../store/api/base'
 import { Progress } from '../../../../components/Progress'
 import styles from './styles.module.scss'
 
 export function CompactStatus() {
-  const { data: status } = useRouteGetStatusQuery(undefined, { 
-    refetchOnMountOrArgChange: true, 
-    pollingInterval: 1000 
-  })
+  const { data: status } = useGetSystemStatus_WS_Query()
 
   if (!status) {
     return null

@@ -1,16 +1,20 @@
 import { useRouteGetStatusQuery, ContainerStatus } from "../../../store/api/openapi"
+import { useGetSystemStatus_WS_Query } from "../../../store/api/base"
 import { Progress } from "../../../components/Progress"
 import styles from './styles.module.scss'
 import { useEffect, useRef, useState } from "react"
 
 export function Status() {
-  const { data: status, isLoading, error } = useRouteGetStatusQuery(undefined, { refetchOnMountOrArgChange: true, pollingInterval: 1000 })
+  const { data: status, isLoading, error } = useRouteGetStatusQuery(undefined, { refetchOnMountOrArgChange: true })
+  const { data: wsStatus } = useGetSystemStatus_WS_Query()
+
+  const displayStatus = wsStatus || status
 
   if (isLoading) {
     return <div className={styles.statusPage}>Loading...</div>
   }
 
-  if (error || !status) {
+  if (error || !displayStatus) {
     return <div className={styles.statusPage}>Failed to load status</div>
   }
 
@@ -21,21 +25,21 @@ export function Status() {
       <section className={styles.section}>
         <h2>Frontend</h2>
         <div className={styles.statusCard}>
-          <ContainerStatusCard container={status.frontend} />
+          <ContainerStatusCard container={displayStatus.frontend} />
         </div>
       </section>
 
       <section className={styles.section}>
         <h2>Coordinator</h2>
         <div className={styles.statusCard}>
-          <ContainerStatusCard container={status.coordinator} />
+          <ContainerStatusCard container={displayStatus.coordinator} />
         </div>
       </section>
 
       <section className={styles.section}>
         <h2>Generators</h2>
         <div className={styles.generatorsList}>
-          {Object.entries(status.generators).map(([name, container]) => (
+          {Object.entries(displayStatus.generators).map(([name, container]) => (
             <div key={name} className={styles.generatorCard}>
               <h3>{name}</h3>
               <ContainerStatusCard container={container} />

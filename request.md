@@ -64,3 +64,10 @@
   （ずっと古いpodが残り続けます。）
   可能なら修正してください。
   （これは別のリポジトリにあります。cdするときはこのタスクが終わった時のcurrent directoryには注意してください。）
+
+* [ ] キャッシュエントリーにキャッシュの使用量を表示する。
+
+  `frontend/app/src/pages/admin/CacheEntries/index.tsx`にキャッシュの一覧が表示されているが、
+  これにキャッシュの使用量のlimitの何%が使われているか表示するようにしてください。
+  上限値は`backend/src/quicklook/config/__init__.py`の`max_object_storage_usage`です。
+  この値を`backend/src/quicklook/frontend/api/systeminfo.py`経由でクライアントに渡すと良いでしょう。

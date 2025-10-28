@@ -1,12 +1,15 @@
 """Status endpoint for frontend."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 import re
+import asyncio
+import json
 
 from quicklook.config import config
 from quicklook.utils.system_status import ContainerStatus, get_container_status
 from quicklook.utils.http_request import http_request
+from quicklook.utils.ttlcache import ttlcache
 
 router = APIRouter()
 
@@ -19,9 +22,9 @@ class SystemStatus(BaseModel):
     generators: dict[str, ContainerStatus]
 
 
-@router.get("/api/status", response_model=SystemStatus)
-async def route_get_status() -> SystemStatus:
-    """Get system status including frontend, coordinator, and generators."""
+@ttlcache(ttl=1.0)
+async def get_cached_status() -> SystemStatus:
+    """Get system status with 1-second cache."""
     frontend_status = get_container_status()
 
     try:
@@ -35,7 +38,6 @@ async def route_get_status() -> SystemStatus:
             for gen_id, gen_data in coordinator_data["generators"].items()
         }
     except Exception:
-        # Return default status with zeros on error
         coordinator_status = ContainerStatus(
             container_name="coordinator",
             memory_max=0,
@@ -52,3 +54,24 @@ async def route_get_status() -> SystemStatus:
         coordinator=coordinator_status,
         generators=generators_status,
     )
+
+
+@router.get("/api/status", response_model=SystemStatus)
+async def route_get_status() -> SystemStatus:
+    """Get system status including frontend, coordinator, and generators."""
+    return await get_cached_status()
+
+
+@router.websocket("/api/status/ws")
+async def status_websocket(websocket: WebSocket) -> None:
+    """WebSocket endpoint for real-time system status updates."""
+    await websocket.accept()
+    try:
+        while True:
+            status = await get_cached_status()
+            await websocket.send_text(status.model_dump_json())
+            await asyncio.sleep(1.0)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        await websocket.close()
