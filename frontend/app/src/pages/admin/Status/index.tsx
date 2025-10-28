@@ -73,7 +73,6 @@ function ContainerStatusCard({ container }: ContainerStatusCardProps) {
     return anon + shmem + kernel + slab
   }
 
-  // --- CPU Usage計算 ---
   const prevRef = useRef<{cpu: number, uptime: number} | null>(null)
   const [cpuPercent, setCpuPercent] = useState<number | null>(null)
 
@@ -84,13 +83,12 @@ function ContainerStatusCard({ container }: ContainerStatusCardProps) {
       const deltaTime = container.uptime - prev.uptime
       let percent: number | null = null
       if (deltaTime > 0) {
-        const logicalCpus = typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 1
-        percent = (deltaCpu / (deltaTime * 1_000_000)) / logicalCpus * 100
+        percent = (deltaCpu / (deltaTime * 1_000_000)) * 100
       }
       setCpuPercent(percent)
     }
     prevRef.current = { cpu: container.cpu_current, uptime: container.uptime }
-  }, [container.cpu_current, container.uptime, container.cpu_max])
+  }, [container.cpu_current, container.uptime])
 
   return (
     <table className={styles.statusTable}>
