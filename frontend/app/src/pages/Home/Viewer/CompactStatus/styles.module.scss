@@ -1,16 +1,14 @@
 .compactStatus {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
+  bottom: 0;
+  left: 0;
   background: rgba(0, 0, 0, 0.8);
-  border-radius: 4px;
-  padding: 8px;
+  border-radius: 0 12px 0 0;
+  padding: 12px;
   color: white;
   font-size: 12px;
-  // max-height: 400px;
   overflow-y: auto;
-  z-index: 1000;
-  min-width: 200px;
+  z-index: 1;
 }
 
 .containerList {

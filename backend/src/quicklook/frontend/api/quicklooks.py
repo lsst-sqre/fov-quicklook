@@ -272,7 +272,8 @@ async def _status_relay_main_loop():
                             jobs = _job_status_dict.last_value()
                             if jobs:
                                 _job_shared_large_status_dict = {
-                                    visit: _job_shared_large_status_dict[visit] for visit in jobs
+                                    visit: _job_shared_large_status_dict[visit]
+                                    for visit in jobs
                                     if visit in _job_shared_large_status_dict
                                 }
 
