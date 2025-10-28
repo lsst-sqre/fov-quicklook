@@ -1,7 +1,6 @@
 import asyncio
 import functools
-from typing import Callable, TypeVar, ParamSpec, Awaitable, Coroutine
-from collections.abc import Awaitable as AwaitableABC
+from typing import Callable, TypeVar, ParamSpec, Coroutine
 
 import quicklook.mylogging
 from quicklook.comm.coordinator import shutdown_all_generators

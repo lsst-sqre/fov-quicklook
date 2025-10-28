@@ -15,7 +15,7 @@ from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
-from quicklook.utils.timeout import with_timeout
+from .pipeline_timeout import with_timeout
 
 from .generate_single_fits_tiles_coordinator import generate_single_fits_tiles_coordinator
 
