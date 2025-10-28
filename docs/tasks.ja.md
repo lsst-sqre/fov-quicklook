@@ -30,11 +30,9 @@
 * [x] バグ修正
   * [x] post isrがうまく処理できない
 * [ ] ジョブがいつまでも終わらないことがある
-  * [ ] タイムアウトを設ける
 * [ ] queueページ
   * 表示の改良
 * [ ] ページを離れた時にwaiting_userを減らす
-* [ ] dynamic priority
 * [ ] liveness/readiness probe
 * [x] raw以外のtype対応
   ```lsst.daf.butler._exceptions.MissingCollectionError: No collection with name 'LSSTCam/runs/nightlyValidation' found.```

@@ -7,38 +7,41 @@
 
 以下を順に実施してください。
 
-* [x] CPU使用率の実装の見直し
+* [ ] k8sのliveness, readiness probeの設定
 
-  `frontend/app/src/pages/admin/Status/index.tsx`でCPU使用率を表示していますが、値がマイナスになったりどうもおかしいです。
-  この値の元になっているバックエンドのコードは`backend/src/quicklook/generator/api/app.py`の`route_get_status`の周辺です。
-  バックエンド、フロントエンド両方のコードを見直し、問題を特定・修正してください。
-  欲しい値は現在のCPU使用率です。例えば2CPUをフルに使っていれば200%と表示して欲しいです。
+  `./k8s/helmchart/templates`の`db.yaml`, `coordinator.yaml`, `frontend.yaml`, `generator.yaml`にliveness, readiness probeの設定を追加する。最後の3者はこのアプリけーションで実装した各コンポーネントである。
+  frontendは`{{Values.config.pathPrefix}}/api/healthz`、coordinatorは`/comm/healthz`、`/comm/healthz`が利用可能。
 
-* [x] バックエンドでgeneratorの終了処理
+* [ ] vote, unvote周りのリファクタリング
 
-  generatorとcoordinatorは`backend/src/quicklook/comm`周辺のコードで連携している。
-  coordinatorから特定のgeneratorを終了させるためのの仕組みを整備して下さい。
-  `backend/src/quicklook/comm/coordinator.py`に`kill_generator(generator: GeneratorInfo)`のような関数を実装することになると思います。
-  これを実行すると、指定したgeneratorプロセスが終了し、`get_available_generators`の結果にも現れなくなります。
-  実現にはgeneratorに終了エンドポイントを作る必要があります。
-  `backend/src/quicklook/comm/generator.py`の既存の`_shutdown`関数が使えるかもしれませんが、今回は待ち時間なしにすぐに終了してください。
-  generatorは終了処理が始まったら、heatbeatは停止する必要があります。
+  `backend/src/quicklook/coordinator/api/app.py`でrouteのパスに`{visit_name}`を使っている箇所は`Depends`を使ってください。
+  `backend/src/quicklook/frontend/api/deps.py`が参考になります。
+  coordinatorでは対応するjobがない場合は404を返すのではなく、特に何もせず終了するので良いです。
 
-* [x] 処理速度の遅いgeneratorを終了させる
+* [ ] `QuicklookMetadataProvider`のリファクタリング
 
-  `backend/src/quicklook/coordinator/create_quicklook/generate_single_fits_tiles_coordinator.py`の`generate_single_fits_tiles_coordinator`では複数のgeneratorに処理をdispatchしています。
-  各タスクで処理にかかった時間を計測し、generatorごとの処理時間の中央値が全体の中央値の2倍以上かかったgeneratorがあれば、`kill_generator`を呼び出して終了させてください。
+  `frontend/app/src/pages/Home/context/quicklook.tsx`周辺のコードです。
+  `QuicklookMetadataProvider`が長くなって見通しが悪いです。
+  vote, unvoteに関する処理を1つのフックに切り出してそれを呼び出すようにしてください。
 
-* [x] バックエンドの`JobPriority`の`user_count`の増減を実装するAPIの追加
+  引数の値が変わった時に登録されたコールバック関数を呼び出すフックを作りそれを使うようにしてください。
+  次のようなシグネチャになると思います。
+  ```typescript
+  useWatch<T>(watchedValue: T, callback: (before: T, after: T) => void)
+  ```
 
-  主な実装は`backend/src/quicklook/coordinator/api/app.py`に行い、
-  ユーザーからのリクエストは`backend/src/quicklook/frontend/api/app.py`に実装されたエンドポイントを通じて受け付け、それを`backend/src/quicklook/coordinator/api/app.py`のappに転送してください。
-  coordinatorのエンドポイントは`/quicklooks/{visit_name}/vote`, `/quicklooks/{visit_name}/unvote`のような感じになるかと思います。（適宜調整をお願いします）
+* [ ] `JobStatus`のエラー情報の追加
 
-* [x] 上記依頼のフロントエンド側の対応
+  `backend/src/quicklook/coordinator/create_quicklook/__init__.py`では`job.status.stage = 'error'`のように`JobStatus`にエラー状態にすることがある。`JobStatus`にエラー情報を保持するフィールドを追加しエラーが起きた時はエラー内容を保持させてください。
 
-  上記対応により、jobの対する`vote`, `unvote`ができるようになります。
-  フロントエンドで適切なタイミングこれらのAPIを呼ぶようにしてください。
-  `frontend/app/src/pages/Home/context/index.tsx`の`HomeContextProvider`の`currentQuicklook.id`が現在表示している`VisitName`に相当します。この値を監視し変更されるたびにvote, unvoteをして下さい。（変更前の値に対しunvote、変更後の値に対しvote）
-  またページを閉じる時も現在表示中の`VisitName`に対してunvoteをしてください。これには`sendBeacon`を使うのが良いでしょう。
-  実装の前に`npm run api:rtk-query`を実行して、API呼び出しのためのコードを生成してください。
+* [ ] ジョブのタイムアウト制限
+
+  何らかの原因でquicklookの作成がいつまで経っても終わらないことがある（かもしれない）。
+  `backend/src/quicklook/coordinator/create_quicklook/__init__.py`の`quicklook_pipeline`の各ステージに60秒（設定可能）のタイムアウトを設ける。新しくその目的のdecoratorをつくり各ステージの処理関数にそのデコレーターを作用させると良いだろう。
+  タイムアウトを超えたら全てのgeneratorを再起動させる。`backend/src/quicklook/comm/coordinator.py`を参考。`shutdown_all_generators()`のような関数を作ると良いだろう。
+
+* [ ] `frontend/app/src/pages/Home/Viewer/QuicklookJobMonitor.tsx`のリファクタリング
+
+  * このコンポーネントで表示されるジョブのリストの上部が隠れて表示されていないようです。修正してください。
+  * 現在表示しているvisitがまだリストにない時は`<LoadingSpinner/>`を表示してください。
+  * quicklookがエラーステータスになったらエラーメッセージを表示してください。エラーメッセージの後に再リクエストボタンも配してください。
