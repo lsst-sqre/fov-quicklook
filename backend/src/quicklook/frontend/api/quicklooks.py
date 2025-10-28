@@ -107,12 +107,18 @@ class QuicklookMetadataProgress:
 
 
 @dataclass
+class QuicklookMetadataPending:
+    visit_name: VisitName
+    type: Literal['pending'] = 'pending'
+
+
+@dataclass
 class QuicklookMetadataError:
     visit_name: VisitName
     type: Literal['error'] = 'error'
 
 
-type QuicklookMetadata = QuicklookMetadataReady | QuicklookMetadataProgress | QuicklookMetadataError
+type QuicklookMetadata = QuicklookMetadataReady | QuicklookMetadataProgress | QuicklookMetadataPending | QuicklookMetadataError
 type_adapter_QuicklookMetadata = TypeAdapter(QuicklookMetadata)
 
 
@@ -193,7 +199,7 @@ async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncG
         job_status = jobs.get(visit, job_status)
         match job_status:
             case None:
-                yield QuicklookMetadataProgress(visit_name=visit, progress={})
+                yield QuicklookMetadataPending(visit_name=visit)
             case JobStatus(stage='queued' | 'generate_single_fits_tiles'):
                 yield QuicklookMetadataProgress(
                     visit_name=visit,

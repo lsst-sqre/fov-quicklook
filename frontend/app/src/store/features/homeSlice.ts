@@ -19,6 +19,7 @@ type State = {
   dataSource: CcdDataType
   showFrame: boolean
   showCompactStatus: boolean
+  showMemoryUsageInCompactStatus: boolean
   hilightedCcdId: string[]
   listGroupingTimeToleranceDigits: number
 }
@@ -53,6 +54,7 @@ function initialState(): State {
     dataSource: 'raw',
     showFrame: true,
     showCompactStatus: true,
+    showMemoryUsageInCompactStatus: false,
     cameraParams: initialSearchParams.cameraParams ?? initialCameraParams,
     hilightedCcdId: initialHightlightCcds(),
     listGroupingTimeToleranceDigits: 2,
@@ -93,6 +95,9 @@ export const homeSlice = createSlice({
     },
     setShowCompactStatus: (state, action: PayloadAction<boolean>) => {
       state.showCompactStatus = action.payload
+    },
+    setShowMemoryUsageInCompactStatus: (state, action: PayloadAction<boolean>) => {
+      state.showMemoryUsageInCompactStatus = action.payload
     },
     toggleHighlightCcd: (state, action: PayloadAction<string>) => {
       const idx = state.hilightedCcdId.indexOf(action.payload)

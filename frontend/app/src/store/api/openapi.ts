@@ -396,6 +396,10 @@ export type QuicklookMetadataProgress = {
   };
   type?: "progress";
 };
+export type QuicklookMetadataPending = {
+  visit_name: string;
+  type?: "pending";
+};
 export type QuicklookMetadataError = {
   visit_name: string;
   type?: "error";
@@ -403,6 +407,7 @@ export type QuicklookMetadataError = {
 export type QuicklookMetadata =
   | QuicklookMetadataReady
   | QuicklookMetadataProgress
+  | QuicklookMetadataPending
   | QuicklookMetadataError;
 export type VisitEntry = {
   id: string;

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { CacheEntry, useDeleteCacheEntryMutation, useGetSystemInfoQuery, useListCacheEntriesQuery } from "../../../store/api/openapi"
+import { Progress } from '../../../components/Progress'
 import styles from './styles.module.scss'
 
 
@@ -22,7 +23,12 @@ export function CacheEntries() {
   return (
     <div className={styles.cacheEntries}>
       <div className={styles.summary}>
-        <p>Total Usage: {humanReadableSize(totalUsage)} / {humanReadableSize(maxUsage)} ({usagePercent}%)</p>
+        <div className={styles.summaryText}>
+          <p>Total Usage: {humanReadableSize(totalUsage)} / {humanReadableSize(maxUsage)} ({usagePercent}%)</p>
+        </div>
+        <div className={styles.progressContainer}>
+          <Progress count={totalUsage} total={maxUsage} width="100%" rounded={true} />
+        </div>
       </div>
       <table>
         <thead>
@@ -30,7 +36,6 @@ export function CacheEntries() {
             <th>Visit</th>
             <th>Ready</th>
             <th>Size</th>
-            <th>% of Limit</th>
             <th>Created At</th>
             <th>Delete</th>
           </tr>
@@ -38,11 +43,11 @@ export function CacheEntries() {
         <tbody>
           {isLoading && (
             <tr>
-              <td colSpan={6}>Loading...</td>
+              <td colSpan={5}>Loading...</td>
             </tr>
           )}
           {entries?.slice().sort((a, b) => -a.created_at.localeCompare(b.created_at)).map(entry => (
-            <CacheEntryRow key={entry.visit_name} entry={entry} onDelete={refetch} maxUsage={maxUsage} />
+            <CacheEntryRow key={entry.visit_name} entry={entry} onDelete={refetch} />
           ))}
         </tbody>
       </table>
@@ -53,18 +58,15 @@ export function CacheEntries() {
 interface CacheEntryRowProps {
   entry: CacheEntry
   onDelete: () => void
-  maxUsage: number
 }
 
-function CacheEntryRow({ entry, onDelete, maxUsage }: CacheEntryRowProps) {
+function CacheEntryRow({ entry, onDelete }: CacheEntryRowProps) {
   const [deleteEntry, { isLoading: isDeleting }] = useDeleteCacheEntryMutation()
 
   const handleDelete = async () => {
     await deleteEntry({ visitName: entry.visit_name })
     onDelete()
   }
-
-  const usagePercent = maxUsage > 0 ? (entry.disk_usage / maxUsage * 100).toFixed(2) : '0.00'
 
   return (
     <tr>
@@ -75,7 +77,6 @@ function CacheEntryRow({ entry, onDelete, maxUsage }: CacheEntryRowProps) {
       </td>
       <td>{entry.ready ? 'Yes' : 'No'}</td>
       <td>{humanReadableSize(entry.disk_usage)}</td>
-      <td>{usagePercent}%</td>
       <td>{entry.created_at}</td>
       <td>
         <button

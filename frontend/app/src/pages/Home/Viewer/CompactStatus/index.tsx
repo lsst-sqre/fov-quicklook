@@ -39,10 +39,21 @@ interface CompactContainerStatusProps {
 }
 
 function CompactContainerStatus({ name, container }: CompactContainerStatusProps) {
+  const [memTooltip, setMemTooltip] = useState<string | null>(null)
+  const [cpuTooltip, setCpuTooltip] = useState<string | null>(null)
+
   const calculateUnrecoverableMemory = (): number => {
     if (!container.memory_stats) return 0
     const { anon, shmem, kernel, slab } = container.memory_stats
     return anon + shmem + kernel + slab
+  }
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
   }
 
   const prevRef = useRef<{ cpu: number; uptime: number } | null>(null)
@@ -63,8 +74,14 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
     prevRef.current = { cpu: container.cpu_current, uptime: container.uptime }
   }, [container.cpu_current, container.uptime, container.cpu_max])
 
+  const showMemoryUsageInCompactStatus = useAppSelector(state => state.home.showMemoryUsageInCompactStatus)
   const unrecoverableMemory = calculateUnrecoverableMemory()
-  const memoryRatio = unrecoverableMemory / container.memory_max
+  const memoryRatio = showMemoryUsageInCompactStatus 
+    ? container.memory_current / container.memory_max 
+    : unrecoverableMemory / container.memory_max
+  const displayMemory = showMemoryUsageInCompactStatus 
+    ? container.memory_current 
+    : unrecoverableMemory
 
   return (
     <div className={styles.containerItem}>
@@ -72,22 +89,38 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
       <div className={styles.metrics}>
         <div className={styles.metricRow}>
           <span className={styles.metricLabel}>Mem:</span>
-          <Progress 
-            count={unrecoverableMemory} 
-            total={container.memory_max} 
-            width="100px" 
-            rounded={true} 
-          />
+          <div 
+            className={styles.progressWrapper}
+            onMouseEnter={() => setMemTooltip(formatBytes(displayMemory))}
+            onMouseLeave={() => setMemTooltip(null)}
+            title={formatBytes(displayMemory)}
+          >
+            <Progress 
+              count={displayMemory} 
+              total={container.memory_max} 
+              width="100px" 
+              rounded={true} 
+            />
+            {memTooltip && <div className={styles.tooltip}>{memTooltip}</div>}
+          </div>
           <span className={styles.metricValue}>{(memoryRatio * 100).toFixed(0)}%</span>
         </div>
         <div className={styles.metricRow}>
           <span className={styles.metricLabel}>CPU:</span>
-          <Progress 
-            count={cpuPercent ?? 0} 
-            total={100} 
-            width="100px" 
-            rounded={true} 
-          />
+          <div 
+            className={styles.progressWrapper}
+            onMouseEnter={() => setCpuTooltip(cpuPercent !== null ? `${cpuPercent.toFixed(1)}%` : '---')}
+            onMouseLeave={() => setCpuTooltip(null)}
+            title={cpuPercent !== null ? `${cpuPercent.toFixed(1)}%` : '---'}
+          >
+            <Progress 
+              count={cpuPercent ?? 0} 
+              total={100} 
+              width="100px" 
+              rounded={true} 
+            />
+            {cpuTooltip && <div className={styles.tooltip}>{cpuTooltip}</div>}
+          </div>
           <span className={styles.metricValue}>
             {cpuPercent !== null ? `${cpuPercent.toFixed(0)}%` : '---'}
           </span>

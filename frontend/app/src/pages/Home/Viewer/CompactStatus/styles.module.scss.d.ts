@@ -6,3 +6,5 @@ export declare const metricLabel: string;
 export declare const metricRow: string;
 export declare const metrics: string;
 export declare const metricValue: string;
+export declare const progressWrapper: string;
+export declare const tooltip: string;

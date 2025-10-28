@@ -1323,6 +1323,9 @@
                         "$ref": "#/components/schemas/QuicklookMetadataProgress"
                     },
                     {
+                        "$ref": "#/components/schemas/QuicklookMetadataPending"
+                    },
+                    {
                         "$ref": "#/components/schemas/QuicklookMetadataError"
                     }
                 ]
@@ -1345,6 +1348,25 @@
                     "visit_name"
                 ],
                 "title": "QuicklookMetadataError"
+            },
+            "QuicklookMetadataPending": {
+                "properties": {
+                    "visit_name": {
+                        "type": "string",
+                        "title": "Visit Name"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "pending",
+                        "title": "Type",
+                        "default": "pending"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit_name"
+                ],
+                "title": "QuicklookMetadataPending"
             },
             "QuicklookMetadataProgress": {
                 "properties": {

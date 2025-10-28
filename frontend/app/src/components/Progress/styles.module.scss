@@ -1,6 +1,11 @@
 .background {
   background-color: #033;
   height: 8px;
+  overflow: hidden;
+
+  &.rounded {
+    border-radius: 4px;
+  }
 }
 
 .bar {

@@ -29,23 +29,16 @@ export function QuicklookJobMonitor() {
     return null
   }
 
-  const currentVisitStatus = currentQuicklook.id ? statusList?.[currentQuicklook.id] : undefined
-  const isInList = currentVisitStatus !== undefined
-  const isError = metadata?.type === 'error'
-
   const handleRetry = async () => {
     if (currentQuicklook.id) {
       await createQuicklook({ createQuicklookRequest: { visit: currentQuicklook.id } })
     }
   }
 
-  return (
-    <div className={styles.viewerBlock}>
-      {!isInList && !isError ? (
-        <div className={styles.centerContent}>
-          <LoadingSpinner />
-        </div>
-      ) : isError ? (
+  // Error state
+  if (metadata?.type === 'error') {
+    return (
+      <div className={styles.viewerBlock}>
         <div className={styles.centerContent}>
           <div className={styles.errorContainer}>
             <div className={styles.errorMessage}>
@@ -56,7 +49,14 @@ export function QuicklookJobMonitor() {
             </button>
           </div>
         </div>
-      ) : metadata?.type === 'progress' ? (
+      </div>
+    )
+  }
+
+  // Progress state
+  if (metadata?.type === 'progress') {
+    return (
+      <div className={styles.viewerBlock}>
         <div className={styles.centerContent}>
           <div className={styles.visualizerWrapper}>
             {Object.keys(metadata.progress).length === 0 && (
@@ -67,11 +67,27 @@ export function QuicklookJobMonitor() {
             <GenerateSingleFitsTilesVisualizer tiles={metadata.progress} height="10vh" gap={true} />
           </div>
         </div>
-      ) : (
+      </div>
+    )
+  }
+
+  // Pending state
+  if (metadata?.type === 'pending') {
+    return (
+      <div className={styles.viewerBlock}>
         <div ref={jobListRef} className={styles.fullWidth}>
           <JobList highlightKey={currentQuicklook.id} />
         </div>
-      )}
+      </div>
+    )
+  }
+
+  // Ready state (shouldn't happen since showMonitor is false for ready)
+  return (
+    <div className={styles.viewerBlock}>
+      <div className={styles.centerContent}>
+        <LoadingSpinner />
+      </div>
     </div>
   )
 }
