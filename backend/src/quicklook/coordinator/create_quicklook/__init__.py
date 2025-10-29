@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import cast
+from typing import cast, Callable, Coroutine, TypeVar
 
 from quicklook.coordinator.housekeeping import run_housekeeping
 import quicklook.mylogging
@@ -16,13 +16,15 @@ from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
-from .pipeline_timeout import with_timeout
 
 from .generate_single_fits_tiles_coordinator import generate_single_fits_tiles_coordinator
 
 logger = quicklook.mylogging.getLogger(__name__)
 
 ds = get_datasource()
+
+
+T = TypeVar('T')
 
 
 @dataclass
@@ -33,79 +35,58 @@ class _PipelineResult:
 
 
 def quicklook_pipeline():
+    def with_stage_timeout(
+        stage_name: str,
+    ) -> Callable[[Callable[[_PipelineResult], Coroutine[None, None, T]]], Callable[[_PipelineResult], Coroutine[None, None, T]]]:
+        """ステージにタイムアウトとエラーハンドリングを適用するデコレーター"""
+        def decorator(func: Callable[[_PipelineResult], Coroutine[None, None, T]]) -> Callable[[_PipelineResult], Coroutine[None, None, T]]:
+            async def wrapper(result: _PipelineResult) -> T:
+                try:
+                    return await asyncio.wait_for(func(result), timeout=config.pipeline_stage_timeout)
+                except asyncio.TimeoutError:
+                    error_msg = f"Stage {stage_name} timed out after {config.pipeline_stage_timeout} seconds"
+                    logger.error(error_msg)
+                    await _finalize_error(result.job, error_msg)
+                    from quicklook.comm.coordinator import shutdown_all_generators
+                    await shutdown_all_generators()
+                    raise
+                except Exception as e:
+                    await _finalize_error(result.job, str(e))
+                    raise
+            return wrapper
+        return decorator
     async def arg_adapter(job: Job):
         return _PipelineResult(job=job)
 
+    @with_stage_timeout('generate_single_fits_tiles')
     async def generate_single_fits_tiles(result: _PipelineResult):
         job = result.job
         visit = job.visit
         
-        async def _generate():
-            async with job.watcher.watch_status():
-                job.status.stage = 'generate_single_fits_tiles'
-            
-            await _create_quicklook_record(job)
-            ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
-            ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)
-            result.ccd_metadata_list = ccd_metadata_list
-            return result
+        async with job.watcher.watch_status():
+            job.status.stage = 'generate_single_fits_tiles'
         
-        try:
-            return await asyncio.wait_for(_generate(), timeout=config.pipeline_stage_timeout)
-        except asyncio.TimeoutError as e:
-            error_msg = f"Stage generate_single_fits_tiles timed out after {config.pipeline_stage_timeout} seconds"
-            logger.error(error_msg)
-            await _finalize_error(job, error_msg)
-            from quicklook.comm.coordinator import shutdown_all_generators
-            await shutdown_all_generators()
-            raise
-        except Exception as e:  # pragma: no cover
-            await _finalize_error(job, str(e))
-            raise
+        await _create_quicklook_record(job)
+        ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
+        ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)
+        result.ccd_metadata_list = ccd_metadata_list
+        return result
 
+    @with_stage_timeout('merge_tiles')
     async def merge_tiles(result: _PipelineResult):
         job = result.job
-        
-        async def _merge():
-            await _merge_tiles(job)
-            return result
-        
-        try:
-            return await asyncio.wait_for(_merge(), timeout=config.pipeline_stage_timeout)
-        except asyncio.TimeoutError as e:
-            error_msg = f"Stage merge_tiles timed out after {config.pipeline_stage_timeout} seconds"
-            logger.error(error_msg)
-            await _finalize_error(job, error_msg)
-            from quicklook.comm.coordinator import shutdown_all_generators
-            await shutdown_all_generators()
-            raise
-        except Exception as e:  # pragma: no cover
-            await _finalize_error(job, str(e))
-            raise
+        await _merge_tiles(job)
+        return result
 
+    @with_stage_timeout('upload_to_object_storage')
     async def upload_to_object_storage(result: _PipelineResult):
         job = result.job
-        
-        async def _upload():
-            uploaded_size = await _transfer_tiles(job)
-            uploaded_size += +await _transfer_fits_headers(job) + await _transfer_quicklook_metadata(
-                job, result.ccd_metadata_list
-            )
-            result.uploaded_size = uploaded_size
-            return result
-        
-        try:
-            return await asyncio.wait_for(_upload(), timeout=config.pipeline_stage_timeout)
-        except asyncio.TimeoutError as e:
-            error_msg = f"Stage upload_to_object_storage timed out after {config.pipeline_stage_timeout} seconds"
-            logger.error(error_msg)
-            await _finalize_error(job, error_msg)
-            from quicklook.comm.coordinator import shutdown_all_generators
-            await shutdown_all_generators()
-            raise
-        except Exception as e:  # pragma: no cover
-            await _finalize_error(job, str(e))
-            raise
+        uploaded_size = await _transfer_tiles(job)
+        uploaded_size += +await _transfer_fits_headers(job) + await _transfer_quicklook_metadata(
+            job, result.ccd_metadata_list
+        )
+        result.uploaded_size = uploaded_size
+        return result
 
     async def finalize_success(result: _PipelineResult):
         return await _finalize_success(result)
