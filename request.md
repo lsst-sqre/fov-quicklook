@@ -8,30 +8,30 @@
 
 以下を順に実施してください。
 
-* [ ] `pyright`の実行と修正
+* [x] `pyright`の実行と修正
 
   `cd backend && make pyright` してエラーがあれば修正してください。
 
-* [ ] `frontend/app/src/pages/Home/Viewer/CompactStatus/index.tsx`のリファクタリング
+* [x] `frontend/app/src/pages/Home/Viewer/CompactStatus/index.tsx`のリファクタリング
 
   現在のvisitに対応するハイライトを黄色ではなくテーマに沿った青緑系の色にしてください。
 
-* [ ] `frontend/app/src/pages/Home/Viewer/QuicklookJobMonitor.tsx`のリファクタリング
+* [x] `frontend/app/src/pages/Home/Viewer/QuicklookJobMonitor.tsx`のリファクタリング
 
   `generate_single_fits_tiles`ステージの時`<GenerateSingleFitsTilesVisualizer/>`が表示されるはずなのに`<JobList/>`が表示されてしまいます。
   バックエンドも確認して原因を特定してください。
 
-* [ ] エラー対応
+* [x] エラー対応
 
   coordinatorで`log-2.log`のエラーが起きています。
   対応をお願いします。
 
-* [ ] タイムアウトが効いていない？
+* [x] タイムアウトが効いていない？
 
   `backend/src/quicklook/coordinator/create_quicklook/__init__.py`のタイムアウト処理が失敗しているようです。
   見直してください。上記のエラーがが関係しているかもしれません。
 
-* [ ] エラーが起きて消えずに残っているエントリーがある。
+* [x] エラーが起きて消えずに残っているエントリーがある。
 
   `backend/src/quicklook/coordinator/create_quicklook/__init__.py`でエラーのエントリーは消えるはずなのですが残っています。
   見直してください。上記のエラーがが関係しているかもしれません。
