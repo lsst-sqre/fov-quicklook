@@ -225,14 +225,19 @@ async def _finalize_error(job: Job, error_message: str | None = None):
     logger.info(f"Deleting object storage data for {job.visit} due to error")
     await job.object_storage.delete_all()
 
-    # DBレコードも削除
+    # DBレコードも削除（カスケード削除でAccessも削除される）
     async with get_db_session() as session:
-        from sqlalchemy import delete
+        from sqlalchemy import select
 
-        stmt = delete(Quicklook).where(Quicklook.visit_name == str(job.visit))
-        await session.execute(stmt)
-        await session.commit()
-        logger.info(f"Deleted quicklook record for {job.visit} due to error")
+        stmt = select(Quicklook).where(Quicklook.visit_name == str(job.visit))
+        result = await session.execute(stmt)
+        quicklook = result.scalar_one_or_none()
+        if quicklook:
+            await session.delete(quicklook)
+            await session.commit()
+            logger.info(f"Deleted quicklook record for {job.visit} due to error")
+        else:
+            logger.warning(f"Quicklook record for {job.visit} not found during error cleanup")
 
     await rpc_scatter(_cleanup_rpc, job)
     await run_housekeeping()
