@@ -16,6 +16,8 @@ export function QuicklookJobMonitor() {
   const showMonitor = !currentQuicklook.ready
   const metadata = currentQuicklook.metadata
 
+  const statusListCount = statusList ? Object.keys(statusList).length : 0
+
   useEffect(() => {
     if (jobListRef.current && currentQuicklook.id && statusList) {
       const element = jobListRef.current.querySelector(`[data-visit="${currentQuicklook.id}"]`)
@@ -23,7 +25,7 @@ export function QuicklookJobMonitor() {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
     }
-  }, [currentQuicklook.id, statusList])
+  }, [currentQuicklook.id, statusListCount])
 
   if (!showMonitor) {
     return null
