@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import cast
@@ -35,11 +36,11 @@ def quicklook_pipeline():
     async def arg_adapter(job: Job):
         return _PipelineResult(job=job)
 
-    @with_timeout
     async def generate_single_fits_tiles(result: _PipelineResult):
         job = result.job
         visit = job.visit
-        try:
+        
+        async def _generate():
             async with job.watcher.watch_status():
                 job.status.stage = 'generate_single_fits_tiles'
             
@@ -48,30 +49,60 @@ def quicklook_pipeline():
             ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)
             result.ccd_metadata_list = ccd_metadata_list
             return result
+        
+        try:
+            return await asyncio.wait_for(_generate(), timeout=config.pipeline_stage_timeout)
+        except asyncio.TimeoutError as e:
+            error_msg = f"Stage generate_single_fits_tiles timed out after {config.pipeline_stage_timeout} seconds"
+            logger.error(error_msg)
+            await _finalize_error(job, error_msg)
+            from quicklook.comm.coordinator import shutdown_all_generators
+            await shutdown_all_generators()
+            raise
         except Exception as e:  # pragma: no cover
             await _finalize_error(job, str(e))
             raise
 
-    @with_timeout
     async def merge_tiles(result: _PipelineResult):
         job = result.job
-        try:
+        
+        async def _merge():
             await _merge_tiles(job)
             return result
+        
+        try:
+            return await asyncio.wait_for(_merge(), timeout=config.pipeline_stage_timeout)
+        except asyncio.TimeoutError as e:
+            error_msg = f"Stage merge_tiles timed out after {config.pipeline_stage_timeout} seconds"
+            logger.error(error_msg)
+            await _finalize_error(job, error_msg)
+            from quicklook.comm.coordinator import shutdown_all_generators
+            await shutdown_all_generators()
+            raise
         except Exception as e:  # pragma: no cover
             await _finalize_error(job, str(e))
             raise
 
-    @with_timeout
     async def upload_to_object_storage(result: _PipelineResult):
         job = result.job
-        try:
+        
+        async def _upload():
             uploaded_size = await _transfer_tiles(job)
             uploaded_size += +await _transfer_fits_headers(job) + await _transfer_quicklook_metadata(
                 job, result.ccd_metadata_list
             )
             result.uploaded_size = uploaded_size
             return result
+        
+        try:
+            return await asyncio.wait_for(_upload(), timeout=config.pipeline_stage_timeout)
+        except asyncio.TimeoutError as e:
+            error_msg = f"Stage upload_to_object_storage timed out after {config.pipeline_stage_timeout} seconds"
+            logger.error(error_msg)
+            await _finalize_error(job, error_msg)
+            from quicklook.comm.coordinator import shutdown_all_generators
+            await shutdown_all_generators()
+            raise
         except Exception as e:  # pragma: no cover
             await _finalize_error(job, str(e))
             raise
