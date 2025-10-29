@@ -40,7 +40,9 @@ def quicklook_pipeline():
         job = result.job
         visit = job.visit
         try:
-            # DBに初期レコードを作成
+            async with job.watcher.watch_status():
+                job.status.stage = 'generate_single_fits_tiles'
+            
             await _create_quicklook_record(job)
             ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
             ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)
