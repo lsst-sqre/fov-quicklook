@@ -99,12 +99,16 @@ async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_nam
     priority = job.priority
     priority.user_count += 1
     
-    from quicklook.db import Access, get_db_session
+    from quicklook.db import Access, Quicklook, get_db_session
     from datetime import datetime
+    from sqlalchemy import select
     async with get_db_session() as session:
-        access = Access(visit_name=visit, accessed_at=datetime.now())
-        session.add(access)
-        await session.commit()
+        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
+        quicklook = result.scalar_one_or_none()
+        if quicklook is not None:
+            access = Access(visit_name=visit, accessed_at=datetime.now())
+            session.add(access)
+            await session.commit()
     
     _log_all_user_counts(jobs)
     
