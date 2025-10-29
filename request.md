@@ -8,17 +8,14 @@
 
 以下を順に実施してください。
 
-* [x] `backend/src/quicklook/coordinator/api/app.py`
+* [ ] `frontend/app/src/components/JobList/index.tsx`のリファクタリング
 
-  vote, unvoteが行われたらログに現在のすべてのエントリーのvisit_name, user_countを出力するようにしてください。
-  単にvote, unvote自体のログは不要です。
+  ハイライト時の色を黄色ではなくアプリのテーマに沿った青緑系の色にしてください。
 
-* [x] `backend/src/quicklook/coordinator/create_quicklook/__init__.py`のリファクタリング
+* [ ] エラー対応
 
-  `quicklook_pipeline`のなかの各ステージに対応する関数にタイムアウトに関する同じパターンが繰り返されています。
-  `quicklook_pipeline`内にデコレーターや高階関数を作ることで整理してください。
-  `backend/src/quicklook/coordinator/create_quicklook/pipeline_timeout.py`がどこからも使われていなければ削除してください。
+  `./error.log`のようなエラーが出ている。対応してください。
 
-* [x] `pyright`の実行と修正
+* [ ] `pyright`の実行と修正
 
   `cd backend && make pyright` してエラーがあれば修正してください。

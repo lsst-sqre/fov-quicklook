@@ -1,0 +1,239 @@
+Traceback (most recent call last):
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 550, in _prepare_and_execute
+self._rows = deque(await prepared_stmt.fetch(*parameters))
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 176, in fetch
+data = await self.__bind_execute(args, 0, timeout)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 267, in __bind_execute
+data, status, _ = await self.__do_execute(
+^^^^^^^^^^^^^^^^^^^^^^^^
+lambda protocol: protocol.bind_execute(
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+self._state, args, '', limit, True, timeout))
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 256, in __do_execute
+return await executor(protocol)
+^^^^^^^^^^^^^^^^^^^^^^^^
+File "asyncpg/protocol/protocol.pyx", line 206, in bind_execute
+asyncpg.exceptions.ForeignKeyViolationError: insert or update on table "accesses" violates foreign key constraint "accesses_visit_name_fkey"
+DETAIL: Key (visit_name)=(raw:2025102800037) is not present in table "quicklooks".
+The above exception was the direct cause of the following exception:
+Traceback (most recent call last):
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+self.dialect.do_execute(
+~~~~~~~~~~~~~~~~~~~~~~~^
+cursor, str_statement, effective_parameters, context
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+cursor.execute(statement, parameters)
+~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 585, in execute
+self._adapt_connection.await_(
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+self._prepare_and_execute(operation, parameters)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+return current.parent.switch(awaitable) # type: ignore[no-any-return,attr-defined] # noqa: E501
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+value = await result
+^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 563, in _prepare_and_execute
+self._handle_exception(error)
+~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 513, in _handle_exception
+self._adapt_connection._handle_exception(error)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 797, in _handle_exception
+raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.IntegrityError: <class 'asyncpg.exceptions.ForeignKeyViolationError'>: insert or update on table "accesses" violates foreign key constraint "accesses_visit_name_fkey"
+DETAIL: Key (visit_name)=(raw:2025102800037) is not present in table "quicklooks".
+The above exception was the direct cause of the following exception:
+Traceback (most recent call last):
+File "/usr/local/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+result = await app( # type: ignore[func-returns-value]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+self.scope, self.receive, self.send
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+return await self.app(scope, receive, send)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/fastapi/applications.py", line 1082, in __call__
+await super().__call__(scope, receive, send)
+File "/usr/local/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+await self.middleware_stack(scope, receive, send)
+File "/usr/local/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+raise exc
+File "/usr/local/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+await self.app(scope, receive, _send)
+File "/usr/local/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+raise exc
+File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+await app(scope, receive, sender)
+File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+await self.middleware_stack(scope, receive, send)
+File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+await route.handle(scope, receive, send)
+File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+await self.app(scope, receive, send)
+File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 78, in app
+await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+raise exc
+File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+await app(scope, receive, sender)
+File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 75, in app
+response = await f(request)
+^^^^^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/fastapi/routing.py", line 308, in app
+raw_response = await run_endpoint_function(
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...<3 lines>...
+)
+^
+File "/usr/local/lib/python3.13/site-packages/fastapi/routing.py", line 219, in run_endpoint_function
+return await dependant.call(**values)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/app/src/quicklook/coordinator/api/app.py", line 107, in route_vote_quicklook
+await session.commit()
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/ext/asyncio/session.py", line 1000, in commit
+await greenlet_spawn(self.sync_session.commit)
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 203, in greenlet_spawn
+result = context.switch(value)
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2030, in commit
+trans.commit(_to_root=True)
+~~~~~~~~~~~~^^^^^^^^^^^^^^^
+File "<string>", line 2, in commit
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+ret_value = fn(self, *arg, **kw)
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 1311, in commit
+self._prepare_impl()
+~~~~~~~~~~~~~~~~~~^^
+File "<string>", line 2, in _prepare_impl
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+ret_value = fn(self, *arg, **kw)
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 1286, in _prepare_impl
+self.session.flush()
+~~~~~~~~~~~~~~~~~~^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+self._flush(objects)
+~~~~~~~~~~~^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+with util.safe_reraise():
+~~~~~~~~~~~~~~~~~^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+raise exc_value.with_traceback(exc_tb)
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+flush_context.execute()
+~~~~~~~~~~~~~~~~~~~~~^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+rec.execute(self)
+~~~~~~~~~~~^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+util.preloaded.orm_persistence.save_obj(
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+self.mapper,
+^^^^^^^^^^^^
+uow.states_for_mapper_hierarchy(self.mapper, False, False),
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+uow,
+^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+_emit_insert_statements(
+~~~~~~~~~~~~~~~~~~~~~~~^
+base_mapper,
+^^^^^^^^^^^^
+...<3 lines>...
+insert,
+^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+result = connection.execute(
+statement,
+params,
+execution_options=execution_options,
+)
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+return meth(
+self,
+distilled_parameters,
+execution_options or NO_OPTIONS,
+)
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+return connection._execute_clauseelement(
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+self, distilled_params, execution_options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+ret = self._execute_context(
+dialect,
+...<8 lines>...
+cache_hit=cache_hit,
+)
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+return self._exec_single_context(
+~~~~~~~~~~~~~~~~~~~~~~~~~^
+dialect, context, statement, parameters
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+self._handle_dbapi_exception(
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+e, str_statement, effective_parameters, cursor, context
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+self.dialect.do_execute(
+~~~~~~~~~~~~~~~~~~~~~~~^
+cursor, str_statement, effective_parameters, context
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+cursor.execute(statement, parameters)
+~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 585, in execute
+self._adapt_connection.await_(
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+self._prepare_and_execute(operation, parameters)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+return current.parent.switch(awaitable) # type: ignore[no-any-return,attr-defined] # noqa: E501
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+value = await result
+^^^^^^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 563, in _prepare_and_execute
+self._handle_exception(error)
+~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 513, in _handle_exception
+self._adapt_connection._handle_exception(error)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 797, in _handle_exception
+raise translated_error from error
+sqlalchemy.exc.IntegrityError: (sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.ForeignKeyViolationError'>: insert or update on table "accesses" violates foreign key constraint "accesses_visit_name_fkey"
+DETAIL: Key (visit_name)=(raw:2025102800037) is not present in table "quicklooks".
+[SQL: INSERT INTO accesses (visit_name, accessed_at) VALUES ($1::VARCHAR, $2::TIMESTAMP WITHOUT TIME ZONE) RETURNING accesses.id]
+[parameters: ('raw:2025102800037', datetime.datetime(2025, 10, 29, 1, 51, 25, 160877))]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+INFO: Deleting object storage data for raw:2025102800040 due to error

@@ -80,8 +80,8 @@ class Config(BaseSettings):
     pipeline_queue_size: int = 64
     pipeline_generate_single_fits_tiles: int = 1
     pipeline_transfer_queue_size: int = 8
-    pipeline_merge_tiles: int = 1
-    pipeline_transfer_tiles: int = 1
+    pipeline_merge_tiles: int = 2
+    pipeline_transfer_tiles: int = 2
 
     # Logging settings
     log_level: Literal['debug', 'info', 'warning', 'error', 'critical'] = 'info'
