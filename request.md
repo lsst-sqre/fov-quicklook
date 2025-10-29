@@ -8,13 +8,10 @@
 
 以下を順に実施してください。
 
-* [x] `backend/src/quicklook/coordinator/api/app.py`の見直し
+* [x] `frontend/app/src/pages/Home/Viewer/CompactStatus/index.tsx`のリファクタリング
 
-  vote時にselectしているが、selectした後に対応するQuicklookエントリが消える可能性はない？
-  もしトランザクションの関係でその心配がないならこのままで良いです。
+  * `showMemoryUsageInCompactStatus`でmemory usageかunrecoverable memoryのどちらかを表示するようにしているが、どちらを表示するのではなく、この値でmemory usageを表示するか決めるようにしてください。（unrecoverable memoryは常に表示。）
+  memory usageやunrecoverable memoryという表記は長いのでどちらもMem, tooltipで詳しい意味を表示するようにしてください。
 
-  特に理由がなければ`import`類はファイルの先頭にまとめましょう
-
-* [x] `pyright`の実行と修正
-
-  `cd backend && make pyright` してエラーがあれば修正してください。
+  * CPUの割合は現在は`<Progress/>`とテキスト表記どちらも同じになっていますが、ここは分けてください。
+  `<Progress/>`は`cpu_max`に対する割合。テキストは１論理CPUの使用時間割合としてください。
