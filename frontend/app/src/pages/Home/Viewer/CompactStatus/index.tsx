@@ -57,31 +57,27 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
   }
 
   const prevRef = useRef<{ cpu: number; uptime: number } | null>(null)
-  const [cpuPercent, setCpuPercent] = useState<number | null>(null)
+  const [cpuPercentOfMax, setCpuPercentOfMax] = useState<number | null>(null)
+  const [cpuPercentPerCore, setCpuPercentPerCore] = useState<number | null>(null)
 
   useEffect(() => {
     const prev = prevRef.current
     if (prev && container.uptime > prev.uptime) {
       const deltaCpu = container.cpu_current - prev.cpu
       const deltaTime = container.uptime - prev.uptime
-      let percent: number | null = null
       if (deltaTime > 0 && container.cpu_max > 0) {
         const cpuMaxPerSecond = container.cpu_max
-        percent = (deltaCpu / (deltaTime * 1_000_000)) / (cpuMaxPerSecond / 100_000) * 100
+        const percentOfMax = (deltaCpu / (deltaTime * 1_000_000)) / (cpuMaxPerSecond / 100_000) * 100
+        const percentPerCore = (deltaCpu / (deltaTime * 1_000_000)) * 100
+        setCpuPercentOfMax(percentOfMax)
+        setCpuPercentPerCore(percentPerCore)
       }
-      setCpuPercent(percent)
     }
     prevRef.current = { cpu: container.cpu_current, uptime: container.uptime }
   }, [container.cpu_current, container.uptime, container.cpu_max])
 
   const showMemoryUsageInCompactStatus = useAppSelector(state => state.home.showMemoryUsageInCompactStatus)
   const unrecoverableMemory = calculateUnrecoverableMemory()
-  const memoryRatio = showMemoryUsageInCompactStatus 
-    ? container.memory_current / container.memory_max 
-    : unrecoverableMemory / container.memory_max
-  const displayMemory = showMemoryUsageInCompactStatus 
-    ? container.memory_current 
-    : unrecoverableMemory
 
   return (
     <div className={styles.containerItem}>
@@ -91,30 +87,50 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
           <span className={styles.metricLabel}>Mem:</span>
           <div 
             className={styles.progressWrapper}
-            onMouseEnter={() => setMemTooltip(formatBytes(displayMemory))}
+            onMouseEnter={() => setMemTooltip(formatBytes(unrecoverableMemory))}
             onMouseLeave={() => setMemTooltip(null)}
-            title={formatBytes(displayMemory)}
+            title={`Unrecoverable Memory: ${formatBytes(unrecoverableMemory)}`}
           >
             <Progress 
-              count={displayMemory} 
+              count={unrecoverableMemory} 
               total={container.memory_max} 
               width="100px" 
               rounded={true} 
             />
             {memTooltip && <div className={styles.tooltip}>{memTooltip}</div>}
           </div>
-          <span className={styles.metricValue}>{(memoryRatio * 100).toFixed(0)}%</span>
+          <span className={styles.metricValue}>{(unrecoverableMemory / container.memory_max * 100).toFixed(0)}%</span>
         </div>
+        {showMemoryUsageInCompactStatus && (
+          <div className={styles.metricRow}>
+            <span className={styles.metricLabel}>Mem:</span>
+            <div 
+              className={styles.progressWrapper}
+              onMouseEnter={() => setMemTooltip(formatBytes(container.memory_current))}
+              onMouseLeave={() => setMemTooltip(null)}
+              title={`Memory Usage: ${formatBytes(container.memory_current)}`}
+            >
+              <Progress 
+                count={container.memory_current} 
+                total={container.memory_max} 
+                width="100px" 
+                rounded={true} 
+              />
+              {memTooltip && <div className={styles.tooltip}>{memTooltip}</div>}
+            </div>
+            <span className={styles.metricValue}>{(container.memory_current / container.memory_max * 100).toFixed(0)}%</span>
+          </div>
+        )}
         <div className={styles.metricRow}>
           <span className={styles.metricLabel}>CPU:</span>
           <div 
             className={styles.progressWrapper}
-            onMouseEnter={() => setCpuTooltip(cpuPercent !== null ? `${cpuPercent.toFixed(1)}%` : '---')}
+            onMouseEnter={() => setCpuTooltip(cpuPercentOfMax !== null ? `CPU usage: ${cpuPercentOfMax.toFixed(1)}% of max` : '---')}
             onMouseLeave={() => setCpuTooltip(null)}
-            title={cpuPercent !== null ? `${cpuPercent.toFixed(1)}%` : '---'}
+            title={cpuPercentOfMax !== null ? `CPU usage: ${cpuPercentOfMax.toFixed(1)}% of max` : '---'}
           >
             <Progress 
-              count={cpuPercent ?? 0} 
+              count={cpuPercentOfMax ?? 0} 
               total={100} 
               width="100px" 
               rounded={true} 
@@ -122,7 +138,7 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
             {cpuTooltip && <div className={styles.tooltip}>{cpuTooltip}</div>}
           </div>
           <span className={styles.metricValue}>
-            {cpuPercent !== null ? `${cpuPercent.toFixed(0)}%` : '---'}
+            {cpuPercentPerCore !== null ? `${cpuPercentPerCore.toFixed(0)}%` : '---'}
           </span>
         </div>
       </div>
