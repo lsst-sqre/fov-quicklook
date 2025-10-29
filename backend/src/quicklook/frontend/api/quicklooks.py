@@ -198,9 +198,9 @@ async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncG
         # その場合はQuicklookMetadataReadyを返したいので。
         job_status = jobs.get(visit, job_status)
         match job_status:
-            case None:
+            case None | JobStatus(stage='queued'):
                 yield QuicklookMetadataPending(visit_name=visit)
-            case JobStatus(stage='queued' | 'generate_single_fits_tiles'):
+            case JobStatus(stage='generate_single_fits_tiles'):
                 yield QuicklookMetadataProgress(
                     visit_name=visit,
                     progress=job_status.generate_single_fits_tiles,

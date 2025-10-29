@@ -12,7 +12,7 @@ export function QuicklookJobMonitor() {
   const { data: statusList } = useGetQuicklooksStatusQuery()
   const [createQuicklook] = useCreateQuicklookMutation()
   const jobListRef = useRef<HTMLDivElement>(null)
-  
+
   const showMonitor = !currentQuicklook.ready
   const metadata = currentQuicklook.metadata
 
@@ -44,9 +44,9 @@ export function QuicklookJobMonitor() {
             <div className={styles.errorMessage}>
               Error loading quicklook
             </div>
-            <button className={styles.retryButton} onClick={handleRetry}>
+            {/* <button className={styles.retryButton} onClick={handleRetry}>
               Retry Request
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

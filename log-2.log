@@ -1,0 +1,196 @@
+INFO:     Deleting object storage data for raw:2025102600564 due to error
+Error occurred in pipeline: (sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.ForeignKeyViolationError'>: update or delete on table "quicklooks" violates foreign key constraint "accesses_visit_name_fkey" on table "accesses"
+DETAIL:  Key (visit_name)=(raw:2025102600564) is still referenced from table "accesses".
+[SQL: DELETE FROM quicklooks WHERE quicklooks.visit_name = $1::VARCHAR]
+[parameters: ('raw:2025102600564',)]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 550, in _prepare_and_execute
+n    self._rows = deque(await prepared_stmt.fetch(*parameters))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 176, in fetch
+    data = await self.__bind_execute(args, 0, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 267, in __bind_execute
+    data, status, _ = await self.__do_execute(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+        lambda protocol: protocol.bind_execute(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            self._state, args, '', limit, True, timeout))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/asyncpg/prepared_stmt.py", line 256, in __do_execute
+    return await executor(protocol)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 206, in bind_execute
+asyncpg.exceptions.ForeignKeyViolationError: update or delete on table "quicklooks" violates foreign key constraint "accesses_visit_name_fkey" on table "accesses"
+DETAIL:  Key (visit_name)=(raw:2025102600564) is still referenced from table "accesses".
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 585, in execute
+    self._adapt_connection.await_(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self._prepare_and_execute(operation, parameters)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 563, in _prepare_and_execute
+    self._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 513, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 797, in _handle_exception
+    raise translated_error from error
+sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.IntegrityError: <class 'asyncpg.exceptions.ForeignKeyViolationError'>: update or delete on table "quicklooks" violates foreign key constraint "accesses_visit_name_fkey" on table "accesses"
+DETAIL:  Key (visit_name)=(raw:2025102600564) is still referenced from table "accesses".
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/app/src/quicklook/utils/pipeline/__init__.py", line 187, in _task
+    result = await args.process(item)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/src/quicklook/coordinator/create_quicklook/pipeline_timeout.py", line 23, in wrapper
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/usr/local/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/app/src/quicklook/coordinator/create_quicklook/__init__.py", line 50, in generate_single_fits_tiles
+    await _finalize_error(job, str(e))
+  File "/app/src/quicklook/coordinator/create_quicklook/__init__.py", line 231, in _finalize_error
+    await session.execute(stmt)
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/ext/asyncio/session.py", line 449, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self,
+        ^^^^^
+    ...<4 lines>...
+        conn,
+        ^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/bulk_persistence.py", line 2033, in orm_execute_statement
+    return super().orm_execute_statement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        session, statement, params, execution_options, bind_arguments, conn
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+        statement, params or {}, execution_options=execution_options
+    )
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 585, in execute
+    self._adapt_connection.await_(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self._prepare_and_execute(operation, parameters)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 563, in _prepare_and_execute
+    self._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 513, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 797, in _handle_exception
+    raise translated_error from error
+sqlalchemy.exc.IntegrityError: (sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.ForeignKeyViolationError'>: update or delete on table "quicklooks" violates foreign key constraint "accesses_visit_name_fkey" on table "accesses"
+DETAIL:  Key (visit_name)=(raw:2025102600564) is still referenced from table "accesses".
+[SQL: DELETE FROM quicklooks WHERE quicklooks.visit_name = $1::VARCHAR]
+[parameters: ('raw:2025102600564',)]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+WARNING:  Health check failed for g-62b82efc4b4c4baeaf9b7acb945115f5: Cannot connect to host 192.168.104.231:9502 ssl:default [Connect call failed ('192.168.104.231', 9502)]
+INFO:     Generator removed: g-62b82efc4b4c4baeaf9b7acb945115f5
+INFO:     Available generators: dict_values([GeneratorInfo(id='g-f36714a208974d309bf1dc2587c2997a', host='192.168.103.42', port=9502), GeneratorInfo(id='g-cd2eeb372dcc47f183f764dd2d1e49d9', host='192.168.51.84', port=9502), GeneratorInfo(id='g-1e10c2709da447718f7428f02ac61f79', host='192.168.82.21', port=9502), GeneratorInfo(id='g-f6c921987c104de2b9ab929f051aa080', host='192.168.83.236', port=9502), GeneratorInfo(id='g-ed4a259a662441548763c5a2297e5789', host='192.168.93.13', port=9502), GeneratorInfo(id='g-216a1665f2464cf3aa9c7ab855827204', host='192.168.97.223', port=9502), GeneratorInfo(id='g-5ce1d68ca8ee4f68adb61f9d7ff6d59b', host='192.168.33.192', port=9502), GeneratorInfo(id='g-cd79ee7f60b84ee2bf8cc6143bdab439', host='192.168.104.231', port=9502)])
