@@ -2,6 +2,7 @@ import asyncio
 import pickle
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated, AsyncIterator, Awaitable, Callable
 
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -21,7 +22,7 @@ from quicklook.coordinator.api.types import (
 )
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
 from quicklook.coordinator.housekeeping import cleanup_at_startup
-from quicklook.db import Quicklook, get_db_session
+from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.job.job import Job
 from quicklook.types import VisitName
 from quicklook.utils.broadcast import Broadcast
@@ -99,9 +100,6 @@ async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_nam
     priority = job.priority
     priority.user_count += 1
     
-    from quicklook.db import Access, Quicklook, get_db_session
-    from datetime import datetime
-    from sqlalchemy import select
     async with get_db_session() as session:
         result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
         quicklook = result.scalar_one_or_none()

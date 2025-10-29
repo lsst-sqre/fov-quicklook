@@ -8,13 +8,12 @@
 
 以下を順に実施してください。
 
-* [x] `frontend/app/src/components/JobList/index.tsx`のリファクタリング
+* [x] `backend/src/quicklook/coordinator/api/app.py`の見直し
 
-  ハイライト時の色を黄色ではなくアプリのテーマに沿った青緑系の色にしてください。
+  vote時にselectしているが、selectした後に対応するQuicklookエントリが消える可能性はない？
+  もしトランザクションの関係でその心配がないならこのままで良いです。
 
-* [x] エラー対応
-
-  `./error.log`のようなエラーが出ている。対応してください。
+  特に理由がなければ`import`類はファイルの先頭にまとめましょう
 
 * [x] `pyright`の実行と修正
 
