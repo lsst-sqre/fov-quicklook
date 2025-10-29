@@ -79,6 +79,16 @@ async def route_quicklook_status():
     return _job_status_list(jobs)
 
 
+def _log_all_user_counts(jobs: JobDict):
+    """すべてのジョブのvisit_nameとuser_countをログ出力"""
+    entries = [(str(visit), job.priority.user_count) for visit, job in jobs.items()]
+    if entries:
+        entries_str = ", ".join(f"{visit}:{count}" for visit, count in entries)
+        logger.info(f"All jobs user_count: {entries_str}")
+    else:
+        logger.info("All jobs user_count: (no jobs)")
+
+
 @app.post('/quicklooks/{visit_name}/vote')
 async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_name)]):
     jobs = running_pipeline.jobs()
@@ -88,7 +98,6 @@ async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_nam
     job = jobs[visit]
     priority = job.priority
     priority.user_count += 1
-    logger.info(f"Vote for {visit}: user_count={priority.user_count}")
     
     from quicklook.db import Access, get_db_session
     from datetime import datetime
@@ -96,6 +105,8 @@ async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_nam
         access = Access(visit_name=visit, accessed_at=datetime.now())
         session.add(access)
         await session.commit()
+    
+    _log_all_user_counts(jobs)
     
     return {"user_count": priority.user_count}
 
@@ -110,7 +121,9 @@ async def route_unvote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_n
     priority = job.priority
     if priority.user_count > 0:
         priority.user_count -= 1
-        logger.info(f"Unvote for {visit}: user_count={priority.user_count}")
+    
+    _log_all_user_counts(jobs)
+    
     return {"user_count": priority.user_count}
 
 
