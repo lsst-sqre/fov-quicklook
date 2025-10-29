@@ -1,12 +1,12 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import cast, Callable, Coroutine, TypeVar
+from typing import Callable, Coroutine, TypeVar, cast
 
-from quicklook.coordinator.housekeeping import run_housekeeping
 import quicklook.mylogging
 from quicklook.comm.rpc_worker import YieledValue, rpc_scatter, rpc_scatter_stream
 from quicklook.config import config
+from quicklook.coordinator.housekeeping import run_housekeeping
 from quicklook.datasource import get_datasource
 from quicklook.db import Quicklook, get_db_session
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata
@@ -37,9 +37,14 @@ class _PipelineResult:
 def quicklook_pipeline():
     def with_stage_timeout(
         stage_name: str,
-    ) -> Callable[[Callable[[_PipelineResult], Coroutine[None, None, T]]], Callable[[_PipelineResult], Coroutine[None, None, T]]]:
+    ) -> Callable[
+        [Callable[[_PipelineResult], Coroutine[None, None, T]]], Callable[[_PipelineResult], Coroutine[None, None, T]]
+    ]:
         """ステージにタイムアウトとエラーハンドリングを適用するデコレーター"""
-        def decorator(func: Callable[[_PipelineResult], Coroutine[None, None, T]]) -> Callable[[_PipelineResult], Coroutine[None, None, T]]:
+
+        def decorator(
+            func: Callable[[_PipelineResult], Coroutine[None, None, T]],
+        ) -> Callable[[_PipelineResult], Coroutine[None, None, T]]:
             async def wrapper(result: _PipelineResult) -> T:
                 try:
                     return await asyncio.wait_for(func(result), timeout=config.pipeline_stage_timeout)
@@ -48,13 +53,17 @@ def quicklook_pipeline():
                     logger.error(error_msg)
                     await _finalize_error(result.job, error_msg)
                     from quicklook.comm.coordinator import shutdown_all_generators
+
                     await shutdown_all_generators()
                     raise
                 except Exception as e:
                     await _finalize_error(result.job, str(e))
                     raise
+
             return wrapper
+
         return decorator
+
     async def arg_adapter(job: Job):
         return _PipelineResult(job=job)
 
@@ -62,10 +71,12 @@ def quicklook_pipeline():
     async def generate_single_fits_tiles(result: _PipelineResult):
         job = result.job
         visit = job.visit
-        
+
+        _ensure_users_exist_for_job(job)
+
         async with job.watcher.watch_status():
             job.status.stage = 'generate_single_fits_tiles'
-        
+
         await _create_quicklook_record(job)
         ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
         ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)

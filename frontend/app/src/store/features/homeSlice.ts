@@ -53,7 +53,7 @@ function initialState(): State {
     searchString: '',
     dataSource: 'raw',
     showFrame: true,
-    showCompactStatus: true,
+    showCompactStatus: false,
     showMemoryUsageInCompactStatus: false,
     cameraParams: initialSearchParams.cameraParams ?? initialCameraParams,
     hilightedCcdId: initialHightlightCcds(),

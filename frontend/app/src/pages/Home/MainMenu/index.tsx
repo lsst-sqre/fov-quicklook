@@ -43,7 +43,7 @@ export function MainMenu() {
         <MenuItem type="checkbox" checked={lineProfilerEnabled} onClick={toggleLineProfiler}>Line Profiler</MenuItem>
         <MenuItem type="checkbox" checked={showFrame} onClick={toggleFrame}>Frame</MenuItem>
         <MenuItem type="checkbox" checked={showCompactStatus} onClick={toggleCompactStatus}>System Status</MenuItem>
-        <MenuItem type="checkbox" checked={showMemoryUsageInCompactStatus} onClick={toggleMemoryUsageInCompactStatus}>Memory Usage in System Status</MenuItem>
+        <MenuItem type="checkbox" checked={showMemoryUsageInCompactStatus} onClick={toggleMemoryUsageInCompactStatus}>Show Recoverable Memory</MenuItem>
       </Menu>
     </div>
   )

@@ -39,7 +39,8 @@ interface CompactContainerStatusProps {
 }
 
 function CompactContainerStatus({ name, container }: CompactContainerStatusProps) {
-  const [memTooltip, setMemTooltip] = useState<string | null>(null)
+  const [unrecoverableMemTooltip, setUnrecoverableMemTooltip] = useState<string | null>(null)
+  const [recoverableMemTooltip, setRecoverableMemTooltip] = useState<string | null>(null)
   const [cpuTooltip, setCpuTooltip] = useState<string | null>(null)
 
   const calculateUnrecoverableMemory = (): number => {
@@ -87,8 +88,8 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
           <span className={styles.metricLabel}>Mem:</span>
           <div 
             className={styles.progressWrapper}
-            onMouseEnter={() => setMemTooltip(formatBytes(unrecoverableMemory))}
-            onMouseLeave={() => setMemTooltip(null)}
+            onMouseEnter={() => setUnrecoverableMemTooltip(formatBytes(unrecoverableMemory))}
+            onMouseLeave={() => setUnrecoverableMemTooltip(null)}
             title={`Unrecoverable Memory: ${formatBytes(unrecoverableMemory)}`}
           >
             <Progress 
@@ -97,7 +98,7 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
               width="100px" 
               rounded={true} 
             />
-            {memTooltip && <div className={styles.tooltip}>{memTooltip}</div>}
+            {unrecoverableMemTooltip && <div className={styles.tooltip}>{unrecoverableMemTooltip}</div>}
           </div>
           <span className={styles.metricValue}>{(unrecoverableMemory / container.memory_max * 100).toFixed(0)}%</span>
         </div>
@@ -106,9 +107,9 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
             <span className={styles.metricLabel}>Mem:</span>
             <div 
               className={styles.progressWrapper}
-              onMouseEnter={() => setMemTooltip(formatBytes(container.memory_current))}
-              onMouseLeave={() => setMemTooltip(null)}
-              title={`Memory Usage: ${formatBytes(container.memory_current)}`}
+              onMouseEnter={() => setRecoverableMemTooltip(formatBytes(container.memory_current))}
+              onMouseLeave={() => setRecoverableMemTooltip(null)}
+              title={`Recoverable Memory: ${formatBytes(container.memory_current)}`}
             >
               <Progress 
                 count={container.memory_current} 
@@ -116,7 +117,7 @@ function CompactContainerStatus({ name, container }: CompactContainerStatusProps
                 width="100px" 
                 rounded={true} 
               />
-              {memTooltip && <div className={styles.tooltip}>{memTooltip}</div>}
+              {recoverableMemTooltip && <div className={styles.tooltip}>{recoverableMemTooltip}</div>}
             </div>
             <span className={styles.metricValue}>{(container.memory_current / container.memory_max * 100).toFixed(0)}%</span>
           </div>
