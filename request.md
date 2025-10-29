@@ -8,14 +8,14 @@
 
 以下を順に実施してください。
 
-* [ ] `frontend/app/src/components/JobList/index.tsx`のリファクタリング
+* [x] `frontend/app/src/components/JobList/index.tsx`のリファクタリング
 
   ハイライト時の色を黄色ではなくアプリのテーマに沿った青緑系の色にしてください。
 
-* [ ] エラー対応
+* [x] エラー対応
 
   `./error.log`のようなエラーが出ている。対応してください。
 
-* [ ] `pyright`の実行と修正
+* [x] `pyright`の実行と修正
 
   `cd backend && make pyright` してエラーがあれば修正してください。
