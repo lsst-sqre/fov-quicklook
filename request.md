@@ -8,10 +8,13 @@
 
 以下を順に実施してください。
 
-* [x] `frontend/app/src/pages/Home/Viewer/CompactStatus/index.tsx`のリファクタリング
+* [x] `frontend/app/src/components/JobList/index.tsx`
 
-  * `showMemoryUsageInCompactStatus`でmemory usageかunrecoverable memoryのどちらかを表示するようにしているが、どちらを表示するのではなく、この値でmemory usageを表示するか決めるようにしてください。（unrecoverable memoryは常に表示。）
-  memory usageやunrecoverable memoryという表記は長いのでどちらもMem, tooltipで詳しい意味を表示するようにしてください。
+  各ジョブのデザインの修正をお願いします。
+  現在、ジョブに対する要素の背景が斜めのグラデーションになっています。
+  これを修正して縦方向のグラデーションにしてください。
 
-  * CPUの割合は現在は`<Progress/>`とテキスト表記どちらも同じになっていますが、ここは分けてください。
-  `<Progress/>`は`cpu_max`に対する割合。テキストは１論理CPUの使用時間割合としてください。
+* [x] `frontend/app/src/pages/Home/Viewer/QuicklookJobMonitor.tsx`
+
+  現在、とある契機で`scrollIntoView`が呼ばれているがこれが呼ばれる頻度が高すぎる。
+  statusListの数が変わった時だけ呼び出すようにしてください。
