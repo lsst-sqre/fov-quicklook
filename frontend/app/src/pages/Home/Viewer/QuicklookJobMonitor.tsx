@@ -22,7 +22,7 @@ export function QuicklookJobMonitor() {
     if (jobListRef.current && currentQuicklook.id && statusList) {
       const element = jobListRef.current.querySelector(`[data-visit="${currentQuicklook.id}"]`)
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
       }
     }
   }, [currentQuicklook.id, statusListCount])
