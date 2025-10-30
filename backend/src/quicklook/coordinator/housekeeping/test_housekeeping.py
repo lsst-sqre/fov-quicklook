@@ -23,8 +23,11 @@ async def reset_db():
         await session.commit()
 
 
-async def test_select_quicklook_to_delete_oldest():
+async def test_select_quicklook_to_delete_oldest(monkeypatch):
     """最もアクセスが少なく古いquicklookが選択されることを確認"""
+    from quicklook.config import config
+    monkeypatch.setattr(config, 'housekeeping_keep_recent_count', 2)
+    
     async with get_db_session() as session:
         # 3つのquicklookを作成
         now = datetime.now()
@@ -57,20 +60,23 @@ async def test_select_quicklook_to_delete_oldest():
         
         await session.commit()
     
-    # アクセスがなく最も古いvisit1が選ばれるはず
+    # アクセスがなく最も古いvisit1が選ばれるはず（visit2とvisit3は新しいので保護される）
     result = await select_quicklook_to_delete()
     assert result == "raw:visit1"
 
 
-async def test_select_quicklook_to_delete_no_ready():
+async def test_select_quicklook_to_delete_no_ready(monkeypatch):
     """ready=falseのquicklookは選択されないことを確認"""
+    from quicklook.config import config
+    monkeypatch.setattr(config, 'housekeeping_keep_recent_count', 0)
+    
     async with get_db_session() as session:
         now = datetime.now()
         quicklook1 = Quicklook(
             visit_name="raw:visit1",
             job_id="job1",
             disk_usage=1000,
-            ready=False,  # ready=false
+            ready=False,
             created_at=now - timedelta(days=3)
         )
         quicklook2 = Quicklook(
@@ -83,7 +89,7 @@ async def test_select_quicklook_to_delete_no_ready():
         session.add_all([quicklook1, quicklook2])
         await session.commit()
     
-    # ready=trueのvisit2が選ばれるはず
+    # ready=trueのvisit2が選ばれるはず（保護数が0なので）
     result = await select_quicklook_to_delete()
     assert result == "raw:visit2"
 
@@ -149,8 +155,11 @@ async def test_cleanup_at_startup():
         assert result.first() is not None
 
 
-async def test_housekeeping_with_limit():
+async def test_housekeeping_with_limit(monkeypatch):
     """容量制限を超えた場合にhousekeepingが動作することを確認"""
+    from quicklook.config import config
+    monkeypatch.setattr(config, 'housekeeping_keep_recent_count', 2)
+    
     async with get_db_session() as session:
         now = datetime.now()
         # 合計10000バイトのquicklookを作成
@@ -166,6 +175,7 @@ async def test_housekeeping_with_limit():
         await session.commit()
     
     # 制限を6000バイトに設定してhousekeepingを実行
+    # 最新の2個(visit0とvisit1)は保護され、残り3個から削除される
     await run_housekeeping(max_usage=6000)
     
     # 削除後、合計が6000バイト以下になっているはず

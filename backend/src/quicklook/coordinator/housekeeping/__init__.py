@@ -17,10 +17,34 @@ logger = logging.getLogger(__name__)
 async def select_quicklook_to_delete() -> str | None:
     """
     削除すべきquicklookを1つ選択する。
-    最近1週間以内のアクセスが少ないもの順、それが同じならcreated_atが古いもの順。
+    
+    選択ロジック:
+    1. ready=trueのquicklookの総数がN個（config.housekeeping_keep_recent_count）以下の場合は、何も削除しない
+    2. N個を超える場合、最新のN個は保護し、残りの中から最近1週間以内のアクセスが少ないもの順、それが同じならcreated_atが古いもの順で選択
+    
+    これにより、アクセス頻度が高いものだけが残った場合でも新しいデータを追加できる。
     """
     async with get_db_session() as session:
         one_week_ago = datetime.now() - timedelta(days=7)
+
+        # ready=trueのquicklook総数を取得
+        total_count_stmt = select(func.count()).select_from(Quicklook).where(Quicklook.ready == True)
+        total_count_result = await session.execute(total_count_stmt)
+        total_count = total_count_result.scalar() or 0
+        
+        # 総数が保護数以下の場合は削除しない
+        if total_count <= config.housekeeping_keep_recent_count:
+            return None
+
+        # 最新のN個のvisit_nameを取得（これらは削除候補から除外）
+        recent_visits_stmt = (
+            select(Quicklook.visit_name)
+            .where(Quicklook.ready == True)
+            .order_by(Quicklook.created_at.desc())
+            .limit(config.housekeeping_keep_recent_count)
+        )
+        recent_visits_result = await session.execute(recent_visits_stmt)
+        protected_visits = {row[0] for row in recent_visits_result.all()}
 
         # 1週間以内のアクセス数をカウント
         recent_access_count = (
@@ -30,14 +54,17 @@ async def select_quicklook_to_delete() -> str | None:
             .subquery()
         )
 
-        # quicklooksとjoinして、アクセス数が少ない順、created_atが古い順でソート
+        # quicklooksとjoinして、保護されていないものの中からアクセス数が少ない順、created_atが古い順でソート
         stmt = (
             select(Quicklook.visit_name)
             .outerjoin(recent_access_count, Quicklook.visit_name == recent_access_count.c.visit_name)
-            .where(Quicklook.ready == True)  # ready=trueのもののみ対象
-            .order_by(func.coalesce(recent_access_count.c.access_count, 0).asc(), Quicklook.created_at.asc())
-            .limit(1)
+            .where(Quicklook.ready == True)
         )
+        
+        if protected_visits:
+            stmt = stmt.where(Quicklook.visit_name.notin_(protected_visits))
+        
+        stmt = stmt.order_by(func.coalesce(recent_access_count.c.access_count, 0).asc(), Quicklook.created_at.asc()).limit(1)
 
         result = await session.execute(stmt)
         row = result.first()

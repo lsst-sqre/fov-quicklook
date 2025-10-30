@@ -98,6 +98,7 @@ class Config(BaseSettings):
 
     # Housekeeping settings
     max_object_storage_usage: int = 1024 * 1024 * 1024 * 45  # 45GB in bytes
+    housekeeping_keep_recent_count: int = 10  # 最近作成されたquicklookをこの数だけ保持（アクセス頻度に関係なく）
 
     # Pipeline stage timeout settings (in seconds)
     pipeline_stage_timeout: int = 60
