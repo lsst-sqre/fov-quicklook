@@ -88,9 +88,8 @@ def _get_external_tile(g: GeneratorInfo, job: Job, pos: TilePos) -> bytes | None
     match response.status_code:
         case 200:
             return response.content
-        case 404:  # pragma: no cover
-            # ここには来ないはずだが
-            return
+        # case 404:
+        #     return
         case _:  # pragma: no cover
             response.raise_for_status()
             raise RuntimeError(f"Failed to get external tile from {g.url}: {response}")

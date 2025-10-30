@@ -87,10 +87,7 @@ def route_get_merged_tile(
     job: Annotated[Job, fastapi.Depends(dep_job)],
     tile_pos: Annotated[TilePos, fastapi.Depends(dep_tile_pos)],
 ):
-    try:
-        data_bytes = job.local_storage.merged_fits_tile.load_compressed_data(tile_pos)
-    except FileNotFoundError:  # pragma: no cover
-        raise fastapi.HTTPException(status_code=404)
+    data_bytes = job.local_storage.merged_fits_tile.load_compressed_data(tile_pos)
     return fastapi.Response(data_bytes, media_type='application/npy+zstd')
 
 
