@@ -8,13 +8,16 @@
 
 以下を順に実施してください。
 
-* [x] `frontend/app/src/components/JobList/index.tsx`
+* [ ] `backend/src/quicklook/coordinator/housekeeping/__init__.py:select_quicklook_to_delete`のリファクタリング
 
-  各ジョブのデザインの修正をお願いします。
-  現在、ジョブに対する要素の背景が斜めのグラデーションになっています。
-  これを修正して縦方向のグラデーションにしてください。
+    現在の実装はアクセス頻度の高いものは消えないことになっている。
+    しかしこれでは、キャッシュにアクセス頻度が高いものだけ残ってしまった時に新しいデータが追加されなくなってしまう。
+    アクセス頻度が高いものと新しいもののバランスを取る必要がある。
+    10(設定可能の値)エントリー分はアクセス頻度と関係なく新しいものを残すように変更してください。
 
-* [x] `frontend/app/src/pages/Home/Viewer/QuicklookJobMonitor.tsx`
+* [ ] `frontend/app/src/pages/Home/Viewer/index.tsx`の`<QuicklookJobMonitor/>`の見直し
 
-  現在、とある契機で`scrollIntoView`が呼ばれているがこれが呼ばれる頻度が高すぎる。
-  statusListの数が変わった時だけ呼び出すようにしてください。
+    `<QuicklookJobMonitor/>`が`<JobList/>`を表示している時やリストが長いと最上部までスクロールできません。
+    これは`scrollIntoView`の問題ではないです。マウスホイールでも最上部までスクロールできません。
+    `<QuicklookJobMonitor/>`はアプリ全体でここでしか使われていません。親要素も検証し、問題を特定・修正してください。
+
