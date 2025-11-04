@@ -24,8 +24,6 @@ RUN \
   pip install -U pip && \
   pip install -e .
 
-COPY ./backend/lib /app/lib
-  
 COPY ./backend/ /app/
 
 COPY --from=frontend /frontend/app/dist/ /app/frontend-assets
