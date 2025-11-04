@@ -23,6 +23,25 @@
                 }
             }
         },
+        "/api/status": {
+            "get": {
+                "summary": "Route Get Status",
+                "description": "Get system status including frontend, coordinator, and generators.",
+                "operationId": "route_get_status",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SystemStatus"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/healthz": {
             "get": {
                 "summary": "Healthz",
@@ -39,27 +58,21 @@
                 }
             }
         },
-        "/api/ready": {
-            "get": {
-                "summary": "Ready",
-                "operationId": "ready",
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/quicklooks/{id}/tiles/{z}/{y}/{x}": {
+        "/api/quicklooks/{visit_name}/tiles/{z}/{y}/{x}": {
             "get": {
                 "summary": "Get Tile",
                 "operationId": "get_tile",
                 "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    },
                     {
                         "name": "z",
                         "in": "path",
@@ -86,16 +99,6 @@
                             "type": "integer",
                             "title": "X"
                         }
-                    },
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^\\w+:\\w+$",
-                            "title": "Id"
-                        }
                     }
                 ],
                 "responses": {
@@ -120,28 +123,29 @@
                 }
             }
         },
-        "/api/quicklooks/{id}/fits_header/{ccd_name}": {
+        "/api/quicklooks/{visit_name}/fits_header/{ccd_name}": {
             "get": {
                 "summary": "Get Fits Header",
                 "operationId": "get_fits_header",
                 "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    },
                     {
                         "name": "ccd_name",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
+                            "pattern": "^\\w+$",
                             "title": "Ccd Name"
-                        }
-                    },
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^\\w+:\\w+$",
-                            "title": "Id"
                         }
                     }
                 ],
@@ -155,7 +159,7 @@
                                     "items": {
                                         "$ref": "#/components/schemas/HeaderType"
                                     },
-                                    "title": "Response Get Fits Header Api Quicklooks  Id  Fits Header  Ccd Name  Get"
+                                    "title": "Response Get Fits Header Api Quicklooks  Visit Name  Fits Header  Ccd Name  Get"
                                 }
                             }
                         }
@@ -167,109 +171,6 @@
                                 "schema": {
                                     "$ref": "#/components/schemas/HTTPValidationError"
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/quicklooks/{id}/status": {
-            "get": {
-                "summary": "Show Quicklook Status",
-                "operationId": "show_quicklook_status",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "title": "Id"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "anyOf": [
-                                        {
-                                            "$ref": "#/components/schemas/QuicklookStatus"
-                                        },
-                                        {
-                                            "type": "null"
-                                        }
-                                    ],
-                                    "title": "Response Show Quicklook Status Api Quicklooks  Id  Status Get"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/quicklooks/{id}/metadata": {
-            "get": {
-                "summary": "Show Quicklook Metadata",
-                "operationId": "show_quicklook_metadata",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "title": "Id"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/QuicklookMetadata"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/quicklooks/*": {
-            "delete": {
-                "summary": "Delete All Quicklooks",
-                "description": "Delete all quicklooks",
-                "operationId": "delete_all_quicklooks",
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
                             }
                         }
                     }
@@ -285,7 +186,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/QuicklookCreateFrontend"
+                                "$ref": "#/components/schemas/CreateQuicklookRequest"
                             }
                         }
                     },
@@ -297,6 +198,140 @@
                         "content": {
                             "application/json": {
                                 "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/vote": {
+            "post": {
+                "summary": "Vote Quicklook",
+                "operationId": "vote_quicklook",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/unvote": {
+            "post": {
+                "summary": "Unvote Quicklook",
+                "operationId": "unvote_quicklook",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/*/status": {
+            "get": {
+                "summary": "Get All Quicklook Jobs",
+                "operationId": "get_all_quicklook_jobs",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/JobStatusList"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/quicklook_metadata": {
+            "get": {
+                "summary": "Get Quicklook Metadata",
+                "operationId": "get_quicklook_metadata",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QuicklookMetadata"
+                                }
                             }
                         }
                     },
@@ -405,18 +440,18 @@
                 }
             }
         },
-        "/api/visits/{id}/ccds/{ccd_name}": {
+        "/api/visits/{visit_name}/ccds/{ccd_name}": {
             "get": {
                 "summary": "Get Visit Metadata",
                 "operationId": "get_visit_metadata",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "visit_name",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "title": "Id"
+                            "title": "Visit Name"
                         }
                     },
                     {
@@ -501,28 +536,29 @@
                 }
             }
         },
-        "/api/quicklooks/{id}/fits/{ccd_name}": {
+        "/api/quicklooks/{visit_name}/fits/{ccd_name}": {
             "get": {
                 "summary": "Get Fits File",
                 "operationId": "get_fits_file",
                 "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    },
                     {
                         "name": "ccd_name",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
+                            "pattern": "^\\w+$",
                             "title": "Ccd Name"
-                        }
-                    },
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^\\w+:\\w+$",
-                            "title": "Id"
                         }
                     }
                 ],
@@ -541,24 +577,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/status": {
-            "get": {
-                "summary": "Get Pod Status",
-                "operationId": "get_pod_status",
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/StatusResponse"
                                 }
                             }
                         }
@@ -588,16 +606,53 @@
                 }
             }
         },
-        "/api/cache_entries:cleanup": {
-            "post": {
-                "summary": "Cleanup Cache Entries",
-                "operationId": "cleanup_cache_entries",
+        "/api/cache_entries/*": {
+            "delete": {
+                "summary": "Delete All Cache Entries",
+                "operationId": "delete_all_cache_entries",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
                         "content": {
                             "application/json": {
                                 "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/cache_entries/{visit_name}": {
+            "delete": {
+                "summary": "Delete Cache Entry",
+                "operationId": "delete_cache_entry",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
                             }
                         }
                     }
@@ -718,70 +773,11 @@
                     }
                 }
             }
-        },
-        "/api/hips": {
-            "get": {
-                "summary": "List Hips Repositories",
-                "operationId": "list_hips_repositories",
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "items": {
-                                        "$ref": "#/components/schemas/HipsRepository"
-                                    },
-                                    "type": "array",
-                                    "title": "Response List Hips Repositories Api Hips Get"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/hips/{path}": {
-            "get": {
-                "summary": "Get Hips File",
-                "operationId": "get_hips_file",
-                "parameters": [
-                    {
-                        "name": "path",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "title": "Path"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     },
     "components": {
         "schemas": {
-            "AmpMeta": {
+            "AmpMetadata": {
                 "properties": {
                     "amp_id": {
                         "type": "integer",
@@ -796,7 +792,7 @@
                     "amp_id",
                     "bbox"
                 ],
-                "title": "AmpMeta"
+                "title": "AmpMetadata"
             },
             "BBox": {
                 "properties": {
@@ -828,36 +824,30 @@
             },
             "CacheEntry": {
                 "properties": {
-                    "id": {
+                    "visit_name": {
                         "type": "string",
-                        "title": "Id"
+                        "title": "Visit Name"
                     },
-                    "phase": {
-                        "type": "string",
-                        "enum": [
-                            "ready",
-                            "in_progress",
-                            "deleting"
-                        ],
-                        "title": "Phase"
+                    "ready": {
+                        "type": "boolean",
+                        "title": "Ready"
                     },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
                         "title": "Created At"
                     },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "title": "Updated At"
+                    "disk_usage": {
+                        "type": "integer",
+                        "title": "Disk Usage"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "id",
-                    "phase",
+                    "visit_name",
+                    "ready",
                     "created_at",
-                    "updated_at"
+                    "disk_usage"
                 ],
                 "title": "CacheEntry"
             },
@@ -880,34 +870,18 @@
                 "maxItems": 4,
                 "minItems": 4
             },
-            "CcdId": {
+            "CcdMetadata": {
                 "properties": {
-                    "visit": {
-                        "$ref": "#/components/schemas/Visit"
-                    },
                     "ccd_name": {
                         "type": "string",
                         "title": "Ccd Name"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "visit",
-                    "ccd_name"
-                ],
-                "title": "CcdId"
-            },
-            "CcdMeta": {
-                "properties": {
-                    "ccd_id": {
-                        "$ref": "#/components/schemas/CcdId"
                     },
                     "image_stat": {
                         "$ref": "#/components/schemas/ImageStat"
                     },
                     "amps": {
                         "items": {
-                            "$ref": "#/components/schemas/AmpMeta"
+                            "$ref": "#/components/schemas/AmpMetadata"
                         },
                         "type": "array",
                         "title": "Amps"
@@ -918,12 +892,69 @@
                 },
                 "type": "object",
                 "required": [
-                    "ccd_id",
+                    "ccd_name",
                     "image_stat",
                     "amps",
                     "bbox"
                 ],
-                "title": "CcdMeta"
+                "title": "CcdMetadata"
+            },
+            "ContainerStatus": {
+                "properties": {
+                    "container_name": {
+                        "type": "string",
+                        "title": "Container Name",
+                        "description": "Container hostname"
+                    },
+                    "memory_max": {
+                        "type": "integer",
+                        "title": "Memory Max",
+                        "description": "Memory limit in bytes (0 if unlimited)"
+                    },
+                    "memory_current": {
+                        "type": "integer",
+                        "title": "Memory Current",
+                        "description": "Current total memory usage in bytes"
+                    },
+                    "memory_stats": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/MemoryStats"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Detailed memory breakdown from cgroup memory.stat"
+                    },
+                    "cpu_max": {
+                        "type": "integer",
+                        "title": "Cpu Max",
+                        "description": "CPU quota in microseconds per period (0 if unlimited)"
+                    },
+                    "cpu_current": {
+                        "type": "integer",
+                        "title": "Cpu Current",
+                        "description": "Accumulated CPU usage time in microseconds since container start"
+                    },
+                    "uptime": {
+                        "type": "number",
+                        "title": "Uptime",
+                        "description": "Container uptime in seconds since boot"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "container_name",
+                    "memory_max",
+                    "memory_current",
+                    "memory_stats",
+                    "cpu_max",
+                    "cpu_current",
+                    "uptime"
+                ],
+                "title": "ContainerStatus",
+                "description": "System status of a container."
             },
             "ContextMenuTemplate": {
                 "properties": {
@@ -948,10 +979,24 @@
                 ],
                 "title": "ContextMenuTemplate"
             },
-            "DataSourceCcdMetadata": {
+            "CreateQuicklookRequest": {
                 "properties": {
                     "visit": {
-                        "$ref": "#/components/schemas/Visit"
+                        "type": "string",
+                        "title": "Visit"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit"
+                ],
+                "title": "CreateQuicklookRequest"
+            },
+            "DataSourceCcdMetadata": {
+                "properties": {
+                    "visit_name": {
+                        "type": "string",
+                        "title": "Visit Name"
                     },
                     "ccd_name": {
                         "type": "string",
@@ -976,7 +1021,7 @@
                 },
                 "type": "object",
                 "required": [
-                    "visit",
+                    "visit_name",
                     "ccd_name",
                     "detector",
                     "exposure",
@@ -984,34 +1029,6 @@
                     "uuid"
                 ],
                 "title": "DataSourceCcdMetadata"
-            },
-            "DiskInfo": {
-                "properties": {
-                    "mount_point": {
-                        "type": "string",
-                        "title": "Mount Point"
-                    },
-                    "total": {
-                        "type": "integer",
-                        "title": "Total"
-                    },
-                    "used": {
-                        "type": "integer",
-                        "title": "Used"
-                    },
-                    "device": {
-                        "type": "string",
-                        "title": "Device"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "mount_point",
-                    "total",
-                    "used",
-                    "device"
-                ],
-                "title": "DiskInfo"
             },
             "Entry": {
                 "properties": {
@@ -1047,26 +1064,6 @@
                 ],
                 "title": "Entry"
             },
-            "GenerateProgress": {
-                "properties": {
-                    "download": {
-                        "$ref": "#/components/schemas/Progress"
-                    },
-                    "preprocess": {
-                        "$ref": "#/components/schemas/Progress"
-                    },
-                    "maketile": {
-                        "$ref": "#/components/schemas/Progress"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "download",
-                    "preprocess",
-                    "maketile"
-                ],
-                "title": "GenerateProgress"
-            },
             "HTTPValidationError": {
                 "properties": {
                     "detail": {
@@ -1085,19 +1082,6 @@
                     "$ref": "#/components/schemas/CardType"
                 },
                 "type": "array"
-            },
-            "HipsRepository": {
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "title": "Name"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "name"
-                ],
-                "title": "HipsRepository"
             },
             "ImageStat": {
                 "properties": {
@@ -1139,218 +1123,310 @@
                 ],
                 "title": "ImageStat"
             },
-            "MergeProgress": {
+            "Job": {
                 "properties": {
-                    "merge": {
-                        "$ref": "#/components/schemas/Progress"
+                    "visit": {
+                        "type": "string",
+                        "title": "Visit"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "merge"
+                    "visit"
                 ],
-                "title": "MergeProgress"
+                "title": "Job"
             },
-            "PodStatus": {
+            "JobStatus": {
                 "properties": {
-                    "hostname": {
+                    "job": {
+                        "$ref": "#/components/schemas/Job"
+                    },
+                    "stage": {
                         "type": "string",
-                        "title": "Hostname"
+                        "enum": [
+                            "queued",
+                            "generate_single_fits_tiles",
+                            "merge_tiles",
+                            "upload_to_object_storage",
+                            "ready",
+                            "error"
+                        ],
+                        "title": "Stage",
+                        "default": "queued"
                     },
-                    "ip_addr": {
-                        "type": "string",
-                        "title": "Ip Addr"
-                    },
-                    "memory_total": {
-                        "type": "integer",
-                        "title": "Memory Total"
-                    },
-                    "memory_used": {
-                        "type": "integer",
-                        "title": "Memory Used"
-                    },
-                    "disks": {
-                        "items": {
-                            "$ref": "#/components/schemas/DiskInfo"
+                    "generate_single_fits_tiles": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Progress"
                         },
-                        "type": "array",
-                        "title": "Disks"
+                        "type": "object",
+                        "title": "Generate Single Fits Tiles"
+                    },
+                    "merge_tiles": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Progress"
+                        },
+                        "type": "object",
+                        "title": "Merge Tiles"
+                    },
+                    "transfer_tiles": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Progress"
+                        },
+                        "type": "object",
+                        "title": "Transfer Tiles"
+                    },
+                    "error_message": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Error Message"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "hostname",
-                    "ip_addr",
-                    "memory_total",
-                    "memory_used",
-                    "disks"
+                    "job"
                 ],
-                "title": "PodStatus"
+                "title": "JobStatus"
+            },
+            "JobStatusList": {
+                "additionalProperties": {
+                    "$ref": "#/components/schemas/JobStatus"
+                },
+                "type": "object"
+            },
+            "MemoryStats": {
+                "properties": {
+                    "anon": {
+                        "type": "integer",
+                        "title": "Anon",
+                        "description": "Anonymous memory usage in bytes (private memory not backed by files)"
+                    },
+                    "file": {
+                        "type": "integer",
+                        "title": "File",
+                        "description": "File-backed memory usage in bytes (page cache)"
+                    },
+                    "kernel": {
+                        "type": "integer",
+                        "title": "Kernel",
+                        "description": "Kernel memory usage in bytes"
+                    },
+                    "slab": {
+                        "type": "integer",
+                        "title": "Slab",
+                        "description": "Slab memory usage in bytes (kernel data structures)"
+                    },
+                    "sock": {
+                        "type": "integer",
+                        "title": "Sock",
+                        "description": "Socket buffer memory usage in bytes"
+                    },
+                    "shmem": {
+                        "type": "integer",
+                        "title": "Shmem",
+                        "description": "Shared memory usage in bytes"
+                    },
+                    "file_mapped": {
+                        "type": "integer",
+                        "title": "File Mapped",
+                        "description": "Memory-mapped file pages in bytes"
+                    },
+                    "file_dirty": {
+                        "type": "integer",
+                        "title": "File Dirty",
+                        "description": "Dirty file-backed pages waiting to be written in bytes"
+                    },
+                    "file_writeback": {
+                        "type": "integer",
+                        "title": "File Writeback",
+                        "description": "File-backed pages currently being written back in bytes"
+                    },
+                    "inactive_anon": {
+                        "type": "integer",
+                        "title": "Inactive Anon",
+                        "description": "Inactive anonymous memory in bytes (candidates for swapping)"
+                    },
+                    "active_anon": {
+                        "type": "integer",
+                        "title": "Active Anon",
+                        "description": "Active anonymous memory in bytes (recently accessed)"
+                    },
+                    "inactive_file": {
+                        "type": "integer",
+                        "title": "Inactive File",
+                        "description": "Inactive file-backed memory in bytes (candidates for reclaim)"
+                    },
+                    "active_file": {
+                        "type": "integer",
+                        "title": "Active File",
+                        "description": "Active file-backed memory in bytes (recently accessed)"
+                    },
+                    "unevictable": {
+                        "type": "integer",
+                        "title": "Unevictable",
+                        "description": "Unevictable memory in bytes (locked, cannot be swapped)"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "anon",
+                    "file",
+                    "kernel",
+                    "slab",
+                    "sock",
+                    "shmem",
+                    "file_mapped",
+                    "file_dirty",
+                    "file_writeback",
+                    "inactive_anon",
+                    "active_anon",
+                    "inactive_file",
+                    "active_file",
+                    "unevictable"
+                ],
+                "title": "MemoryStats",
+                "description": "Detailed memory statistics from cgroup memory.stat."
             },
             "Progress": {
                 "properties": {
-                    "count": {
-                        "type": "integer",
-                        "title": "Count"
-                    },
                     "total": {
                         "type": "integer",
                         "title": "Total"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "title": "Count",
+                        "default": 0
                     }
                 },
                 "type": "object",
                 "required": [
-                    "count",
                     "total"
                 ],
                 "title": "Progress"
             },
-            "QuicklookCreateFrontend": {
+            "QuicklookMetadata": {
+                "anyOf": [
+                    {
+                        "$ref": "#/components/schemas/QuicklookMetadataReady"
+                    },
+                    {
+                        "$ref": "#/components/schemas/QuicklookMetadataProgress"
+                    },
+                    {
+                        "$ref": "#/components/schemas/QuicklookMetadataPending"
+                    },
+                    {
+                        "$ref": "#/components/schemas/QuicklookMetadataError"
+                    }
+                ]
+            },
+            "QuicklookMetadataError": {
                 "properties": {
-                    "id": {
+                    "visit_name": {
                         "type": "string",
-                        "title": "Id"
+                        "title": "Visit Name"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "error",
+                        "title": "Type",
+                        "default": "error"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "id"
+                    "visit_name"
                 ],
-                "title": "QuicklookCreateFrontend"
+                "title": "QuicklookMetadataError"
             },
-            "QuicklookJobPhase": {
-                "type": "integer",
-                "enum": [
-                    0,
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    6,
-                    7,
-                    -1
-                ],
-                "title": "QuicklookJobPhase"
-            },
-            "QuicklookMetadata": {
+            "QuicklookMetadataPending": {
                 "properties": {
-                    "id": {
+                    "visit_name": {
                         "type": "string",
-                        "title": "Id"
+                        "title": "Visit Name"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "pending",
+                        "title": "Type",
+                        "default": "pending"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit_name"
+                ],
+                "title": "QuicklookMetadataPending"
+            },
+            "QuicklookMetadataProgress": {
+                "properties": {
+                    "visit_name": {
+                        "type": "string",
+                        "title": "Visit Name"
+                    },
+                    "progress": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/Progress"
+                        },
+                        "type": "object",
+                        "title": "Progress"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "progress",
+                        "title": "Type",
+                        "default": "progress"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit_name",
+                    "progress"
+                ],
+                "title": "QuicklookMetadataProgress"
+            },
+            "QuicklookMetadataReady": {
+                "properties": {
+                    "visit_name": {
+                        "type": "string",
+                        "title": "Visit Name"
+                    },
+                    "ccd_metadata_list": {
+                        "items": {
+                            "$ref": "#/components/schemas/CcdMetadata"
+                        },
+                        "type": "array",
+                        "title": "Ccd Metadata List"
                     },
                     "wcs": {
+                        "additionalProperties": true,
                         "type": "object",
                         "title": "Wcs"
                     },
-                    "ccd_meta": {
-                        "anyOf": [
-                            {
-                                "items": {
-                                    "$ref": "#/components/schemas/CcdMeta"
-                                },
-                                "type": "array"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Ccd Meta"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "id",
-                    "wcs",
-                    "ccd_meta"
-                ],
-                "title": "QuicklookMetadata"
-            },
-            "QuicklookStatus": {
-                "properties": {
-                    "id": {
+                    "type": {
                         "type": "string",
-                        "title": "Id"
-                    },
-                    "phase": {
-                        "$ref": "#/components/schemas/QuicklookJobPhase"
-                    },
-                    "generate_progress": {
-                        "anyOf": [
-                            {
-                                "additionalProperties": {
-                                    "$ref": "#/components/schemas/GenerateProgress"
-                                },
-                                "type": "object"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Generate Progress"
-                    },
-                    "transfer_progress": {
-                        "anyOf": [
-                            {
-                                "additionalProperties": {
-                                    "$ref": "#/components/schemas/TransferProgress"
-                                },
-                                "type": "object"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Transfer Progress"
-                    },
-                    "merge_progress": {
-                        "anyOf": [
-                            {
-                                "additionalProperties": {
-                                    "$ref": "#/components/schemas/MergeProgress"
-                                },
-                                "type": "object"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Merge Progress"
+                        "const": "ready",
+                        "title": "Type",
+                        "default": "ready"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "id",
-                    "phase",
-                    "generate_progress",
-                    "transfer_progress",
-                    "merge_progress"
+                    "visit_name",
+                    "ccd_metadata_list",
+                    "wcs"
                 ],
-                "title": "QuicklookStatus"
-            },
-            "StatusResponse": {
-                "properties": {
-                    "frontend": {
-                        "$ref": "#/components/schemas/PodStatus"
-                    },
-                    "coordinator": {
-                        "$ref": "#/components/schemas/PodStatus"
-                    },
-                    "generators": {
-                        "items": {
-                            "$ref": "#/components/schemas/PodStatus"
-                        },
-                        "type": "array",
-                        "title": "Generators"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "frontend",
-                    "coordinator",
-                    "generators"
-                ],
-                "title": "StatusResponse"
+                "title": "QuicklookMetadataReady"
             },
             "SystemInfo": {
                 "properties": {
@@ -1364,26 +1440,44 @@
                         },
                         "type": "array",
                         "title": "Context Menu Templates"
+                    },
+                    "max_object_storage_usage": {
+                        "type": "integer",
+                        "title": "Max Object Storage Usage"
                     }
                 },
                 "type": "object",
                 "required": [
                     "admin_page",
-                    "context_menu_templates"
+                    "context_menu_templates",
+                    "max_object_storage_usage"
                 ],
                 "title": "SystemInfo"
             },
-            "TransferProgress": {
+            "SystemStatus": {
                 "properties": {
-                    "transfer": {
-                        "$ref": "#/components/schemas/Progress"
+                    "frontend": {
+                        "$ref": "#/components/schemas/ContainerStatus"
+                    },
+                    "coordinator": {
+                        "$ref": "#/components/schemas/ContainerStatus"
+                    },
+                    "generators": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/ContainerStatus"
+                        },
+                        "type": "object",
+                        "title": "Generators"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "transfer"
+                    "frontend",
+                    "coordinator",
+                    "generators"
                 ],
-                "title": "TransferProgress"
+                "title": "SystemStatus",
+                "description": "System status including frontend, coordinator, and generators."
             },
             "ValidationError": {
                 "properties": {
@@ -1417,19 +1511,6 @@
                     "type"
                 ],
                 "title": "ValidationError"
-            },
-            "Visit": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "title": "Id"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "id"
-                ],
-                "title": "Visit"
             },
             "VisitEntry": {
                 "properties": {

@@ -1,5 +1,6 @@
 import { useMemo } from "react"
-import { CcdMeta, useGetFitsHeaderQuery } from "../../../store/api/openapi"
+import { CcdMetadata, useGetFitsHeaderQuery } from "../../../store/api/openapi"
+import { useHomeContext } from "../context"
 import { useFocusedAmp, useFocusedCcd } from "../hooks"
 
 
@@ -12,9 +13,10 @@ export function HeaderViewer() {
   )
 }
 
-function HeaderViewerOfCcd({ ccd }: { ccd: CcdMeta }) {
-  const { ccd_name, visit } = ccd.ccd_id
-  const { data } = useGetFitsHeaderQuery({ ccdName: ccd_name, id: `${visit.id}` })
+function HeaderViewerOfCcd({ ccd }: { ccd: CcdMetadata }) {
+  const { currentQuicklook } = useHomeContext()
+  const { ccd_name } = ccd
+  const { data } = useGetFitsHeaderQuery({ ccdName: ccd_name, visitName: `${currentQuicklook.id}` })
   const focusedAmp = useFocusedAmp()
   const headerNumber = useMemo(() => focusedAmp?.amp_id ?? 0, [focusedAmp])
 

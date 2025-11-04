@@ -16,6 +16,6 @@ curl 'https://usdf-rsp-dev.slac.stanford.edu/fov-quicklook/api/quicklooks' \
 -H 'Content-Length: 26' \
 -H 'Connection: keep-alive' \
 -H 'Sec-Fetch-Dest: empty' \
--H 'Cookie: gafaelfawr="xxx="; _ga_2BMBCFJ72S=GS1.1.1744597213.1.1.1744599045.0.0.0; _ga_4TNTC7E7PN=GS1.1.1744597213.1.1.1744599045.0.0.0; _ga_7FEJNFK38V=GS1.1.1744597213.1.1.1744599045.0.0.0; _ga=GA1.1.1184893326.1744597214' \
+-H 'Cookie: gafaelfawr="xxx="' \
 -H 'Priority: u=3, i' \
 --data-raw '{"id":"raw:2025042300208"}'

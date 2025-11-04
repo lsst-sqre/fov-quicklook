@@ -4,39 +4,24 @@ const injectedRtkApi = api.injectEndpoints({
     getSystemInfo: build.query<GetSystemInfoApiResponse, GetSystemInfoApiArg>({
       query: () => ({ url: `/api/system_info` }),
     }),
+    routeGetStatus: build.query<
+      RouteGetStatusApiResponse,
+      RouteGetStatusApiArg
+    >({
+      query: () => ({ url: `/api/status` }),
+    }),
     healthz: build.query<HealthzApiResponse, HealthzApiArg>({
       query: () => ({ url: `/api/healthz` }),
     }),
-    ready: build.query<ReadyApiResponse, ReadyApiArg>({
-      query: () => ({ url: `/api/ready` }),
-    }),
     getTile: build.query<GetTileApiResponse, GetTileApiArg>({
       query: (queryArg) => ({
-        url: `/api/quicklooks/${queryArg.id}/tiles/${queryArg.z}/${queryArg.y}/${queryArg.x}`,
+        url: `/api/quicklooks/${queryArg.visitName}/tiles/${queryArg.z}/${queryArg.y}/${queryArg.x}`,
       }),
     }),
     getFitsHeader: build.query<GetFitsHeaderApiResponse, GetFitsHeaderApiArg>({
       query: (queryArg) => ({
-        url: `/api/quicklooks/${queryArg.id}/fits_header/${queryArg.ccdName}`,
+        url: `/api/quicklooks/${queryArg.visitName}/fits_header/${queryArg.ccdName}`,
       }),
-    }),
-    showQuicklookStatus: build.query<
-      ShowQuicklookStatusApiResponse,
-      ShowQuicklookStatusApiArg
-    >({
-      query: (queryArg) => ({ url: `/api/quicklooks/${queryArg.id}/status` }),
-    }),
-    showQuicklookMetadata: build.query<
-      ShowQuicklookMetadataApiResponse,
-      ShowQuicklookMetadataApiArg
-    >({
-      query: (queryArg) => ({ url: `/api/quicklooks/${queryArg.id}/metadata` }),
-    }),
-    deleteAllQuicklooks: build.mutation<
-      DeleteAllQuicklooksApiResponse,
-      DeleteAllQuicklooksApiArg
-    >({
-      query: () => ({ url: `/api/quicklooks/*`, method: "DELETE" }),
     }),
     createQuicklook: build.mutation<
       CreateQuicklookApiResponse,
@@ -45,7 +30,39 @@ const injectedRtkApi = api.injectEndpoints({
       query: (queryArg) => ({
         url: `/api/quicklooks`,
         method: "POST",
-        body: queryArg.quicklookCreateFrontend,
+        body: queryArg.createQuicklookRequest,
+      }),
+    }),
+    voteQuicklook: build.mutation<
+      VoteQuicklookApiResponse,
+      VoteQuicklookApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/vote`,
+        method: "POST",
+      }),
+    }),
+    unvoteQuicklook: build.mutation<
+      UnvoteQuicklookApiResponse,
+      UnvoteQuicklookApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/unvote`,
+        method: "POST",
+      }),
+    }),
+    getAllQuicklookJobs: build.query<
+      GetAllQuicklookJobsApiResponse,
+      GetAllQuicklookJobsApiArg
+    >({
+      query: () => ({ url: `/api/quicklooks/*/status` }),
+    }),
+    getQuicklookMetadata: build.query<
+      GetQuicklookMetadataApiResponse,
+      GetQuicklookMetadataApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/quicklook_metadata`,
       }),
     }),
     listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
@@ -64,7 +81,7 @@ const injectedRtkApi = api.injectEndpoints({
       GetVisitMetadataApiArg
     >({
       query: (queryArg) => ({
-        url: `/api/visits/${queryArg.id}/ccds/${queryArg.ccdName}`,
+        url: `/api/visits/${queryArg.visitName}/ccds/${queryArg.ccdName}`,
       }),
     }),
     getExposureDataTypes: build.query<
@@ -75,11 +92,8 @@ const injectedRtkApi = api.injectEndpoints({
     }),
     getFitsFile: build.query<GetFitsFileApiResponse, GetFitsFileApiArg>({
       query: (queryArg) => ({
-        url: `/api/quicklooks/${queryArg.id}/fits/${queryArg.ccdName}`,
+        url: `/api/quicklooks/${queryArg.visitName}/fits/${queryArg.ccdName}`,
       }),
-    }),
-    getPodStatus: build.query<GetPodStatusApiResponse, GetPodStatusApiArg>({
-      query: () => ({ url: `/api/status` }),
     }),
     listCacheEntries: build.query<
       ListCacheEntriesApiResponse,
@@ -87,11 +101,20 @@ const injectedRtkApi = api.injectEndpoints({
     >({
       query: () => ({ url: `/api/cache_entries` }),
     }),
-    cleanupCacheEntries: build.mutation<
-      CleanupCacheEntriesApiResponse,
-      CleanupCacheEntriesApiArg
+    deleteAllCacheEntries: build.mutation<
+      DeleteAllCacheEntriesApiResponse,
+      DeleteAllCacheEntriesApiArg
     >({
-      query: () => ({ url: `/api/cache_entries:cleanup`, method: "POST" }),
+      query: () => ({ url: `/api/cache_entries/*`, method: "DELETE" }),
+    }),
+    deleteCacheEntry: build.mutation<
+      DeleteCacheEntryApiResponse,
+      DeleteCacheEntryApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/cache_entries/${queryArg.visitName}`,
+        method: "DELETE",
+      }),
     }),
     listStorageEntries: build.query<
       ListStorageEntriesApiResponse,
@@ -128,15 +151,6 @@ const injectedRtkApi = api.injectEndpoints({
         },
       }),
     }),
-    listHipsRepositories: build.query<
-      ListHipsRepositoriesApiResponse,
-      ListHipsRepositoriesApiArg
-    >({
-      query: () => ({ url: `/api/hips` }),
-    }),
-    getHipsFile: build.query<GetHipsFileApiResponse, GetHipsFileApiArg>({
-      query: (queryArg) => ({ url: `/api/hips/${queryArg.path}` }),
-    }),
   }),
   overrideExisting: false,
 });
@@ -144,40 +158,46 @@ export { injectedRtkApi as api };
 export type GetSystemInfoApiResponse =
   /** status 200 Successful Response */ SystemInfo;
 export type GetSystemInfoApiArg = void;
+export type RouteGetStatusApiResponse =
+  /** status 200 Successful Response */ SystemStatus;
+export type RouteGetStatusApiArg = void;
 export type HealthzApiResponse = /** status 200 Successful Response */ any;
 export type HealthzApiArg = void;
-export type ReadyApiResponse = /** status 200 Successful Response */ any;
-export type ReadyApiArg = void;
 export type GetTileApiResponse = /** status 200 Successful Response */ any;
 export type GetTileApiArg = {
+  visitName: string;
   z: number;
   y: number;
   x: number;
-  id: string;
 };
 export type GetFitsHeaderApiResponse =
   /** status 200 Successful Response */ HeaderType[];
 export type GetFitsHeaderApiArg = {
+  visitName: string;
   ccdName: string;
-  id: string;
 };
-export type ShowQuicklookStatusApiResponse =
-  /** status 200 Successful Response */ QuicklookStatus | null;
-export type ShowQuicklookStatusApiArg = {
-  id: string;
-};
-export type ShowQuicklookMetadataApiResponse =
-  /** status 200 Successful Response */ QuicklookMetadata;
-export type ShowQuicklookMetadataApiArg = {
-  id: string;
-};
-export type DeleteAllQuicklooksApiResponse =
-  /** status 200 Successful Response */ any;
-export type DeleteAllQuicklooksApiArg = void;
 export type CreateQuicklookApiResponse =
   /** status 200 Successful Response */ any;
 export type CreateQuicklookApiArg = {
-  quicklookCreateFrontend: QuicklookCreateFrontend;
+  createQuicklookRequest: CreateQuicklookRequest;
+};
+export type VoteQuicklookApiResponse =
+  /** status 200 Successful Response */ any;
+export type VoteQuicklookApiArg = {
+  visitName: string;
+};
+export type UnvoteQuicklookApiResponse =
+  /** status 200 Successful Response */ any;
+export type UnvoteQuicklookApiArg = {
+  visitName: string;
+};
+export type GetAllQuicklookJobsApiResponse =
+  /** status 200 Successful Response */ JobStatusList;
+export type GetAllQuicklookJobsApiArg = void;
+export type GetQuicklookMetadataApiResponse =
+  /** status 200 Successful Response */ QuicklookMetadata;
+export type GetQuicklookMetadataApiArg = {
+  visitName: string;
 };
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitEntry[];
@@ -190,7 +210,7 @@ export type ListVisitsApiArg = {
 export type GetVisitMetadataApiResponse =
   /** status 200 Successful Response */ DataSourceCcdMetadata;
 export type GetVisitMetadataApiArg = {
-  id: string;
+  visitName: string;
   ccdName: string;
 };
 export type GetExposureDataTypesApiResponse =
@@ -204,18 +224,20 @@ export type GetExposureDataTypesApiArg = {
 };
 export type GetFitsFileApiResponse = /** status 200 Successful Response */ any;
 export type GetFitsFileApiArg = {
+  visitName: string;
   ccdName: string;
-  id: string;
 };
-export type GetPodStatusApiResponse =
-  /** status 200 Successful Response */ StatusResponse;
-export type GetPodStatusApiArg = void;
 export type ListCacheEntriesApiResponse =
   /** status 200 Successful Response */ CacheEntry[];
 export type ListCacheEntriesApiArg = void;
-export type CleanupCacheEntriesApiResponse =
+export type DeleteAllCacheEntriesApiResponse =
   /** status 200 Successful Response */ any;
-export type CleanupCacheEntriesApiArg = void;
+export type DeleteAllCacheEntriesApiArg = void;
+export type DeleteCacheEntryApiResponse =
+  /** status 200 Successful Response */ any;
+export type DeleteCacheEntryApiArg = {
+  visitName: string;
+};
 export type ListStorageEntriesApiResponse =
   /** status 200 Successful Response */ Entry[];
 export type ListStorageEntriesApiArg = {
@@ -231,13 +253,6 @@ export type DeleteStorageEntriesByPrefixApiResponse =
 export type DeleteStorageEntriesByPrefixApiArg = {
   prefix: string;
 };
-export type ListHipsRepositoriesApiResponse =
-  /** status 200 Successful Response */ HipsRepository[];
-export type ListHipsRepositoriesApiArg = void;
-export type GetHipsFileApiResponse = /** status 200 Successful Response */ any;
-export type GetHipsFileApiArg = {
-  path: string;
-};
 export type ContextMenuTemplate = {
   name: string;
   template: string;
@@ -246,6 +261,60 @@ export type ContextMenuTemplate = {
 export type SystemInfo = {
   admin_page: boolean;
   context_menu_templates: ContextMenuTemplate[];
+  max_object_storage_usage: number;
+};
+export type MemoryStats = {
+  /** Anonymous memory usage in bytes (private memory not backed by files) */
+  anon: number;
+  /** File-backed memory usage in bytes (page cache) */
+  file: number;
+  /** Kernel memory usage in bytes */
+  kernel: number;
+  /** Slab memory usage in bytes (kernel data structures) */
+  slab: number;
+  /** Socket buffer memory usage in bytes */
+  sock: number;
+  /** Shared memory usage in bytes */
+  shmem: number;
+  /** Memory-mapped file pages in bytes */
+  file_mapped: number;
+  /** Dirty file-backed pages waiting to be written in bytes */
+  file_dirty: number;
+  /** File-backed pages currently being written back in bytes */
+  file_writeback: number;
+  /** Inactive anonymous memory in bytes (candidates for swapping) */
+  inactive_anon: number;
+  /** Active anonymous memory in bytes (recently accessed) */
+  active_anon: number;
+  /** Inactive file-backed memory in bytes (candidates for reclaim) */
+  inactive_file: number;
+  /** Active file-backed memory in bytes (recently accessed) */
+  active_file: number;
+  /** Unevictable memory in bytes (locked, cannot be swapped) */
+  unevictable: number;
+};
+export type ContainerStatus = {
+  /** Container hostname */
+  container_name: string;
+  /** Memory limit in bytes (0 if unlimited) */
+  memory_max: number;
+  /** Current total memory usage in bytes */
+  memory_current: number;
+  /** Detailed memory breakdown from cgroup memory.stat */
+  memory_stats: MemoryStats | null;
+  /** CPU quota in microseconds per period (0 if unlimited) */
+  cpu_max: number;
+  /** Accumulated CPU usage time in microseconds since container start */
+  cpu_current: number;
+  /** Container uptime in seconds since boot */
+  uptime: number;
+};
+export type SystemStatus = {
+  frontend: ContainerStatus;
+  coordinator: ContainerStatus;
+  generators: {
+    [key: string]: ContainerStatus;
+  };
 };
 export type ValidationError = {
   loc: (string | number)[];
@@ -257,41 +326,39 @@ export type HttpValidationError = {
 };
 export type CardType = [string, string, string, string];
 export type HeaderType = CardType[];
-export type QuicklookJobPhase = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | -1;
+export type CreateQuicklookRequest = {
+  visit: string;
+};
+export type Job = {
+  visit: string;
+  id?: string;
+};
 export type Progress = {
-  count: number;
   total: number;
+  count?: number;
 };
-export type GenerateProgress = {
-  download: Progress;
-  preprocess: Progress;
-  maketile: Progress;
+export type JobStatus = {
+  job: Job;
+  stage?:
+    | "queued"
+    | "generate_single_fits_tiles"
+    | "merge_tiles"
+    | "upload_to_object_storage"
+    | "ready"
+    | "error";
+  generate_single_fits_tiles?: {
+    [key: string]: Progress;
+  };
+  merge_tiles?: {
+    [key: string]: Progress;
+  };
+  transfer_tiles?: {
+    [key: string]: Progress;
+  };
+  error_message?: string | null;
 };
-export type TransferProgress = {
-  transfer: Progress;
-};
-export type MergeProgress = {
-  merge: Progress;
-};
-export type QuicklookStatus = {
-  id: string;
-  phase: QuicklookJobPhase;
-  generate_progress: {
-    [key: string]: GenerateProgress;
-  } | null;
-  transfer_progress: {
-    [key: string]: TransferProgress;
-  } | null;
-  merge_progress: {
-    [key: string]: MergeProgress;
-  } | null;
-};
-export type Visit = {
-  id: string;
-};
-export type CcdId = {
-  visit: Visit;
-  ccd_name: string;
+export type JobStatusList = {
+  [key: string]: JobStatus;
 };
 export type ImageStat = {
   median: number | null;
@@ -304,24 +371,44 @@ export type BBox = {
   minx: number;
   maxx: number;
 };
-export type AmpMeta = {
+export type AmpMetadata = {
   amp_id: number;
   bbox: BBox;
 };
-export type CcdMeta = {
-  ccd_id: CcdId;
+export type CcdMetadata = {
+  ccd_name: string;
   image_stat: ImageStat;
-  amps: AmpMeta[];
+  amps: AmpMetadata[];
   bbox: BBox;
 };
-export type QuicklookMetadata = {
-  id: string;
-  wcs: object;
-  ccd_meta: CcdMeta[] | null;
+export type QuicklookMetadataReady = {
+  visit_name: string;
+  ccd_metadata_list: CcdMetadata[];
+  wcs: {
+    [key: string]: any;
+  };
+  type?: "ready";
 };
-export type QuicklookCreateFrontend = {
-  id: string;
+export type QuicklookMetadataProgress = {
+  visit_name: string;
+  progress: {
+    [key: string]: Progress;
+  };
+  type?: "progress";
 };
+export type QuicklookMetadataPending = {
+  visit_name: string;
+  type?: "pending";
+};
+export type QuicklookMetadataError = {
+  visit_name: string;
+  type?: "error";
+};
+export type QuicklookMetadata =
+  | QuicklookMetadataReady
+  | QuicklookMetadataProgress
+  | QuicklookMetadataPending
+  | QuicklookMetadataError;
 export type VisitEntry = {
   id: string;
   day_obs: number;
@@ -334,65 +421,43 @@ export type VisitEntry = {
   target_name: string;
 };
 export type DataSourceCcdMetadata = {
-  visit: Visit;
+  visit_name: string;
   ccd_name: string;
   detector: number;
   exposure: number;
   day_obs: number;
   uuid: string;
 };
-export type DiskInfo = {
-  mount_point: string;
-  total: number;
-  used: number;
-  device: string;
-};
-export type PodStatus = {
-  hostname: string;
-  ip_addr: string;
-  memory_total: number;
-  memory_used: number;
-  disks: DiskInfo[];
-};
-export type StatusResponse = {
-  frontend: PodStatus;
-  coordinator: PodStatus;
-  generators: PodStatus[];
-};
 export type CacheEntry = {
-  id: string;
-  phase: "ready" | "in_progress" | "deleting";
+  visit_name: string;
+  ready: boolean;
   created_at: string;
-  updated_at: string;
+  disk_usage: number;
 };
 export type Entry = {
   name: string;
   type: "directory" | "file";
   size: number | null;
 };
-export type HipsRepository = {
-  name: string;
-};
 export const {
   useGetSystemInfoQuery,
+  useRouteGetStatusQuery,
   useHealthzQuery,
-  useReadyQuery,
   useGetTileQuery,
   useGetFitsHeaderQuery,
-  useShowQuicklookStatusQuery,
-  useShowQuicklookMetadataQuery,
-  useDeleteAllQuicklooksMutation,
   useCreateQuicklookMutation,
+  useVoteQuicklookMutation,
+  useUnvoteQuicklookMutation,
+  useGetAllQuicklookJobsQuery,
+  useGetQuicklookMetadataQuery,
   useListVisitsQuery,
   useGetVisitMetadataQuery,
   useGetExposureDataTypesQuery,
   useGetFitsFileQuery,
-  useGetPodStatusQuery,
   useListCacheEntriesQuery,
-  useCleanupCacheEntriesMutation,
+  useDeleteAllCacheEntriesMutation,
+  useDeleteCacheEntryMutation,
   useListStorageEntriesQuery,
   useDeleteStorageEntryMutation,
   useDeleteStorageEntriesByPrefixMutation,
-  useListHipsRepositoriesQuery,
-  useGetHipsFileQuery,
 } = injectedRtkApi;

@@ -18,7 +18,7 @@ type FitsHeaderProps = {
 
 
 function FitsHeader({ ccdName: ccdId, visitId }: FitsHeaderProps) {
-  const { data } = useGetFitsHeaderQuery({ id: visitId, ccdName: ccdId })
+  const { data } = useGetFitsHeaderQuery({ visitName: visitId, ccdName: ccdId })
   const [searchTerm, setSearchTerm] = useState("")
   const searchInputRef = useRef<HTMLInputElement>(null)
   const tableRef = useRef<HTMLTableElement>(null)

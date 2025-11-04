@@ -1,187 +1,115 @@
-from pydantic import BaseModel
 from dataclasses import dataclass
-from functools import cache, cached_property
-from typing import Any, Literal, TypeAlias
+from typing import TYPE_CHECKING, Generic, Literal, NewType, TypeAlias, TypeVar
 
 import numpy
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
+from quicklook.utils.hash_utils import hash_iterable
 
 CcdDataType: TypeAlias = Literal['raw', 'post_isr_image', 'preliminary_visit_image']
 
 
-@dataclass
-class Progress:
-    count: int
-    total: int
-
-    @staticmethod
-    def noop_progress(_: 'Progress'):
-        pass
-
-
-# @dataclass
-# class TileRange:
-#     yi1: int
-#     yi2: int
-#     xi1: int
-#     xi2: int
-
-
-@dataclass
-class BBox:
-    miny: float
-    maxy: float
-    minx: float
-    maxx: float
-
-    def union(self, other: 'BBox'):
-        return BBox(
-            miny=min(self.miny, other.miny),
-            maxy=max(self.maxy, other.maxy),
-            minx=min(self.minx, other.minx),
-            maxx=max(self.maxx, other.maxx),
-        )
-
-
-@dataclass(frozen=True)
-class Visit:
-    id: str  # '{data_type}:{exposure}'
-
-    @cache
-    def _parts(self):
-        return self.id.split(':')
+class VisitName(str):
+    def _parts(self) -> list[str]:
+        parts = self.split(':')
+        if len(parts) < 2:  # pragma: no cover
+            raise ValueError(f'Invalid visit name: {self!r}')
+        return parts
 
     @property
-    def data_type(self):
-        return self._parts()[-2]
+    def data_type(self) -> CcdDataType:
+        return self._parts()[-2]  # type: ignore
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._parts()[-1]
 
     @classmethod
-    def from_id(cls, id: str):
-        return cls(id)
+    def __get_pydantic_core_schema__(cls, _src, _handler: GetCoreSchemaHandler) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+
+
+CcdName = NewType('CcdName', str)
+
+
+@dataclass(frozen=True)
+class CcdDataRef:
+    visit: VisitName
+    ccd: CcdName
+
+    @property
+    def fullname(self) -> str:
+        return f"{self.visit}/{self.ccd}"
+
+    @property
+    def ccd_name(self) -> CcdName:
+        # TODO: 代わりにself.ccdを使う
+        return self.ccd
+
+    def __str__(self) -> str:  # pragma: no cover
+        return self.fullname
 
 
 @dataclass
-class CcdId:
-    visit: Visit
-    ccd_name: str
+class Progress:
+    total: int
+    count: int = 0
 
-    @cached_property
-    def name(self):
-        return f'{self.visit.id}/{self.ccd_name}'
+    def update(self, count: int = 1):
+        self.count += count
+        return self
+
+    def full(self):
+        self.count = self.total
+        return self
+
+    def update_and_yield_every(self, every: int, *, count: int = 1):
+        self.count += count
+        if self.count % every == 0:
+            yield self
+
+
+T = TypeVar('T')
+
+
+@dataclass
+class ReturnValue(Generic[T]):
+    value: T
+
+
+@dataclass(frozen=True)
+class TilePos:
+    level: int
+    i: int
+    j: int
+
+    def safe_hash(self) -> int:
+        return hash_iterable((self.level, self.i, self.j))
 
 
 @dataclass
 class Tile:
-    visit: Visit
-    level: int
-    i: int
-    j: int
+    visit: VisitName
+    pos: TilePos
     data: numpy.ndarray
 
 
-@dataclass
-class ImageStat:
-    median: float | None  # post_isr_image には NaN が含まれることがありこれがjsonになるとnullになる
-    mad: float | None  # post_isr_image には NaN が含まれることがありこれがjsonになるとnullになる
-    shape: tuple[int, ...]
-
-
-@dataclass
-class AmpMeta:
-    amp_id: int
-    bbox: BBox
-
-
-type CardType = tuple[str, str, str, str]
-type HeaderType = list[CardType]
-
-
-@dataclass
-class PreProcessedCcd:
-    ccd_id: CcdId
-    bbox: BBox
-    pool: numpy.ndarray
-    stat: ImageStat
-    amps: list[AmpMeta]
-    headers: list[HeaderType]
-
-
 @dataclass(frozen=True)
-class GeneratorPod:
-    host: str
-    port: int
-
-    @cached_property
-    def name(self):
-        return f'{self.host}:{self.port}'
-
-    Name = str
-
-
-@dataclass
-class GenerateProgress:
-    download: Progress
-    preprocess: Progress
-    maketile: Progress
-
-
-@dataclass
-class MergeProgress:
-    merge: Progress
-
-
-@dataclass
-class TransferProgress:
-    transfer: Progress
-
-
-@dataclass
-class CcdMeta:
-    ccd_id: CcdId
-    image_stat: ImageStat
-    amps: list[AmpMeta]
-    bbox: BBox
-
-
-class QuicklookMeta(BaseModel):
-    ccd_meta: list[CcdMeta]
-
-
-GenerateTaskResponse = None | GenerateProgress | BaseException | CcdMeta
-MergeTaskResponse = None | MergeProgress | BaseException
-TransferTaskResponse = None | TransferProgress | BaseException
-
-
-@dataclass(frozen=True)
-class TileId:
-    level: int
-    i: int
-    j: int
-
-
-@dataclass(frozen=True)
-class PackedTileId:
-    level: int
-    i: int
-    j: int
-
+class PackedTilePos(TilePos):
     @classmethod
-    def from_unpacked(cls, level: int, i: int, j: int):
+    def from_unpacked(cls, unpacked_pos: TilePos):
         from quicklook.config import config
 
         pack = config.tile_pack
-        return cls(level, i >> pack, j >> pack)
+        return cls(unpacked_pos.level, unpacked_pos.i >> pack, unpacked_pos.j >> pack)
 
     def unpackeds(self):
         from quicklook.config import config
 
         for i in range(1 << config.tile_pack):
             for j in range(1 << config.tile_pack):
-                yield TileId(self.level, self.i << config.tile_pack | i, self.j << config.tile_pack | j)
+                yield TilePos(self.level, self.i << config.tile_pack | i, self.j << config.tile_pack | j)
 
     def index(self, i: int, j: int) -> int:
         """
@@ -200,7 +128,9 @@ class PackedTileId:
         local_j = j - (self.j << config.tile_pack)
 
         # Ensure coordinates are within valid range
-        if not (0 <= local_i < (1 << config.tile_pack) and 0 <= local_j < (1 << config.tile_pack)):
-            raise ValueError(f"Coordinates (i={i}, j={j}) outside range of packed tile (level={self.level}, i={self.i}, j={self.j})")
+        if not (0 <= local_i < (1 << config.tile_pack) and 0 <= local_j < (1 << config.tile_pack)):  # pragma: no cover
+            raise ValueError(
+                f"Coordinates (i={i}, j={j}) outside range of packed tile (level={self.level}, i={self.i}, j={self.j})"
+            )
 
         return (local_i << config.tile_pack) | local_j

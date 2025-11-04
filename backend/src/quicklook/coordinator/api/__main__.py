@@ -1,20 +1,17 @@
-import logging
+from urllib.parse import urlparse
 
 import uvicorn
 
 from quicklook.config import config
-from quicklook.logging import initialize_logger
-from quicklook.utils import timeit
-from quicklook.utils.uvicorn import uvicorn_add_log_prefix
 
-timeit.settings.logger = logging.getLogger('uvicorn')
-initialize_logger(["POST /register_generator"])
-uvicorn_add_log_prefix(config.dev_log_prefix)
+parsed = urlparse(config.coordinator_base_url)
+port = parsed.port
+assert port
+
 uvicorn.run(
-    'quicklook.coordinator.api:app',
+    'quicklook.coordinator.api.app:app',
     host='0.0.0.0',
-    port=config.coordinator_port,
-    access_log=True,
-    reload=config.dev_reload,
+    port=port,
+    access_log=False,
     log_level=config.log_level,
 )

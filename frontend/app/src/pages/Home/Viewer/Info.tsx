@@ -6,7 +6,7 @@ import styles from './styles.module.scss'
 
 export function Info() {
   const [x, y] = useMouseCursorFocalPlaneCoord()
-  const { quicklookHandle } = useHomeContext()
+  const { quicklookLayerHandle: quicklookHandle } = useHomeContext()
   const quicklookLayer = quicklookHandle.current?.layer()
   const { value, level } = quicklookLayer?.pixelValue([x, y]) ?? { value: Number.NaN, level: -1 }
   const focusedCcd = useFocusedCcd()
@@ -35,7 +35,7 @@ export function Info() {
               CCD
             </th>
             <td>
-              {focusedCcd?.ccd_id.ccd_name}
+              {focusedCcd?.ccd_name}
             </td>
           </tr>
           <tr>

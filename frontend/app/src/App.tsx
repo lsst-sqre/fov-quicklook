@@ -1,15 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Provider } from 'react-redux'
 import { BrowserRouter } from 'react-router-dom'
-import { QuicklookStatusProvider } from './pages/Home/context/quicklook'
+import { WindowCenter } from './components/layout'
+import { LoadingSpinner } from './components/Loading'
+import { env } from './env'
+import { QuicklookMetadataProvider } from './pages/Home/context/quicklook'
 import { AppRouter } from './router'
 import { makeStore } from './store'
 import { SystemInfo } from './store/api/openapi'
 import { getSystemInfo } from './systemInfo'
-import { env } from './env'
-import { LoadingSpinner } from './components/Loading'
-import { WindowCenter } from './components/layout'
 
 
 export function App() {
@@ -27,13 +27,16 @@ export function App() {
 
 
 function RawApp({ systemInfo }: { systemInfo: SystemInfo }) {
-  const store = makeStore(systemInfo)
+  const storeRef = useRef<ReturnType<typeof makeStore>>()
+  if (!storeRef.current) {
+    storeRef.current = makeStore(systemInfo)
+  }
   return (
-    <Provider store={store}>
+    <Provider store={storeRef.current}>
       <BrowserRouter basename={env.baseUrl}>
-        <QuicklookStatusProvider>
+        <QuicklookMetadataProvider>
           <AppRouter />
-        </QuicklookStatusProvider>
+        </QuicklookMetadataProvider>
       </BrowserRouter>
       <Toaster />
     </Provider>

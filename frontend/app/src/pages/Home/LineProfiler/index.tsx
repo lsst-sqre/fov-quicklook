@@ -9,7 +9,7 @@ import { WebglPlot, WebglPlotProps } from "./WebglPlot"
 
 
 export const LineProfiler = memo(() => {
-  const { quicklookHandle } = useHomeContext()
+  const { quicklookLayerHandle: quicklookHandle } = useHomeContext()
   const globe = useGlobe()
   const [, mouseY] = useAppSelector(state => state.home.mouseCursorClientCoord)
   const cameraRevision = useAppSelector(state => state.home.cameraRevision)

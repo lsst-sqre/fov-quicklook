@@ -1,10 +1,6 @@
-import logging
-
 from fastapi import APIRouter
 
-from quicklook import storage
-
-logger = logging.getLogger('uvicorn')
+import quicklook.object_storage as storage
 
 router = APIRouter()
 

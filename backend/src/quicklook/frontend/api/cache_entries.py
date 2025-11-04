@@ -1,23 +1,24 @@
-import logging
+import quicklook.mylogging
 from datetime import datetime
 
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 
-from quicklook.db import db_context
-from quicklook.models import QuicklookRecord
+from quicklook.coordinator.housekeeping import delete_one_quicklook, select_quicklook_to_delete
+from quicklook.db import Quicklook
+from quicklook.db.session import get_db_session
 
-logger = logging.getLogger('uvicorn')
+logger = quicklook.mylogging.getLogger('uvicorn')
 
 router = APIRouter()
 
 
 class CacheEntry(BaseModel):
-    id: str
-    phase: QuicklookRecord.Phase
+    visit_name: str
+    ready: bool
     created_at: datetime
-    updated_at: datetime
+    disk_usage: int
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -26,13 +27,21 @@ class CacheEntry(BaseModel):
 
 @router.get('/api/cache_entries')
 async def list_cache_entries() -> list[CacheEntry]:
-    with db_context() as db:
-        q = db.execute(select(QuicklookRecord).order_by(QuicklookRecord.created_at.desc()))
-        records = q.scalars().all()
-        return [CacheEntry.model_validate(record) for record in records]
+    async with get_db_session() as db:
+        result = await db.execute(select(Quicklook))
+        rows = result.scalars().all()
+
+    return [CacheEntry.model_validate(r) for r in rows]
 
 
-@router.post('/api/cache_entries:cleanup')
-async def cleanup_cache_entries() -> None:
-    from quicklook.coordinator.quicklookjob.job_runner import housekeep
-    await housekeep()
+@router.delete('/api/cache_entries/*')
+async def delete_all_cache_entries() -> None:
+    while visit_name := await select_quicklook_to_delete():
+        print(f'Deleting quicklook for visit: {visit_name}')
+        await delete_one_quicklook(visit_name)
+    print('Finished deleting all quicklooks')
+
+
+@router.delete('/api/cache_entries/{visit_name}')
+async def delete_cache_entry(visit_name: str) -> None:
+    await delete_one_quicklook(visit_name)

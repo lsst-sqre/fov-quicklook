@@ -1,22 +1,21 @@
-import logging
+import quicklook.mylogging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
 from quicklook.datasource import get_datasource
-from quicklook.deps.visit_from_path import visit_from_path
-from quicklook.types import CcdId, Visit
+from quicklook.frontend.api.deps import dep_ccd_data_ref
+from quicklook.types import CcdDataRef, CcdName, VisitName
 
-logger = logging.getLogger(f'uvicorn.{__name__}')
+logger = quicklook.mylogging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.get('/api/quicklooks/{id}/fits/{ccd_name}')
+@router.get('/api/quicklooks/{visit_name}/fits/{ccd_name}')
 async def get_fits_file(
-    visit: Annotated[Visit, Depends(visit_from_path)],
-    ccd_name: str,
+    ccd_data_ref: Annotated[CcdDataRef, Depends(dep_ccd_data_ref)],
 ):
     ds = get_datasource()
-    data = ds.get_data(CcdId(visit, ccd_name))
+    data = await ds.get_data(ccd_data_ref)
     return Response(content=data, media_type='image/fits')

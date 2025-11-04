@@ -1,10 +1,7 @@
-/.venv
-/tmp
-*.egg-info
-__pycache__
-/docker-volumes
-.ipynb_checkpoints
-/.coverage
-/.coverage.*
-/.pytest_cache
 /pyright
+
+/.coverage*
+*.egg-info
+
+/docker-volumes
+/.venv

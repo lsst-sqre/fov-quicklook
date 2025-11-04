@@ -1,14 +1,14 @@
-from dataclasses import dataclass
+import threading
 from functools import cache, lru_cache
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 from venv import logger
 
 from lsst.resources import ResourcePath
-from numpy import record
 
-from quicklook.types import CcdDataType, CcdId
+from quicklook.datasource.types import VisitEntry
+from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
-from ..types import DataSourceBase, DataSourceCcdMetadata, Query, Visit
+from ..types import DataSourceBase, DataSourceCcdMetadata, Query
 from .instrument import Instrument
 from .retrieve_data import retrieve_data
 
@@ -26,41 +26,28 @@ default_instrument = 'LSSTCam'
 DataRef = Any
 
 
-@dataclass
-class VisitEntry:
-    id: str
-    day_obs: int
-    physical_filter: str
-    obs_id: str
-    exposure_time: float
-    science_program: str
-    observation_type: str
-    observation_reason: str
-    target_name: str
-
-
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def __init__(self):
-        from quicklook.butlerutils import chown_pgpassfile
+        from .butlerutils import chown_pgpassfile
 
         chown_pgpassfile()
 
-    def query_visits(self, q: Query) -> list[VisitEntry]:
-        return get_datasource(q.data_type).query_visits(q)
+    def query_visits_sync(self, q: Query) -> list[VisitEntry]:
+        return _get_datasource(q.data_type).query_visits(q)
 
-    def list_ccds(self, visit: Visit) -> list[str]:
-        return get_datasource(visit.data_type).list_ccds(visit)
+    def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
+        return _get_datasource(visit.data_type).list_ccds(visit)
 
-    def get_data(self, ccd_id: CcdId) -> bytes:
-        return get_datasource(ccd_id.visit.data_type).get_data(ccd_id)
+    def get_data_sync(self, ref: CcdDataRef) -> bytes:
+        return _get_datasource(ref.visit.data_type).get_data(ref)
 
-    def get_metadata(self, ccd_id: CcdId) -> DataSourceCcdMetadata:
-        return get_datasource(ccd_id.visit.data_type).get_metadata(ccd_id)
+    def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
+        return _get_datasource(ref.visit.data_type).get_metadata(ref)
 
-    def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]:
+    def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         types: list[CcdDataType] = []
         for data_type in cast(list[CcdDataType], ['raw', 'post_isr_image', 'preliminary_visit_image']):
-            datasource = get_datasource(data_type)
+            datasource = _get_datasource(data_type)
             if datasource.exposure_exists(exposure_id):
                 types.append(data_type)
         return types
@@ -122,54 +109,60 @@ class DataTypeSpecificDataSource:
             for ref, exp in [(ref, exposures[cast(int, ref.dataId[self.data_id_key])]) for ref in refs]
         ]
 
-    def list_ccds(self, visit: Visit) -> list[str]:
+    def list_ccds(self, visit: VisitName) -> list[CcdName]:
         b = self._butler
         refs = b.query_datasets(visit.data_type, where=f"{self.data_id_key}={visit.name}")
         i = Instrument.get(default_instrument)
-        return [i.detector_2_ccd[ref.dataId['detector']] for ref in refs]  # type: ignore
+        ccd_names = [CcdName(i.detector_2_ccd[ref.dataId['detector']]) for ref in refs]  # type: ignore
+        if visit.data_type == 'post_isr_image':
+            # ４隅のraftは位置情報がrawと違うため除外する
+            ccd_names = [ccd_name for ccd_name in ccd_names if ccd_name[:3] not in {'R00', 'R40', 'R04', 'R44'}]
+        return ccd_names
 
     def exposure_exists(self, exposure_id: int) -> bool:
-        from lsst.daf.butler._exceptions import EmptyQueryResultError
+        from lsst.daf.butler._exceptions import EmptyQueryResultError, MissingCollectionError
 
         b = self._butler
         try:
             refs = b.query_datasets(self.data_type, where=f"{self.data_id_key}={exposure_id}", limit=1)
-        except EmptyQueryResultError:
+
+        except (EmptyQueryResultError, MissingCollectionError):
             return False
         return len(refs) > 0
 
-    def get_data(self, ccd_id: CcdId) -> bytes:
-        return retrieve_data(self._getUri(ccd_id), partial=self.partial)
+    def get_data(self, ref: CcdDataRef) -> bytes:
+        return retrieve_data(self._getUri(ref), partial=self.partial)
 
-    def _getUri(self, ccd_id: CcdId) -> ResourcePath:
+    def _getUri(self, ref: CcdDataRef) -> ResourcePath:
         b = self._butler
-        detector_id = Instrument.get(default_instrument).ccd_2_detector[ccd_id.ccd_name]
-        ref = self._refs_by_visit(ccd_id.visit)[detector_id]
-        return b.getURI(ref)  # type: ignore
+        detector_id = Instrument.get(default_instrument).ccd_2_detector[ref.ccd_name]
+        butler_ref = self._refs_by_visit(ref.visit)[detector_id]
+        return b.getURI(butler_ref)  # type: ignore
 
-    @lru_cache(maxsize=4)
-    def _refs_by_visit(self, visit: Visit) -> dict[int, ButlerDatasetRef]:
+    def _refs_by_visit(self, visit: VisitName) -> dict[int, ButlerDatasetRef]:
         b = self._butler
         refs = b.query_datasets(visit.data_type, where=f"{self.data_id_key}={visit.name}")
         return {cast(int, ref.dataId['detector']): ref for ref in refs}
 
-    def get_metadata(self, ccd_id: CcdId) -> DataSourceCcdMetadata:
+    def get_metadata(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
         b = self._butler
-        detector_id = Instrument.get(default_instrument).ccd_2_detector[ccd_id.ccd_name]
-        refs = b.query_datasets(
-            ccd_id.visit.data_type,
-            where=f"{self.data_id_key}={ccd_id.visit.name} and detector={detector_id}",
+        detector_id = Instrument.get(default_instrument).ccd_2_detector[ref.ccd_name]
+        butler_refs = b.query_datasets(
+            ref.visit.data_type,
+            where=f"{self.data_id_key}={ref.visit.name} and detector={detector_id}",
         )
-        if len(refs) != 1:
-            raise ValueError(f"Cannot find unique dataset for {ccd_id.visit.name} and detector {detector_id}. found {len(refs)} matches")
-        ref = refs[0]
+        if len(butler_refs) != 1:
+            raise ValueError(
+                f"Cannot find unique dataset for {ref.visit.name} and detector {detector_id}. found {len(butler_refs)} matches"
+            )
+        butler_ref = butler_refs[0]
         return DataSourceCcdMetadata(
             detector=detector_id,
-            ccd_name=ccd_id.ccd_name,
-            day_obs=ref.dataId.get('day_obs', -1),
-            exposure=ref.dataId.get(self.data_id_key, -1),
-            visit=Visit.from_id('raw:Dummy'),
-            uuid=str(ref.id),
+            ccd_name=ref.ccd_name,
+            day_obs=butler_ref.dataId.get('day_obs', -1),
+            exposure=butler_ref.dataId.get(self.data_id_key, -1),
+            visit_name=ref.visit,
+            uuid=str(butler_ref.id),
         )
 
     def _get_latest_day_obs(self) -> int | None:
@@ -205,8 +198,17 @@ class PreliminaryVisitImageDataSource(DataTypeSpecificDataSource):
     partial = True
 
 
-@cache
-def get_datasource(data_type: CcdDataType) -> DataTypeSpecificDataSource:
+def _get_datasource(data_type: CcdDataType) -> DataTypeSpecificDataSource:
+    thread_id = threading.get_ident()
+    return _get_datasource_cache(data_type, thread_id=thread_id)
+
+
+@lru_cache(64)
+def _get_datasource_cache(data_type: CcdDataType, thread_id: int) -> DataTypeSpecificDataSource:
+    return _get_datasource_no_cache(data_type)
+
+
+def _get_datasource_no_cache(data_type: CcdDataType) -> DataTypeSpecificDataSource:
     match data_type:
         case 'raw':
             return RawDataSource()

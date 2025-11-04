@@ -10,14 +10,13 @@
     "preview": "vite preview",
     "type-check": "tsc -b",
     "scss-types": "typed-scss-modules src -i node_modules",
-    "refresh-api-schema": "ssh da12 -lmichitaro make -s -C rubin-quicklook-k8s/backend dev/openapi > openapi.json",
+    "refresh-api-schema": "make -s -C ../../backend dev/openapi > openapi.json",
     "api:rtk-query": "npm run refresh-api-schema && rtk-query-codegen-openapi ./openapi-config.json",
     "test": "vitest"
   },
   "dependencies": {
     "@hpcc-js/wasm-zstd": "^1.2.1",
     "@reduxjs/toolkit": "^2.3.0",
-    "@stellar-globe/react-draggable-dialog": "file:../lib/stellar-globe/react-draggable-dialog",
     "@stellar-globe/react-stellar-globe": "file:../lib/stellar-globe/react-stellar-globe",
     "@stellar-globe/stellar-globe": "file:../lib/stellar-globe/stellar-globe",
     "@szhsin/react-menu": "^4.2.3",

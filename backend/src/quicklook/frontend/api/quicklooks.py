@@ -1,141 +1,317 @@
-import logging
+import asyncio
+import os
+import pickle
+import re
+import signal
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from functools import cached_property
+from typing import Annotated, AsyncGenerator, Callable, Literal, TypeVar
 
-from fastapi import APIRouter, HTTPException, WebSocket, status
-from pydantic import BaseModel
-from starlette.websockets import WebSocketDisconnect
+import websockets
+from fastapi import APIRouter, Depends, FastAPI, WebSocket
+from pydantic import TypeAdapter
+from sqlalchemy import select
 
-from quicklook import storage
+import quicklook.mylogging
 from quicklook.config import config
-from quicklook.coordinator.api.quicklooks import QuicklookCreate
-from quicklook.coordinator.housekeep import touch_quicklook
-from quicklook.coordinator.quicklookjob.job import QuicklookJobPhase, QuicklookJobReport
-from quicklook.frontend.api.remotejobs import RemoteQuicklookJobsWatcher
-from quicklook.types import CcdMeta, GenerateProgress, MergeProgress, TransferProgress, Visit
+from quicklook.coordinator.api.types import (
+    CreateQuicklookRequest,
+    JobStatusList,
+    SharedStatusMessage,
+    SharedStatusMessageJobSharedLargeStatus,
+    SharedStatusMessageJobStatusList,
+)
+from quicklook.db import Quicklook, get_db_session
+from quicklook.frontend.api.deps import dep_visit_name
+from quicklook.generator.generate_single_fits_tiles import CcdMetadata
+from quicklook.job.shared_large_status import JobSharedLargeStatus
+from quicklook.job.status import JobStatus
+from quicklook.object_storage import VisitObjectStorage
+from quicklook.types import CcdName, Progress, VisitName
+from quicklook.utils.broadcast import Broadcast
+from quicklook.utils.hash_utils import json_digest
 from quicklook.utils.http_request import http_request
-from quicklook.utils.websocket import safe_websocket
+from quicklook.utils.websocket import run_until_disconnect, safe_websocket
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with _quicklook_status_relay():
+        yield
+
 
 router = APIRouter()
 
-logger = logging.getLogger(f'uvicorn.{__name__}')
-
-
-class QuicklookStatus(BaseModel):
-    id: str
-    phase: QuicklookJobPhase
-    generate_progress: dict[str, GenerateProgress] | None
-    transfer_progress: dict[str, TransferProgress] | None
-    merge_progress: dict[str, MergeProgress] | None
-
-    @classmethod
-    def from_report(cls, report: QuicklookJobReport) -> 'QuicklookStatus':
-        return cls(
-            id=report.visit.id,
-            phase=report.phase,
-            generate_progress=report.generate_progress,
-            transfer_progress=report.transfer_progress,
-            merge_progress=report.merge_progress,
-        )
-
-
-@router.websocket('/api/quicklooks.ws')
-async def list_quicklooks_ws(client_ws: WebSocket):
-    await client_ws.accept()
-    async with safe_websocket(client_ws):
-        async for jobs in RemoteQuicklookJobsWatcher().watch(lambda _: _.values()):
-            try:
-                await client_ws.send_json([QuicklookStatus.from_report(job).model_dump() for job in jobs])
-            except WebSocketDisconnect:
-                break
-
-
-@router.get('/api/quicklooks/{id}/status', response_model=QuicklookStatus | None)
-async def show_quicklook_status(id: str):
-    visit = Visit.from_id(id)
-    report = RemoteQuicklookJobsWatcher().jobs.get(visit)
-    return quicklook_status(visit, report)
-
-
-@router.websocket('/api/quicklooks/{id}/status.ws')
-async def show_quicklook_status_ws(id: str, client_ws: WebSocket):
-    visit = Visit.from_id(id)
-    await client_ws.accept()
-    async with safe_websocket(client_ws):
-
-        def pick(qls: dict[Visit, QuicklookJobReport]) -> QuicklookJobReport | None:
-            return qls.get(visit)
-
-        async for report in RemoteQuicklookJobsWatcher().watch(pick):  # pragma: no branch
-            status = quicklook_status(visit, report)
-            try:
-                await client_ws.send_json(status.model_dump() if status else None)
-            except WebSocketDisconnect:
-                break
-
-
-def quicklook_status(visit: Visit, report: QuicklookJobReport | None) -> QuicklookStatus | None:
-    if report:
-        status = QuicklookStatus.from_report(report)
-    else:
-        job = storage.load_quicklook_job(visit)
-        if job:
-            status = QuicklookStatus.from_report(QuicklookJobReport.from_job(job))
-        else:
-            status = None
-    return status
-
-
-class QuicklookMetadata(BaseModel):
-    # QuicklookMetaと紛らわしいがこちらはフロントエンド用
-    id: str
-    wcs: dict
-    ccd_meta: list[CcdMeta] | None
-
-
-@router.get('/api/quicklooks/{id}/metadata', response_model=QuicklookMetadata)
-async def show_quicklook_metadata(id: str):
-    metadata = quicklook_metadata(visit=Visit.from_id(id))
-    if metadata:
-        touch_quicklook(visit=Visit.from_id(id))
-        return metadata
-    raise HTTPException(status.HTTP_404_NOT_FOUND)
-
-
-def quicklook_metadata(visit: Visit) -> QuicklookMetadata | None:
-    meta = storage.get_quicklook_meta(visit)
-    if meta:
-        scale = 0.2 / 3600.0  # pixel size in degree
-        return QuicklookMetadata(
-            id=visit.id,
-            wcs={
-                "NAXIS1": 63424,
-                "NAXIS2": 63376,
-                "CRVAL1": 0,
-                "CRVAL2": 0,
-                "CRPIX1": 31750.5,
-                "CRPIX2": 31750.5,
-                "CD1_1": -scale,
-                "CD1_2": 0,
-                "CD2_1": 0,
-                "CD2_2": scale,
-            },
-            ccd_meta=meta.ccd_meta,
-        )
-
-
-@router.delete('/api/quicklooks/*', description='Delete all quicklooks')
-async def delete_all_quicklooks():
-    return await http_request('delete', f'{config.coordinator_base_url}/quicklooks/*')
-
-
-class QuicklookCreateFrontend(BaseModel):
-    id: str
+logger = quicklook.mylogging.getLogger(__name__)
 
 
 @router.post('/api/quicklooks', description='Create a quicklook')
-async def create_quicklook(params: QuicklookCreateFrontend):
-    logger.info(f'create_quicklook: {params.id}')
+async def create_quicklook(params: CreateQuicklookRequest):
     return await http_request(
         'post',
         f'{config.coordinator_base_url}/quicklooks',
-        json=QuicklookCreate(visit=Visit.from_id(params.id)).model_dump(),
+        json=params.model_dump(),
     )
+
+
+@router.post('/api/quicklooks/{visit_name}/vote')
+async def vote_quicklook(visit_name: Annotated[VisitName, Depends(dep_visit_name)]):
+    return await http_request(
+        'post',
+        f'{config.coordinator_base_url}/quicklooks/{visit_name}/vote',
+    )
+
+
+@router.post('/api/quicklooks/{visit_name}/unvote')
+async def unvote_quicklook(visit_name: Annotated[VisitName, Depends(dep_visit_name)]):
+    return await http_request(
+        'post',
+        f'{config.coordinator_base_url}/quicklooks/{visit_name}/unvote',
+    )
+
+
+@router.get('/api/quicklooks/*/status', response_model=JobStatusList)
+async def get_all_quicklook_jobs():
+    async for jobs in _job_status_dict.subscribe():
+        return jobs
+
+
+type_adapter_JsonStatus = TypeAdapter(JobStatus | None)
+
+
+@router.websocket('/api/quicklooks/*/status.ws')
+async def websocket_quicklooks_status(ws: WebSocket):
+    async with safe_websocket(ws):
+
+        async def send_job_updates():
+            async for jobs in _job_status_dict.subscribe():
+                await ws.send_json({visit: type_adapter_JsonStatus.dump_python(job) for visit, job in jobs.items()})
+
+        await run_until_disconnect(ws, send_job_updates())
+
+
+@dataclass
+class QuicklookMetadataReady:
+    visit_name: VisitName
+    ccd_metadata_list: list[CcdMetadata]
+    wcs: dict
+    type: Literal['ready'] = 'ready'
+
+
+@dataclass
+class QuicklookMetadataProgress:
+    visit_name: VisitName
+    progress: dict[CcdName, Progress]
+    type: Literal['progress'] = 'progress'
+
+
+@dataclass
+class QuicklookMetadataPending:
+    visit_name: VisitName
+    type: Literal['pending'] = 'pending'
+
+
+@dataclass
+class QuicklookMetadataError:
+    visit_name: VisitName
+    type: Literal['error'] = 'error'
+
+
+type QuicklookMetadata = QuicklookMetadataReady | QuicklookMetadataProgress | QuicklookMetadataPending | QuicklookMetadataError
+type_adapter_QuicklookMetadata = TypeAdapter(QuicklookMetadata)
+
+
+@router.get('/api/quicklooks/{visit_name}/quicklook_metadata', response_model=QuicklookMetadata)
+async def get_quicklook_metadata(
+    visit: Annotated[VisitName, Depends(dep_visit_name)],
+):
+    if metadata := await _get_quicklook_metadata_from_db(visit):
+        return metadata
+
+    async for metadata in _get_quicklook_metadata_from_shared_status(visit):
+        return metadata
+
+
+@router.websocket('/api/quicklooks/{visit_name}/quicklook_metadata.ws')
+async def websocket_quicklook_metadata(
+    ws: WebSocket,
+    visit: Annotated[VisitName, Depends(dep_visit_name)],
+):
+    async with safe_websocket(ws):
+
+        async def push():
+            if metadata := await _get_quicklook_metadata_from_db(visit):
+                await ws.send_json(type_adapter_QuicklookMetadata.dump_python(metadata))
+                return
+
+            async for metadata_json in _yield_on_digest_change(
+                (
+                    type_adapter_QuicklookMetadata.dump_python(metadata)
+                    async for metadata in _get_quicklook_metadata_from_shared_status(visit)
+                ),
+                json_digest,
+            ):
+                await ws.send_json(metadata_json)
+
+        await run_until_disconnect(ws, push())
+
+
+T = TypeVar('T')
+
+
+async def _yield_on_digest_change(
+    g: AsyncGenerator,
+    digest: Callable[[T], bytes],
+) -> AsyncGenerator[T, None]:
+    last_digest = None
+    async for value in g:
+        current_digest = digest(value)
+        if current_digest != last_digest:
+            yield value
+            last_digest = current_digest
+
+
+async def _get_quicklook_metadata_from_db(visit: VisitName) -> QuicklookMetadata | None:
+    async with get_db_session() as session:
+        result = await session.execute(
+            select(Quicklook).where(
+                Quicklook.visit_name == visit,
+                Quicklook.ready == True,
+            )
+        )
+        quicklook: Quicklook | None = result.scalar_one_or_none()
+        if quicklook:
+            ccd_metadata_list = await VisitObjectStorage(visit).get_ccd_metadata_list()
+            return QuicklookMetadataReady(
+                visit_name=visit,
+                ccd_metadata_list=ccd_metadata_list,
+                wcs=_quicklook_metadata_wcs(),
+            )
+
+
+async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncGenerator[QuicklookMetadata, None]:
+    job_status = None
+    async for jobs in _job_status_dict.subscribe():
+        # TODO: refactoring
+        # タイル生成jobが完了すると即座にjobsからエントリーが消える
+        # その場合はQuicklookMetadataReadyを返したいので。
+        job_status = jobs.get(visit, job_status)
+        match job_status:
+            case None | JobStatus(stage='queued'):
+                yield QuicklookMetadataPending(visit_name=visit)
+            case JobStatus(stage='generate_single_fits_tiles'):
+                yield QuicklookMetadataProgress(
+                    visit_name=visit,
+                    progress=job_status.generate_single_fits_tiles,
+                )
+            case JobStatus(stage='merge_tiles' | 'upload_to_object_storage' | 'ready'):
+                yield QuicklookMetadataReady(
+                    visit_name=visit,
+                    ccd_metadata_list=_job_shared_large_status_dict[visit].ccd_metadata_list,
+                    wcs=_quicklook_metadata_wcs(),
+                )
+            case JobStatus(stage='error'):
+                yield QuicklookMetadataError(visit_name=visit)
+            case _:  # pragma: no cover
+                raise ValueError(f"Unknown job status stage: {job_status.stage}")
+
+
+_job_shared_large_status_dict: dict[VisitName, JobSharedLargeStatus] = {}
+_job_status_dict = Broadcast[JobStatusList](max_queue_size=2)
+
+
+@dataclass
+class QuicklookSharedStatus:
+    visit_name: VisitName
+
+    @cached_property
+    def job_status(self) -> JobStatus | None:
+        jobs = _job_status_dict.last_value()
+        if jobs and (job_status := jobs.get(self.visit_name)):
+            return job_status
+
+    @cached_property
+    def job(self):
+        if self.job_status:
+            return self.job_status.job
+
+    @cached_property
+    def _large_status(self) -> JobSharedLargeStatus | None:
+        return _job_shared_large_status_dict.get(self.visit_name)
+
+    @cached_property
+    def dist_config(self):
+        return self._large_status.dist_config if self._large_status else None
+
+
+@asynccontextmanager
+async def _quicklook_status_relay():
+    main_task = asyncio.create_task(_status_relay_main_loop())
+    async with _job_status_dict.activate():
+        try:
+            yield
+        finally:
+            main_task.cancel()
+            try:
+                await main_task
+            except asyncio.CancelledError:
+                pass
+
+
+async def _status_relay_main_loop():
+    global _job_shared_large_status_dict
+    ws_base_url = re.sub(r'^http://', 'ws://', config.coordinator_base_url)
+    for i in reversed(range(5)):
+        try:
+            async with websockets.connect(f'{ws_base_url}/quicklooks/*/shared_status.ws') as ws:
+                while True:
+                    msg_bytes = await ws.recv()
+                    assert isinstance(msg_bytes, bytes)
+                    msg: SharedStatusMessage = pickle.loads(msg_bytes)
+
+                    match msg:
+                        case SharedStatusMessageJobStatusList(data=data):
+                            _job_status_dict.put(data)
+                        case SharedStatusMessageJobSharedLargeStatus(visit=visit, data=data):
+                            _job_shared_large_status_dict[visit] = data
+                            jobs = _job_status_dict.last_value()
+                            if jobs:
+                                _job_shared_large_status_dict = {
+                                    visit: _job_shared_large_status_dict[visit]
+                                    for visit in jobs
+                                    if visit in _job_shared_large_status_dict
+                                }
+
+        except Exception as e:
+            logger.warning(f'Failed to connect to {ws_base_url}: {str(e)}. Remaining retries: {i}')
+            import traceback
+
+            traceback.print_exc()
+            await asyncio.sleep(5)
+    else:
+        await _shutdown()
+
+
+def _quicklook_metadata_wcs():
+    scale = 0.2 / 3600.0  # pixel size in degree
+    return {
+        "NAXIS1": 63424,
+        "NAXIS2": 63376,
+        "CRVAL1": 0,
+        "CRVAL2": 0,
+        "CRPIX1": 31750.5,
+        "CRPIX2": 31750.5,
+        "CD1_1": -scale,
+        "CD1_2": 0,
+        "CD2_1": 0,
+        "CD2_2": scale,
+    }
+
+
+async def _shutdown():  # pragma: no cover
+    await asyncio.sleep(10)  # 繰り返しの再起動を防ぐために少し待つ
+    os.kill(os.getpid(), signal.SIGINT)
+    # さらに待って強制終了
+    await asyncio.sleep(10)
+    os.kill(os.getpid(), signal.SIGKILL)

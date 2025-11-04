@@ -1,0 +1,26 @@
+from collections.abc import Iterable
+from typing import Any
+
+
+type CardType = tuple[str, str, str, str]
+type HeaderType = list[CardType]
+
+
+def fitsheader_to_list(hdul: Iterable[Any]) -> list[HeaderType]:
+    headers: list[HeaderType] = []
+    for hdu in hdul:
+        cards: HeaderType = []
+        for card in hdu.header.cards:  # type: ignore
+            try:
+                keyword, value, comment = card
+            except Exception as e:
+                keyword, value, comment = 'QL-ERROR', f'{e}: {card}', ''
+            cards.append((keyword, value.__class__.__name__, stringify(value), comment))
+        headers.append(cards)
+    return headers
+
+
+def stringify(value) -> str:
+    if isinstance(value, bool):
+        return 'T' if value else 'F'
+    return str(value)

@@ -1,17 +1,15 @@
 import { GlobeHandle } from "@stellar-globe/react-stellar-globe"
 import { angle, SkyCoord } from "@stellar-globe/stellar-globe"
-import { createContext, FC, ReactNode, RefObject, useCallback, useContext, useMemo, useRef } from "react"
-import { QuicklookHandle } from "../../../StellarGlobe/Quicklook/QuicklookLayer"
-import { useQuicklookStatus } from "./quicklook"
-import { DialogContext, DialogContextHandle } from "@stellar-globe/react-draggable-dialog"
+import { createContext, FC, ReactNode, RefObject, useCallback, useContext, useRef } from "react"
+import { QuicklookLayerHandle } from "../../../StellarGlobe/Quicklook/QuicklookLayer"
+import { useQuicklookMetadata } from "./quicklook"
 // import { RubinTileHandle } from "./RubinTileLayer/RubinTileComponent"
 
 
 type ContextType = {
   globeHandle: RefObject<GlobeHandle>,
-  quicklookHandle: RefObject<QuicklookHandle>,
-  currentQuicklook: ReturnType<typeof useQuicklookStatus>
-  dialogContext: RefObject<DialogContextHandle>
+  quicklookLayerHandle: RefObject<QuicklookLayerHandle>,
+  currentQuicklook: ReturnType<typeof useQuicklookMetadata>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -25,27 +23,18 @@ type HomeContextProps = {
 // eslint-disable-next-line react-refresh/only-export-components
 function HomeContextProvider({ children }: HomeContextProps) {
   const globeHandle = useRef<GlobeHandle>(null)
-  const quicklookHandle = useRef<QuicklookHandle>(null)
-  const currentQuicklook = useQuicklookStatus()
-  const dialogContext = useRef<DialogContextHandle>(null)
-
-  const defaultPositionHint = useMemo(() => ({
-    right: 8,
-    top: 8,
-  }), [])
+  const currentQuicklook = useQuicklookMetadata()
+  const quicklookLayerHandle = useRef<QuicklookLayerHandle>(null)
 
   const context: ContextType = {
     globeHandle,
-    quicklookHandle,
     currentQuicklook,
-    dialogContext,
+    quicklookLayerHandle,
   }
 
   return (
     <Context.Provider value={context}>
-      <DialogContext ref={dialogContext} defaultPositionHint={defaultPositionHint} >
-        {children}
-      </DialogContext>
+      {children}
     </Context.Provider>
   )
 }

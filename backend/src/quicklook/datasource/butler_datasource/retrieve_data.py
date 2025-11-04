@@ -4,7 +4,7 @@ from lsst.resources.s3 import S3ResourcePath
 
 from quicklook.utils.fits import fits_partial_load
 
-logger = logging.getLogger(f'uvicorn.{__name__}')
+logger = logging.getLogger(__name__)
 
 
 def retrieve_data(uri: ResourcePath, *, partial=False) -> bytes:  # pragma: no cover

@@ -57,8 +57,9 @@ export function interpoateText(template: string, meta: DataSourceCcdMetadata): s
     dataType: string
   }
 
+
   const meta2 = { ...meta } as Meta2
-  meta2.dataType = meta.visit.id.split(':')[0]
+  meta2.dataType = meta.visit_name.split(':')[0]
 
   return template.replace(/%\((\w+(?:\|\w+(?:\(\d+\))?)*)\)/g, (match, expr) => {
     const [key, ...pipes] = expr.split('|')

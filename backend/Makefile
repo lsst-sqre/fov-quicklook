@@ -1,40 +1,80 @@
-.PHONY: test test/watch test/covhtml-server pyright pyright/watch db/create-migration db/migrate db/rollback db/docker 
-
-targets ?= tests
-
+.PHONY: test 
 test:
-	./.venv/bin/python -m pytest \
-		$(test_opts) \
-		--failed-first -x \
-		--cov=quicklook \
-		--cov-report=html \
-		--tb=short \
-		$(targets)
+	./.venv/bin/pytest
 
-test/watch:
-	./.venv/bin/ptw --runner "$(MAKE) test"
+.PHONY: test/cov
+test/cov:
+	./.venv/bin/pytest --cov=. --cov-report=html -m 'slow or not slow'
 
-test/covhtml-server:
-	./.venv/bin/python -m http.server -d ./htmlcov 4000
+.PHONY: test/cov-server
+test/cov-server:
+	./.venv/bin/python -m http.server -d htmlcov 4000
 
+.PHONY: test/all
+# Run all tests including those marked as slow. Overrides -m "not slow" from pytest.ini by passing an explicit -m all selector.
+test/all:
+	./.venv/bin/pytest -m "not slow or slow"
+
+.PHONY: pyright/setup
+pyright/setup:
+	mkdir -p pyright
+	cd pyright && npm install pyright
+
+.PHONY: pyright
 pyright:
 	[ -x ./pyright/node_modules/.bin/pyright ] || ( mkdir -p pyright && cd pyright && npm install pyright  )
 	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python
 
+.PHONY: pyright/watch
 pyright/watch:
 	[ -x ./pyright/node_modules/.bin/pyright ] || ( mkdir -p pyright && cd pyright && npm install pyright  )
 	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python --watch
 
+export ENV_FILE=./.dev.env
+
+.PHONY: dev/coordinator
+dev/coordinator:
+	./.venv/bin/uvicorn --reload quicklook.coordinator.api.app:app --port 9501 --no-access-log --reload-dir src
+
+ .PHONY: dev/generator
+dev/generator:
+	./.venv/bin/uvicorn --reload quicklook.generator.api.app:app --port 9502 --no-access-log --reload-dir src
+
+ .PHONY: dev/generator2
+dev/generator2:
+	QUICKLOOK_generator_port=9600 ./.venv/bin/uvicorn --reload quicklook.generator.api.app:app --port 9600 --no-access-log --reload-dir src
+
+.PHONY: dev/frontend
+dev/frontend:
+	./.venv/bin/uvicorn --reload quicklook.frontend.api.app:app --port 9500 --no-access-log --reload-dir src
+
+
+.PHONY: dev/openapi
+dev/openapi:
+	QUICKLOOK_admin_page=True \
+	QUICKLOOK_frontend_app_prefix= \
+	ENV_FILE=./.dev.env \
+	./.venv/bin/python -m quicklook.frontend.api.openapi
+
+
+.PHONY: db/create-migration
 db/create-migration:
 	@ [ "$(message)" ] || (echo "message is not set" && false)
 	./.venv/bin/alembic revision --autogenerate -m "$(message)"
 
+.PHONY: db/migrate
 db/migrate:
 	./.venv/bin/alembic upgrade head
 
+.PHONY: db/rollback
 db/rollback:
 	./.venv/bin/alembic downgrade -1
 
+.PHONY: db/bootstrap
+db/bootstrap:
+	./.venv/bin/python -m quicklook.scripts.bootstrap_db
+
+.PHONY: db/docker
 db/docker:
 	docker run --rm \
 		--name quicklook-db \
@@ -42,9 +82,8 @@ db/docker:
 		-e POSTGRES_PASSWORD=quicklook \
 		-e POSTGRES_DB=quicklook \
 		-p 5432:5432 \
-		-v $(PWD)/docker-volumes/postgres:/var/lib/postgresql/data \
-		postgres:16
-
-dev/openapi:
-	@QUICKLOOK_admin_page=True \
-		./.venv/bin/python -m quicklook.frontend.api.openapi
+		-v "$(PWD)/docker-volumes/postgres:/var/lib/postgresql/data" \
+		postgres:16 \
+		-c log_statement=all \
+		-c log_destination=stderr \
+		-c log_line_prefix='%m [%p] %u@%d %r %a '

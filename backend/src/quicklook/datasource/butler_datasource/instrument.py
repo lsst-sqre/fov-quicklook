@@ -2,12 +2,14 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
+from quicklook.types import CcdName
+
 
 @dataclass
 class Instrument:
     name: str
-    detector_2_ccd: dict[int, str]
-    ccd_2_detector: dict[str, int]
+    detector_2_ccd: dict[int, CcdName]
+    ccd_2_detector: dict[CcdName, int]
 
     @classmethod
     def get(cls, instrument_name: str):
@@ -30,8 +32,8 @@ class Instrument:
             purpose: str
 
             @property
-            def ccd_name(self):
-                return f'{self.raft}_{self.name_in_raft}'
+            def ccd_name(self) -> CcdName:
+                return CcdName(f'{self.raft}_{self.name_in_raft}')
 
             @classmethod
             def from_line(cls, line: str) -> 'Line':

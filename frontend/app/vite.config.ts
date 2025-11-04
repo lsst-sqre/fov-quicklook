@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
+// @ts-ignore
 import { getGafaelfawrToken } from './vite.proxysettings'
 
 
@@ -22,10 +23,10 @@ export default ({ mode }) => {
     ],
     server: {
       proxy: {
-        // '/api/': {
-        //   target: 'http://127.0.0.1:29500',
+        // [`${base}/api/`]: {
+        //   target: 'http://127.0.0.1:9500',
         //   ws: true,
-        //   rewrite: (path) => path.replace(/\/api\//, '/fov-quicklook/api/'),
+        //   // rewrite: (path) => path.replace(/\/api\//, '/fov-quicklook/api/'),
         // },
         [`${base}/api/`]: {
           target: 'https://usdf-rsp-dev.slac.stanford.edu',

@@ -4,6 +4,7 @@ image_ref := localhost:32000/quicklook
 
 build:
 	if [ "$(PYRIGHT_BEFORE_PUSH)" ]; then $(MAKE) -C backend pyright; fi
+	cd frontend/app && npm run build
 	docker build -t $(image_ref) .
 
 push: build

@@ -1,0 +1,130 @@
+.jobStatus {
+  position: relative;
+  margin: 0;
+  padding: 1.5rem;
+  border-radius: 16px;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 16px;
+  }
+
+  &.highlighted::before {
+    background: linear-gradient(to bottom, rgba(0, 200, 180, 0.4) 0%, rgba(0, 150, 160, 0.3) 100%);
+    box-shadow: 0 0 20px rgba(0, 200, 180, 0.5);
+  }
+
+  h2 {
+    position: relative;
+    z-index: 1;
+    margin: 0 0 1.5rem 0;
+    font-size: 1.2rem;
+  }
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.generateSingleFitsTiles {
+  h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+  }
+}
+
+.tileGrid {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--tile-gap, 0px);
+}
+
+.raftRow {
+  display: flex;
+  gap: var(--tile-gap, 0px);
+}
+
+.raft {
+  position: relative;
+}
+
+.sensorGrid {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--tile-gap, 0px);
+}
+
+.sensorRow {
+  display: flex;
+  gap: var(--tile-gap, 0px);
+}
+
+.sensor {
+  width: calc(var(--tile-height) / 3);
+  height: calc(var(--tile-height) / 3);
+  position: relative;
+  background: #033;
+  border: 1px solid #044;
+
+  &.gapless {
+    border: none;
+  }
+}
+
+.progressBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.progressFill {
+  background-color: #077;
+  transition: height 0.3s ease, background-color 0.3s ease;
+
+  &.completed {
+    background-color: #0cc;
+  }
+}
+
+.workerNodes {
+  h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+  }
+}
+
+.workerStack {
+  display: flex;
+  flex-direction: column;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.workerBar {
+  border-radius: 0;
+}
+
+.hidden {
+  // opacity: 0.125;
+  visibility: hidden;
+}

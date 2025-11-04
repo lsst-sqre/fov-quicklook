@@ -1,4 +1,3 @@
-import '@stellar-globe/react-draggable-dialog/style.css'
 import '@szhsin/react-menu/dist/index.css'
 import '@szhsin/react-menu/dist/theme-dark.css'
 import 'material-symbols/rounded.css'

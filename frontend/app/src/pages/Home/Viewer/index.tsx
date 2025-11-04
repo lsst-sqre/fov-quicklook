@@ -1,7 +1,6 @@
 import { Globe$, GlobeEventLayer$, GridLayer$, PanLayer$, RollLayer$, TouchLayer$, ZoomLayer$ } from '@stellar-globe/react-stellar-globe'
 import { GlobeEventMap, GlobePointerEvent, V2 } from "@stellar-globe/stellar-globe"
 import { memo, useCallback } from "react"
-import { GenerateProgress } from '../../../appComponents/JobProgress'
 import { Quicklook$ } from '../../../StellarGlobe/Quicklook/QuicklookLayer'
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
@@ -10,15 +9,16 @@ import { useHomeContext } from "../context"
 import { CcdFrames, HighlitedCcds } from './CcdFrames/CcdFrames'
 import { CursorLine } from './CursorLine'
 import { Info } from './Info'
-import styles from './styles.module.scss'
 import { ViewerContextMenu } from './ViewerContextMenu'
+import { QuicklookJobMonitor } from './QuicklookJobMonitor'
+import { CompactStatus } from './CompactStatus'
 
 type ViewerProps = {
   style?: React.CSSProperties
 }
 
 export const Viewer = memo(({ style }: ViewerProps) => {
-  const { globeHandle, quicklookHandle, currentQuicklook } = useHomeContext()
+  const { globeHandle, quicklookLayerHandle: quicklookHandle, currentQuicklook } = useHomeContext()
   const dispatch = useAppDispatch()
 
   const onPointerMove = useCallback((e: GlobePointerEvent) => {
@@ -55,7 +55,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
         <RollLayer$ />
         <TouchLayer$ />
         <PanLayer$ />
-        {currentQuicklook.metadata &&
+        {currentQuicklook.metadata?.type === 'ready' &&
           <Quicklook$
             ref={quicklookHandle}
             metadata={currentQuicklook.metadata}
@@ -71,11 +71,8 @@ export const Viewer = memo(({ style }: ViewerProps) => {
       </Globe$>
       <CursorLine />
       <Info />
-      {!!currentQuicklook.metadata || (
-        <div className={styles.viewerBlock}>
-          <GenerateProgress s={currentQuicklook.status} />
-        </div>
-      )}
+      <QuicklookJobMonitor />
+      <CompactStatus />
     </div>
   )
 })

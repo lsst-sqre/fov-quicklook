@@ -1,6 +1,8 @@
 import json
+
 from fastapi.openapi.utils import get_openapi
-from . import app
+
+from .app import app
 
 
 def generate_openapi_json():

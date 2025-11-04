@@ -1,4 +1,19 @@
 .cacheEntries {
+  .summary {
+    margin-bottom: 1em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+  }
+
+  .summaryText {
+    font-weight: bold;
+  }
+
+  .progressContainer {
+    width: 100%;
+  }
+
   table {
 
     td,

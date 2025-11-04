@@ -1,0 +1,324 @@
+ERROR:    Exception in ASGI application
+  + Exception Group Traceback (most recent call last):
+  |   File "/usr/local/lib/python3.13/site-packages/starlette/_utils.py", line 79, in collapse_excgroups
+  |     yield
+  |   File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 183, in __call__
+  |     async with anyio.create_task_group() as task_group:
+  |                ~~~~~~~~~~~~~~~~~~~~~~~^^
+  |   File "/usr/local/lib/python3.13/site-packages/anyio/_backends/_asyncio.py", line 781, in __aexit__
+  |     raise BaseExceptionGroup(
+  |         "unhandled errors in a TaskGroup", self._exceptions
+  |     ) from None
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/usr/local/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+    |     result = await app(  # type: ignore[func-returns-value]
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |         self.scope, self.receive, self.send
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |     )
+    |     ^
+    |   File "/usr/local/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    |     return await self.app(scope, receive, send)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/local/lib/python3.13/site-packages/fastapi/applications.py", line 1082, in __call__
+    |     await super().__call__(scope, receive, send)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    |     raise exc
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    |     await self.app(scope, receive, _send)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 182, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ~~~~~~~~~~~~~~~~~~^^
+    |   File "/usr/local/lib/python3.13/contextlib.py", line 162, in __exit__
+    |     self.gen.throw(value)
+    |     ~~~~~~~~~~~~~~^^^^^^^
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 184, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/app/src/quicklook/frontend/api/compression.py", line 20, in custom_compression_middleware
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 159, in call_next
+    |     raise app_exc
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    |     await route.handle(scope, receive, send)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    |     await self.app(scope, receive, send)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 78, in app
+    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 75, in app
+    |     response = await f(request)
+    |                ^^^^^^^^^^^^^^^^
+    |   File "/usr/local/lib/python3.13/site-packages/fastapi/routing.py", line 308, in app
+    |     raw_response = await run_endpoint_function(
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |     ...<3 lines>...
+    |     )
+    |     ^
+    |   File "/usr/local/lib/python3.13/site-packages/fastapi/routing.py", line 219, in run_endpoint_function
+    |     return await dependant.call(**values)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/app/src/quicklook/frontend/api/visits.py", line 51, in get_exposure_data_types
+    |     return await ds.get_exposure_data_types(id)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/app/src/quicklook/datasource/types.py", line 63, in get_exposure_data_types
+    |     return await asyncio.to_thread(self.get_exposure_data_types_sync, exposure_id)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/local/lib/python3.13/asyncio/threads.py", line 25, in to_thread
+    |     return await loop.run_in_executor(None, func_call)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/local/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    |     result = self.fn(*self.args, **self.kwargs)
+    |   File "/app/src/quicklook/datasource/butler_datasource/__init__.py", line 51, in get_exposure_data_types_sync
+    |     if datasource.exposure_exists(exposure_id):
+    |        ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+    |   File "/app/src/quicklook/datasource/butler_datasource/__init__.py", line 123, in exposure_exists
+    |     refs = b.query_datasets(self.data_type, where=f"{self.data_id_key}={exposure_id}", limit=1)
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/_butler.py", line 1941, in query_datasets
+    |     refs = list(result)
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/queries/_dataset_query_results.py", line 75, in __iter__
+    |     for page in self._iter_pages():
+    |                 ~~~~~~~~~~~~~~~~^^
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/queries/_dataset_query_results.py", line 84, in _iter_pages
+    |     for page in self._driver.execute(self._spec, self._tree):
+    |                 ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/direct_query_driver/_driver.py", line 215, in execute
+    |     builder = self.build_query(
+    |         tree,
+    |     ...<3 lines>...
+    |         allow_duplicate_overlaps=result_spec.allow_duplicate_overlaps,
+    |     )
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/direct_query_driver/_driver.py", line 555, in build_query
+    |     query_tree_analysis = self._analyze_query_tree(tree, allow_duplicate_overlaps)
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/direct_query_driver/_driver.py", line 638, in _analyze_query_tree
+    |     collection_analysis = self._analyze_collections(tree)
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/direct_query_driver/_driver.py", line 1271, in _analyze_collections
+    |     for record in self.managers.collections.resolve_wildcard(
+    |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+    |         CollectionWildcard.from_names(collection_names), flatten_chains=True, include_chains=True
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |     )
+    |     ^
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/registry/collections/_base.py", line 454, in resolve_wildcard
+    |     for record in filter_types(self._find_many(explicit_names, flatten_chains, cache)):
+    |                                ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/registry/collections/_base.py", line 378, in _find_many
+    |     raise MissingCollectionError(f"No collection with name '{missing_names[0]}' found.")
+    | lsst.daf.butler._exceptions.MissingCollectionError: No collection with name 'LSSTCam/runs/nightlyValidation' found.
+    +------------------------------------
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/fastapi/applications.py", line 1082, in __call__
+    await super().__call__(scope, receive, send)
+  File "/usr/local/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/usr/local/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/usr/local/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 182, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 184, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/src/quicklook/frontend/api/compression.py", line 20, in custom_compression_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 159, in call_next
+    raise app_exc
+  File "/usr/local/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 78, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/usr/local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/usr/local/lib/python3.13/site-packages/starlette/routing.py", line 75, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/fastapi/routing.py", line 308, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/fastapi/routing.py", line 219, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/src/quicklook/frontend/api/visits.py", line 51, in get_exposure_data_types
+    return await ds.get_exposure_data_types(id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/src/quicklook/datasource/types.py", line 63, in get_exposure_data_types
+    return await asyncio.to_thread(self.get_exposure_data_types_sync, exposure_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/app/src/quicklook/datasource/butler_datasource/__init__.py", line 51, in get_exposure_data_types_sync
+    if datasource.exposure_exists(exposure_id):
+       ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/app/src/quicklook/datasource/butler_datasource/__init__.py", line 123, in exposure_exists
+    refs = b.query_datasets(self.data_type, where=f"{self.data_id_key}={exposure_id}", limit=1)
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/_butler.py", line 1941, in query_datasets
+    refs = list(result)
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/queries/_dataset_query_results.py", line 75, in __iter__
+    for page in self._iter_pages():
+                ~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/queries/_dataset_query_results.py", line 84, in _iter_pages
+    for page in self._driver.execute(self._spec, self._tree):
+                ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/direct_query_driver/_driver.py", line 215, in execute
+    builder = self.build_query(
+        tree,
+    ...<3 lines>...
+        allow_duplicate_overlaps=result_spec.allow_duplicate_overlaps,
+    )
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/direct_query_driver/_driver.py", line 555, in build_query
+    query_tree_analysis = self._analyze_query_tree(tree, allow_duplicate_overlaps)
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/direct_query_driver/_driver.py", line 638, in _analyze_query_tree
+    collection_analysis = self._analyze_collections(tree)
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/direct_query_driver/_driver.py", line 1271, in _analyze_collections
+    for record in self.managers.collections.resolve_wildcard(
+                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        CollectionWildcard.from_names(collection_names), flatten_chains=True, include_chains=True
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/registry/collections/_base.py", line 454, in resolve_wildcard
+    for record in filter_types(self._find_many(explicit_names, flatten_chains, cache)):
+                               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/lsst/daf/butler/registry/collections/_base.py", line 378, in _find_many
+    raise MissingCollectionError(f"No collection with name '{missing_names[0]}' found.")
+lsst.daf.butler._exceptions.MissingCollectionError: No collection with name 'LSSTCam/runs/nightlyValidation' found.
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: 'raw:2025101900014'. Remaining retries: 2
+Traceback (most recent call last):
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: 'raw:2025101900014'. Remaining retries: 2
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: 'raw:2025101900014'. Remaining retries: 2
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 259, in _status_relay_main_loop
+    visit: _job_shared_large_status_dict[visit] for visit in jobs
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+KeyError: 'raw:2025101900014'
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 259, in _status_relay_main_loop
+    visit: _job_shared_large_status_dict[visit] for visit in jobs
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+KeyError: 'raw:2025101900014'
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 259, in _status_relay_main_loop
+    visit: _job_shared_large_status_dict[visit] for visit in jobs
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+KeyError: 'raw:2025101900014'
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: 'raw:2025101900014'. Remaining retries: 2
+Traceback (most recent call last):
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 259, in _status_relay_main_loop
+    visit: _job_shared_large_status_dict[visit] for visit in jobs
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+KeyError: 'raw:2025101900014'
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: 'raw:2025101900013'. Remaining retries: 1
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: 'raw:2025101900013'. Remaining retries: 1
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: 'raw:2025101900013'. Remaining retries: 1
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 259, in _status_relay_main_loop
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 259, in _status_relay_main_loop
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 259, in _status_relay_main_loop
+    visit: _job_shared_large_status_dict[visit] for visit in jobs
+    visit: _job_shared_large_status_dict[visit] for visit in jobs
+    visit: _job_shared_large_status_dict[visit] for visit in jobs
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+KeyError: 'raw:2025101900013'
+KeyError: 'raw:2025101900013'
+KeyError: 'raw:2025101900013'
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: 'raw:2025101900013'. Remaining retries: 1
+Traceback (most recent call last):
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 259, in _status_relay_main_loop
+    visit: _job_shared_large_status_dict[visit] for visit in jobs
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+KeyError: 'raw:2025101900013'
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: no close frame received or sent. Remaining retries: 0
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: no close frame received or sent. Remaining retries: 0
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: no close frame received or sent. Remaining retries: 0
+WARNING:  Failed to connect to ws://fov-quicklook-coordinator:9501: no close frame received or sent. Remaining retries: 0
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 247, in _status_relay_main_loop
+    msg_bytes = await ws.recv()
+                ^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/websockets/asyncio/connection.py", line 322, in recv
+    raise self.protocol.close_exc from self.recv_exc
+websockets.exceptions.ConnectionClosedError: no close frame received or sent
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 247, in _status_relay_main_loop
+    msg_bytes = await ws.recv()
+                ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/websockets/asyncio/connection.py", line 322, in recv
+    raise self.protocol.close_exc from self.recv_exc
+websockets.exceptions.ConnectionClosedError: no close frame received or sent
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 247, in _status_relay_main_loop
+    msg_bytes = await ws.recv()
+                ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/websockets/asyncio/connection.py", line 322, in recv
+    raise self.protocol.close_exc from self.recv_exc
+websockets.exceptions.ConnectionClosedError: no close frame received or sent
+Traceback (most recent call last):
+  File "/app/src/quicklook/frontend/api/quicklooks.py", line 247, in _status_relay_main_loop
+    msg_bytes = await ws.recv()
+                ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/site-packages/websockets/asyncio/connection.py", line 322, in recv
+    raise self.protocol.close_exc from self.recv_exc
+websockets.exceptions.ConnectionClosedError: no close frame received or sent
+  

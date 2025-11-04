@@ -39,7 +39,6 @@ function useVisitList() {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
   const query = useMemo(() => {
-
     if (isValidSearchString(searchString)) {
       switch (searchString.length) {
         case 8:

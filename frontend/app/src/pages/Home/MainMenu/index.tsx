@@ -24,6 +24,16 @@ export function MainMenu() {
     dispatch(homeSlice.actions.setShowFrame(!showFrame))
   }, [dispatch, showFrame])
 
+  const showCompactStatus = useAppSelector(state => state.home.showCompactStatus)
+  const toggleCompactStatus = useCallback(() => {
+    dispatch(homeSlice.actions.setShowCompactStatus(!showCompactStatus))
+  }, [dispatch, showCompactStatus])
+
+  const showMemoryUsageInCompactStatus = useAppSelector(state => state.home.showMemoryUsageInCompactStatus)
+  const toggleMemoryUsageInCompactStatus = useCallback(() => {
+    dispatch(homeSlice.actions.setShowMemoryUsageInCompactStatus(!showMemoryUsageInCompactStatus))
+  }, [dispatch, showMemoryUsageInCompactStatus])
+
   return (
     <div>
       <Menu menuButton={<MenuButton><MaterialSymbol symbol="menu" /></MenuButton>} theming="dark"  >
@@ -32,6 +42,8 @@ export function MainMenu() {
         <MenuDivider />
         <MenuItem type="checkbox" checked={lineProfilerEnabled} onClick={toggleLineProfiler}>Line Profiler</MenuItem>
         <MenuItem type="checkbox" checked={showFrame} onClick={toggleFrame}>Frame</MenuItem>
+        <MenuItem type="checkbox" checked={showCompactStatus} onClick={toggleCompactStatus}>System Status</MenuItem>
+        <MenuItem type="checkbox" checked={showMemoryUsageInCompactStatus} onClick={toggleMemoryUsageInCompactStatus}>Show Recoverable Memory</MenuItem>
       </Menu>
     </div>
   )

@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useMemo } from "react"
+import { useSearchParams } from "react-router-dom"
 import { MaterialSymbol } from "../../../components/MaterialSymbol"
 import { ListStorageEntriesApiResponse, useDeleteStorageEntriesByPrefixMutation, useDeleteStorageEntryMutation, useListStorageEntriesQuery } from "../../../store/api/openapi"
 import styles from './styles.module.scss'
-import { useSearchParams } from "react-router-dom"
 
 
 type StorageContext = {
@@ -18,7 +18,7 @@ const StorageContext = createContext<StorageContext | null>(null)
 export function StorageExplorer() {
   const [searchParams, setSearchParams] = useSearchParams()
   const path = searchParams.get('path') || ''
-  const { data: entries, refetch } = useListStorageEntriesQuery({ path })
+  const { data: entries, refetch } = useListStorageEntriesQuery({ path }, { refetchOnMountOrArgChange: true })
 
   const setPath = useCallback((newPath: string) => {
     setSearchParams({ path: newPath })
@@ -76,8 +76,8 @@ function Entry({
   const goIn = useCallback(() => {
     setPath(`${path}${entry.name}`)
   }, [entry.name, path, setPath])
-  const [deleteEntry] = useDeleteStorageEntryMutation()
-  const [deleteEntryByPrefix] = useDeleteStorageEntriesByPrefixMutation()
+  const [deleteEntry, { isLoading: isDeleting }] = useDeleteStorageEntryMutation()
+  const [deleteEntryByPrefix, { isLoading: isDeletingByPrefix }] = useDeleteStorageEntriesByPrefixMutation()
 
   const handleDelete = useCallback(async () => {
     if (entry.type === 'directory') {
@@ -105,7 +105,7 @@ function Entry({
             <MaterialSymbol symbol="arrow_forward" />
           </button>
         )}
-        <button onClick={handleDelete}>
+        <button onClick={handleDelete} disabled={isDeleting || isDeletingByPrefix}>
           <MaterialSymbol symbol="delete" />
         </button>
       </th>

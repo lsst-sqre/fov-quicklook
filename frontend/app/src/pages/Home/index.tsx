@@ -54,7 +54,7 @@ const useSetInitialSearchConditions = () => {
 
   useEffect(() => {
     if (visitId) {
-      const dataSource = extractDataSourceFromVisitId(visitId)
+      const dataSource = extractDataTypeFromVisitId(visitId)
       if (dataSource) {
         dispatch(homeSlice.actions.setDataSource(dataSource))
       }
@@ -77,7 +77,7 @@ function extractDateFromVisitId(visitId: string) {
 }
 
 
-function extractDataSourceFromVisitId(visitId: string): CcdDataType | undefined {
+function extractDataTypeFromVisitId(visitId: string): CcdDataType | undefined {
   /*
    * post_isr_image:2025051900437 のようなテキストから post_isr_image を抽出する
    * 形式がマッチしなければ undefined を返す

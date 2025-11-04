@@ -1,23 +1,24 @@
 from fastapi import APIRouter, Query
+import pydantic
 
 from quicklook.datasource import get_datasource
 from quicklook.datasource.butler_datasource import VisitEntry
 from quicklook.datasource.types import DataSourceCcdMetadata
 from quicklook.datasource.types import Query as DataSourceQuery
-from quicklook.types import CcdDataType, CcdId, Visit
+from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 router = APIRouter()
 
 
 @router.get('/api/visits', response_model=list[VisitEntry])
-def list_visits(
+async def list_visits(
     exposure: int | None = Query(None),
     day_obs: int | None = Query(None),
     limit: int = Query(default=1000, le=10000),
     data_type: CcdDataType = Query(default='raw'),
 ):
     ds = get_datasource()
-    return ds.query_visits(
+    return await ds.query_visits(
         DataSourceQuery(
             data_type=data_type,
             exposure=exposure,
@@ -27,15 +28,24 @@ def list_visits(
     )
 
 
-@router.get('/api/visits/{id}/ccds/{ccd_name}', response_model=DataSourceCcdMetadata)
-def get_visit_metadata(id: str, ccd_name: str):
+@router.get(
+    '/api/visits/{visit_name}/ccds/{ccd_name}',
+    response_model=DataSourceCcdMetadata,
+)
+async def get_visit_metadata(
+    visit_name: str,
+    ccd_name: str,
+) -> DataSourceCcdMetadata:
     ds = get_datasource()
-    ref = CcdId(visit=Visit.from_id(id), ccd_name=ccd_name)
-    metadata = ds.get_metadata(ref)
+    ref = CcdDataRef(
+        visit=VisitName(visit_name),
+        ccd=CcdName(ccd_name),
+    )
+    metadata = await ds.get_metadata(ref)
     return metadata
 
 
 @router.get('/api/exposures/{id}/types', response_model=list[CcdDataType])
-def get_exposure_data_types(id: int):
+async def get_exposure_data_types(id: int):
     ds = get_datasource()
-    return ds.get_exposure_data_types(id)
+    return await ds.get_exposure_data_types(id)

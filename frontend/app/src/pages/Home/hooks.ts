@@ -12,7 +12,7 @@ function useQuicklookMetadata() {
 export function useWcs() {
   const metadata = useQuicklookMetadata()
   return useMemo(() => {
-    if (metadata) {
+    if (metadata?.type === 'ready') {
       return Tract.fromFitsHeader(metadata.wcs)
     }
   }, [metadata])
@@ -47,9 +47,9 @@ export function useFocusedCcd() {
   const [x, y] = useMouseCursorFocalPlaneCoord()
 
   return useMemo(() => {
-    if (metadata && metadata.ccd_meta) {
-      for (const ccd of metadata.ccd_meta) {
-        const { ccd_id, bbox } = ccd
+    if (metadata?.type === 'ready') {
+      for (const ccd of metadata.ccd_metadata_list) {
+        const { bbox } = ccd
         const [p1, p2, p3, p4] = [
           [bbox.minx, bbox.miny],
           [bbox.maxx, bbox.miny],

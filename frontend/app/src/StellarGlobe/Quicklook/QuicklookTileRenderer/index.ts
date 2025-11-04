@@ -1,6 +1,6 @@
 import { Cache, Globe, ReleaseCallbacks, Tract, V2, angle, tile } from "@stellar-globe/stellar-globe"
 import npyjs from 'npyjs'
-import { QuicklookMetadata } from "../../../store/api/openapi"
+import { QuicklookMetadata, QuicklookMetadataReady } from "../../../store/api/openapi"
 import { RubinImageFilter, RubinImageFilterParams } from "./ImaegFilter"
 import { zstdDecompress } from "./zstd"
 import { env } from "../../../env"
@@ -19,7 +19,7 @@ export class QuicklookRenderer extends tile.Renderer<QuicklookTextureProvider> {
 
   constructor(
     globe: Globe,
-    readonly metadata: QuicklookMetadata,
+    readonly metadata: QuicklookMetadataReady,
     filterParams: RubinImageFilterParams,
   ) {
     const filter = new RubinImageFilter(globe.gl, filterParams)
@@ -66,7 +66,7 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
 
   constructor(
     globe: Globe,
-    readonly metadata: QuicklookMetadata,
+    readonly metadata: QuicklookMetadataReady,
     readonly filter: RubinImageFilter,
   ) {
     super(globe)
@@ -105,7 +105,7 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
       return npy
     }
     const tileId = Tract.encodeTileId(this.tracts[0], level, p, q)
-    const url = `${env.baseUrl}/api/quicklooks/${this.metadata.id}/tiles/${level}/${p}/${q}`
+    const url = `${env.baseUrl}/api/quicklooks/${this.metadata.visit_name}/tiles/${level}/${p}/${q}`
     const fresh = await loadRemoteNpy(url)
     this.npyCache.set(tileId, fresh)
     return fresh
@@ -209,6 +209,7 @@ async function loadRemoteNpy(url: string) {
       const array = await zstdDecompress(new Uint8Array(raw))
       // console.info(`${url}: compression rate: ${(100 * raw.byteLength / array.byteLength).toFixed(0)}%`)
       const n = new npyjs()
+      // @ts-ignore
       return n.parse(array.buffer)
     }
     default:

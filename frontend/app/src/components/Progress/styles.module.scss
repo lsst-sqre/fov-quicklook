@@ -1,18 +1,23 @@
 .background {
   background-color: #033;
-  // overflow: hidden;
   height: 8px;
-  // border-radius: 4px;
-  // width: 200px;
+  overflow: hidden;
+
+  &.rounded {
+    border-radius: 4px;
+  }
 }
 
 .bar {
   background-color: #077;
   transition: width 0.2s ease-out, background-color 0.2s ease-out 0.2s;
   height: 100%;
-
 }
 
 .completed {
   background-color: #0cc;
+}
+
+.rounded {
+  border-radius: 4px;
 }

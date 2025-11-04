@@ -1,0 +1,98 @@
+import contextlib
+import multiprocessing
+import os
+import signal
+import socket
+import time
+from dataclasses import dataclass
+from typing import Callable
+
+import requests
+import uvicorn
+
+
+@dataclass
+class _UvicornAppRunner:
+    """Uvicornアプリケーションランナーの情報"""
+
+    wait_for_ready: Callable[[], None]
+    base_url: str
+
+
+@contextlib.contextmanager
+def run_uvicorn_app(
+    app: str,
+    *,
+    port: int | None = None,
+    timeout=10,
+    log_prefix='',
+    healthz='/healthz',
+    log_level: str | int | None = None,
+    access_log: bool = False,
+):
+    if port is None:  # pragma: no cover
+        port = find_free_tcp_port()
+
+    p = multiprocessing.Process(
+        target=_uvicorn_run,
+        args=(app,),
+        kwargs={
+            'port': port,
+            'log_prefix': log_prefix,
+            'log_level': log_level,
+            'access_log': access_log,
+        },
+    )
+    p.start()
+
+    base_url = f'http://127.0.0.1:{port}'
+
+    def wait_for_ready():
+        start = time.time()
+        while time.time() - start < timeout:  # pragma: no branch
+            try:
+                requests.get(f'{base_url}{healthz}')
+                break
+            except requests.exceptions.ConnectionError:
+                time.sleep(0.1)
+        else:  # pragma: no cover
+            raise TimeoutError(f'{app} did not start in {timeout} seconds')
+
+    try:
+        yield _UvicornAppRunner(wait_for_ready=wait_for_ready, base_url=base_url)
+    finally:
+        assert p.pid
+        os.kill(p.pid, signal.SIGINT)  # p.terminate() を使うとcoverageがとれないのでSIGINTを送る
+        p.join()
+
+
+def _uvicorn_run(
+    app: str,
+    *,
+    port: int,
+    log_prefix: str,
+    log_level: str | int | None,
+    access_log: bool,
+):
+    _uvicorn_add_log_prefix(log_prefix)
+    uvicorn.run(
+        app,
+        port=port,
+        log_level=log_level,
+        access_log=access_log,
+    )
+
+
+def _uvicorn_add_log_prefix(prefix: str):
+    log_config = uvicorn.config.LOGGING_CONFIG  # type: ignore
+    log_config["formatters"]["default"]["fmt"] = f'{prefix}{log_config["formatters"]["default"]["fmt"]}'
+
+
+def find_free_tcp_port(host='127.0.0.1') -> int:  # pragma: no cover
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        # 0 を指定すると OS が未使用のポートを割り当てる
+        s.bind((host, 0))
+        s.listen(1)  # サーバ用途なら listen しておく
+        port = s.getsockname()[1]
+    # ← with を抜けるとソケットが閉じるため、この瞬間に他プロセスに取られる可能性がある
+    return port
