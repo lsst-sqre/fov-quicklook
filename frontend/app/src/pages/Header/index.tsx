@@ -20,7 +20,7 @@ export const Header = memo(() => {
           <LinkButton to="/admin/status">System Status</LinkButton>
           <LinkButton to="/admin/jobs">Jobs</LinkButton>
           <LinkButton to="/admin/cache-entries">Cache Entries</LinkButton>
-          <LinkButton to="/admin/storage">Storage</LinkButton>
+          {/* <LinkButton to="/admin/storage">Storage</LinkButton> */}
           <div style={{ width: '1em' }} />
         </>
       )}

@@ -127,30 +127,6 @@ const injectedRtkApi = api.injectEndpoints({
         },
       }),
     }),
-    deleteStorageEntry: build.mutation<
-      DeleteStorageEntryApiResponse,
-      DeleteStorageEntryApiArg
-    >({
-      query: (queryArg) => ({
-        url: `/api/storage`,
-        method: "DELETE",
-        params: {
-          path: queryArg.path,
-        },
-      }),
-    }),
-    deleteStorageEntriesByPrefix: build.mutation<
-      DeleteStorageEntriesByPrefixApiResponse,
-      DeleteStorageEntriesByPrefixApiArg
-    >({
-      query: (queryArg) => ({
-        url: `/api/storage/by-prefix`,
-        method: "DELETE",
-        params: {
-          prefix: queryArg.prefix,
-        },
-      }),
-    }),
   }),
   overrideExisting: false,
 });
@@ -242,16 +218,6 @@ export type ListStorageEntriesApiResponse =
   /** status 200 Successful Response */ Entry[];
 export type ListStorageEntriesApiArg = {
   path: string;
-};
-export type DeleteStorageEntryApiResponse =
-  /** status 200 Successful Response */ any;
-export type DeleteStorageEntryApiArg = {
-  path: string;
-};
-export type DeleteStorageEntriesByPrefixApiResponse =
-  /** status 200 Successful Response */ any;
-export type DeleteStorageEntriesByPrefixApiArg = {
-  prefix: string;
 };
 export type ContextMenuTemplate = {
   name: string;
@@ -458,6 +424,4 @@ export const {
   useDeleteAllCacheEntriesMutation,
   useDeleteCacheEntryMutation,
   useListStorageEntriesQuery,
-  useDeleteStorageEntryMutation,
-  useDeleteStorageEntriesByPrefixMutation,
 } = injectedRtkApi;
