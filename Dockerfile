@@ -7,10 +7,10 @@ COPY ./frontend/ /frontend
 # building javascripts can be done by the following commands, but it takes a long time.
 # therefore, I recommend to build javascripts on your local machine and copy them to /frontend/app/dist
 
-# RUN \
-#   cd /frontend/lib/stellar-globe && npm install && npm run build && \
-#   cd /frontend/lib/react-stellar-globe && npm install && npm run build && \
-#   cd /frontend/app && npm install && npm run build
+RUN \
+  cd /frontend/lib/stellar-globe/stellar-globe && npm install && npm run build && \
+  cd /frontend/lib/stellar-globe/react-stellar-globe && npm install && npm run build && \
+  cd /frontend/app && npm install && npm run build
 
 # for backend
 FROM python:3.13-bookworm
