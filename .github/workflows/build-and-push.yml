@@ -1,0 +1,35 @@
+name: Build and Push Docker Image
+
+"on":
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
+  pull_request: {}
+  merge_group: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build and push to ghcr.io
+        uses: lsst-sqre/build-and-push-to-ghcr@v1
+        id: build
+        with:
+          image: ${{ github.repository }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print image tag
+        run: echo Pushed ghcr.io/${{ github.repository }}:${{ steps.build.outputs.tag }}
