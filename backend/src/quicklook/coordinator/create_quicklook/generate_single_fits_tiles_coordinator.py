@@ -1,6 +1,7 @@
 import asyncio
 import queue
 from collections import deque
+from typing import cast
 
 from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.rpc_worker import rpc_scatter
@@ -17,19 +18,44 @@ from quicklook.rpc.client import Rpc
 from quicklook.rpc.queue import RpcQueue
 from quicklook.types import CcdDataRef, CcdName
 
+# Global cache for RPC connections
+# Key: GeneratorId
+# Value: (RpcQueue, Task)
+_rpc_cache: dict[GeneratorId, tuple[RpcQueue, asyncio.Task]] = {}
+
+# Dispatcher for messages from generators
+# Key: job_id
+# Value: asyncio.Queue[tuple[GeneratorId, GenerateSingleFitsTilesProgress | CcdMetadata]]
+_message_dispatcher: dict[str, asyncio.Queue] = {}
+
+
+async def _rpc_listener(rpc: Rpc, generator_id: GeneratorId):
+    """RPCからのメッセージを受信して適切なジョブのキューに振り分ける"""
+    try:
+        async for msg in rpc.iterate():
+            job_id = None
+            match msg:
+                case GenerateSingleFitsTilesProgress(job_id=jid):
+                    job_id = jid
+                case CcdMetadata(job_id=jid):
+                    job_id = jid
+            
+            if job_id and job_id in _message_dispatcher:
+                await _message_dispatcher[job_id].put((generator_id, msg))
+    except Exception:
+        # 接続エラーなどはここでハンドリング（再接続ロジックなどが必要ならここ）
+        # 現状はキャッシュから削除して終了
+        if generator_id in _rpc_cache:
+            del _rpc_cache[generator_id]
+
 
 async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDataRef]) -> list[CcdMetadata]:
     """
     FITS データから単一タイルを生成する協調処理。
 
-    各ジェネレータに対して1つのRPC呼び出しを行い、
-    queue.Queue を通じて動的にCCDを割り当てる。
-    各ジェネレータは設定された数のCCDを同時に処理できる。
-
-    動的割り当ての利点:
-      - 高速なジェネレータがより多くのCCDを処理
-      - 低速なジェネレータがボトルネックにならない
-      - 自動的に最適な負荷分散を実現
+    各ジェネレータに対して永続的なRPC接続を維持し、
+    空いているジェネレータに動的にCCDを割り当てる。
+    遅いジェネレータがある場合は、他のジェネレータに再割り当て（投機的実行）を行う。
     """
     ccd_refs.sort(key=lambda ref: ref.ccd_name)
     generators = get_available_generators()
@@ -37,65 +63,104 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         raise RuntimeError("No generators available")
 
     generator_list = list(generators.values())
-    remaining_ccds = deque(ccd_refs)
-    ccd_metadata_dict: dict[CcdName, CcdMetadata] = {}
-    ccd_generator_map: dict[CcdName, GeneratorId] = {}
-    lock = asyncio.Lock()
-    max_concurrent_ccds = config.generator_max_concurrent_ccds_per_job
-
-    async def worker(generator: GeneratorInfo):
-        """
-        各ジェネレータのワーカー。
-        単一のRPC呼び出しでRpcQueue経由で動的にCCDを供給する。
-        """
-        client_queue: asyncio.Queue[CcdDataRef | None] = asyncio.Queue()
-
-        async with lock:
-            initial_batch: list[CcdDataRef] = []
-            for _ in range(max_concurrent_ccds):
-                if remaining_ccds:
-                    ccd_ref = remaining_ccds.popleft()
-                    initial_batch.append(ccd_ref)
-                    await client_queue.put(ccd_ref)
-
-        if not initial_batch:
-            return
-
-        rpc_queue = RpcQueue(client_queue)
-
-        rpc = Rpc(
-            f'{generator.ws_url}/rpc',
-            _generate_tiles_with_queue,
-            job,
-            rpc_queue,
-        )
-
-        all_sent = False
-        async for msg in rpc.iterate():
-            match msg:
-                case GenerateSingleFitsTilesProgress(progress=progress, ccd_name=ccd_name):
-                    async with job.watcher.watch_status():
-                        job.status.generate_single_fits_tiles[ccd_name] = progress
-                case CcdMetadata(ccd_name=ccd_name):
-                    async with lock:
-                        ccd_metadata_dict[ccd_name] = msg
-                        ccd_generator_map[ccd_name] = generator.id
-
-                    async with lock:
-                        if remaining_ccds:
-                            next_ccd = remaining_ccds.popleft()
-                            await client_queue.put(next_ccd)
-                        elif not all_sent:
-                            await client_queue.put(None)
-                            all_sent = True
-
-    # すべてのジェネレータに対して並行処理
-    async with asyncio.TaskGroup() as tg:
+    
+    # Register message queue for this job
+    msg_queue: asyncio.Queue[tuple[GeneratorId, GenerateSingleFitsTilesProgress | CcdMetadata]] = asyncio.Queue()
+    _message_dispatcher[job.id] = msg_queue
+    
+    try:
+        # Ensure RPC connections are established
+        queues: dict[GeneratorId, queue.Queue] = {}
         for generator in generator_list:
-            tg.create_task(worker(generator))
+            if generator.id not in _rpc_cache:
+                client_queue: asyncio.Queue[tuple[Job, CcdDataRef] | None] = asyncio.Queue()
+                rpc_queue = RpcQueue(client_queue)
+                
+                rpc = Rpc(
+                    f'{generator.ws_url}/rpc',
+                    _generate_tiles_with_queue,
+                    rpc_queue,
+                )
+                
+                task = asyncio.create_task(_rpc_listener(rpc, generator.id))
+                _rpc_cache[generator.id] = (rpc_queue, task)
+            
+            queues[generator.id] = _rpc_cache[generator.id][0]
 
-    if len(ccd_metadata_dict) != len(ccd_refs):
-        raise RuntimeError(f"Not all CCDs processed: got {len(ccd_metadata_dict)}/{len(ccd_refs)} metadata")
+        # Dispatch logic
+        remaining_ccds = deque(ccd_refs)
+        ccd_metadata_dict: dict[CcdName, CcdMetadata] = {}
+        ccd_generator_map: dict[CcdName, GeneratorId] = {}
+        
+        # Track which generator is processing which CCD
+        processing_ccds: dict[CcdName, list[GeneratorId]] = {}
+        
+        # Track load (approximate number of pending tasks for THIS job)
+        generator_load: dict[GeneratorId, int] = {g.id: 0 for g in generator_list}
+        max_concurrent = config.generator_max_concurrent_ccds_per_job
+        
+        def dispatch_one(generator_id: GeneratorId, ccd_ref: CcdDataRef):
+            queues[generator_id].queue.put_nowait((job, ccd_ref))
+            generator_load[generator_id] += 1
+            if ccd_ref.ccd_name not in processing_ccds:
+                processing_ccds[ccd_ref.ccd_name] = []
+            processing_ccds[ccd_ref.ccd_name].append(generator_id)
+
+        def try_dispatch(generator_id: GeneratorId):
+            if generator_load[generator_id] >= max_concurrent:
+                return
+
+            if remaining_ccds:
+                dispatch_one(generator_id, remaining_ccds.popleft())
+            else:
+                # Speculative dispatch
+                pending = [ref for ref in ccd_refs if ref.ccd_name not in ccd_metadata_dict]
+                if not pending:
+                    return
+                
+                # Sort pending by number of replicas (ascending)
+                pending.sort(key=lambda ref: len(processing_ccds.get(ref.ccd_name, [])))
+                
+                for ref in pending:
+                    current_runners = processing_ccds.get(ref.ccd_name, [])
+                    if generator_id not in current_runners:
+                        dispatch_one(generator_id, ref)
+                        break
+
+        # Initial dispatch: fill all generators
+        for generator in generator_list:
+            for _ in range(max_concurrent):
+                try_dispatch(generator.id)
+        
+        # Loop until all CCDs are processed
+        while len(ccd_metadata_dict) < len(ccd_refs):
+            try:
+                # Wait for message or timeout to do speculative dispatch
+                item = await asyncio.wait_for(msg_queue.get(), timeout=0.5)
+                gen_id, msg = item
+                
+                match msg:
+                    case GenerateSingleFitsTilesProgress(progress=progress, ccd_name=ccd_name):
+                        async with job.watcher.watch_status():
+                            job.status.generate_single_fits_tiles[ccd_name] = progress
+                    
+                    case CcdMetadata(ccd_name=ccd_name) as metadata:
+                        generator_load[gen_id] -= 1
+                        if ccd_name not in ccd_metadata_dict:
+                            ccd_metadata_dict[ccd_name] = metadata
+                            ccd_generator_map[ccd_name] = gen_id
+                        
+                        try_dispatch(gen_id)
+
+            except asyncio.TimeoutError:
+                # Check all generators for free slots (e.g. if they finished tasks but we missed it? Unlikely)
+                # Or just to be safe.
+                for generator in generator_list:
+                    try_dispatch(generator.id)
+
+    finally:
+        del _message_dispatcher[job.id]
+        # We do NOT close the RPC connections.
 
     dist_config = CcdDistributionConfig(ccd_generator_map, generators)
     async with job.watcher.notify_shared_large_status():
@@ -108,31 +173,19 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
     return [*ccd_metadata_dict.values()]
 
 
-def _generate_tiles_with_queue(job: Job, ccd_queue: queue.Queue[CcdDataRef | None]):
+def _generate_tiles_with_queue(rpc_queue: queue.Queue[tuple[Job, CcdDataRef] | None]):
     """
     ジェネレータプロセスで実行される RPC 関数。
     queueから動的にCCDを取得して処理する。
-
-    Args:
-        job: ジョブオブジェクト
-        ccd_queue: CCDを供給するキュー。Noneが送られると終了。
-
-    Yields:
-        CcdMetadata: 処理完了したCCDのメタデータ
-
-    Note:
-        GeneratorIDはRPC ProcessPoolExecutorのinitializerで設定済み
     """
-
-    def ccd_refs_generator():
-        """キューからCCDを取得するジェネレータ"""
+    def items_generator():
         while True:
-            ccd_ref = ccd_queue.get()
-            if ccd_ref is None:
+            item = rpc_queue.get()
+            if item is None:
                 break
-            yield ccd_ref
+            yield item
 
-    yield from generate_single_fits_tiles_pipeline(job, ccd_refs_generator())
+    yield from generate_single_fits_tiles_pipeline(items_generator())
 
 
 def _save_job_metadata_rpc(job: Job) -> None:

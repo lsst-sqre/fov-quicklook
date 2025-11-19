@@ -25,12 +25,14 @@ ds = get_datasource()
 
 @dataclass
 class GenerateSingleFitsTilesProgress:
+    job_id: str
     ccd_name: CcdName
     progress: Progress
 
 
 @dataclass
 class CcdMetadata:
+    job_id: str
     ccd_name: CcdName
     image_stat: ImageStat
     amps: list[AmpMetadata]
@@ -49,8 +51,7 @@ _pool_exit_stack: ExitStack | None = None
 
 
 def generate_single_fits_tiles_pipeline(
-    job: Job,
-    refs: Iterable[CcdDataRef],
+    items: Iterable[tuple[Job, CcdDataRef]],
 ) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
     with tempfile.TemporaryDirectory() as tmpdir, multiprocessing.Manager() as manager:
         q = cast(
@@ -60,16 +61,17 @@ def generate_single_fits_tiles_pipeline(
 
         def ccd_paths():
             with ThreadPoolExecutor(2) as executor:
-                for path in imap_unordered_threadpool(executor, download, refs, max_in_flight=2):
-                    yield path
+                for result in imap_unordered_threadpool(executor, download, items, max_in_flight=2):
+                    yield result
 
-        def download(ref: CcdDataRef):
-            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 1)))
+        def download(item: tuple[Job, CcdDataRef]):
+            job, ref = item
+            q.put(GenerateSingleFitsTilesProgress(job_id=job.id, ccd_name=ref.ccd_name, progress=Progress(4, 1)))
             data_bytes = ds.get_data_sync(ref)
             outpath = Path(tmpdir) / f"{ref.ccd_name}.fits"
             outpath.write_bytes(data_bytes)
-            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 2)))
-            return (ref, outpath)
+            q.put(GenerateSingleFitsTilesProgress(job_id=job.id, ccd_name=ref.ccd_name, progress=Progress(4, 2)))
+            return (job, ref, outpath)
 
         def main():
             try:
@@ -88,7 +90,7 @@ def generate_single_fits_tiles_pipeline(
                                 path,
                                 q,  # type:ignore
                             )
-                            for ref, path in ccd_paths()
+                            for job, ref, path in ccd_paths()
                         ),
                     ):
                         q.put(ccd_metadata)
@@ -115,6 +117,7 @@ def _process_ccd(args: ProcessCcdArgs):
         ppccd = preprocess_ccd(args.ref, args.path)
         args.progress.put(
             GenerateSingleFitsTilesProgress(
+                job_id=args.job.id,
                 ccd_name=ppccd.data_ref.ccd_name,
                 progress=Progress(4, 3),
             )
@@ -125,6 +128,7 @@ def _process_ccd(args: ProcessCcdArgs):
     generate_tiles(ppccd, args.job)
     args.progress.put(
         GenerateSingleFitsTilesProgress(
+            job_id=args.job.id,
             ccd_name=ppccd.data_ref.ccd_name,
             progress=Progress(4, 4),
         )
@@ -133,6 +137,7 @@ def _process_ccd(args: ProcessCcdArgs):
     args.job.local_storage.fits_header.save(args.ref.ccd_name, ppccd.headers)
 
     return CcdMetadata(
+        job_id=args.job.id,
         ccd_name=ppccd.data_ref.ccd,
         image_stat=ppccd.stat,
         amps=ppccd.amps,

@@ -58,5 +58,6 @@ def test_generate_single_fits_tiles_pipeline(broccoli_visit: VisitName):
         CcdDataRef(visit=broccoli_visit, ccd=CcdName('R00_SG0')),
         CcdDataRef(visit=broccoli_visit, ccd=CcdName('R00_SG1')),
     ]
-    for _ in generate_single_fits_tiles_pipeline(job, ccd_refs):
+    items = [(job, ref) for ref in ccd_refs]
+    for _ in generate_single_fits_tiles_pipeline(items):
         print(_)

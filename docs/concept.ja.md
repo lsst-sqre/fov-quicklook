@@ -41,7 +41,7 @@ LSST Camから得られる画像は１ショット189個のFITSファイルか�
 
       ここは工夫の必要な場所でgeneratorには性能のばらつきがあり、一向に処理が進まないgeneratorが実際にいる。
       そのため、最初に全FITSをgeneratorに割り当てるのではなく動的にスケジュールする。
-      詳しくは[こちら](./dynamic-dispatch.ja.md)。
+      詳しくは[こちら](./implementation.ja.md)。
     
     * generatorは分担したFITSファイルをタイル化する
       * このフェーズが終わるとユーザーはプレビューを表示できるようになる
