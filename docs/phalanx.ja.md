@@ -191,9 +191,9 @@ ccd_data_types:
    FOV-Quicklook の Phalanx 設定は `lsst-sqre/phalanx` リポジトリに存在します。
    変更を加えるには：
    
-   a. `lsst-sqre/phalanx` リポジトリをクローン
-   b. `applications/fov-quicklook/` 内のファイルを更新
-   c. プルリクエストを作成
+   1. `lsst-sqre/phalanx` リポジトリをクローン
+   1. `applications/fov-quicklook/` 内のファイルを更新
+   1. プルリクエストを作成
 
 4. **デプロイ**:
    
