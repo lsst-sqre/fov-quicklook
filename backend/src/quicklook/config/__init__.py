@@ -16,12 +16,15 @@ class ContextMenuTemplate(BaseModel):
 
 class CcdDataTypeConfig(BaseModel):
     """CCDデータタイプの設定"""
-    name: str  # 識別子 (例: 'raw', 'post_isr_image')
+    id: str  # 識別子（URL、キャッシュパス等で使用、例: 'raw', 'embargo/raw'）
+    name: str  # Butler dataset type name (例: 'raw', 'calexp')
     display_name: str  # UI表示名 (例: 'Raw', 'Post-ISR')
     collections: list[str]  # Butlerコレクション名
     data_id_key: str = "exposure"  # Butlerでのデータ識別キー ('exposure' or 'visit')
     order_by: list[str] = ["-exposure"]  # クエリの並び順
     partial: bool = False  # 部分読み込みを使用するか
+    repository_name: str = "embargo"  # Butler リポジトリ名
+    instrument: str = "LSSTCam"  # Butler instrument名
 
 
 class Config(BaseSettings):
@@ -116,28 +119,37 @@ class Config(BaseSettings):
     # CCD Data Types configuration
     ccd_data_types: list[CcdDataTypeConfig] = [
         CcdDataTypeConfig(
+            id='raw',
             name='raw',
             display_name='Raw',
             collections=['LSSTCam/raw/all'],
             data_id_key='exposure',
             order_by=['-day_obs', '-exposure'],
             partial=False,
+            repository_name='embargo',
+            instrument='LSSTCam',
         ),
         CcdDataTypeConfig(
+            id='post_isr_image',
             name='post_isr_image',
             display_name='Post-ISR',
             collections=['LSSTCam/runs/nightlyValidation'],
             data_id_key='exposure',
             order_by=['-exposure'],
             partial=True,
+            repository_name='embargo',
+            instrument='LSSTCam',
         ),
         CcdDataTypeConfig(
+            id='preliminary_visit_image',
             name='preliminary_visit_image',
             display_name='Preliminary',
             collections=['LSSTCam/runs/nightlyValidation'],
             data_id_key='visit',
             order_by=['-visit'],
             partial=True,
+            repository_name='embargo',
+            instrument='LSSTCam',
         ),
     ]
 

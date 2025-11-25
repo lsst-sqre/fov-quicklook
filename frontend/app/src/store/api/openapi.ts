@@ -221,12 +221,15 @@ export type ContextMenuTemplate = {
   is_url: boolean;
 };
 export type CcdDataTypeConfig = {
+  id: string;
   name: string;
   display_name: string;
   collections: string[];
   data_id_key?: string;
   order_by?: string[];
   partial?: boolean;
+  repository_name?: string;
+  instrument?: string;
 };
 export type SystemInfo = {
   admin_page: boolean;

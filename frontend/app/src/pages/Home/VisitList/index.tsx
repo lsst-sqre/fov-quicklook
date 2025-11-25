@@ -296,8 +296,8 @@ function SearchBox() {
             flexGrow: 1,
           }}
         >
-          {ccdDataTypes.map(({ name, display_name }) => (
-            <option key={name} value={name}>{display_name}</option>
+          {ccdDataTypes.map(({ id, display_name }) => (
+            <option key={id} value={id}>{display_name}</option>
           ))}
         </select>
         <Menu

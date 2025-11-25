@@ -790,6 +790,10 @@
             },
             "CcdDataTypeConfig": {
                 "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
                     "name": {
                         "type": "string",
                         "title": "Name"
@@ -824,10 +828,21 @@
                         "type": "boolean",
                         "title": "Partial",
                         "default": false
+                    },
+                    "repository_name": {
+                        "type": "string",
+                        "title": "Repository Name",
+                        "default": "embargo"
+                    },
+                    "instrument": {
+                        "type": "string",
+                        "title": "Instrument",
+                        "default": "LSSTCam"
                     }
                 },
                 "type": "object",
                 "required": [
+                    "id",
                     "name",
                     "display_name",
                     "collections"

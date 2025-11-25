@@ -46,7 +46,7 @@ class DummyDataSource(DataSourceBase):
         )
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
-        return [CcdDataType(dt.name) for dt in config.ccd_data_types]
+        return [CcdDataType(dt.id) for dt in config.ccd_data_types]
 
 
 def _s3_get_visit_ccd_fits_raw(ref: CcdDataRef) -> bytes:

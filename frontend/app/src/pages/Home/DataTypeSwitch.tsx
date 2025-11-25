@@ -29,12 +29,12 @@ export function DataTypeSwitch() {
 
   return (
     <>
-      {ccdDataTypes.map(({ name, display_name }) => (
+      {ccdDataTypes.map(({ id, display_name }) => (
         <button
-          key={name}
-          className={classNames(currentType === name && styles.selectedType)}
-          disabled={!types.includes(name as DataType)}
-          onClick={() => changeType(name as DataType)}
+          key={id}
+          className={classNames(currentType === id && styles.selectedType)}
+          disabled={!types.includes(id as DataType)}
+          onClick={() => changeType(id as DataType)}
         >
           {display_name}
         </button>
