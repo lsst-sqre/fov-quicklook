@@ -1,10 +1,10 @@
 import threading
-from functools import cache, lru_cache
-from typing import TYPE_CHECKING, Any, ClassVar, cast
-from venv import logger
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, cast
 
 from lsst.resources import ResourcePath
 
+from quicklook.config import CcdDataTypeConfig, config
 from quicklook.datasource.types import VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
@@ -46,30 +46,41 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         types: list[CcdDataType] = []
-        for data_type in cast(list[CcdDataType], ['raw', 'post_isr_image', 'preliminary_visit_image']):
-            datasource = _get_datasource(data_type)
+        for data_type_config in config.ccd_data_types:
+            datasource = _get_datasource(CcdDataType(data_type_config.name))
             if datasource.exposure_exists(exposure_id):
-                types.append(data_type)
+                types.append(CcdDataType(data_type_config.name))
         return types
 
 
 class DataTypeSpecificDataSource:
-    # データタイプ固有の属性
-    collections: ClassVar[list[str]]
-    data_id_key: ClassVar[str] = "exposure"  # デフォルトはexposure
-    data_type: ClassVar[str]
-    order_by: ClassVar[list[str]] = ["-exposure"]
-    partial: bool = False
+    """設定から動的に生成されるデータタイプ固有のデータソース"""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, data_type_config: CcdDataTypeConfig):
         from lsst.daf.butler import Butler
 
+        self._config = data_type_config
         self._butler: ButlerType = Butler(
             'embargo',
             instrument=default_instrument,
-            collections=self.collections,
+            collections=data_type_config.collections,
         )  # type: ignore
+
+    @property
+    def data_type(self) -> str:
+        return self._config.name
+
+    @property
+    def data_id_key(self) -> str:
+        return self._config.data_id_key
+
+    @property
+    def order_by(self) -> list[str]:
+        return self._config.order_by
+
+    @property
+    def partial(self) -> bool:
+        return self._config.partial
 
     def query_visits(self, q: Query) -> list[VisitEntry]:
         '''
@@ -166,7 +177,6 @@ class DataTypeSpecificDataSource:
         )
 
     def _get_latest_day_obs(self) -> int | None:
-        # 最新のday_obsを取得する
         b = self._butler
         refs = b.query_datasets(self.data_type, where="detector=0", order_by=["-day_obs"], limit=1)
         if len(refs) == 0:
@@ -176,26 +186,6 @@ class DataTypeSpecificDataSource:
     def _get_exposure_info(self, day_obs: int) -> dict[int, ButlerDimensionRecord]:
         records = self._butler.registry.queryDimensionRecords('exposure', where=f"day_obs={day_obs}")
         return {record.id: record for record in records}
-
-
-class RawDataSource(DataTypeSpecificDataSource):
-    collections = ['LSSTCam/raw/all']
-    data_type = 'raw'
-    order_by = ['-day_obs', '-exposure']
-
-
-class PostIsrImageDataSource(DataTypeSpecificDataSource):
-    collections = ['LSSTCam/runs/nightlyValidation']
-    data_type = 'post_isr_image'
-    partial = True
-
-
-class PreliminaryVisitImageDataSource(DataTypeSpecificDataSource):
-    collections = ['LSSTCam/runs/nightlyValidation']
-    data_type = 'preliminary_visit_image'
-    data_id_key = "visit"
-    order_by = ['-visit']
-    partial = True
 
 
 def _get_datasource(data_type: CcdDataType) -> DataTypeSpecificDataSource:
@@ -209,11 +199,7 @@ def _get_datasource_cache(data_type: CcdDataType, thread_id: int) -> DataTypeSpe
 
 
 def _get_datasource_no_cache(data_type: CcdDataType) -> DataTypeSpecificDataSource:
-    match data_type:
-        case 'raw':
-            return RawDataSource()
-        case 'post_isr_image':
-            return PostIsrImageDataSource()
-        case 'preliminary_visit_image':
-            return PreliminaryVisitImageDataSource()
+    for data_type_config in config.ccd_data_types:
+        if data_type_config.name == data_type:
+            return DataTypeSpecificDataSource(data_type_config)
     raise ValueError(f'Unknown data type: {data_type}')

@@ -14,6 +14,16 @@ class ContextMenuTemplate(BaseModel):
     is_url: bool
 
 
+class CcdDataTypeConfig(BaseModel):
+    """CCDデータタイプの設定"""
+    name: str  # 識別子 (例: 'raw', 'post_isr_image')
+    display_name: str  # UI表示名 (例: 'Raw', 'Post-ISR')
+    collections: list[str]  # Butlerコレクション名
+    data_id_key: str = "exposure"  # Butlerでのデータ識別キー ('exposure' or 'visit')
+    order_by: list[str] = ["-exposure"]  # クエリの並び順
+    partial: bool = False  # 部分読み込みを使用するか
+
+
 class Config(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix='QUICKLOOK_',
@@ -102,6 +112,34 @@ class Config(BaseSettings):
 
     # Pipeline stage timeout settings (in seconds)
     pipeline_stage_timeout: int = 60
+
+    # CCD Data Types configuration
+    ccd_data_types: list[CcdDataTypeConfig] = [
+        CcdDataTypeConfig(
+            name='raw',
+            display_name='Raw',
+            collections=['LSSTCam/raw/all'],
+            data_id_key='exposure',
+            order_by=['-day_obs', '-exposure'],
+            partial=False,
+        ),
+        CcdDataTypeConfig(
+            name='post_isr_image',
+            display_name='Post-ISR',
+            collections=['LSSTCam/runs/nightlyValidation'],
+            data_id_key='exposure',
+            order_by=['-exposure'],
+            partial=True,
+        ),
+        CcdDataTypeConfig(
+            name='preliminary_visit_image',
+            display_name='Preliminary',
+            collections=['LSSTCam/runs/nightlyValidation'],
+            data_id_key='visit',
+            order_by=['-visit'],
+            partial=True,
+        ),
+    ]
 
 
 config = Config(
