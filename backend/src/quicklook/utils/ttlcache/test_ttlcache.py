@@ -174,3 +174,79 @@ def test_with_mocked_time():
         # Should recalculate
         assert test_func(2) == 12
         assert call_count == 2
+
+
+async def test_async_basic_caching():
+    """Test that async function results are cached."""
+    call_count = 0
+
+    @ttlcache(ttl=60)
+    async def test_func(x: int, y: int) -> int:
+        nonlocal call_count
+        call_count += 1
+        return x + y
+
+    # First call should execute the function
+    assert await test_func(1, 2) == 3
+    assert call_count == 1
+
+    # Second call with same args should use cached result
+    assert await test_func(1, 2) == 3
+    assert call_count == 1
+
+    # Call with different args should execute the function again
+    assert await test_func(2, 3) == 5
+    assert call_count == 2
+
+
+async def test_async_ttl_expiration():
+    """Test that async cache entries expire after the TTL period."""
+    import asyncio
+    call_count = 0
+
+    @ttlcache(ttl=0.1)  # Short TTL for testing
+    async def test_func(x: int) -> int:
+        nonlocal call_count
+        call_count += 1
+        return x * 2
+
+    # First call
+    assert await test_func(5) == 10
+    assert call_count == 1
+
+    # Call immediately should use cache
+    assert await test_func(5) == 10
+    assert call_count == 1
+
+    # Wait for TTL to expire
+    await asyncio.sleep(0.2)
+
+    # Call after TTL expired should execute the function again
+    assert await test_func(5) == 10
+    assert call_count == 2
+
+
+async def test_async_cache_clear():
+    """Test cache_clear functionality for async functions."""
+    call_count = 0
+
+    @ttlcache(ttl=60)
+    async def test_func(x: int) -> int:
+        nonlocal call_count
+        call_count += 1
+        return x * 4
+
+    # First call
+    assert await test_func(2) == 8
+    assert call_count == 1
+
+    # Second call should use cache
+    assert await test_func(2) == 8
+    assert call_count == 1
+
+    # Clear cache
+    test_func.cache_clear()  #  type: ignore
+
+    # Call after clearing should execute the function again
+    assert await test_func(2) == 8
+    assert call_count == 2

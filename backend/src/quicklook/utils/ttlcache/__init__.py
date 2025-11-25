@@ -1,6 +1,8 @@
+import asyncio
 import functools
+import inspect
 import time
-from typing import Any, Callable, TypeVar, ParamSpec, cast
+from typing import Any, Callable, TypeVar, ParamSpec, cast, Coroutine
 
 T = TypeVar('T')
 P = ParamSpec('P')
@@ -11,6 +13,7 @@ def ttlcache(ttl: float | None = None) -> Callable[[Callable[P, T]], Callable[P,
     A decorator that caches function results with a configurable TTL (Time-To-Live).
 
     Similar to functools.cache, but with an added TTL feature.
+    Supports both sync and async functions.
 
     Args:
         ttl: Time-to-live in seconds for cache entries. None means entries never expire.
@@ -20,34 +23,62 @@ def ttlcache(ttl: float | None = None) -> Callable[[Callable[P, T]], Callable[P,
     """
 
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
-        cache: dict[Any, tuple[T, float]] = {}
+        cache: dict[Any, tuple[Any, float]] = {}
 
-        @functools.wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            key = (args, frozenset(kwargs.items()))
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+                key = (args, frozenset(kwargs.items()))
 
-            current_time = time.time()
-            if key in cache:
-                result, timestamp = cache[key]
-                if ttl is None or current_time - timestamp < ttl:
-                    return result
+                current_time = time.time()
+                if key in cache:
+                    result, timestamp = cache[key]
+                    if ttl is None or current_time - timestamp < ttl:
+                        return result
 
-            result = func(*args, **kwargs)
-            cache[key] = (result, current_time)
-            return result
+                result = await func(*args, **kwargs)
+                cache[key] = (result, current_time)
+                return result
 
-        def cache_clear() -> None:
-            """Clear the cache and statistics."""
-            cache.clear()
+            def cache_clear() -> None:
+                """Clear the cache and statistics."""
+                cache.clear()
 
-        def cache_info() -> dict[str, Any]:
-            """Return cache information."""
-            return {"currsize": len(cache), "ttl": ttl}
+            def cache_info() -> dict[str, Any]:
+                """Return cache information."""
+                return {"currsize": len(cache), "ttl": ttl}
 
-        wrapper.cache_clear = cache_clear  # type: ignore
-        wrapper.cache_info = cache_info  # type: ignore
+            async_wrapper.cache_clear = cache_clear  # type: ignore
+            async_wrapper.cache_info = cache_info  # type: ignore
 
-        return cast(Callable[P, T], wrapper)
+            return cast(Callable[P, T], async_wrapper)
+        else:
+            @functools.wraps(func)
+            def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+                key = (args, frozenset(kwargs.items()))
+
+                current_time = time.time()
+                if key in cache:
+                    result, timestamp = cache[key]
+                    if ttl is None or current_time - timestamp < ttl:
+                        return result
+
+                result = func(*args, **kwargs)
+                cache[key] = (result, current_time)
+                return result
+
+            def cache_clear() -> None:
+                """Clear the cache and statistics."""
+                cache.clear()
+
+            def cache_info() -> dict[str, Any]:
+                """Return cache information."""
+                return {"currsize": len(cache), "ttl": ttl}
+
+            wrapper.cache_clear = cache_clear  # type: ignore
+            wrapper.cache_info = cache_info  # type: ignore
+
+            return cast(Callable[P, T], wrapper)
 
     # Handle case when decorator is used without arguments
     if callable(ttl):  # type: ignore
