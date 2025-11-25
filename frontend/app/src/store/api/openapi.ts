@@ -181,7 +181,7 @@ export type ListVisitsApiArg = {
   exposure?: number | null;
   dayObs?: number | null;
   limit?: number;
-  dataType?: "raw" | "post_isr_image" | "preliminary_visit_image";
+  dataType?: string;
 };
 export type GetVisitMetadataApiResponse =
   /** status 200 Successful Response */ DataSourceCcdMetadata;
@@ -190,11 +190,7 @@ export type GetVisitMetadataApiArg = {
   ccdName: string;
 };
 export type GetExposureDataTypesApiResponse =
-  /** status 200 Successful Response */ (
-    | "raw"
-    | "post_isr_image"
-    | "preliminary_visit_image"
-  )[];
+  /** status 200 Successful Response */ string[];
 export type GetExposureDataTypesApiArg = {
   id: number;
 };
@@ -224,10 +220,19 @@ export type ContextMenuTemplate = {
   template: string;
   is_url: boolean;
 };
+export type CcdDataTypeConfig = {
+  name: string;
+  display_name: string;
+  collections: string[];
+  data_id_key?: string;
+  order_by?: string[];
+  partial?: boolean;
+};
 export type SystemInfo = {
   admin_page: boolean;
   context_menu_templates: ContextMenuTemplate[];
   max_object_storage_usage: number;
+  ccd_data_types: CcdDataTypeConfig[];
 };
 export type MemoryStats = {
   /** Anonymous memory usage in bytes (private memory not backed by files) */
