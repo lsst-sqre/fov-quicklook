@@ -809,9 +809,9 @@
                         "type": "array",
                         "title": "Collections"
                     },
-                    "data_id_key": {
+                    "data_id_dimension": {
                         "type": "string",
-                        "title": "Data Id Key",
+                        "title": "Data Id Dimension",
                         "default": "exposure"
                     },
                     "order_by": {

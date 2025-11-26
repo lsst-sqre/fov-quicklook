@@ -75,8 +75,8 @@ class DataTypeSpecificDataSource:
         return self._config.name
 
     @property
-    def data_id_key(self) -> str:
-        return self._config.data_id_key
+    def data_id_dimension(self) -> str:
+        return self._config.data_id_dimension
 
     @property
     def order_by(self) -> list[str]:
@@ -102,7 +102,7 @@ class DataTypeSpecificDataSource:
 
         conds: list[str] = ['detector=0']
         if q.exposure:
-            conds.append(f"{self.data_id_key}={q.exposure}")
+            conds.append(f"{self.data_id_dimension}={q.exposure}")
         if q.day_obs:
             conds.append(f"day_obs={q.day_obs}")
         where = " and ".join(conds)
@@ -115,7 +115,7 @@ class DataTypeSpecificDataSource:
 
         return [
             VisitEntry(
-                id=f'{self.id}:{ref.dataId[self.data_id_key]}',
+                id=f'{self.id}:{ref.dataId[self.data_id_dimension]}',
                 obs_id=exp.obs_id,
                 day_obs=exp.day_obs,
                 physical_filter=exp.physical_filter,
@@ -125,12 +125,12 @@ class DataTypeSpecificDataSource:
                 observation_reason=exp.observation_reason,
                 target_name=exp.target_name,
             )
-            for ref, exp in [(ref, exposures[cast(int, ref.dataId[self.data_id_key])]) for ref in refs]
+            for ref, exp in [(ref, exposures[cast(int, ref.dataId[self.data_id_dimension])]) for ref in refs]
         ]
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
         b = self._butler
-        refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_key}={visit.name}")
+        refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_dimension}={visit.name}")
         i = Instrument.get(self.instrument)
         ccd_names = [CcdName(i.detector_2_ccd[ref.dataId['detector']]) for ref in refs]  # type: ignore
         if self.butler_data_type == 'post_isr_image':
@@ -143,7 +143,7 @@ class DataTypeSpecificDataSource:
 
         b = self._butler
         try:
-            refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_key}={exposure_id}", limit=1)
+            refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_dimension}={exposure_id}", limit=1)
 
         except (EmptyQueryResultError, MissingCollectionError):
             return False
@@ -160,7 +160,7 @@ class DataTypeSpecificDataSource:
 
     def _refs_by_visit(self, visit: VisitName) -> dict[int, ButlerDatasetRef]:
         b = self._butler
-        refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_key}={visit.name}")
+        refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_dimension}={visit.name}")
         return {cast(int, ref.dataId['detector']): ref for ref in refs}
 
     def get_metadata(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
@@ -168,7 +168,7 @@ class DataTypeSpecificDataSource:
         detector_id = Instrument.get(self.instrument).ccd_2_detector[ref.ccd_name]
         butler_refs = b.query_datasets(
             self.butler_data_type,
-            where=f"{self.data_id_key}={ref.visit.name} and detector={detector_id}",
+            where=f"{self.data_id_dimension}={ref.visit.name} and detector={detector_id}",
         )
         if len(butler_refs) != 1:
             raise ValueError(
@@ -179,7 +179,7 @@ class DataTypeSpecificDataSource:
             detector=detector_id,
             ccd_name=ref.ccd_name,
             day_obs=butler_ref.dataId.get('day_obs', -1),
-            exposure=butler_ref.dataId.get(self.data_id_key, -1),
+            exposure=butler_ref.dataId.get(self.data_id_dimension, -1),
             visit_name=ref.visit,
             uuid=str(butler_ref.id),
         )
