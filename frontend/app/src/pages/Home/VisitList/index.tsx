@@ -283,6 +283,7 @@ function SearchBox() {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
   const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
+  const ccdDataTypes = useAppSelector(state => state.copyTemplate.ccdDataTypes)
   const { refetch } = useVisitList()
 
   return (
@@ -295,9 +296,9 @@ function SearchBox() {
             flexGrow: 1,
           }}
         >
-          <option value="raw">Raw</option>
-          <option value="post_isr_image">Post-ISR (recent)</option>
-          <option value="preliminary_visit_image">Preliminary PVI (recent)</option>
+          {ccdDataTypes.map(({ id, display_name }) => (
+            <option key={id} value={id}>{display_name}</option>
+          ))}
         </select>
         <Menu
           menuButton={

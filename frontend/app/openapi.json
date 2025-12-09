@@ -401,11 +401,6 @@
                         "in": "query",
                         "required": false,
                         "schema": {
-                            "enum": [
-                                "raw",
-                                "post_isr_image",
-                                "preliminary_visit_image"
-                            ],
                             "type": "string",
                             "default": "raw",
                             "title": "Data Type"
@@ -511,11 +506,6 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "enum": [
-                                            "raw",
-                                            "post_isr_image",
-                                            "preliminary_visit_image"
-                                        ],
                                         "type": "string"
                                     },
                                     "title": "Response Get Exposure Data Types Api Exposures  Id  Types Get"
@@ -797,6 +787,68 @@
                 "type": "array",
                 "maxItems": 4,
                 "minItems": 4
+            },
+            "CcdDataTypeConfig": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "title": "Display Name"
+                    },
+                    "collections": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Collections"
+                    },
+                    "data_id_key": {
+                        "type": "string",
+                        "title": "Data Id Key",
+                        "default": "exposure"
+                    },
+                    "order_by": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Order By",
+                        "default": [
+                            "-exposure"
+                        ]
+                    },
+                    "partial": {
+                        "type": "boolean",
+                        "title": "Partial",
+                        "default": false
+                    },
+                    "repository_name": {
+                        "type": "string",
+                        "title": "Repository Name",
+                        "default": "embargo"
+                    },
+                    "instrument": {
+                        "type": "string",
+                        "title": "Instrument",
+                        "default": "LSSTCam"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "display_name",
+                    "collections"
+                ],
+                "title": "CcdDataTypeConfig",
+                "description": "CCD\u30c7\u30fc\u30bf\u30bf\u30a4\u30d7\u306e\u8a2d\u5b9a"
             },
             "CcdMetadata": {
                 "properties": {
@@ -1372,13 +1424,21 @@
                     "max_object_storage_usage": {
                         "type": "integer",
                         "title": "Max Object Storage Usage"
+                    },
+                    "ccd_data_types": {
+                        "items": {
+                            "$ref": "#/components/schemas/CcdDataTypeConfig"
+                        },
+                        "type": "array",
+                        "title": "Ccd Data Types"
                     }
                 },
                 "type": "object",
                 "required": [
                     "admin_page",
                     "context_menu_templates",
-                    "max_object_storage_usage"
+                    "max_object_storage_usage",
+                    "ccd_data_types"
                 ],
                 "title": "SystemInfo"
             },

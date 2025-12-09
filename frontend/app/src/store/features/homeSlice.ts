@@ -87,7 +87,7 @@ export const homeSlice = createSlice({
     setSearchString: (state, action: PayloadAction<string>) => {
       state.searchString = action.payload
     },
-    setDataSource: (state, action: PayloadAction<'raw' | 'post_isr_image' | 'preliminary_visit_image'>) => {
+    setDataSource: (state, action: PayloadAction<CcdDataType>) => {
       state.dataSource = action.payload
     },
     setShowFrame: (state, action: PayloadAction<boolean>) => {

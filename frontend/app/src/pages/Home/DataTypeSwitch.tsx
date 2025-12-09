@@ -2,7 +2,7 @@ import styles from './styles.module.scss'
 import { useCallback } from "react"
 import { useGetExposureDataTypesQuery } from "../../store/api/openapi"
 import { homeSlice } from "../../store/features/homeSlice"
-import { useAppDispatch } from "../../store/hooks"
+import { useAppDispatch, useAppSelector } from "../../store/hooks"
 import { useHomeContext } from "./context"
 import classNames from 'classnames'
 import { useChangeCurrentQuicklook } from '../../hooks/useChangeCurrentQuicklook'
@@ -20,28 +20,23 @@ export function DataTypeSwitch() {
   const types = (isFetching ? [] : data!) ?? []
   const dispatch = useAppDispatch()
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
+  const ccdDataTypes = useAppSelector(state => state.copyTemplate.ccdDataTypes)
 
   const changeType = useCallback((type: DataType) => {
     changeCurrentQuicklook(`${type}:${exposureId}`)
     dispatch(homeSlice.actions.setDataSource(type))
   }, [changeCurrentQuicklook, dispatch, exposureId])
 
-  const buttonConfigs = [
-    { type: 'raw', label: 'Raw' },
-    { type: 'post_isr_image', label: 'Post-ISR' },
-    { type: 'preliminary_visit_image', label: 'Preliminary' }
-  ] as const
-
   return (
     <>
-      {buttonConfigs.map(({ type, label }) => (
+      {ccdDataTypes.map(({ id, display_name }) => (
         <button
-          key={type}
-          className={classNames(currentType === type && styles.selectedType)}
-          disabled={!types.includes(type as DataType)}
-          onClick={() => changeType(type as DataType)}
+          key={id}
+          className={classNames(currentType === id && styles.selectedType)}
+          disabled={!types.includes(id as DataType)}
+          onClick={() => changeType(id as DataType)}
         >
-          {label}
+          {display_name}
         </button>
       ))}
     </>
