@@ -119,7 +119,7 @@ ccd_data_types:
     display_name: Raw
     collections:
       - LSSTCam/raw/all
-    data_id_key: exposure
+    data_id_dimension: exposure
     order_by:
       - -day_obs
       - -exposure
@@ -128,7 +128,7 @@ ccd_data_types:
     display_name: Post-ISR
     collections:
       - LSSTCam/runs/nightlyValidation
-    data_id_key: exposure
+    data_id_dimension: exposure
     order_by:
       - -exposure
     partial: true
@@ -136,7 +136,7 @@ ccd_data_types:
     display_name: Preliminary
     collections:
       - LSSTCam/runs/nightlyValidation
-    data_id_key: visit
+    data_id_dimension: visit
     order_by:
       - -visit
     partial: true

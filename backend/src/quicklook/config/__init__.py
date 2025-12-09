@@ -20,7 +20,7 @@ class CcdDataTypeConfig(BaseModel):
     name: str  # Butler dataset type name (例: 'raw', 'calexp')
     display_name: str  # UI表示名 (例: 'Raw', 'Post-ISR')
     collections: list[str]  # Butlerコレクション名
-    data_id_key: str = "exposure"  # Butlerでのデータ識別キー ('exposure' or 'visit')
+    data_id_dimension: str = "exposure"  # Butlerでのデータ識別ディメンション ('exposure' or 'visit')
     order_by: list[str] = ["-exposure"]  # クエリの並び順
     partial: bool = False  # 部分読み込みを使用するか
     repository_name: str = "embargo"  # Butler リポジトリ名
@@ -123,7 +123,7 @@ class Config(BaseSettings):
             name='raw',
             display_name='Raw',
             collections=['LSSTCam/raw/all'],
-            data_id_key='exposure',
+            data_id_dimension='exposure',
             order_by=['-day_obs', '-exposure'],
             partial=False,
             repository_name='embargo',
@@ -134,7 +134,7 @@ class Config(BaseSettings):
             name='post_isr_image',
             display_name='Post-ISR',
             collections=['LSSTCam/runs/nightlyValidation'],
-            data_id_key='exposure',
+            data_id_dimension='exposure',
             order_by=['-exposure'],
             partial=True,
             repository_name='embargo',
@@ -145,7 +145,7 @@ class Config(BaseSettings):
             name='preliminary_visit_image',
             display_name='Preliminary',
             collections=['LSSTCam/runs/nightlyValidation'],
-            data_id_key='visit',
+            data_id_dimension='visit',
             order_by=['-visit'],
             partial=True,
             repository_name='embargo',

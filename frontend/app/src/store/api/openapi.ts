@@ -225,7 +225,7 @@ export type CcdDataTypeConfig = {
   name: string;
   display_name: string;
   collections: string[];
-  data_id_key?: string;
+  data_id_dimension?: string;
   order_by?: string[];
   partial?: boolean;
   repository_name?: string;
