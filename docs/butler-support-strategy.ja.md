@@ -62,7 +62,7 @@ class CcdDataTypeConfig(BaseModel):
     # Butler クエリ設定
     name: str  # Butler dataset type name (例: 'raw', 'calexp')
     collections: list[str]  # Butlerコレクション名
-    data_id_key: str = "exposure"  # データ識別キー
+    data_id_dimension: str = "exposure"  # データ識別ディメンション
     order_by: list[str] = ["-exposure"]  # クエリの並び順
     partial: bool = False  # 部分読み込みを使用するか
     
@@ -103,7 +103,7 @@ ccd_data_types:
     collections: ["LSSTCam/raw/all"]
     repository_name: embargo
     instrument: LSSTCam
-    data_id_key: exposure
+    data_id_dimension: exposure
     order_by: ["-day_obs", "-exposure"]
     partial: false
 
@@ -188,7 +188,7 @@ class CcdDataTypeConfig(BaseModel):
     # Butler クエリ設定
     name: str  # Butler dataset type name
     collections: list[str]
-    data_id_key: str = "exposure"
+    data_id_dimension: str = "exposure"
     order_by: list[str] = ["-exposure"]
     partial: bool = False
     
@@ -302,7 +302,7 @@ ccd_data_types:
     name: raw
     display_name: Raw
     collections: ["LSSTCam/raw/all"]
-    data_id_key: exposure
+    data_id_dimension: exposure
     order_by: ["-day_obs", "-exposure"]
     partial: false
     repository_name: embargo
@@ -311,7 +311,7 @@ ccd_data_types:
     name: post_isr_image
     display_name: Post-ISR
     collections: ["LSSTCam/runs/nightlyValidation"]
-    data_id_key: exposure
+    data_id_dimension: exposure
     order_by: ["-exposure"]
     partial: true
     repository_name: embargo
@@ -320,7 +320,7 @@ ccd_data_types:
     name: preliminary_visit_image
     display_name: Preliminary
     collections: ["LSSTCam/runs/nightlyValidation"]
-    data_id_key: visit
+    data_id_dimension: visit
     order_by: ["-visit"]
     partial: true
     repository_name: embargo
