@@ -68,6 +68,7 @@ k8s/                    # Kubernetes Helm チャート (Phalanx 統合)
 docs/
   concept.ja.md         # システム設計と用語 (日本語)
   dev.ja.md             # 開発環境設定 (日本語)
+  phalanx.ja.md         # Phalanx デプロイメント ガイド (日本語)
   request.md            # HTTP API リクエスト例
   tasks.ja.md           # タスク定義 (日本語)
 
@@ -359,6 +360,7 @@ make restart  # 既存のコーディネーター、ジェネレーター、フ�
 - `frontend/app/src/store/api/openapi.ts` — 自動生成 API クライアント (OpenAPI スキーマから)
 
 **デプロイ**:
+- `/docs/phalanx.ja.md` — Phalanx デプロイメント ガイド (日本語)
 - `/k8s/phalanx/applications/fov-quicklook/README.md` — Helm チャートドキュメント
 
 ---

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Literal, NewType, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Generic, NewType, TypeVar
 
 import numpy
 from pydantic import GetCoreSchemaHandler
@@ -7,7 +7,7 @@ from pydantic_core import CoreSchema, core_schema
 
 from quicklook.utils.hash_utils import hash_iterable
 
-CcdDataType: TypeAlias = Literal['raw', 'post_isr_image', 'preliminary_visit_image']
+CcdDataType = NewType('CcdDataType', str)
 
 
 class VisitName(str):
