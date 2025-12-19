@@ -12,8 +12,8 @@
 
 | 対象 | ドキュメント |
 |------|-------------|
-| **バックエンド開発** (Python) | `backend/.github/copilot-instructions.md` |
-| **フロントエンド開発** (React/TypeScript) | `frontend/app/.github/copilot-instructions.md` |
+| **バックエンド開発** (Python) | `backend/.github/DEVELOPMENT.md` |
+| **フロントエンド開発** (React/TypeScript) | `frontend/app/.github/DEVELOPMENT.md` |
 | **システム設計・概念** | `/docs/concept.ja.md` |
 | **開発環境セットアップ** | `/docs/dev.ja.md` |
 | **デプロイ (Phalanx)** | `/docs/phalanx.ja.md` |
@@ -55,8 +55,8 @@
 
 | パス | 目的 | 詳細 |
 |------|------|------|
-| `backend/` | Python バックエンド (FastAPI) | `backend/.github/copilot-instructions.md` |
-| `frontend/app/` | React フロントエンド | `frontend/app/.github/copilot-instructions.md` |
+| `backend/` | Python バックエンド (FastAPI) | `backend/.github/DEVELOPMENT.md` |
+| `frontend/app/` | React フロントエンド | `frontend/app/.github/DEVELOPMENT.md` |
 | `k8s/phalanx/` | Helm チャート | `/docs/phalanx.ja.md` |
 | `docs/` | 設計・開発ドキュメント | - |
 
@@ -112,5 +112,5 @@
 以下の場合、適切なドキュメントを更新してください：
 
 - **プロジェクト全体に関わる変更**: このファイル (`.github/copilot-instructions.md`)
-- **バックエンド固有の変更**: `backend/.github/copilot-instructions.md`
-- **フロントエンド固有の変更**: `frontend/app/.github/copilot-instructions.md`
+- **バックエンド固有の変更**: `backend/.github/DEVELOPMENT.md`
+- **フロントエンド固有の変更**: `frontend/app/.github/DEVELOPMENT.md`

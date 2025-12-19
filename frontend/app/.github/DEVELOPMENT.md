@@ -1,8 +1,8 @@
-# FOV-Quicklook フロントエンド向け Copilot 指示
+# FOV-Quicklook フロントエンド開発ガイド
 
 ## 概要
 
-このドキュメントはフロントエンド（React/TypeScript）開発に特化した指示です。
+このドキュメントはフロントエンド（React/TypeScript）開発に特化したガイドです。
 プロジェクト全体の概要は `/.github/copilot-instructions.md` を参照してください。
 
 ---

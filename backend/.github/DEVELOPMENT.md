@@ -1,8 +1,8 @@
-# FOV-Quicklook バックエンド向け Copilot 指示
+# FOV-Quicklook バックエンド開発ガイド
 
 ## 概要
 
-このドキュメントはバックエンド（Python）開発に特化した指示です。
+このドキュメントはバックエンド（Python）開発に特化したガイドです。
 プロジェクト全体の概要は `/.github/copilot-instructions.md` を参照してください。
 
 ---
