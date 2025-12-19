@@ -574,6 +574,28 @@
                 }
             }
         },
+        "/api/admin/kill_coordinator": {
+            "post": {
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Kill Coordinator",
+                "description": "Coordinator \u3092\u30b7\u30e3\u30c3\u30c8\u30c0\u30a6\u30f3\u3057\u3001\u5168 Generator \u3082\u505c\u6b62\u3055\u305b\u308b\u3002\nk8s \u304c\u81ea\u52d5\u7684\u306b\u518d\u8d77\u52d5\u3059\u308b\u305f\u3081\u3001\u30b7\u30b9\u30c6\u30e0\u5168\u4f53\u304c\u518d\u8d77\u52d5\u3055\u308c\u308b\u3002",
+                "operationId": "kill_coordinator",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ShutdownResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/cache_entries": {
             "get": {
                 "summary": "List Cache Entries",
@@ -1407,6 +1429,19 @@
                     "wcs"
                 ],
                 "title": "QuicklookMetadataReady"
+            },
+            "ShutdownResponse": {
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "title": "Status"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "status"
+                ],
+                "title": "ShutdownResponse"
             },
             "SystemInfo": {
                 "properties": {

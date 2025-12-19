@@ -1,5 +1,8 @@
+export declare const actionsCard: string;
 export declare const generatorCard: string;
 export declare const generatorsList: string;
+export declare const restartButton: string;
+export declare const restartDescription: string;
 export declare const section: string;
 export declare const statusCard: string;
 export declare const statusPage: string;

@@ -6,6 +6,8 @@ GeneratorからのRegistration要求を受け付け、利用可能なGenerator�
 """
 
 import asyncio
+import os
+import signal
 import quicklook.mylogging
 import uuid
 from collections.abc import AsyncIterator
@@ -64,6 +66,23 @@ async def register_generator(
 @router.get("/comm/healthz")
 async def health_check():
     return {"status": "ok"}
+
+
+@router.post("/comm/shutdown")
+async def shutdown_coordinator():
+    """Coordinatorをシャットダウンし、すべてのgeneratorも停止する"""
+    logger.warning("Coordinator shutdown requested")
+    asyncio.create_task(_coordinator_shutdown())
+    return {"status": "shutting_down"}
+
+
+async def _coordinator_shutdown():
+    """コーディネーターをシャットダウンする。すべてのgeneratorにもシャットダウンを送信"""
+    await shutdown_all_generators()
+    await asyncio.sleep(0.5)
+    os.kill(os.getpid(), signal.SIGINT)
+    await asyncio.sleep(3)
+    os.kill(os.getpid(), signal.SIGKILL)  # pragma: no cover
 
 
 if config.environment == 'test':  # pragma: no branch
