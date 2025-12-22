@@ -1,52 +1,45 @@
 .PHONY: test 
 test:
-	./.venv/bin/pytest
+	uv run pytest
 
 .PHONY: test/cov
 test/cov:
-	./.venv/bin/pytest --cov=. --cov-report=html -m 'slow or not slow'
+	uv run pytest --cov=. --cov-report=html -m 'slow or not slow'
 
 .PHONY: test/cov-server
 test/cov-server:
-	./.venv/bin/python -m http.server -d htmlcov 4000
+	uv run python -m http.server -d htmlcov 4000
 
 .PHONY: test/all
 # Run all tests including those marked as slow. Overrides -m "not slow" from pytest.ini by passing an explicit -m all selector.
 test/all:
-	./.venv/bin/pytest -m "not slow or slow"
-
-.PHONY: pyright/setup
-pyright/setup:
-	mkdir -p pyright
-	cd pyright && npm install pyright
+	uv run pytest -m "not slow or slow"
 
 .PHONY: pyright
 pyright:
-	[ -x ./pyright/node_modules/.bin/pyright ] || ( mkdir -p pyright && cd pyright && npm install pyright  )
-	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python
+	uv run pyright src tests
 
 .PHONY: pyright/watch
 pyright/watch:
-	[ -x ./pyright/node_modules/.bin/pyright ] || ( mkdir -p pyright && cd pyright && npm install pyright  )
-	find src tests -name '*.py' | xargs ./pyright/node_modules/.bin/pyright --pythonpath ./.venv/bin/python --watch
+	uv run pyright --watch src tests
 
 export ENV_FILE=./.dev.env
 
 .PHONY: dev/coordinator
 dev/coordinator:
-	./.venv/bin/uvicorn --reload quicklook.coordinator.api.app:app --port 9501 --no-access-log --reload-dir src
+	uv run uvicorn --reload quicklook.coordinator.api.app:app --port 9501 --no-access-log --reload-dir src
 
  .PHONY: dev/generator
 dev/generator:
-	./.venv/bin/uvicorn --reload quicklook.generator.api.app:app --port 9502 --no-access-log --reload-dir src
+	uv run uvicorn --reload quicklook.generator.api.app:app --port 9502 --no-access-log --reload-dir src
 
  .PHONY: dev/generator2
 dev/generator2:
-	QUICKLOOK_generator_port=9600 ./.venv/bin/uvicorn --reload quicklook.generator.api.app:app --port 9600 --no-access-log --reload-dir src
+	QUICKLOOK_generator_port=9600 uv run uvicorn --reload quicklook.generator.api.app:app --port 9600 --no-access-log --reload-dir src
 
 .PHONY: dev/frontend
 dev/frontend:
-	./.venv/bin/uvicorn --reload quicklook.frontend.api.app:app --port 9500 --no-access-log --reload-dir src
+	uv run uvicorn --reload quicklook.frontend.api.app:app --port 9500 --no-access-log --reload-dir src
 
 
 .PHONY: dev/openapi
@@ -54,25 +47,25 @@ dev/openapi:
 	QUICKLOOK_admin_page=True \
 	QUICKLOOK_frontend_app_prefix= \
 	ENV_FILE=./.dev.env \
-	./.venv/bin/python -m quicklook.frontend.api.openapi
+	uv run python -m quicklook.frontend.api.openapi
 
 
 .PHONY: db/create-migration
 db/create-migration:
 	@ [ "$(message)" ] || (echo "message is not set" && false)
-	./.venv/bin/alembic revision --autogenerate -m "$(message)"
+	uv run alembic revision --autogenerate -m "$(message)"
 
 .PHONY: db/migrate
 db/migrate:
-	./.venv/bin/alembic upgrade head
+	uv run alembic upgrade head
 
 .PHONY: db/rollback
 db/rollback:
-	./.venv/bin/alembic downgrade -1
+	uv run alembic downgrade -1
 
 .PHONY: db/bootstrap
 db/bootstrap:
-	./.venv/bin/python -m quicklook.scripts.bootstrap_db
+	uv run python -m quicklook.scripts.bootstrap_db
 
 .PHONY: db/docker
 db/docker:
