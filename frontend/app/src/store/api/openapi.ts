@@ -95,6 +95,12 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/quicklooks/${queryArg.visitName}/fits/${queryArg.ccdName}`,
       }),
     }),
+    killCoordinator: build.mutation<
+      KillCoordinatorApiResponse,
+      KillCoordinatorApiArg
+    >({
+      query: () => ({ url: `/api/admin/kill_coordinator`, method: "POST" }),
+    }),
     listCacheEntries: build.query<
       ListCacheEntriesApiResponse,
       ListCacheEntriesApiArg
@@ -199,6 +205,9 @@ export type GetFitsFileApiArg = {
   visitName: string;
   ccdName: string;
 };
+export type KillCoordinatorApiResponse =
+  /** status 200 Successful Response */ ShutdownResponse;
+export type KillCoordinatorApiArg = void;
 export type ListCacheEntriesApiResponse =
   /** status 200 Successful Response */ CacheEntry[];
 export type ListCacheEntriesApiArg = void;
@@ -402,6 +411,9 @@ export type DataSourceCcdMetadata = {
   day_obs: number;
   uuid: string;
 };
+export type ShutdownResponse = {
+  status: string;
+};
 export type CacheEntry = {
   visit_name: string;
   ready: boolean;
@@ -428,6 +440,7 @@ export const {
   useGetVisitMetadataQuery,
   useGetExposureDataTypesQuery,
   useGetFitsFileQuery,
+  useKillCoordinatorMutation,
   useListCacheEntriesQuery,
   useDeleteAllCacheEntriesMutation,
   useDeleteCacheEntryMutation,

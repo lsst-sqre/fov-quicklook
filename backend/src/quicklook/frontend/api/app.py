@@ -8,6 +8,7 @@ from quicklook.frontend.api.compression import setup_compression
 from quicklook.frontend.api.staticassets import setup_static_assets
 from quicklook.frontend.api.use_route_names_as_operation_ids import use_route_names_as_operation_ids
 
+from .admin import router as admin_router
 from .get_fits_file import router as get_fits_file_router
 from .get_fits_header import router as get_fits_header_router
 from .get_tile import router as gettile_router
@@ -41,6 +42,7 @@ app.include_router(visits_router, prefix=config.frontend_app_prefix)
 app.include_router(get_fits_file_router, prefix=config.frontend_app_prefix)
 
 if config.admin_page:  # pragma: no cover
+    app.include_router(admin_router, prefix=config.frontend_app_prefix)
     app.include_router(cache_entries_router, prefix=config.frontend_app_prefix)
     app.include_router(storage_explorer_router, prefix=config.frontend_app_prefix)
 

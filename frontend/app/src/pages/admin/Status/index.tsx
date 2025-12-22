@@ -1,4 +1,4 @@
-import { useRouteGetStatusQuery, ContainerStatus } from "../../../store/api/openapi"
+import { useRouteGetStatusQuery, ContainerStatus, useKillCoordinatorMutation } from "../../../store/api/openapi"
 import { useGetSystemStatus_WS_Query } from "../../../store/api/base"
 import { Progress } from "../../../components/Progress"
 import styles from './styles.module.scss'
@@ -7,8 +7,19 @@ import { useEffect, useRef, useState } from "react"
 export function Status() {
   const { data: status, isLoading, error } = useRouteGetStatusQuery(undefined, { refetchOnMountOrArgChange: true })
   const { data: wsStatus } = useGetSystemStatus_WS_Query()
+  const [killCoordinator, { isLoading: isKilling }] = useKillCoordinatorMutation()
 
   const displayStatus = wsStatus || status
+
+  const handleRestartSystem = async () => {
+    if (window.confirm('Restart the system?\nThis will restart all components (coordinator, generators, frontend).')) {
+      try {
+        await killCoordinator().unwrap()
+      } catch (e) {
+        console.error('Failed to restart system:', e)
+      }
+    }
+  }
 
   if (isLoading) {
     return <div className={styles.statusPage}>Loading...</div>
@@ -21,6 +32,22 @@ export function Status() {
   return (
     <div className={styles.statusPage}>
       <h1>System Status</h1>
+
+      <section className={styles.section}>
+        <h2>Actions</h2>
+        <div className={styles.actionsCard}>
+          <button
+            className={styles.restartButton}
+            onClick={handleRestartSystem}
+            disabled={isKilling}
+          >
+            {isKilling ? 'Restarting...' : 'Restart System'}
+          </button>
+          <p className={styles.restartDescription}>
+            Restarts all components (coordinator, generators, frontend).
+          </p>
+        </div>
+      </section>
       
       <section className={styles.section}>
         <h2>Frontend</h2>

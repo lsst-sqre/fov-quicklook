@@ -15,15 +15,24 @@ RUN \
 # for backend
 FROM python:3.13-bookworm
 
+# Install uv via pip (alternative to COPY --from=ghcr.io/astral-sh/uv:latest)
+RUN pip install uv
+
 WORKDIR /app
 
-COPY ./backend/setup.py /app/setup.py
+# Copy dependency files first for better caching
+COPY ./backend/pyproject.toml ./backend/uv.lock /app/
 
-RUN \
-  mkdir -p src && \
-  pip install -U pip && \
-  pip install -e .
+# Install dependencies (without dev dependencies)
+RUN uv sync --frozen --no-dev --no-install-project
 
+# Copy application code
 COPY ./backend/ /app/
+
+# Install the project itself
+RUN uv sync --frozen --no-dev
+
+# Add virtual environment to PATH so python, alembic, etc. are available
+ENV PATH="/app/.venv/bin:$PATH"
 
 COPY --from=frontend /frontend/app/dist/ /app/frontend-assets
