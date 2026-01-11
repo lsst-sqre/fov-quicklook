@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { WindowCenter } from './components/layout'
 import { LoadingSpinner } from './components/Loading'
 import { env } from './env'
+import { useCoordinatorIdMonitor } from './hooks/useCoordinatorIdMonitor'
 import { QuicklookMetadataProvider } from './pages/Home/context/quicklook'
 import { AppRouter } from './router'
 import { makeStore } from './store'
@@ -33,6 +34,7 @@ function RawApp({ systemInfo }: { systemInfo: SystemInfo }) {
   }
   return (
     <Provider store={storeRef.current}>
+      <CoordinatorIdMonitor />
       <BrowserRouter basename={env.baseUrl}>
         <QuicklookMetadataProvider>
           <AppRouter />
@@ -41,4 +43,10 @@ function RawApp({ systemInfo }: { systemInfo: SystemInfo }) {
       <Toaster />
     </Provider>
   )
+}
+
+
+function CoordinatorIdMonitor() {
+  useCoordinatorIdMonitor()
+  return null
 }

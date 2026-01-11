@@ -65,7 +65,7 @@ async def register_generator(
 
 @router.get("/comm/healthz")
 async def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "coordinator_id": _coordinator_id}
 
 
 @router.post("/comm/shutdown")
@@ -115,6 +115,10 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
 
 def get_available_generators() -> dict[GeneratorId, GeneratorInfo]:
     return _available_generators
+
+
+def get_coordinator_id() -> CoordinatorId | None:
+    return _coordinator_id
 
 
 def remove_generator(generator_info: GeneratorInfo) -> None:
