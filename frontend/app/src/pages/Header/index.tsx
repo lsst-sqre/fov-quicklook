@@ -15,8 +15,8 @@ export const Header = memo(() => {
       <FlexiblePadding />
       {adminPageEnabled && (
         <>
-          {/* <DeleteAllCacheEntries /> */}
-          {/* <div style={{ width: '1em' }} /> */}
+          <DeleteAllCacheEntries />
+          <div style={{ width: '1em' }} />
           <LinkButton to="/admin/status">System Status</LinkButton>
           <LinkButton to="/admin/jobs">Jobs</LinkButton>
           <LinkButton to="/admin/cache-entries">Cache Entries</LinkButton>
