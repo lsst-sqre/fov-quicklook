@@ -90,9 +90,18 @@ class TilePos:
 
 @dataclass
 class Tile:
+    """タイルデータを表すクラス。
+
+    Attributes:
+        visit: 観測の識別名
+        pos: タイルの位置情報
+        data: タイルデータ。shape: (tile_size, tile_size, 2)
+              チャネル0: 値、チャネル1: アルファ（被覆率）
+    """
+
     visit: VisitName
     pos: TilePos
-    data: numpy.ndarray
+    data: numpy.ndarray  # shape: (tile_size, tile_size, 2)
 
 
 @dataclass(frozen=True)

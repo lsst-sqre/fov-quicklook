@@ -155,12 +155,14 @@ class _SingleFitsTileStorage:
         for ccd_name in ccd_names:
             data = self._load(ccd_name, pos)
             if merged is None:
-                merged = data
+                merged = data.copy()
             else:
-                merged += data
+                # 値は加算、アルファはmax（重ね合わせても透明度は増えない）
+                merged[:, :, 0] += data[:, :, 0]
+                merged[:, :, 1] = numpy.maximum(merged[:, :, 1], data[:, :, 1])
         if merged is None:  # pragma: no cover
             # CcdInfo.ofが多少の誤差があるようなので。
-            merged = numpy.zeros((config.tile_size, config.tile_size), dtype=numpy.float32)
+            merged = numpy.zeros((config.tile_size, config.tile_size, 2), dtype=numpy.float32)
         return merged
 
     def iter_tiles(self):

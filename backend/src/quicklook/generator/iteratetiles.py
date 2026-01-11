@@ -15,7 +15,7 @@ def iterate_tiles(
     tile_size = config.tile_size
     max_level = config.tile_max_level
     data = ppccd.pool
-    h, w = data.shape
+    h, w = data.shape[:2]  # shape: (H, W, 2) なので最初の2つを取得
     y1 = int(ppccd.bbox.miny)  # focal planeでの始まりのy-index
     x1 = int(ppccd.bbox.minx)
     y2 = int(y1 + h)  # 終わりのindex
@@ -65,35 +65,52 @@ def safe_slice(
     x2: int,  # tileでの終わりのx-index
     y2: int,
 ):
+    # pool shape: (H, W, 2) - 2チャネル配列
     if x1 >= pool_x1 and y1 >= pool_y1 and x2 <= pool_x1 + pool.shape[1] and y2 <= pool_y1 + pool.shape[0]:
-        return pool[y1 - pool_y1 : y2 - pool_y1, x1 - pool_x1 : x2 - pool_x1]
-    zeros = numpy.zeros((y2 - y1, x2 - x1), dtype=pool.dtype)
+        return pool[y1 - pool_y1 : y2 - pool_y1, x1 - pool_x1 : x2 - pool_x1, :]
+    zeros = numpy.zeros((y2 - y1, x2 - x1, 2), dtype=pool.dtype)
+    # はみ出した領域は (value=0, alpha=0) のまま
     x1_ = max(x1, pool_x1)
     y1_ = max(y1, pool_y1)
     x2_ = min(x2, pool_x1 + pool.shape[1])
     y2_ = min(y2, pool_y1 + pool.shape[0])
-    zeros[y1_ - y1 : y2_ - y1, x1_ - x1 : x2_ - x1] = pool[
+    zeros[y1_ - y1 : y2_ - y1, x1_ - x1 : x2_ - x1, :] = pool[
         y1_ - pool_y1 : y2_ - pool_y1,
         x1_ - pool_x1 : x2_ - pool_x1,
+        :,
     ]
     return zeros
 
 
 def shrink_image(
-    data: numpy.ndarray,  # 2D array
+    data: numpy.ndarray,  # 2チャネル配列: (H, W, 2) - チャネル0: 値, チャネル1: アルファ
     y1: int,
     y2: int,
     x1: int,
     x2: int,
 ):
+    h, w, _ = data.shape
+    # パディング用の zeros は (value=0, alpha=0)
     if y1 != 0:
-        data = numpy.vstack((numpy.zeros(data.shape[1], dtype=numpy.float32), data))
+        data = numpy.concatenate((numpy.zeros((1, w, 2), dtype=numpy.float32), data), axis=0)
     if y2 != 0:
-        data = numpy.vstack((data, numpy.zeros(data.shape[1], dtype=numpy.float32)))
+        data = numpy.concatenate((data, numpy.zeros((1, data.shape[1], 2), dtype=numpy.float32)), axis=0)
     if x1 != 0:
-        data = numpy.hstack((numpy.zeros((data.shape[0], 1), dtype=numpy.float32), data))
+        data = numpy.concatenate((numpy.zeros((data.shape[0], 1, 2), dtype=numpy.float32), data), axis=1)
     if x2 != 0:
-        data = numpy.hstack((data, numpy.zeros((data.shape[0], 1), dtype=numpy.float32)))
-    h, w = data.shape
-    data = numpy.mean(data.reshape(h // 2, 2, w // 2, 2), axis=(1, 3))
-    return data
+        data = numpy.concatenate((data, numpy.zeros((data.shape[0], 1, 2), dtype=numpy.float32)), axis=1)
+
+    h, w, _ = data.shape
+
+    # 2x2平均化: alpha=0 のピクセルは値計算から除外、結果の alpha は被覆率
+    values = data[:, :, 0].reshape(h // 2, 2, w // 2, 2)
+    alphas = data[:, :, 1].reshape(h // 2, 2, w // 2, 2)
+
+    alpha_sum = alphas.sum(axis=(1, 3))
+    safe_sum = numpy.where(alpha_sum > 0, alpha_sum, 1.0)
+
+    new_values = (values * alphas).sum(axis=(1, 3)) / safe_sum
+    new_alphas = alpha_sum / 4.0
+
+    result = numpy.stack([new_values, new_alphas], axis=-1)
+    return result
