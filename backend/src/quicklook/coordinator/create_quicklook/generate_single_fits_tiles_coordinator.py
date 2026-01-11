@@ -1,138 +1,329 @@
-import asyncio
-import queue
-from collections import deque
+"""
+Generate Single FITS Tiles: Coordinator側実装
 
+WebSocket API方式によるFITSタイル生成。
+各Generatorに対してWebSocket接続を確立し、動的にCCDを割り当てながら処理を行う。
+"""
+
+import asyncio
+import pickle
+from collections import defaultdict
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime
+
+import aiohttp
+
+import quicklook.mylogging
 from quicklook.comm.coordinator import get_available_generators
 from quicklook.comm.rpc_worker import rpc_scatter
 from quicklook.comm.types import GeneratorId, GeneratorInfo
 from quicklook.config import config
-from quicklook.generator.generate_single_fits_tiles import (
-    CcdMetadata,
-    GenerateSingleFitsTilesProgress,
-    generate_single_fits_tiles_pipeline,
+from quicklook.generator.api.ccd_processing_protocol import (
+    AssignCcdMessage,
+    CompletedMessage,
+    ErrorMessage,
+    InitJobMessage,
+    ProgressMessage,
 )
+from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
-from quicklook.rpc.client import Rpc
-from quicklook.rpc.queue import RpcQueue
-from quicklook.types import CcdDataRef, CcdName
+from quicklook.types import CcdDataRef, CcdName, Progress
+
+logger = quicklook.mylogging.getLogger(__name__)
+
+
+@dataclass
+class CcdSubmission:
+    """CCD submit履歴を追跡するためのデータ構造"""
+    ccd_ref: CcdDataRef
+    submitted_at: datetime
+    generator_id: GeneratorId
+
+
+class CcdDispatcher:
+    """
+    CCD割り当てを管理するクラス。
+
+    Phase 1: 初期ディスパッチ - 全CCDを順次Generatorに割り当て
+    Phase 2: 再ディスパッチ - 未完了CCDを古い順にラウンドロビンで再submit
+
+    これにより、遅いGeneratorに割り当てられたCCDを
+    空きスロットのある他のGeneratorに再割り当てできる。
+    """
+
+    def __init__(
+        self,
+        ccd_refs: Sequence[CcdDataRef],
+        resubmit_min_age_seconds: float = config.resubmit_min_age_seconds,
+        resubmit_max_attempts_per_ccd: int = config.resubmit_max_attempts_per_ccd,
+    ):
+        self._ccd_refs = list(ccd_refs)
+        self._remaining_index = 0  # Phase 1用: 次にsubmitするCCDのインデックス
+        self._submitted_ccds: list[CcdSubmission] = []  # submit履歴（Phase 2用）
+        self._ccd_metadata_dict: dict[CcdName, CcdMetadata] = {}  # 完了メタデータ
+        self._ccd_generator_map: dict[CcdName, GeneratorId] = {}  # 最終的な担当Generator
+        self._phase2_index = 0  # Phase 2用ラウンドロビンインデックス
+        self._attempts: dict[CcdName, int] = defaultdict(int)  # submit回数追跡
+        self._all_completed = asyncio.Event()  # 全完了通知用
+        self._lock = asyncio.Lock()
+
+        # 再submit暴走防止パラメータ
+        self._resubmit_min_age_seconds = resubmit_min_age_seconds
+        self._resubmit_max_attempts_per_ccd = resubmit_max_attempts_per_ccd
+
+    @property
+    def ccd_metadata_dict(self) -> dict[CcdName, CcdMetadata]:
+        return self._ccd_metadata_dict
+
+    @property
+    def ccd_generator_map(self) -> dict[CcdName, GeneratorId]:
+        return self._ccd_generator_map
+
+    @property
+    def all_completed(self) -> asyncio.Event:
+        return self._all_completed
+
+    async def get_next_ccd(self, generator_id: GeneratorId) -> CcdDataRef | None:
+        """
+        次に処理すべきCCDを取得する。
+
+        Phase 1: 未submitのCCDがあれば優先的に割り当て
+        Phase 2: 全CCDがsubmit済みなら、未完了CCDを再submit
+
+        Returns:
+            次に処理すべきCCD、または全て完了していればNone
+        """
+        async with self._lock:
+            # 全完了チェック
+            if len(self._ccd_metadata_dict) == len(self._ccd_refs):
+                return None
+
+            # Phase 1: 未submitのCCDがあれば優先
+            if self._remaining_index < len(self._ccd_refs):
+                ccd_ref = self._ccd_refs[self._remaining_index]
+                self._remaining_index += 1
+                self._submitted_ccds.append(
+                    CcdSubmission(ccd_ref, datetime.now(), generator_id)
+                )
+                self._attempts[ccd_ref.ccd_name] += 1
+                return ccd_ref
+
+            # Phase 2: 未完了CCDを（提出順の）ラウンドロビンで再submit
+            if self._resubmit_max_attempts_per_ccd <= 0:
+                # 再submit無効化
+                return None
+
+            for offset in range(len(self._submitted_ccds)):
+                idx = (self._phase2_index + offset) % len(self._submitted_ccds)
+                submission = self._submitted_ccds[idx]
+                ccd_name = submission.ccd_ref.ccd_name
+
+                # 既に完了したCCDは対象外
+                if ccd_name in self._ccd_metadata_dict:
+                    continue
+
+                # 暴走防止: 一定時間以上"古い"in-flightのみ
+                age_seconds = (datetime.now() - submission.submitted_at).total_seconds()
+                if age_seconds < self._resubmit_min_age_seconds:
+                    continue
+
+                # 暴走防止: 再submit上限チェック
+                if self._attempts[ccd_name] > self._resubmit_max_attempts_per_ccd:
+                    continue
+
+                self._attempts[ccd_name] += 1
+                self._phase2_index = (idx + 1) % len(self._submitted_ccds)
+                return submission.ccd_ref
+
+            return None
+
+    async def on_ccd_completed(
+        self,
+        ccd_name: CcdName,
+        metadata: CcdMetadata,
+        generator_id: GeneratorId,
+    ) -> None:
+        """
+        CCD処理完了を記録する。
+
+        最初の完了のみ採用（重複処理の結果は破棄）。
+        """
+        async with self._lock:
+            # 最初の完了のみ採用
+            if ccd_name not in self._ccd_metadata_dict:
+                self._ccd_metadata_dict[ccd_name] = metadata
+                self._ccd_generator_map[ccd_name] = generator_id
+
+                if len(self._ccd_metadata_dict) == len(self._ccd_refs):
+                    self._all_completed.set()
 
 
 async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDataRef]) -> list[CcdMetadata]:
     """
-    FITS データから単一タイルを生成する協調処理。
+    WebSocket API方式によるFITSタイル生成
 
-    各ジェネレータに対して1つのRPC呼び出しを行い、
-    queue.Queue を通じて動的にCCDを割り当てる。
-    各ジェネレータは設定された数のCCDを同時に処理できる。
+    各Generatorに対してWebSocket接続を確立し、
+    動的にCCDを割り当てながら処理を行う。
 
     動的割り当ての利点:
       - 高速なジェネレータがより多くのCCDを処理
       - 低速なジェネレータがボトルネックにならない
       - 自動的に最適な負荷分散を実現
+
+    遅延Generatorへの対策:
+      - Phase 1: 全CCDを順次割り当て（従来の動的割り当て）
+      - Phase 2: 未完了CCDを他のGeneratorに再割り当て
+      - 最初に完了したGeneratorのみ採用、重複処理結果は破棄
     """
-    ccd_refs.sort(key=lambda ref: ref.ccd_name)
+    ccd_refs = sorted(ccd_refs, key=lambda ref: ref.ccd_name)
     generators = get_available_generators()
     if not generators:
         raise RuntimeError("No generators available")
 
     generator_list = list(generators.values())
-    remaining_ccds = deque(ccd_refs)
-    ccd_metadata_dict: dict[CcdName, CcdMetadata] = {}
-    ccd_generator_map: dict[CcdName, GeneratorId] = {}
-    lock = asyncio.Lock()
+    dispatcher = CcdDispatcher(ccd_refs)
     max_concurrent_ccds = config.generator_max_concurrent_ccds_per_job
 
-    async def worker(generator: GeneratorInfo):
+    async def worker(generator: GeneratorInfo) -> None:
         """
-        各ジェネレータのワーカー。
-        単一のRPC呼び出しでRpcQueue経由で動的にCCDを供給する。
+        各Generatorのワーカー。
+        WebSocket接続で動的にCCDを供給する。
         """
-        client_queue: asyncio.Queue[CcdDataRef | None] = asyncio.Queue()
+        ws_url = f"{generator.ws_url}/jobs/{job.id}/generate-tiles"
+        logger.info(f"Worker connecting to {ws_url}")
 
-        async with lock:
-            initial_batch: list[CcdDataRef] = []
-            for _ in range(max_concurrent_ccds):
-                if remaining_ccds:
-                    ccd_ref = remaining_ccds.popleft()
-                    initial_batch.append(ccd_ref)
-                    await client_queue.put(ccd_ref)
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(ws_url) as ws:
+                    logger.info(f"Connected to generator {generator.id}")
 
-        if not initial_batch:
-            return
+                    # 最初にJobオブジェクトを送信
+                    await ws.send_bytes(pickle.dumps(InitJobMessage(job=job)))
+                    logger.debug(f"Sent InitJobMessage to generator {generator.id}")
 
-        rpc_queue = RpcQueue(client_queue)
+                    # 初期バッチ割り当て
+                    has_initial_batch = False
+                    for _ in range(max_concurrent_ccds):
+                        ccd_ref = await dispatcher.get_next_ccd(generator.id)
+                        if ccd_ref is not None:
+                            logger.debug(f"Assigning CCD {ccd_ref.ccd_name} to generator {generator.id}")
+                            await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
+                            has_initial_batch = True
 
-        rpc = Rpc(
-            f'{generator.ws_url}/rpc',
-            _generate_tiles_with_queue,
-            job,
-            rpc_queue,
+                    if not has_initial_batch:
+                        # 初期バッチがない場合、Phase 2での参加を待つ
+                        ccd_ref = await dispatcher.get_next_ccd(generator.id)
+                        if ccd_ref is None:
+                            # 終了シグナルを送信してクローズ
+                            await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
+                            return
+                        await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
+
+                    logger.info(f"Initial batch sent to generator {generator.id}, waiting for responses")
+                    # メッセージ処理ループ
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.BINARY:
+                            data = pickle.loads(msg.data)
+                            logger.debug(f"Received message from generator {generator.id}: {type(data).__name__}")
+                            await _handle_generator_message(
+                                data, job, dispatcher, generator, ws
+                            )
+
+                            # 全完了チェック
+                            if dispatcher.all_completed.is_set():
+                                logger.info(f"All CCDs completed, closing connection to generator {generator.id}")
+                                # 終了シグナルを送信
+                                await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
+                                break
+
+                        elif msg.type == aiohttp.WSMsgType.CLOSED:
+                            logger.info(f"WebSocket closed by generator {generator.id}")
+                            break
+                        elif msg.type == aiohttp.WSMsgType.ERROR:
+                            logger.error(f"WebSocket error from generator {generator.id}: {ws.exception()}")
+                            break
+
+        except aiohttp.ClientError as e:
+            logger.warning(f"Generator {generator.id} connection failed: {e}")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Worker error for generator {generator.id}: {e}")
+
+    # 全workerを起動
+    worker_tasks = [asyncio.create_task(worker(g)) for g in generator_list]
+
+    try:
+        # 全CCD完了を待機（タイムアウト付き）
+        timeout_seconds = config.generate_single_fits_tiles_timeout_seconds
+        await asyncio.wait_for(dispatcher.all_completed.wait(), timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        logger.error(f"Timeout waiting for CCDs: {len(dispatcher.ccd_metadata_dict)}/{len(ccd_refs)} completed")
+        raise RuntimeError(
+            f"Timeout ({timeout_seconds}s) waiting for CCD processing: "
+            f"got {len(dispatcher.ccd_metadata_dict)}/{len(ccd_refs)} metadata"
+        )
+    finally:
+        # 残存workerをキャンセル
+        for task in worker_tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*worker_tasks, return_exceptions=True)
+
+    if len(dispatcher.ccd_metadata_dict) != len(ccd_refs):
+        raise RuntimeError(
+            f"Not all CCDs processed: got {len(dispatcher.ccd_metadata_dict)}/{len(ccd_refs)} metadata"
         )
 
-        all_sent = False
-        async for msg in rpc.iterate():
-            match msg:
-                case GenerateSingleFitsTilesProgress(progress=progress, ccd_name=ccd_name):
-                    async with job.watcher.watch_status():
-                        job.status.generate_single_fits_tiles[ccd_name] = progress
-                case CcdMetadata(ccd_name=ccd_name):
-                    async with lock:
-                        ccd_metadata_dict[ccd_name] = msg
-                        ccd_generator_map[ccd_name] = generator.id
-
-                    async with lock:
-                        if remaining_ccds:
-                            next_ccd = remaining_ccds.popleft()
-                            await client_queue.put(next_ccd)
-                        elif not all_sent:
-                            await client_queue.put(None)
-                            all_sent = True
-
-    # すべてのジェネレータに対して並行処理
-    async with asyncio.TaskGroup() as tg:
-        for generator in generator_list:
-            tg.create_task(worker(generator))
-
-    if len(ccd_metadata_dict) != len(ccd_refs):
-        raise RuntimeError(f"Not all CCDs processed: got {len(ccd_metadata_dict)}/{len(ccd_refs)} metadata")
-
-    dist_config = CcdDistributionConfig(ccd_generator_map, generators)
+    dist_config = CcdDistributionConfig(dispatcher.ccd_generator_map, generators)
     async with job.watcher.notify_shared_large_status():
         job.shared_large_status.dist_config = dist_config
-        job.shared_large_status.ccd_metadata_list = [*ccd_metadata_dict.values()]
+        job.shared_large_status.ccd_metadata_list = [*dispatcher.ccd_metadata_dict.values()]
 
     await rpc_scatter(_save_job_metadata_rpc, job)
     await rpc_scatter(_save_ccd_distribution_config_rpc, job, dist_config)
 
-    return [*ccd_metadata_dict.values()]
+    return [*dispatcher.ccd_metadata_dict.values()]
 
 
-def _generate_tiles_with_queue(job: Job, ccd_queue: queue.Queue[CcdDataRef | None]):
-    """
-    ジェネレータプロセスで実行される RPC 関数。
-    queueから動的にCCDを取得して処理する。
+async def _handle_generator_message(
+    data: ProgressMessage | CompletedMessage | ErrorMessage,
+    job: Job,
+    dispatcher: CcdDispatcher,
+    generator: GeneratorInfo,
+    ws: aiohttp.ClientWebSocketResponse,
+) -> None:
+    """Generatorからのメッセージを処理"""
+    match data:
+        case ProgressMessage(ccd_name=ccd_name, progress=progress):
+            if progress is not None:
+                async with job.watcher.watch_status():
+                    job.status.generate_single_fits_tiles[ccd_name] = progress
 
-    Args:
-        job: ジョブオブジェクト
-        ccd_queue: CCDを供給するキュー。Noneが送られると終了。
+        case CompletedMessage(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox):
+            metadata = CcdMetadata(
+                ccd_name=ccd_name,
+                image_stat=image_stat,  # type: ignore
+                amps=amps,  # type: ignore
+                bbox=bbox,  # type: ignore
+            )
+            await dispatcher.on_ccd_completed(ccd_name, metadata, generator.id)
+            logger.debug(f"CCD {ccd_name} completed from {generator.id}, total: {len(dispatcher.ccd_metadata_dict)}")
 
-    Yields:
-        CcdMetadata: 処理完了したCCDのメタデータ
+            # 追加CCD割り当て
+            next_ccd = await dispatcher.get_next_ccd(generator.id)
+            if next_ccd is not None:
+                await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=next_ccd)))
+            else:
+                # 追加CCDがない場合は終了シグナルを送信
+                # Generatorは既に投入済みのCCDを処理し終えたら終了する
+                logger.info(f"No more CCDs for generator {generator.id}, sending end signal")
+                await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
 
-    Note:
-        GeneratorIDはRPC ProcessPoolExecutorのinitializerで設定済み
-    """
-
-    def ccd_refs_generator():
-        """キューからCCDを取得するジェネレータ"""
-        while True:
-            ccd_ref = ccd_queue.get()
-            if ccd_ref is None:
-                break
-            yield ccd_ref
-
-    yield from generate_single_fits_tiles_pipeline(job, ccd_refs_generator())
+        case ErrorMessage(ccd_name=ccd_name, error=error):
+            logger.error(f"Generator {generator.id} error for CCD {ccd_name}: {error}")
 
 
 def _save_job_metadata_rpc(job: Job) -> None:
