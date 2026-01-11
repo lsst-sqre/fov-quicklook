@@ -9,6 +9,7 @@ from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.comm.generator import lifespan as generator_lifespan
 from quicklook.comm.generator import router as comm_generator_router
 from quicklook.config import config
+from quicklook.generator.api.ccd_processing import websocket_generate_tiles_raw
 from quicklook.job.job import Job
 from quicklook.rpc.lifespan import rpc_lifespan
 from quicklook.rpc.server import create_rpc_endpoint
@@ -101,3 +102,12 @@ def route_get_fits_headers(
         data_bytes,
         media_type='application/python-pickle',
     )
+
+
+@app.websocket('/jobs/{job_id}/generate-tiles')
+async def route_websocket_generate_tiles(
+    websocket: fastapi.WebSocket,
+    job_id: str,
+):
+    """CCD処理用WebSocketエンドポイント（job_idはURL互換性のため保持、実際のJobはWebSocketで送信される）"""
+    await websocket_generate_tiles_raw(websocket)

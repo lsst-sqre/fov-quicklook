@@ -47,7 +47,7 @@ async def test_create_quicklook_pipeline():
 
     async with quicklook_pipeline().run() as ph:
         await ph.push(job)
-        await ev.wait()
+        await asyncio.wait_for(ev.wait(), timeout=60.0)  # 60秒タイムアウト
 
 
 printer = JobStatusPrinter()
