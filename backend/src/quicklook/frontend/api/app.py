@@ -7,6 +7,7 @@ from quicklook.config import config
 from quicklook.frontend.api.compression import setup_compression
 from quicklook.frontend.api.staticassets import setup_static_assets
 from quicklook.frontend.api.use_route_names_as_operation_ids import use_route_names_as_operation_ids
+from quicklook.frontend.comm import lifespan as comm_lifespan
 
 from .admin import router as admin_router
 from .get_fits_file import router as get_fits_file_router
@@ -27,7 +28,8 @@ logger = quicklook.mylogging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with quicklook_lifespan(app):
-        yield
+        async with comm_lifespan(app):
+            yield
 
 
 app = FastAPI(lifespan=lifespan)
