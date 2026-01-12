@@ -2,10 +2,11 @@ import contextlib
 import multiprocessing
 import queue
 import tempfile
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ContextManager, Generator, Iterable, cast
 
@@ -24,9 +25,21 @@ ds = get_datasource()
 
 
 @dataclass
+class CcdTiming:
+    """CCD処理の各ステップの時間（秒単位）"""
+    ccd_name: CcdName
+    download_s: float | None = None
+    preprocess_s: float | None = None
+    generate_tiles_s: float | None = None
+    save_header_s: float | None = None
+
+
+@dataclass
 class GenerateSingleFitsTilesProgress:
     ccd_name: CcdName
     progress: Progress
+    # 処理時間（秒）- ダウンロード完了時のみ
+    timing: CcdTiming | None = None
 
 
 @dataclass
@@ -35,6 +48,8 @@ class CcdMetadata:
     image_stat: ImageStat
     amps: list[AmpMetadata]
     bbox: BBox
+    # 処理時間
+    timing: CcdTiming | None = None
 
 
 def _initialize_pool_worker(initializers: list[Callable[[], ContextManager]]) -> None:
@@ -51,10 +66,10 @@ _pool_exit_stack: ExitStack | None = None
 def generate_single_fits_tiles_pipeline(
     job: Job,
     refs: Iterable[CcdDataRef],
-) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
+) -> Generator[GenerateSingleFitsTilesProgress | CcdTiming | CcdMetadata]:
     with tempfile.TemporaryDirectory() as tmpdir, multiprocessing.Manager() as manager:
         q = cast(
-            queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata | None],
+            queue.Queue[GenerateSingleFitsTilesProgress | CcdTiming | CcdMetadata | None],
             manager.Queue(),
         )
 
@@ -65,10 +80,13 @@ def generate_single_fits_tiles_pipeline(
 
         def download(ref: CcdDataRef):
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 1)))
+            start = time.perf_counter()
             data_bytes = ds.get_data_sync(ref)
             outpath = Path(tmpdir) / f"{ref.ccd_name}.fits"
             outpath.write_bytes(data_bytes)
+            download_s = time.perf_counter() - start
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 2)))
+            q.put(CcdTiming(ccd_name=ref.ccd_name, download_s=download_s))
             return (ref, outpath)
 
         def main():
@@ -107,12 +125,16 @@ class ProcessCcdArgs:
     job: Job
     ref: CcdDataRef
     path: Path
-    progress: queue.Queue[GenerateSingleFitsTilesProgress]
+    progress: queue.Queue[GenerateSingleFitsTilesProgress | CcdTiming]
 
 
 def _process_ccd(args: ProcessCcdArgs):
+    timing = CcdTiming(ccd_name=args.ref.ccd_name)
+    
     try:
+        start = time.perf_counter()
         ppccd = preprocess_ccd(args.ref, args.path)
+        timing.preprocess_s = time.perf_counter() - start
         args.progress.put(
             GenerateSingleFitsTilesProgress(
                 ccd_name=ppccd.data_ref.ccd_name,
@@ -122,7 +144,9 @@ def _process_ccd(args: ProcessCcdArgs):
     finally:
         args.path.unlink(missing_ok=True)
 
+    start = time.perf_counter()
     generate_tiles(ppccd, args.job)
+    timing.generate_tiles_s = time.perf_counter() - start
     args.progress.put(
         GenerateSingleFitsTilesProgress(
             ccd_name=ppccd.data_ref.ccd_name,
@@ -130,13 +154,18 @@ def _process_ccd(args: ProcessCcdArgs):
         )
     )
 
+    start = time.perf_counter()
     args.job.local_storage.fits_header.save(args.ref.ccd_name, ppccd.headers)
+    timing.save_header_s = time.perf_counter() - start
+    
+    args.progress.put(timing)
 
     return CcdMetadata(
         ccd_name=ppccd.data_ref.ccd,
         image_stat=ppccd.stat,
         amps=ppccd.amps,
         bbox=ppccd.bbox,
+        timing=timing,
     )
 
 

@@ -17,7 +17,7 @@ from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
 
-from .generate_single_fits_tiles_coordinator import generate_single_fits_tiles_coordinator
+from .generate_single_fits_tiles_coordinator import generate_single_fits_tiles_coordinator, VisitTimeProfile
 
 logger = quicklook.mylogging.getLogger(__name__)
 
@@ -79,8 +79,12 @@ def quicklook_pipeline():
 
         await _create_quicklook_record(job)
         ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
-        ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)
+        ccd_metadata_list, time_profile = await generate_single_fits_tiles_coordinator(job, ccd_refs)
         result.ccd_metadata_list = ccd_metadata_list
+        
+        # タイムプロファイルをS3に保存
+        await _upload_time_profile(job, time_profile)
+        
         return result
 
     @with_stage_timeout('merge_tiles')
@@ -189,6 +193,12 @@ async def _transfer_tiles(job: Job):
 async def _transfer_quicklook_metadata(job: Job, ccd_metadata_list: list[CcdMetadata]) -> int:
     """quicklookメタデータをobject storageに保存"""
     return await job.object_storage.put_ccd_metadata_list(ccd_metadata_list)
+
+
+async def _upload_time_profile(job: Job, time_profile: VisitTimeProfile) -> None:
+    """タイムプロファイルをobject storageに保存"""
+    await job.object_storage.put_time_profile(time_profile)
+    logger.info(f"Uploaded time profile for {job.visit} with {len(time_profile.ccd_profiles)} CCDs")
 
 
 async def _transfer_fits_headers(job: Job) -> int:

@@ -4,7 +4,8 @@ CCD処理用WebSocketプロトコル定義
 Coordinator ↔ Generator 間のメッセージ形式を定義する。
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
 from quicklook.generator.preprocess_ccd import AmpMetadata, ImageStat
@@ -13,6 +14,29 @@ from quicklook.utils.geom import BBox
 
 if TYPE_CHECKING:
     from quicklook.job.job import Job
+
+
+# ============================================================
+# タイムプロファイル用データ構造
+# ============================================================
+
+
+@dataclass
+class CcdTiming:
+    """CCD処理の各ステップのタイミング情報（秒単位）"""
+    ccd_name: CcdName
+    generator_id: str = ""
+    # Generator側の処理時間（秒）
+    download_s: float | None = None
+    preprocess_s: float | None = None
+    generate_tiles_s: float | None = None
+    save_header_s: float | None = None
+    # Coordinator側の受信タイムスタンプ（ISO形式）
+    assigned_at: str | None = None
+    download_received_at: str | None = None
+    preprocess_received_at: str | None = None
+    generate_tiles_received_at: str | None = None
+    completed_received_at: str | None = None
 
 
 # ============================================================
@@ -52,6 +76,8 @@ class ProgressMessage:
     ccd_name: CcdName = CcdName("")
     stage: Literal["downloading", "preprocessing", "generating", "done"] = "downloading"
     progress: Progress | None = None
+    # 処理時間（秒）- そのステージの処理時間を含む（完了時のみ）
+    elapsed_s: float | None = None
 
 
 @dataclass
@@ -62,6 +88,11 @@ class CompletedMessage:
     image_stat: ImageStat | None = None
     amps: list[AmpMetadata] | None = None
     bbox: BBox | None = None
+    # 各ステップの処理時間（秒）
+    download_s: float | None = None
+    preprocess_s: float | None = None
+    generate_tiles_s: float | None = None
+    save_header_s: float | None = None
 
 
 @dataclass

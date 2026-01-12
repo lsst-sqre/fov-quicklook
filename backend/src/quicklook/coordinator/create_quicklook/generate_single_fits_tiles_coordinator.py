@@ -6,10 +6,11 @@ WebSocket API方式によるFITSタイル生成。
 """
 
 import asyncio
+import json
 import pickle
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, asdict
 from datetime import datetime
 
 import aiohttp
@@ -41,6 +42,37 @@ class CcdSubmission:
     submitted_at: datetime
     generator_id: GeneratorId
 
+    @property
+    def ccd_name(self) -> CcdName:
+        return self.ccd_ref.ccd
+
+
+@dataclass
+class CcdTimeProfile:
+    """CCDのタイムプロファイル（ガントチャート用）"""
+    ccd_name: str
+    generator_id: str
+    # Coordinator側タイムスタンプ（ISO形式）
+    assigned_at: str | None = None
+    completed_at: str | None = None
+    # Generator側処理時間（秒）
+    download_s: float | None = None
+    preprocess_s: float | None = None
+    generate_tiles_s: float | None = None
+    save_header_s: float | None = None
+
+
+@dataclass
+class VisitTimeProfile:
+    """Visit全体のタイムプロファイル"""
+    visit_name: str
+    start_time: str
+    end_time: str | None = None
+    ccd_profiles: list[CcdTimeProfile] = field(default_factory=list)
+    
+    def to_json(self) -> str:
+        return json.dumps(asdict(self), indent=2, ensure_ascii=False)
+
 
 class CcdDispatcher:
     """
@@ -56,6 +88,7 @@ class CcdDispatcher:
     def __init__(
         self,
         ccd_refs: Sequence[CcdDataRef],
+        visit_name: str = "",
         resubmit_min_age_seconds: float = config.resubmit_min_age_seconds,
         resubmit_max_attempts_per_ccd: int = config.resubmit_max_attempts_per_ccd,
     ):
@@ -72,6 +105,14 @@ class CcdDispatcher:
         # 再submit暴走防止パラメータ
         self._resubmit_min_age_seconds = resubmit_min_age_seconds
         self._resubmit_max_attempts_per_ccd = resubmit_max_attempts_per_ccd
+        
+        # タイムプロファイル
+        self._time_profile = VisitTimeProfile(
+            visit_name=visit_name,
+            start_time=datetime.now().isoformat(),
+        )
+        # CCDごとのタイムプロファイル（ccd_nameでインデックス）
+        self._ccd_profiles: dict[CcdName, CcdTimeProfile] = {}
 
     @property
     def ccd_metadata_dict(self) -> dict[CcdName, CcdMetadata]:
@@ -84,6 +125,10 @@ class CcdDispatcher:
     @property
     def all_completed(self) -> asyncio.Event:
         return self._all_completed
+    
+    @property
+    def time_profile(self) -> VisitTimeProfile:
+        return self._time_profile
 
     async def get_next_ccd(self, generator_id: GeneratorId) -> CcdDataRef | None:
         """
@@ -104,10 +149,17 @@ class CcdDispatcher:
             if self._remaining_index < len(self._ccd_refs):
                 ccd_ref = self._ccd_refs[self._remaining_index]
                 self._remaining_index += 1
+                now = datetime.now()
                 self._submitted_ccds.append(
-                    CcdSubmission(ccd_ref, datetime.now(), generator_id)
+                    CcdSubmission(ccd_ref, now, generator_id)
                 )
                 self._attempts[ccd_ref.ccd_name] += 1
+                # タイムプロファイルを記録
+                self._ccd_profiles[ccd_ref.ccd_name] = CcdTimeProfile(
+                    ccd_name=str(ccd_ref.ccd_name),
+                    generator_id=str(generator_id),
+                    assigned_at=now.isoformat(),
+                )
                 return ccd_ref
 
             # Phase 2: 未完了CCDを（提出順の）ラウンドロビンで再submit
@@ -144,6 +196,10 @@ class CcdDispatcher:
         ccd_name: CcdName,
         metadata: CcdMetadata,
         generator_id: GeneratorId,
+        download_s: float | None = None,
+        preprocess_s: float | None = None,
+        generate_tiles_s: float | None = None,
+        save_header_s: float | None = None,
     ) -> None:
         """
         CCD処理完了を記録する。
@@ -155,12 +211,24 @@ class CcdDispatcher:
             if ccd_name not in self._ccd_metadata_dict:
                 self._ccd_metadata_dict[ccd_name] = metadata
                 self._ccd_generator_map[ccd_name] = generator_id
+                
+                # タイムプロファイルを更新
+                if ccd_name in self._ccd_profiles:
+                    profile = self._ccd_profiles[ccd_name]
+                    profile.completed_at = datetime.now().isoformat()
+                    profile.download_s = download_s
+                    profile.preprocess_s = preprocess_s
+                    profile.generate_tiles_s = generate_tiles_s
+                    profile.save_header_s = save_header_s
 
                 if len(self._ccd_metadata_dict) == len(self._ccd_refs):
                     self._all_completed.set()
+                    # 全完了時にタイムプロファイルを完成させる
+                    self._time_profile.end_time = datetime.now().isoformat()
+                    self._time_profile.ccd_profiles = list(self._ccd_profiles.values())
 
 
-async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDataRef]) -> list[CcdMetadata]:
+async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDataRef]) -> tuple[list[CcdMetadata], VisitTimeProfile]:
     """
     WebSocket API方式によるFITSタイル生成
 
@@ -176,6 +244,9 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
       - Phase 1: 全CCDを順次割り当て（従来の動的割り当て）
       - Phase 2: 未完了CCDを他のGeneratorに再割り当て
       - 最初に完了したGeneratorのみ採用、重複処理結果は破棄
+      
+    Returns:
+        (CcdMetadataリスト, タイムプロファイル) のタプル
     """
     ccd_refs = sorted(ccd_refs, key=lambda ref: ref.ccd_name)
     generators = get_available_generators()
@@ -183,7 +254,9 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         raise RuntimeError("No generators available")
 
     generator_list = list(generators.values())
-    dispatcher = CcdDispatcher(ccd_refs)
+    # visit_nameを取得（ccd_refsから）
+    visit_name = str(ccd_refs[0].visit) if ccd_refs else ""
+    dispatcher = CcdDispatcher(ccd_refs, visit_name=visit_name)
     max_concurrent_ccds = config.generator_max_concurrent_ccds_per_job
 
     async def worker(generator: GeneratorInfo) -> None:
@@ -285,7 +358,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
     await rpc_scatter(_save_job_metadata_rpc, job)
     await rpc_scatter(_save_ccd_distribution_config_rpc, job, dist_config)
 
-    return [*dispatcher.ccd_metadata_dict.values()]
+    return [*dispatcher.ccd_metadata_dict.values()], dispatcher.time_profile
 
 
 async def _handle_generator_message(
@@ -302,14 +375,31 @@ async def _handle_generator_message(
                 async with job.watcher.watch_status():
                     job.status.generate_single_fits_tiles[ccd_name] = progress
 
-        case CompletedMessage(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox):
+        case CompletedMessage(
+            ccd_name=ccd_name, 
+            image_stat=image_stat, 
+            amps=amps, 
+            bbox=bbox,
+            download_s=download_s,
+            preprocess_s=preprocess_s,
+            generate_tiles_s=generate_tiles_s,
+            save_header_s=save_header_s,
+        ):
             metadata = CcdMetadata(
                 ccd_name=ccd_name,
                 image_stat=image_stat,  # type: ignore
                 amps=amps,  # type: ignore
                 bbox=bbox,  # type: ignore
             )
-            await dispatcher.on_ccd_completed(ccd_name, metadata, generator.id)
+            await dispatcher.on_ccd_completed(
+                ccd_name, 
+                metadata, 
+                generator.id,
+                download_s=download_s,
+                preprocess_s=preprocess_s,
+                generate_tiles_s=generate_tiles_s,
+                save_header_s=save_header_s,
+            )
             logger.debug(f"CCD {ccd_name} completed from {generator.id}, total: {len(dispatcher.ccd_metadata_dict)}")
 
             # 追加CCD割り当て

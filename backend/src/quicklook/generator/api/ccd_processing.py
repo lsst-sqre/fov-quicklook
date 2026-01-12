@@ -17,11 +17,12 @@ from starlette.websockets import WebSocketState
 
 from quicklook.generator.generate_single_fits_tiles import (
     CcdMetadata,
+    CcdTiming,
     GenerateSingleFitsTilesProgress,
     generate_single_fits_tiles_pipeline,
 )
 from quicklook.job.job import Job
-from quicklook.types import CcdDataRef
+from quicklook.types import CcdDataRef, CcdName
 
 from .ccd_processing_protocol import (
     AssignCcdMessage,
@@ -30,6 +31,7 @@ from .ccd_processing_protocol import (
     GeneratorMessage,
     InitJobMessage,
     ProgressMessage,
+    CcdTiming as ProtocolCcdTiming,
 )
 
 logger = quicklook.mylogging.getLogger(__name__)
@@ -184,6 +186,9 @@ def _run_pipeline_sync(
         """結果キューにメッセージを追加"""
         asyncio.run_coroutine_threadsafe(result_queue.put(msg), loop)
 
+    # CCDごとのタイミング情報を収集
+    ccd_timings: dict[CcdName, CcdTiming] = {}
+    
     # 既存パイプラインを使用
     for msg in generate_single_fits_tiles_pipeline(job, ccd_generator()):
         if cancel_event.is_set():
@@ -196,10 +201,42 @@ def _run_pipeline_sync(
                     stage="generating",
                     progress=progress,
                 ))
-            case CcdMetadata(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox):
+            case CcdTiming() as timing:
+                # タイミング情報をマージ
+                if timing.ccd_name in ccd_timings:
+                    existing = ccd_timings[timing.ccd_name]
+                    if timing.download_s is not None:
+                        existing.download_s = timing.download_s
+                    if timing.preprocess_s is not None:
+                        existing.preprocess_s = timing.preprocess_s
+                    if timing.generate_tiles_s is not None:
+                        existing.generate_tiles_s = timing.generate_tiles_s
+                    if timing.save_header_s is not None:
+                        existing.save_header_s = timing.save_header_s
+                else:
+                    ccd_timings[timing.ccd_name] = timing
+                print(timing)
+            case CcdMetadata(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox, timing=timing):
+                # タイミング情報を取得
+                final_timing = ccd_timings.get(ccd_name)
+                if timing is not None and final_timing is not None:
+                    # CcdMetadataのtimingとマージ
+                    if timing.preprocess_s is not None:
+                        final_timing.preprocess_s = timing.preprocess_s
+                    if timing.generate_tiles_s is not None:
+                        final_timing.generate_tiles_s = timing.generate_tiles_s
+                    if timing.save_header_s is not None:
+                        final_timing.save_header_s = timing.save_header_s
+                elif timing is not None:
+                    final_timing = timing
+                print(msg)
                 put_result(CompletedMessage(
                     ccd_name=ccd_name,
                     image_stat=image_stat,
                     amps=amps,
                     bbox=bbox,
+                    download_s=final_timing.download_s if final_timing else None,
+                    preprocess_s=final_timing.preprocess_s if final_timing else None,
+                    generate_tiles_s=final_timing.generate_tiles_s if final_timing else None,
+                    save_header_s=final_timing.save_header_s if final_timing else None,
                 ))

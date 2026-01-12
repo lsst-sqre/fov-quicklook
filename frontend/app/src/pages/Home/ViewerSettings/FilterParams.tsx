@@ -28,6 +28,7 @@ export const FilterParams = memo(() => {
 
   useEffect(() => {
     if (metadata?.type === 'ready') {
+      console.log(metadata)
       const [min, max] = autoBarMinMax(metadata)
       setBarMinMax([min, max])
       const shouldDoAutoMinMax = currentQuicklook.changeCount() > 1 || initialSearchParams.filterParams === undefined

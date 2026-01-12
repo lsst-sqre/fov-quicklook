@@ -9,6 +9,7 @@ from quicklook.types import CcdName, PackedTilePos, TilePos, VisitName
 
 if TYPE_CHECKING:
     from quicklook.generator.generate_single_fits_tiles import CcdMetadata
+    from quicklook.coordinator.create_quicklook.generate_single_fits_tiles_coordinator import VisitTimeProfile
 
 from quicklook.utils.fitsheader import HeaderType
 from quicklook.utils.s3 import s3_delete_object, s3_delete_objects_with_prefix, s3_download_object, s3_list_objects, s3_upload_object
@@ -127,3 +128,21 @@ class VisitObjectStorage:
 
     async def get_ccd_metadata_list(self) -> list['CcdMetadata']:
         return await asyncio.to_thread(self.get_ccd_metadata_list_sync)
+
+    def put_time_profile_sync(self, time_profile: 'VisitTimeProfile') -> int:
+        """タイムプロファイルをobject storageに保存（JSON形式）"""
+        data = time_profile.to_json().encode('utf-8')
+        key = f'quicklooks/{self.visit}/time-profile.json'
+        s3_upload_object(config.s3_tile, f'{config.s3_tile_key_prefix}{key}', data, 'application/json')
+        return len(data)
+
+    def get_time_profile_sync(self) -> str:
+        """タイムプロファイルをobject storageから取得（JSON文字列）"""
+        data = self._get_sync('time-profile.json')
+        return data.decode('utf-8')
+
+    async def put_time_profile(self, time_profile: 'VisitTimeProfile') -> int:
+        return await asyncio.to_thread(self.put_time_profile_sync, time_profile)
+
+    async def get_time_profile(self) -> str:
+        return await asyncio.to_thread(self.get_time_profile_sync)

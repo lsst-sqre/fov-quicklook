@@ -19,6 +19,7 @@ from .quicklooks import router as quicklooks_router
 from .storage_explorer import router as storage_explorer_router
 from .systeminfo import router as systeminfo_router
 from .status import router as status_router
+from .time_profile import router as time_profile_router
 from .visits import router as visits_router
 from .cache_entries import router as cache_entries_router
 
@@ -42,6 +43,7 @@ app.include_router(get_fits_header_router, prefix=config.frontend_app_prefix)
 app.include_router(quicklooks_router, prefix=config.frontend_app_prefix)
 app.include_router(visits_router, prefix=config.frontend_app_prefix)
 app.include_router(get_fits_file_router, prefix=config.frontend_app_prefix)
+app.include_router(time_profile_router, prefix=config.frontend_app_prefix)
 
 if config.admin_page:  # pragma: no cover
     app.include_router(admin_router, prefix=config.frontend_app_prefix)
