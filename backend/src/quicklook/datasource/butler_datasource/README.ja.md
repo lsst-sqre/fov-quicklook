@@ -4,6 +4,10 @@
 
 ## raw
 
+```
+!pip install lsst-daf-butler boto3 psycopg2-binary
+```
+
 ```python
 import os
 import shutil

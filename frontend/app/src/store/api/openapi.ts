@@ -73,6 +73,7 @@ const injectedRtkApi = api.injectEndpoints({
           day_obs: queryArg.dayObs,
           limit: queryArg.limit,
           data_type: queryArg.dataType,
+          repository_name: queryArg.repositoryName,
         },
       }),
     }),
@@ -188,6 +189,7 @@ export type ListVisitsApiArg = {
   dayObs?: number | null;
   limit?: number;
   dataType?: string;
+  repositoryName?: string;
 };
 export type GetVisitMetadataApiResponse =
   /** status 200 Successful Response */ DataSourceCcdMetadata;
@@ -230,8 +232,7 @@ export type ContextMenuTemplate = {
   is_url: boolean;
 };
 export type CcdDataTypeConfig = {
-  id: string;
-  name: string;
+  data_type: string;
   display_name: string;
   collections: string[];
   data_id_dimension?: string;

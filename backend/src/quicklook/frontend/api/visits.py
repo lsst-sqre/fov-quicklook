@@ -1,6 +1,4 @@
 from fastapi import APIRouter, Query
-import pydantic
-
 from quicklook.datasource import get_datasource
 from quicklook.datasource.butler_datasource import VisitEntry
 from quicklook.datasource.types import DataSourceCcdMetadata
@@ -15,12 +13,14 @@ async def list_visits(
     exposure: int | None = Query(None),
     day_obs: int | None = Query(None),
     limit: int = Query(default=1000, le=10000),
-    data_type: CcdDataType = Query(default='raw'),
+    data_type: CcdDataType = Query(...),
+    repository_name: str = Query(...),
 ):
     ds = get_datasource()
     return await ds.query_visits(
         DataSourceQuery(
             data_type=data_type,
+            repository_name=repository_name,
             exposure=exposure,
             day_obs=day_obs,
             limit=limit,

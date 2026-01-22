@@ -10,9 +10,10 @@ import { useChangeCurrentQuicklook } from '../../hooks/useChangeCurrentQuicklook
 export function DataTypeSwitch() {
   type DataType = typeof types[number]
   const { currentQuicklook } = useHomeContext()
-  const exposureId = Number(currentQuicklook.id?.split(':')[1])
-  const currentType = currentQuicklook.id?.split(':')[0] as DataType | undefined
-  const { data, isFetching } = useGetExposureDataTypesQuery({ id: exposureId }, {
+  const parts = currentQuicklook.id?.split(':') ?? []
+  const exposureId = parts[2] ? Number(parts[2]) : undefined
+  const currentType = parts.length >= 3 ? `${parts[0]}:${parts[1]}` as DataType : undefined
+  const { data, isFetching } = useGetExposureDataTypesQuery({ id: exposureId! }, {
     skip: !exposureId,
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
@@ -29,16 +30,19 @@ export function DataTypeSwitch() {
 
   return (
     <>
-      {ccdDataTypes.map(({ id, display_name }) => (
-        <button
-          key={id}
-          className={classNames(currentType === id && styles.selectedType)}
-          disabled={!types.includes(id as DataType)}
-          onClick={() => changeType(id as DataType)}
-        >
-          {display_name}
-        </button>
-      ))}
+      {ccdDataTypes.map(({ data_type, display_name, repository_name }) => {
+        const key = `${repository_name}:${data_type}`
+        return (
+          <button
+            key={key}
+            className={classNames(currentType === key && styles.selectedType)}
+            disabled={!types.includes(data_type as DataType)}
+            onClick={() => changeType(key as DataType)}
+          >
+            {display_name}
+          </button>
+        )
+      })}
     </>
   )
 }

@@ -9,7 +9,7 @@ from quicklook.utils.s3 import s3_download_object
 
 
 def test_s3_partial_load():
-    visit = VisitName('calexp:192350')
+    visit = VisitName('dummy:calexp:192350')
     ccd_name = 'R11_S21'
 
     def read(start: int, end: int) -> bytes:

@@ -8,6 +8,7 @@ from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 @dataclass
 class Query:
     data_type: CcdDataType
+    repository_name: str
     limit: int
     exposure: int | None = None
     day_obs: int | None = None

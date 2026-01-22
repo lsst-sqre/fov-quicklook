@@ -34,7 +34,7 @@ async def reset_db():
 
 
 async def test_create_quicklook_pipeline():
-    job = Job(VisitName('raw:broccoli'))
+    job = Job(VisitName('dummy:raw:broccoli'))
     job.watcher.on_change_status(print_job_status)
     ev = asyncio.Event()
 

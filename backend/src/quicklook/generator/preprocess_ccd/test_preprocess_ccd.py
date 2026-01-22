@@ -10,13 +10,13 @@ from quicklook.utils.s3 import s3_download_object
 
 
 def test_preprocess_ccd_raw():
-    ccd_ref = CcdDataRef(visit=VisitName('raw:broccoli'), ccd=CcdName('R00_SG0'))
+    ccd_ref = CcdDataRef(visit=VisitName('dummy:raw:broccoli'), ccd=CcdName('R00_SG0'))
     with fits_path(ccd_ref) as path:
         preprocess_ccd(ccd_ref, path)
 
 
 def test_preprocess_ccd_calexp():
-    ccd_ref = CcdDataRef(visit=VisitName('calexp:192350'), ccd=CcdName('R01_S00'))
+    ccd_ref = CcdDataRef(visit=VisitName('dummy:calexp:192350'), ccd=CcdName('R01_S00'))
     with fits_path(ccd_ref) as path:
         preprocess_ccd(ccd_ref, path)
 

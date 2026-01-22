@@ -6,6 +6,6 @@ from quicklook.types import VisitName
 
 
 def dep_visit_name(
-    visit_name: Annotated[str, fastapi.Path(..., pattern=r'^\w+:\w+$')],
+    visit_name: Annotated[str, fastapi.Path(..., pattern=r'^\w+:\w+:\w+$')],
 ):
     return VisitName(visit_name)

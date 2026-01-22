@@ -66,27 +66,28 @@ const useSetInitialSearchConditions = () => {
 
 function extractDateFromVisitId(visitId: string) {
   /*
-   * post_isr_image:2025051900437 のようなテキストから20250519を抽出する
+   * embargo:raw:2025051900437 のようなテキストから20250519を抽出する
    * 形式がマッチしなければ '' を返す
    */
-  if (!visitId.match(/^.+:\d{13}$/)) {
+  const parts = visitId.split(':')
+  const last = parts[parts.length - 1]
+  if (!last?.match(/^\d{13}$/)) {
     return ''
   }
-  const date = visitId.split(':')[1]
-  return date.slice(0, 8)
+  return last.slice(0, 8)
 }
 
 
 function extractDataTypeFromVisitId(visitId: string): CcdDataType | undefined {
   /*
-   * post_isr_image:2025051900437 のようなテキストから post_isr_image を抽出する
+   * embargo:raw:2025051900437 のようなテキストから embargo:raw を抽出する
    * 形式がマッチしなければ undefined を返す
    */
-  if (!visitId.match(/^(.+):\d{13}$/)) {
+  const parts = visitId.split(':')
+  if (parts.length < 3) {
     return undefined
   }
-  const dataSource = visitId.split(':')[0]
-  return dataSource as CcdDataType
+  return parts.slice(0, -1).join(':') as CcdDataType
 }
 
 

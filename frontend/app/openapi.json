@@ -399,11 +399,19 @@
                     {
                         "name": "data_type",
                         "in": "query",
-                        "required": false,
+                        "required": true,
                         "schema": {
                             "type": "string",
-                            "default": "raw",
                             "title": "Data Type"
+                        }
+                    },
+                    {
+                        "name": "repository_name",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Repository Name"
                         }
                     }
                 ],
@@ -812,13 +820,9 @@
             },
             "CcdDataTypeConfig": {
                 "properties": {
-                    "id": {
+                    "data_type": {
                         "type": "string",
-                        "title": "Id"
-                    },
-                    "name": {
-                        "type": "string",
-                        "title": "Name"
+                        "title": "Data Type"
                     },
                     "display_name": {
                         "type": "string",
@@ -864,8 +868,7 @@
                 },
                 "type": "object",
                 "required": [
-                    "id",
-                    "name",
+                    "data_type",
                     "display_name",
                     "collections"
                 ],

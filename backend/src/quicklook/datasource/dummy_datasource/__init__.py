@@ -13,9 +13,9 @@ from ..types import DataSourceBase, DataSourceCcdMetadata, Query, VisitName
 class DummyDataSource(DataSourceBase):
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return [
-            create_dummy_visit_entry("raw:broccoli", 20230101, "r", 30.0, target_name="dummy_target"),
-            create_dummy_visit_entry("calexp:192350", 20230102, "g", 15.0, target_name="dummy_target_2"),
-            *[create_dummy_visit_entry(f"raw:dummy-{i}", 20230104, "z") for i in range(50)],
+            create_dummy_visit_entry("dummy:raw:broccoli", 20230101, "r", 30.0, target_name="dummy_target"),
+            create_dummy_visit_entry("dummy:calexp:192350", 20230102, "g", 15.0, target_name="dummy_target_2"),
+            *[create_dummy_visit_entry(f"dummy:raw:dummy-{i}", 20230104, "z") for i in range(50)],
         ][: q.limit]
 
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
@@ -46,7 +46,7 @@ class DummyDataSource(DataSourceBase):
         )
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
-        return [CcdDataType(dt.id) for dt in config.ccd_data_types]
+        return [CcdDataType(dt.data_type) for dt in config.ccd_data_types]
 
 
 def _s3_get_visit_ccd_fits_raw(ref: CcdDataRef) -> bytes:

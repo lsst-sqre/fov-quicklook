@@ -19,7 +19,7 @@ from .generate_single_fits_tiles_coordinator import CcdDispatcher, CcdSubmission
 
 def make_ccd_ref(ccd_name: str) -> CcdDataRef:
     """テスト用のCcdDataRefを作成"""
-    return CcdDataRef(VisitName(f"raw:{ccd_name}"), CcdName(ccd_name))
+    return CcdDataRef(VisitName(f"dummy:raw:{ccd_name}"), CcdName(ccd_name))
 
 
 def make_ccd_metadata(ccd_name: str) -> CcdMetadata:

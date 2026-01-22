@@ -4,7 +4,7 @@ import { api } from './api'
 import { SystemInfo } from './api/openapi'
 import { copyTemplateInitialState, copyTemplateSlice } from './features/copyTemplateSlice'
 import { hipsSlice } from './features/hipsSlice'
-import { homeSlice } from './features/homeSlice'
+import { homeInitialState, homeSlice } from './features/homeSlice'
 import { systemSlice } from './features/systemSlice'
 
 export function makeStore(systemInfo: SystemInfo) {
@@ -20,6 +20,7 @@ export function makeStore(systemInfo: SystemInfo) {
       serializableCheck: false,
     }).concat(api.middleware),
     preloadedState: {
+      [homeSlice.name]: homeInitialState(systemInfo),
       [copyTemplateSlice.name]: copyTemplateInitialState(systemInfo),
     },
   })

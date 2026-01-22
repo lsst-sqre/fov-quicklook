@@ -16,7 +16,7 @@ def set_generator_id():
 def test_logger_writes_to_base_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(config, 'job_local_dir', tmp_path)
 
-    job = Job(visit=VisitName('raw:logger-test'))
+    job = Job(visit=VisitName('dummy:raw:logger-test'))
     storage = JobLocalStorage.from_job(job)
 
     logger = storage.logger

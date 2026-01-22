@@ -19,13 +19,13 @@ def set_generator_id():
 
 @pytest.fixture
 def broccoli_visit() -> VisitName:
-    return VisitName('raw:broccoli')
+    return VisitName('dummy:raw:broccoli')
 
 
 def test_process_ccd():
-    visit = VisitName('raw:broccoli')
+    visit = VisitName('dummy:raw:broccoli')
     ccd_name = CcdName('R01_S00')
-    # visit = VisitName('calexp:192350')
+    # visit = VisitName('dummy:calexp:192350')
     
     job = Job(visit=visit)
 

@@ -38,19 +38,21 @@ function isValidSearchString(s: string) {
 function useVisitList() {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
+  const [repositoryName, dataType] = dataSource.split(':')
   const query = useMemo(() => {
     if (isValidSearchString(searchString)) {
       switch (searchString.length) {
         case 8:
-          return { dayObs: Number(searchString), dataType: dataSource }
+          return { dayObs: Number(searchString), dataType, repositoryName }
         case 13:
-          return { exposure: Number.parseInt(searchString), dataType: dataSource }
+          return { exposure: Number.parseInt(searchString), dataType, repositoryName }
       }
     }
     return {
-      dataType: dataSource,
+      dataType,
+      repositoryName,
     } as ListVisitsApiArg
-  }, [dataSource, searchString])
+  }, [dataType, repositoryName, searchString])
   const { data: list, refetch, isFetching } = useListVisitsQuery(query)
   return { list, refetch, isFetching }
 }
@@ -169,7 +171,7 @@ function VisitGroup({ group }: { group: VisitListEntryType[] }) {
 
 function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-  const selected = currentQuicklook?.split(':')[1] === entry.id.split(':')[1]
+  const selected = currentQuicklook?.split(':').slice(-1)[0] === entry.id.split(':').slice(-1)[0]
   const entryRef = useRef<HTMLDivElement>(null)
   const listContainerRef = React.useContext(ListScrollContainerContext)
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
@@ -296,9 +298,10 @@ function SearchBox() {
             flexGrow: 1,
           }}
         >
-          {ccdDataTypes.map(({ id, display_name }) => (
-            <option key={id} value={id}>{display_name}</option>
-          ))}
+          {ccdDataTypes.map((dt) => {
+            const key = `${dt.repository_name}:${dt.data_type}`
+            return <option key={key} value={key}>{dt.display_name}</option>
+          })}
         </select>
         <Menu
           menuButton={

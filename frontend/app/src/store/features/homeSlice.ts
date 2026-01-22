@@ -4,7 +4,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { angle, V2 } from "@stellar-globe/stellar-globe"
 import { initialSearchParams } from "../../hooks/useHashSync"
 import { RubinImageFilter, RubinImageFilterParams } from "../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter"
-import { ListVisitsApiArg } from "../api/openapi"
+import { ListVisitsApiArg, SystemInfo } from "../api/openapi"
 
 export type CcdDataType = NonNullable<ListVisitsApiArg["dataType"]>
 
@@ -41,7 +41,9 @@ type LineProfilerState = {
   enabled: boolean
 }
 
-function initialState(): State {
+function initialState(systemInfo?: SystemInfo): State {
+  const dt = systemInfo?.ccd_data_types?.[0]
+  const defaultDataSource = dt ? `${dt.repository_name}:${dt.data_type}` as CcdDataType : '' as CcdDataType
   return {
     currentQuicklook: undefined,
     cameraRevision: 0,
@@ -51,7 +53,7 @@ function initialState(): State {
     },
     filterParams: initialSearchParams.filterParams ?? RubinImageFilter.defaultParams(),
     searchString: '',
-    dataSource: 'raw',
+    dataSource: defaultDataSource,
     showFrame: true,
     showCompactStatus: false,
     showMemoryUsageInCompactStatus: false,
@@ -60,6 +62,8 @@ function initialState(): State {
     listGroupingTimeToleranceDigits: 2,
   }
 }
+
+export { initialState as homeInitialState }
 
 export const homeSlice = createSlice({
   name: "home",

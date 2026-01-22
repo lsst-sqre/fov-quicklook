@@ -60,7 +60,7 @@ class CcdDataTypeConfig(BaseModel):
     display_name: str  # 例: 'Raw', 'CalExp (Main)'
     
     # Butler クエリ設定
-    name: str  # Butler dataset type name (例: 'raw', 'calexp')
+    data_type: str  # Butler dataset type name (例: 'raw', 'calexp')
     collections: list[str]  # Butlerコレクション名
     data_id_dimension: str = "exposure"  # データ識別ディメンション
     order_by: list[str] = ["-exposure"]  # クエリの並び順
@@ -73,10 +73,10 @@ class CcdDataTypeConfig(BaseModel):
 
 **設計のポイント**:
 
-1. **`id` と `name` の分離**:
+1. **`id` と `data_type` の分離**:
    - `id`: システム内部での一意識別子。URL パス、S3 キャッシュパス、フロントエンドでの識別に使用
      - 例: `embargo/raw`, `main/calexp`
-   - `name`: Butler の dataset type 名。Butler クエリで使用
+   - `data_type`: Butler の dataset type 名。Butler クエリで使用
      - 例: `raw`, `calexp`, `post_isr_image`
    
 2. **`repository_name`**: Butler リポジトリ名（`embargo`, `main` など）
@@ -88,7 +88,7 @@ class CcdDataTypeConfig(BaseModel):
 - データタイプごとに異なるリポジトリを使用可能
 - 設定が一箇所に集約される
 - 既存の設定構造を拡張するだけ
-- `id` と `name` の分離により、同じデータタイプを異なるリポジトリから取得可能
+- `id` と `data_type` の分離により、同じデータタイプを異なるリポジトリから取得可能
 
 **デメリット**:
 - 同じリポジトリを複数のデータタイプで使う場合、設定が重複
@@ -98,7 +98,7 @@ class CcdDataTypeConfig(BaseModel):
 # デフォルト設定（embargo リポジトリのみ）
 ccd_data_types:
   - id: raw
-    name: raw
+    data_type: raw
     display_name: Raw
     collections: ["LSSTCam/raw/all"]
     repository_name: embargo
@@ -110,13 +110,13 @@ ccd_data_types:
 # 複数リポジトリ使用時の例
 ccd_data_types:
   - id: embargo/raw
-    name: raw
+    data_type: raw
     display_name: Raw (Embargo)
     collections: ["LSSTCam/raw/all"]
     repository_name: embargo
     instrument: LSSTCam
   - id: main/calexp
-    name: calexp
+    data_type: calexp
     display_name: CalExp (Main)
     collections: ["LSSTCam/runs/DR1"]
     repository_name: main
@@ -135,7 +135,7 @@ class ButlerRepoConfig(BaseModel):
 
 class CcdDataTypeConfig(BaseModel):
     id: str
-    name: str
+    data_type: str
     display_name: str
     collections: list[str]
     repository_name: str = "embargo"  # ButlerRepoConfig.name への参照
@@ -161,7 +161,7 @@ class CcdDataTypeConfig(BaseModel):
 
 ## 推奨案: 案 1 を採用
 
-現在の `CcdDataTypeConfig` に `repository_name` と `instrument` フィールドを追加し、`id` と `name` を分離する。
+現在の `CcdDataTypeConfig` に `repository_name` と `instrument` フィールドを追加し、`id` と `data_type` を分離する。
 
 **理由**:
 1. 最小限の変更で複数リポジトリに対応可能
@@ -186,7 +186,7 @@ class CcdDataTypeConfig(BaseModel):
     display_name: str
     
     # Butler クエリ設定
-    name: str  # Butler dataset type name
+    data_type: str  # Butler dataset type name
     collections: list[str]
     data_id_dimension: str = "exposure"
     order_by: list[str] = ["-exposure"]
@@ -221,8 +221,8 @@ class DataTypeSpecificDataSource:
 - **S3 キャッシュキー**: `quicklooks/{data_type}:{visit}/...` → `id` を使用
 - **フロントエンド**: data type の選択・表示 → `id` を使用
 
-**Butler クエリ**では引き続き `name` を使用:
-- `butler.query_datasets(data_type_config.name, ...)`
+**Butler クエリ**では引き続き `data_type` を使用:
+- `butler.query_datasets(data_type_config.data_type, ...)`
 
 ### 4. Helm values スキーマ更新
 
@@ -299,7 +299,7 @@ embargo リポジトリのみを使用する場合の設定:
 ```yaml
 ccd_data_types:
   - id: raw
-    name: raw
+    data_type: raw
     display_name: Raw
     collections: ["LSSTCam/raw/all"]
     data_id_dimension: exposure
@@ -308,7 +308,7 @@ ccd_data_types:
     repository_name: embargo
     instrument: LSSTCam
   - id: post_isr_image
-    name: post_isr_image
+    data_type: post_isr_image
     display_name: Post-ISR
     collections: ["LSSTCam/runs/nightlyValidation"]
     data_id_dimension: exposure
@@ -317,7 +317,7 @@ ccd_data_types:
     repository_name: embargo
     instrument: LSSTCam
   - id: preliminary_visit_image
-    name: preliminary_visit_image
+    data_type: preliminary_visit_image
     display_name: Preliminary
     collections: ["LSSTCam/runs/nightlyValidation"]
     data_id_dimension: visit

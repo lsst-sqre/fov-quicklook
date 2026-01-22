@@ -32,23 +32,23 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         chown_pgpassfile()
 
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
-        return _get_datasource(q.data_type).query_visits(q)
+        return _get_datasource(q.data_type, q.repository_name).query_visits(q)
 
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
-        return _get_datasource(visit.data_type).list_ccds(visit)
+        return _get_datasource(visit.data_type, visit.repository_name).list_ccds(visit)
 
     def get_data_sync(self, ref: CcdDataRef) -> bytes:
-        return _get_datasource(ref.visit.data_type).get_data(ref)
+        return _get_datasource(ref.visit.data_type, ref.visit.repository_name).get_data(ref)
 
     def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
-        return _get_datasource(ref.visit.data_type).get_metadata(ref)
+        return _get_datasource(ref.visit.data_type, ref.visit.repository_name).get_metadata(ref)
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         types: list[CcdDataType] = []
         for data_type_config in config.ccd_data_types:
-            datasource = _get_datasource(CcdDataType(data_type_config.id))
+            datasource = _get_datasource(data_type_config.data_type, data_type_config.repository_name)
             if datasource.exposure_exists(exposure_id):
-                types.append(CcdDataType(data_type_config.id))
+                types.append(CcdDataType(data_type_config.data_type))
         return types
 
 
@@ -66,13 +66,13 @@ class DataTypeSpecificDataSource:
         )  # type: ignore
 
     @property
-    def id(self) -> str:
-        return self._config.id
-
-    @property
     def butler_data_type(self) -> str:
         """Butler dataset type name for queries"""
-        return self._config.name
+        return self._config.data_type
+
+    @property
+    def repository_name(self) -> str:
+        return self._config.repository_name
 
     @property
     def data_id_dimension(self) -> str:
@@ -115,7 +115,7 @@ class DataTypeSpecificDataSource:
 
         return [
             VisitEntry(
-                id=f'{self.id}:{ref.dataId[self.data_id_dimension]}',
+                id=f'{self.repository_name}:{self.butler_data_type}:{ref.dataId[self.data_id_dimension]}',
                 obs_id=exp.obs_id,
                 day_obs=exp.day_obs,
                 physical_filter=exp.physical_filter,
@@ -196,18 +196,19 @@ class DataTypeSpecificDataSource:
         return {record.id: record for record in records}
 
 
-def _get_datasource(data_type: CcdDataType) -> DataTypeSpecificDataSource:
+def _get_datasource(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:
     thread_id = threading.get_ident()
-    return _get_datasource_cache(data_type, thread_id=thread_id)
+    return _get_datasource_cache(data_type, repository_name, thread_id=thread_id)
 
 
 @lru_cache(64)
-def _get_datasource_cache(data_type: CcdDataType, thread_id: int) -> DataTypeSpecificDataSource:
-    return _get_datasource_no_cache(data_type)
+def _get_datasource_cache(data_type: str, repository_name: str, thread_id: int) -> DataTypeSpecificDataSource:
+    return _get_datasource_no_cache(data_type, repository_name)
 
 
-def _get_datasource_no_cache(data_type: CcdDataType) -> DataTypeSpecificDataSource:
+def _get_datasource_no_cache(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:
     for data_type_config in config.ccd_data_types:
-        if data_type_config.id == data_type:
+        if data_type_config.data_type == data_type and data_type_config.repository_name == repository_name:
             return DataTypeSpecificDataSource(data_type_config)
-    raise ValueError(f'Unknown data type: {data_type}')
+    available = [(dt.data_type, dt.repository_name) for dt in config.ccd_data_types]
+    raise ValueError(f'Unknown data type: ({data_type}, {repository_name}). Available: {available}')
