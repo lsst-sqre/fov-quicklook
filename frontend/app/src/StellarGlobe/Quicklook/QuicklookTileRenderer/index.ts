@@ -106,7 +106,7 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
     }
     const tileId = Tract.encodeTileId(this.tracts[0], level, p, q)
     const url = `${env.baseUrl}/api/quicklooks/${this.metadata.visit_name}/tiles/${level}/${p}/${q}`
-    const fresh = await loadRemoteNpy(url)
+    const fresh = normalizeNpy(await loadRemoteNpy(url))
     this.npyCache.set(tileId, fresh)
     return fresh
   }
@@ -126,7 +126,7 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
       return tt
     }
 
-    if (!(dtype === 'float32' && shape.length === 2 && shape[0] === tileSize && shape[1] === tileSize)) {
+    if (!(dtype === 'float32' && shape.length === 3 && shape[0] === tileSize && shape[1] === tileSize && shape[2] === 2)) {
       console.log({ dtype, shape, tileSize })
       throw new Error(`Unexpected format for (${level}, ${p}, ${q})`)
     }
@@ -138,11 +138,11 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
         gl.texImage2D(
           gl.TEXTURE_2D,
           0,
-          gl.R32F,
+          gl.RG32F,
           tileSize,
           tileSize,
           0,
-          gl.RED,
+          gl.RG,
           gl.FLOAT,
           data,
         )
@@ -171,9 +171,10 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
       if (npy) {
         const i = (y >> level) % TILE_SIZE
         const j = (x >> level) % TILE_SIZE
+        const idx = (i * TILE_SIZE + j) * 2
         return {
           level,
-          value: npy.data[i * TILE_SIZE + j] as number,
+          value: npy.data[idx] as number,
         }
       }
     }
@@ -215,4 +216,23 @@ async function loadRemoteNpy(url: string) {
     default:
       throw new Error(`Unexpected content-type: ${contentType}`)
   }
+}
+
+
+/**
+ * (H, W) 形式の古いキャッシュデータを (H, W, 2) に変換する。
+ * 非ゼロピクセルにalpha=1.0を設定する。
+ */
+function normalizeNpy(npy: Npy): Npy {
+  if (npy.shape.length === 2 && npy.dtype === 'float32') {
+    const [h, w] = npy.shape
+    const src = npy.data as Float32Array
+    const dst = new Float32Array(h * w * 2)
+    for (let i = 0; i < h * w; i++) {
+      dst[i * 2] = src[i]
+      dst[i * 2 + 1] = src[i] !== 0 ? 1.0 : 0.0
+    }
+    return { ...npy, data: dst, shape: [h, w, 2] }
+  }
+  return npy
 }

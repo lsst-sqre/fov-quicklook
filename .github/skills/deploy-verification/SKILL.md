@@ -113,6 +113,28 @@ main:raw:2026012800215                              True      13.3 GB  2026-02-1
 ./verify-deploy.sh visits preliminary_visit_image embargo 20
 ```
 
+### タイムプロファイル
+
+パイプラインの各フェーズ（generate → merge → upload）の所要時間を表示する。
+プロファイルは quicklook 生成完了時に自動的に object storage に保存される。
+
+```bash
+./verify-deploy.sh time-profile embargo:raw:2026012800326
+```
+
+出力例:
+```
+=== Time Profile: embargo:raw:2026012800326 ===
+
+  generate_single_fits_tiles: 8.3s
+  merge_tiles:                13.9s
+  upload_to_object_storage:   17.6s
+  ────────────────────────────────
+  total:                      39.8s
+```
+
+プロファイルが存在しない場合（古いキャッシュ等）は「見つかりません」と表示される。
+
 出力例:
 ```
 id                                          day_obs     filter exp_time observation_type

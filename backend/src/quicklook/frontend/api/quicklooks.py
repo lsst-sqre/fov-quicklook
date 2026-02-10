@@ -32,6 +32,7 @@ from quicklook.types import CcdName, Progress, VisitName
 from quicklook.utils.broadcast import Broadcast
 from quicklook.utils.hash_utils import json_digest
 from quicklook.utils.http_request import http_request
+from quicklook.utils.s3 import NoSuchKey
 from quicklook.utils.websocket import run_until_disconnect, safe_websocket
 
 
@@ -131,6 +132,17 @@ async def get_quicklook_metadata(
 
     async for metadata in _get_quicklook_metadata_from_shared_status(visit):
         return metadata
+
+
+@router.get('/api/quicklooks/{visit_name}/time_profile')
+async def get_time_profile(
+    visit: Annotated[VisitName, Depends(dep_visit_name)],
+):
+    object_storage = VisitObjectStorage(visit)
+    try:
+        return await object_storage.get_time_profile()
+    except (NoSuchKey, Exception):
+        return None
 
 
 @router.websocket('/api/quicklooks/{visit_name}/quicklook_metadata.ws')

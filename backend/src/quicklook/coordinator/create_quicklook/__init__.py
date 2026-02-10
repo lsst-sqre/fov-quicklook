@@ -14,6 +14,7 @@ from quicklook.generator.merge_single_tile_fits import merge_single_fits_tiles
 from quicklook.generator.transfer_fits_headers import transfer_fits_headers
 from quicklook.generator.transfer_tiles import transfer_tiles
 from quicklook.job.job import Job
+from quicklook.job.time_profile import TimeProfile
 from quicklook.types import CcdDataRef, Progress, ReturnValue
 from quicklook.utils.pipeline import Pipeline, Stage
 
@@ -32,6 +33,7 @@ class _PipelineResult:
     job: Job
     ccd_metadata_list: list[CcdMetadata] = field(default_factory=list)
     uploaded_size: int = 0
+    time_profile: TimeProfile = field(default_factory=TimeProfile)
 
 
 def quicklook_pipeline():
@@ -79,23 +81,31 @@ def quicklook_pipeline():
 
         await _create_quicklook_record(job)
         ccd_refs = [CcdDataRef(visit=visit, ccd=ccd_name) for ccd_name in await ds.list_ccds(visit)]
-        ccd_metadata_list = await generate_single_fits_tiles_coordinator(job, ccd_refs)
-        result.ccd_metadata_list = ccd_metadata_list
+        result.time_profile.generate_single_fits_tiles.start()
+        gen_result = await generate_single_fits_tiles_coordinator(job, ccd_refs)
+        result.time_profile.generate_single_fits_tiles.finish()
+        result.time_profile.ccd_profiles = gen_result.ccd_profiles
+        result.time_profile.generator_profiles = gen_result.generator_profiles
+        result.ccd_metadata_list = gen_result.ccd_metadata_list
         return result
 
     @with_stage_timeout('merge_tiles')
     async def merge_tiles(result: _PipelineResult):
         job = result.job
+        result.time_profile.merge_tiles.start()
         await _merge_tiles(job)
+        result.time_profile.merge_tiles.finish()
         return result
 
     @with_stage_timeout('upload_to_object_storage')
     async def upload_to_object_storage(result: _PipelineResult):
         job = result.job
+        result.time_profile.upload_to_object_storage.start()
         uploaded_size = await _transfer_tiles(job)
         uploaded_size += +await _transfer_fits_headers(job) + await _transfer_quicklook_metadata(
             job, result.ccd_metadata_list
         )
+        result.time_profile.upload_to_object_storage.finish()
         result.uploaded_size = uploaded_size
         return result
 
@@ -218,6 +228,17 @@ async def _finalize_success(result: _PipelineResult):
     total_uploaded_size = result.uploaded_size
     async with job.watcher.watch_status():
         job.status.stage = 'ready'
+
+    profile_summary = result.time_profile.summary()
+    logger.info(
+        "Time profile for %s: generate=%.1fs, merge=%.1fs, upload=%.1fs, total=%.1fs",
+        job.visit,
+        profile_summary['generate_single_fits_tiles'],
+        profile_summary['merge_tiles'],
+        profile_summary['upload_to_object_storage'],
+        profile_summary['total'],
+    )
+    await job.object_storage.put_time_profile(profile_summary)
 
     # DBレコードを更新
     async with get_db_session() as session:

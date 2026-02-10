@@ -15,7 +15,7 @@ def iterate_tiles(
     tile_size = config.tile_size
     max_level = config.tile_max_level
     data = ppccd.pool
-    h, w = data.shape
+    h, w = data.shape[:2]
     y1 = int(ppccd.bbox.miny)  # focal planeでの始まりのy-index
     x1 = int(ppccd.bbox.minx)
     y2 = int(y1 + h)  # 終わりのindex
@@ -66,34 +66,50 @@ def safe_slice(
     y2: int,
 ):
     if x1 >= pool_x1 and y1 >= pool_y1 and x2 <= pool_x1 + pool.shape[1] and y2 <= pool_y1 + pool.shape[0]:
-        return pool[y1 - pool_y1 : y2 - pool_y1, x1 - pool_x1 : x2 - pool_x1]
-    zeros = numpy.zeros((y2 - y1, x2 - x1), dtype=pool.dtype)
+        return pool[y1 - pool_y1 : y2 - pool_y1, x1 - pool_x1 : x2 - pool_x1, :]
+    zeros = numpy.zeros((y2 - y1, x2 - x1, 2), dtype=pool.dtype)
     x1_ = max(x1, pool_x1)
     y1_ = max(y1, pool_y1)
     x2_ = min(x2, pool_x1 + pool.shape[1])
     y2_ = min(y2, pool_y1 + pool.shape[0])
-    zeros[y1_ - y1 : y2_ - y1, x1_ - x1 : x2_ - x1] = pool[
+    zeros[y1_ - y1 : y2_ - y1, x1_ - x1 : x2_ - x1, :] = pool[
         y1_ - pool_y1 : y2_ - pool_y1,
         x1_ - pool_x1 : x2_ - pool_x1,
+        :,
     ]
     return zeros
 
 
 def shrink_image(
-    data: numpy.ndarray,  # 2D array
+    data: numpy.ndarray,  # (H, W, 2): channel 0=value, channel 1=alpha
     y1: int,
     y2: int,
     x1: int,
     x2: int,
 ):
-    if y1 != 0:
-        data = numpy.vstack((numpy.zeros(data.shape[1], dtype=numpy.float32), data))
-    if y2 != 0:
-        data = numpy.vstack((data, numpy.zeros(data.shape[1], dtype=numpy.float32)))
-    if x1 != 0:
-        data = numpy.hstack((numpy.zeros((data.shape[0], 1), dtype=numpy.float32), data))
-    if x2 != 0:
-        data = numpy.hstack((data, numpy.zeros((data.shape[0], 1), dtype=numpy.float32)))
-    h, w = data.shape
-    data = numpy.mean(data.reshape(h // 2, 2, w // 2, 2), axis=(1, 3))
-    return data
+    pad_top = 1 if y1 != 0 else 0
+    pad_bottom = 1 if y2 != 0 else 0
+    pad_left = 1 if x1 != 0 else 0
+    pad_right = 1 if x2 != 0 else 0
+
+    if pad_top or pad_bottom or pad_left or pad_right:
+        data = numpy.pad(
+            data,
+            ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)),
+            mode='constant',
+            constant_values=0,
+        )
+
+    h, w, _ = data.shape
+    new_h, new_w = h // 2, w // 2
+    values = data[:, :, 0].reshape(new_h, 2, new_w, 2)
+    alphas = data[:, :, 1].reshape(new_h, 2, new_w, 2)
+
+    alpha_sum = alphas.sum(axis=(1, 3))
+    safe_denom = numpy.where(alpha_sum > 0, alpha_sum, 1.0)
+
+    result = numpy.empty((new_h, new_w, 2), dtype=numpy.float32)
+    result[:, :, 0] = (values * alphas).sum(axis=(1, 3)) / safe_denom
+    result[:, :, 1] = alpha_sum / 4.0
+
+    return result

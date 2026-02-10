@@ -7,9 +7,10 @@ WebSocket API方式によるFITSタイル生成。
 
 import asyncio
 import pickle
+import time
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 import aiohttp
@@ -29,6 +30,7 @@ from quicklook.generator.api.ccd_processing_protocol import (
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.job.job import Job
 from quicklook.job.local_storage import CcdDistributionConfig
+from quicklook.job.time_profile import CcdProfile, GeneratorProfile
 from quicklook.types import CcdDataRef, CcdName, Progress
 
 logger = quicklook.mylogging.getLogger(__name__)
@@ -73,6 +75,15 @@ class CcdDispatcher:
         self._resubmit_min_age_seconds = resubmit_min_age_seconds
         self._resubmit_max_attempts_per_ccd = resubmit_max_attempts_per_ccd
 
+        # CCD処理タイミング: 最初にassignした時刻を記録
+        self._ccd_assign_time: dict[CcdName, float] = {}
+        self._ccd_complete_time: dict[CcdName, float] = {}
+
+        # Generator稼働タイミング
+        self._generator_start_time: dict[GeneratorId, float] = {}
+        self._generator_end_time: dict[GeneratorId, float] = {}
+        self._generator_ccd_count: dict[GeneratorId, int] = defaultdict(int)
+
     @property
     def ccd_metadata_dict(self) -> dict[CcdName, CcdMetadata]:
         return self._ccd_metadata_dict
@@ -108,6 +119,9 @@ class CcdDispatcher:
                     CcdSubmission(ccd_ref, datetime.now(), generator_id)
                 )
                 self._attempts[ccd_ref.ccd_name] += 1
+                # 初回assignの時刻を記録
+                if ccd_ref.ccd_name not in self._ccd_assign_time:
+                    self._ccd_assign_time[ccd_ref.ccd_name] = time.time()
                 return ccd_ref
 
             # Phase 2: 未完了CCDを（提出順の）ラウンドロビンで再submit
@@ -155,12 +169,45 @@ class CcdDispatcher:
             if ccd_name not in self._ccd_metadata_dict:
                 self._ccd_metadata_dict[ccd_name] = metadata
                 self._ccd_generator_map[ccd_name] = generator_id
+                self._ccd_complete_time[ccd_name] = time.time()
+                self._generator_ccd_count[generator_id] += 1
 
                 if len(self._ccd_metadata_dict) == len(self._ccd_refs):
                     self._all_completed.set()
 
+    def record_generator_start(self, generator_id: GeneratorId) -> None:
+        self._generator_start_time[generator_id] = time.time()
 
-async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDataRef]) -> list[CcdMetadata]:
+    def record_generator_end(self, generator_id: GeneratorId) -> None:
+        self._generator_end_time[generator_id] = time.time()
+
+    def build_ccd_profiles(self) -> list[CcdProfile]:
+        profiles: list[CcdProfile] = []
+        for ccd_name, complete_time in self._ccd_complete_time.items():
+            assign_time = self._ccd_assign_time.get(ccd_name, 0.0)
+            generator_id = self._ccd_generator_map.get(ccd_name, GeneratorId("unknown"))
+            elapsed = complete_time - assign_time if assign_time > 0 else 0.0
+            profiles.append(CcdProfile(ccd_name=ccd_name, generator_id=generator_id, elapsed=elapsed))
+        return profiles
+
+    def build_generator_profiles(self) -> list[GeneratorProfile]:
+        profiles: list[GeneratorProfile] = []
+        for generator_id, start_time in self._generator_start_time.items():
+            end_time = self._generator_end_time.get(generator_id, start_time)
+            elapsed = end_time - start_time
+            ccd_count = self._generator_ccd_count.get(generator_id, 0)
+            profiles.append(GeneratorProfile(generator_id=generator_id, elapsed=elapsed, ccd_count=ccd_count))
+        return profiles
+
+
+@dataclass
+class GenerateSingleFitsTilesResult:
+    ccd_metadata_list: list[CcdMetadata]
+    ccd_profiles: list[CcdProfile]
+    generator_profiles: list[GeneratorProfile]
+
+
+async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDataRef]) -> GenerateSingleFitsTilesResult:
     """
     WebSocket API方式によるFITSタイル生成
 
@@ -198,6 +245,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(ws_url) as ws:
                     logger.info(f"Connected to generator {generator.id}")
+                    dispatcher.record_generator_start(generator.id)
 
                     # 最初にJobオブジェクトを送信
                     await ws.send_bytes(pickle.dumps(InitJobMessage(job=job)))
@@ -251,6 +299,8 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
             raise
         except Exception as e:
             logger.error(f"Worker error for generator {generator.id}: {e}")
+        finally:
+            dispatcher.record_generator_end(generator.id)
 
     # 全workerを起動
     worker_tasks = [asyncio.create_task(worker(g)) for g in generator_list]
@@ -285,7 +335,11 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
     await rpc_scatter(_save_job_metadata_rpc, job)
     await rpc_scatter(_save_ccd_distribution_config_rpc, job, dist_config)
 
-    return [*dispatcher.ccd_metadata_dict.values()]
+    return GenerateSingleFitsTilesResult(
+        ccd_metadata_list=[*dispatcher.ccd_metadata_dict.values()],
+        ccd_profiles=dispatcher.build_ccd_profiles(),
+        generator_profiles=dispatcher.build_generator_profiles(),
+    )
 
 
 async def _handle_generator_message(

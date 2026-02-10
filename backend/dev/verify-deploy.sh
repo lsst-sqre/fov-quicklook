@@ -235,6 +235,33 @@ for v in visits:
 " 2>/dev/null || echo "$body" | $PYTHON -m json.tool 2>/dev/null || echo "$body"
 }
 
+cmd_time_profile() {
+    if [[ $# -eq 0 ]]; then
+        echo "使い方: $0 time-profile <visit_name>" >&2
+        echo "  例: $0 time-profile embargo:raw:2026012800326" >&2
+        return 1
+    fi
+
+    local visit_name="$1"
+    echo "=== Time Profile: $visit_name ==="
+    local body
+    body="$(api_get "/api/quicklooks/${visit_name}/time_profile")" || return 1
+
+    echo "$body" | $PYTHON -c "
+import sys, json
+profile = json.load(sys.stdin)
+if profile is None:
+    print('プロファイルが見つかりません（まだ生成されていないか、古いキャッシュです）')
+    sys.exit(0)
+print()
+print(f'  generate_single_fits_tiles: {profile[\"generate_single_fits_tiles\"]:.1f}s')
+print(f'  merge_tiles:                {profile[\"merge_tiles\"]:.1f}s')
+print(f'  upload_to_object_storage:   {profile[\"upload_to_object_storage\"]:.1f}s')
+print(f'  ────────────────────────────────')
+print(f'  total:                      {profile[\"total\"]:.1f}s')
+" 2>/dev/null || echo "$body" | $PYTHON -m json.tool 2>/dev/null || echo "$body"
+}
+
 cmd_regenerate() {
     if [[ $# -eq 0 ]]; then
         echo "使い方: $0 regenerate <visit_name>" >&2
@@ -363,6 +390,7 @@ usage() {
     echo "  visits [data_type] [repository_name] [limit]"
     echo "                               visit一覧 (デフォルト: raw embargo 10)"
     echo "  regenerate <visit_name>      quicklook再生成 (進捗監視付き)"
+    echo "  time-profile <visit_name>    タイムプロファイル表示"
     echo ""
     echo "visit_nameの形式: {repository_name}:{data_type}:{exposure_id}"
     echo "  例: embargo:raw:2026012800326"
@@ -406,6 +434,9 @@ case "$command" in
         ;;
     regenerate)
         cmd_regenerate "$@"
+        ;;
+    time-profile)
+        cmd_time_profile "$@"
         ;;
     -h|--help|help)
         usage

@@ -102,9 +102,10 @@ async def _gather_single_fits_tiles(
         for fut in asyncio.as_completed(tasks):
             arr = await fut
             if pool is None:
-                pool = arr
+                pool = arr.copy()
             else:
-                pool += arr
+                pool[:, :, 0] += arr[:, :, 0]
+                numpy.maximum(pool[:, :, 1], arr[:, :, 1], out=pool[:, :, 1])
 
     headers = get_cache_headers()
 
@@ -116,8 +117,8 @@ async def _gather_single_fits_tiles(
         )
 
     return Response(
-        ndarray2npybytes(pool),
-        media_type='application/npy',
+        zstd.compress(ndarray2npybytes(pool)),
+        media_type='application/npy+zstd',
         headers=headers,
     )
 
@@ -159,7 +160,7 @@ async def _fetch_merged_tile(
 
 @cache
 def blank_npy_zstd():
-    arr = numpy.zeros((config.tile_size, config.tile_size), dtype=numpy.float32)
+    arr = numpy.zeros((config.tile_size, config.tile_size, 2), dtype=numpy.float32)
     return zstd.compress(ndarray2npybytes(arr))
 
 
