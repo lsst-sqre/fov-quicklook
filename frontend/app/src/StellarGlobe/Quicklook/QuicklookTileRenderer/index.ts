@@ -126,7 +126,7 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
       return tt
     }
 
-    if (!(dtype === 'float32' && shape.length === 2 && shape[0] === tileSize && shape[1] === tileSize)) {
+    if (!(dtype === 'float32' && shape.length === 3 && shape[0] === tileSize && shape[1] === tileSize && shape[2] === 2)) {
       console.log({ dtype, shape, tileSize })
       throw new Error(`Unexpected format for (${level}, ${p}, ${q})`)
     }
@@ -138,11 +138,11 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
         gl.texImage2D(
           gl.TEXTURE_2D,
           0,
-          gl.R32F,
+          gl.RG32F,
           tileSize,
           tileSize,
           0,
-          gl.RED,
+          gl.RG,
           gl.FLOAT,
           data,
         )
@@ -171,9 +171,10 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
       if (npy) {
         const i = (y >> level) % TILE_SIZE
         const j = (x >> level) % TILE_SIZE
+        const idx = (i * TILE_SIZE + j) * 2
         return {
           level,
-          value: npy.data[i * TILE_SIZE + j] as number,
+          value: npy.data[idx] as number,
         }
       }
     }

@@ -15,10 +15,12 @@ vec3 colormap(float x);
 // ↑これらの関数の実装はJavaScript内でこのファイルと連結される。
 
 void main(void) {
-    float raw = texture(u_texture0, v_coord).r;
-    float v = scale(raw);
+    vec2 raw = texture(u_texture0, v_coord).rg;
+    float value = raw.r;
+    float alpha = raw.g;
+    float v = scale(value);
     v = clamp(v, 0.f, 1.f);
-    outputColor = vec4(colormap(v), 1.f);
+    outputColor = vec4(colormap(v), alpha);
 }
 
 void dummy(void) {
