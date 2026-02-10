@@ -20,6 +20,7 @@ dependencies = [
     "lsst-daf-butler",
     "psycopg2-binary",
     "zstandard",
+    "isal",
     "websockets",
     "alembic",
     "asyncpg",
