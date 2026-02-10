@@ -80,3 +80,42 @@ db/docker:
 		-c log_statement=all \
 		-c log_destination=stderr \
 		-c log_line_prefix='%m [%p] %u@%d %r %a '
+
+
+# --- デプロイ ---
+# DEPLOY_BRANCH: ArgoCDが参照するイメージタグ（ブランチ名）。
+# デフォルトは現在のgitブランチ。
+# 注意: ブランチ名に「/」を含むとGitHub Actionsのビルドがトリガーされない。
+DEPLOY_BRANCH ?= $(shell git branch --show-current)
+
+.PHONY: deploy/push
+deploy/push:
+	git push
+
+.PHONY: deploy/wait-build
+deploy/wait-build:
+	gh run watch --repo lsst-sqre/fov-quicklook
+
+.PHONY: deploy/restart
+deploy/restart:
+	cd dev && ./argocd.sh restart
+
+.PHONY: deploy/status
+deploy/status:
+	cd dev && ./argocd.sh status
+
+.PHONY: deploy/healthz
+deploy/healthz:
+	cd dev && ./verify-deploy.sh healthz
+
+.PHONY: deploy/set-branch
+deploy/set-branch:
+	cd dev && ./argocd.sh set-branch $(DEPLOY_BRANCH) --sync
+
+.PHONY: deploy
+deploy: deploy/push deploy/wait-build deploy/restart
+	@echo ""
+	@echo "=== デプロイ完了。30秒後に状態確認... ==="
+	@sleep 30
+	cd dev && ./argocd.sh status
+	cd dev && ./verify-deploy.sh healthz
