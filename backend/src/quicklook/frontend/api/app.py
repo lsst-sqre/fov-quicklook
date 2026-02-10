@@ -27,6 +27,9 @@ logger = quicklook.mylogging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from quicklook.revision import GIT_REVISION
+    logger.info("Frontend starting, revision=%s", GIT_REVISION)
+
     async with quicklook_lifespan(app):
         async with comm_lifespan(app):
             yield

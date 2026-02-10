@@ -7,8 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ContextManager, Generator, Iterable, cast
+from typing import Any, ContextManager, Generator, Iterable, cast
 
+import quicklook.mylogging
 from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.config import config
 from quicklook.datasource import get_datasource
@@ -20,7 +21,14 @@ from quicklook.utils.geom import BBox
 from quicklook.utils.imap_unordered_threadpool import imap_unordered_threadpool
 from quicklook.utils.timer import Timer
 
+logger = quicklook.mylogging.getLogger(__name__)
+
 ds = get_datasource()
+
+# ダウンロード済み（未処理）のtmpファイル数を制限するセマフォ。
+# ローカルFSからの読み込みは非常に高速なため、制限なしでは全CCDが
+# 一度にダウンロードされてtmpディレクトリとメモリを圧迫する。
+_download_semaphore_size = config.generator_max_concurrent_ccds_per_job + 2
 
 
 @dataclass
@@ -58,16 +66,23 @@ def generate_single_fits_tiles_pipeline(
             manager.Queue(),
         )
 
+        # ダウンロード済み（未処理）のtmpファイル数を制限するセマフォ。
+        # download()でacquire → _process_ccd()のunlink後にrelease。
+        # Manager経由で作成し、プロセス間で共有可能にする。
+        download_sem = manager.Semaphore(_download_semaphore_size)
+
         def ccd_paths():
             with ThreadPoolExecutor(2) as executor:
                 for path in imap_unordered_threadpool(executor, download, refs, max_in_flight=2):
                     yield path
 
         def download(ref: CcdDataRef):
+            download_sem.acquire()
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 1)))
             data_bytes = ds.get_data_sync(ref)
             outpath = Path(tmpdir) / f"{ref.ccd_name}.fits"
             outpath.write_bytes(data_bytes)
+            logger.info("Downloaded %s (%d bytes)", ref.ccd_name, len(data_bytes))
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 2)))
             return (ref, outpath)
 
@@ -87,6 +102,7 @@ def generate_single_fits_tiles_pipeline(
                                 ref,
                                 path,
                                 q,  # type:ignore
+                                download_sem,
                             )
                             for ref, path in ccd_paths()
                         ),
@@ -108,6 +124,7 @@ class ProcessCcdArgs:
     ref: CcdDataRef
     path: Path
     progress: queue.Queue[GenerateSingleFitsTilesProgress]
+    download_sem: Any  # multiprocessing.Manager().Semaphore() proxy
 
 
 def _process_ccd(args: ProcessCcdArgs):
@@ -121,6 +138,7 @@ def _process_ccd(args: ProcessCcdArgs):
         )
     finally:
         args.path.unlink(missing_ok=True)
+        args.download_sem.release()
 
     generate_tiles(ppccd, args.job)
     args.progress.put(

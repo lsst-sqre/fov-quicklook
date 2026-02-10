@@ -1,13 +1,13 @@
 """Transfer FITS headers to object storage."""
 
-import logging
 import pickle
 
+import quicklook.mylogging
 from quicklook.comm.generator import self_generator_id
 from quicklook.job.job import Job
 from quicklook.types import CcdName, CcdDataRef, Progress
 
-logger = logging.getLogger(__name__)
+logger = quicklook.mylogging.getLogger(__name__)
 
 
 def transfer_fits_headers(job: Job):

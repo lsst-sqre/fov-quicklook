@@ -35,6 +35,9 @@ logger = quicklook.mylogging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     global running_pipeline
 
+    from quicklook.revision import GIT_REVISION
+    logger.info("Coordinator starting, revision=%s", GIT_REVISION)
+
     await cleanup_at_startup()
 
     async with coordinator_lifespan(app):

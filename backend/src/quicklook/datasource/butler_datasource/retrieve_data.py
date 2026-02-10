@@ -1,12 +1,14 @@
-import logging
 import os
+import zipfile
 
 from lsst.resources import ResourcePath
 from lsst.resources.file import FileResourcePath
 from lsst.resources.s3 import S3ResourcePath
 from quicklook.utils.fits import fits_partial_load
 
-logger = logging.getLogger(__name__)
+import quicklook.mylogging
+
+logger = quicklook.mylogging.getLogger(__name__)
 
 
 def _log_memory(label: str) -> None:
@@ -18,6 +20,20 @@ def _log_memory(label: str) -> None:
         logger.info("Memory[%s]: RSS=%.1fMB, PID=%d", label, rss_mb, os.getpid())
     except Exception:
         pass
+
+
+def _extract_zip_path(uri: ResourcePath) -> tuple[str, str] | None:
+    """URIからzip-pathフラグメントを解析する。
+
+    lsst.resources の FileResourcePath.read() は #zip-path= フラグメントを
+    無視してZIPファイル全体を返してしまう。12GBを超えるZIPの場合OOMを引き起こすため、
+    zipfileモジュールで対象ファイルのみを抽出する必要がある。
+    """
+    fragment = uri.unquoted_fragment if hasattr(uri, 'unquoted_fragment') else ''
+    if fragment and fragment.startswith("zip-path="):
+        _, _, path_in_zip = fragment.partition("=")
+        return (uri.ospath, path_in_zip)
+    return None
 
 
 def retrieve_data(uri: ResourcePath, *, partial=False) -> bytes:  # pragma: no cover
@@ -42,6 +58,16 @@ def retrieve_data(uri: ResourcePath, *, partial=False) -> bytes:  # pragma: no c
                 logger.info("retrieve_data: partial read %d bytes from file", len(data))
                 _log_memory("after_partial_read")
                 return data
+
+    # ZIP内ファイルの場合、zipfileモジュールで対象ファイルのみ抽出する
+    zip_info = _extract_zip_path(uri)
+    if zip_info is not None:
+        zip_path, path_in_zip = zip_info
+        with zipfile.ZipFile(zip_path) as zf:
+            data = zf.read(path_in_zip)
+        logger.info("retrieve_data: extracted %d bytes from zip (%s)", len(data), path_in_zip)
+        _log_memory("after_zip_extract")
+        return data
 
     data = uri.read()
     logger.info("retrieve_data: full read %d bytes", len(data))

@@ -32,6 +32,10 @@ COPY ./backend/ /app/
 # Install the project itself
 RUN uv sync --frozen --no-dev
 
+# Git revision for runtime identification
+ARG GIT_REVISION=unknown
+ENV GIT_REVISION=${GIT_REVISION}
+
 # Add virtual environment to PATH so python, alembic, etc. are available
 ENV PATH="/app/.venv/bin:$PATH"
 

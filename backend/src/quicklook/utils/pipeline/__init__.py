@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
-import logging
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Generic, ParamSpec, TypeVar
 
-logger = logging.getLogger(__name__)
+import quicklook.mylogging
+
+logger = quicklook.mylogging.getLogger(__name__)
 
 
 P = ParamSpec('P')

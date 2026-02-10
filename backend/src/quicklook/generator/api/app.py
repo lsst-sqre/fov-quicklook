@@ -18,6 +18,10 @@ from quicklook.utils.async_process_generator import create_async_process_pool
 from quicklook.utils.numpyutils import ndarray2npybytes
 from quicklook.utils.system_status import ContainerStatus, get_container_status
 
+import quicklook.mylogging
+
+logger = quicklook.mylogging.getLogger(__name__)
+
 # グローバルなプロセスプール
 _process_pool = None
 
@@ -25,6 +29,9 @@ _process_pool = None
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     global _process_pool
+
+    from quicklook.revision import GIT_REVISION
+    logger.info("Generator starting, revision=%s", GIT_REVISION)
 
     async with generator_lifespan(app):
         async with rpc_lifespan(app):

@@ -1,4 +1,3 @@
-import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -6,6 +5,7 @@ from typing import Callable, Iterable
 
 import requests
 
+import quicklook.mylogging
 from quicklook.comm.generator import GeneratorIdInitializer, self_generator_id
 from quicklook.comm.types import GeneratorId, GeneratorInfo
 from quicklook.config import config
@@ -18,7 +18,7 @@ from quicklook.utils import multiprocessing_coverage_compatible as mp
 from quicklook.utils.geom import BBox
 from quicklook.utils.stacklib import Stack, pool_args, thread_local_context
 
-logger = logging.getLogger(__name__)
+logger = quicklook.mylogging.getLogger(__name__)
 
 
 def transfer_tiles(job: Job):
