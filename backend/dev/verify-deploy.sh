@@ -235,17 +235,17 @@ for v in visits:
 " 2>/dev/null || echo "$body" | $PYTHON -m json.tool 2>/dev/null || echo "$body"
 }
 
-cmd_tile_profile() {
+cmd_time_profile() {
     if [[ $# -eq 0 ]]; then
-        echo "使い方: $0 tile-profile <visit_name>" >&2
-        echo "  例: $0 tile-profile embargo:raw:2026012800326" >&2
+        echo "使い方: $0 time-profile <visit_name>" >&2
+        echo "  例: $0 time-profile embargo:raw:2026012800326" >&2
         return 1
     fi
 
     local visit_name="$1"
-    echo "=== Tile Profile: $visit_name ==="
+    echo "=== Time Profile: $visit_name ==="
     local body
-    body="$(api_get "/api/quicklooks/${visit_name}/tile_profile")" || return 1
+    body="$(api_get "/api/quicklooks/${visit_name}/time_profile")" || return 1
 
     echo "$body" | $PYTHON -c "
 import sys, json
@@ -390,7 +390,7 @@ usage() {
     echo "  visits [data_type] [repository_name] [limit]"
     echo "                               visit一覧 (デフォルト: raw embargo 10)"
     echo "  regenerate <visit_name>      quicklook再生成 (進捗監視付き)"
-    echo "  tile-profile <visit_name>    タイル生成プロファイル表示"
+    echo "  time-profile <visit_name>    タイムプロファイル表示"
     echo ""
     echo "visit_nameの形式: {repository_name}:{data_type}:{exposure_id}"
     echo "  例: embargo:raw:2026012800326"
@@ -435,8 +435,8 @@ case "$command" in
     regenerate)
         cmd_regenerate "$@"
         ;;
-    tile-profile)
-        cmd_tile_profile "$@"
+    time-profile)
+        cmd_time_profile "$@"
         ;;
     -h|--help|help)
         usage

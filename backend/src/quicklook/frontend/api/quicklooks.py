@@ -134,13 +134,13 @@ async def get_quicklook_metadata(
         return metadata
 
 
-@router.get('/api/quicklooks/{visit_name}/tile_profile')
-async def get_tile_profile(
+@router.get('/api/quicklooks/{visit_name}/time_profile')
+async def get_time_profile(
     visit: Annotated[VisitName, Depends(dep_visit_name)],
 ):
     object_storage = VisitObjectStorage(visit)
     try:
-        return await object_storage.get_tile_profile()
+        return await object_storage.get_time_profile()
     except (NoSuchKey, Exception):
         return None
 

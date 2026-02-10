@@ -103,14 +103,14 @@ class VisitObjectStorage:
         data = self._get_sync('ccd-metadata-list.pickle')
         return pickle.loads(data)
 
-    def put_tile_profile_sync(self, profile_data: dict) -> int:
-        """tile profileをobject storageに保存"""
+    def put_time_profile_sync(self, profile_data: dict) -> int:
+        """time profileをobject storageに保存"""
         data = pickle.dumps(profile_data)
-        return self._put_sync('tile-profile.pickle', data)
+        return self._put_sync('time-profile.pickle', data)
 
-    def get_tile_profile_sync(self) -> dict:
-        """tile profileをobject storageから取得"""
-        data = self._get_sync('tile-profile.pickle')
+    def get_time_profile_sync(self) -> dict:
+        """time profileをobject storageから取得"""
+        data = self._get_sync('time-profile.pickle')
         return pickle.loads(data)
 
     # Async versions (run sync versions in thread pool)
@@ -138,8 +138,8 @@ class VisitObjectStorage:
     async def get_ccd_metadata_list(self) -> list['CcdMetadata']:
         return await asyncio.to_thread(self.get_ccd_metadata_list_sync)
 
-    async def put_tile_profile(self, profile_data: dict) -> int:
-        return await asyncio.to_thread(self.put_tile_profile_sync, profile_data)
+    async def put_time_profile(self, profile_data: dict) -> int:
+        return await asyncio.to_thread(self.put_time_profile_sync, profile_data)
 
-    async def get_tile_profile(self) -> dict:
-        return await asyncio.to_thread(self.get_tile_profile_sync)
+    async def get_time_profile(self) -> dict:
+        return await asyncio.to_thread(self.get_time_profile_sync)
