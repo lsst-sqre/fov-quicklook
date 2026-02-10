@@ -86,7 +86,8 @@ def _process_tile(args: _ProcessTileArgs):
     arr = storage.single_fits_tile.load_local_merged(pos=args.pos, ccd_names=internal_ccd_names)
     if len(external_generators) > 0:
         for _arr in _gather_external_tile_data(storage.job.id, args.pos, external_generators):
-            arr += _arr
+            arr[:, :, 0] += _arr[:, :, 0]
+            numpy.maximum(arr[:, :, 1], _arr[:, :, 1], out=arr[:, :, 1])
     storage.merged_fits_tile.save_compressed_data(
         pos=args.pos,
         compressed_data=zstd.compress(ndarray2npybytes(arr)),

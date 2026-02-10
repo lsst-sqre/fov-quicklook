@@ -39,10 +39,14 @@ def preprocess_ccd_calexp(
         # header = hdul[0].header  # type: ignore
         # assert ccd_name == f'{header["RAFTNAME"]}_{header["SENSNAME"]}'
         bbox = ccds_by_name()[ccd_name].bbox
-        # メモリ効率: hdul[1].data を直接 astype で変換してコピーを避ける
-        pool: numpy.ndarray = hdul[1].data.astype('<f4', copy=False)  # type: ignore
+        raw_data: numpy.ndarray = hdul[1].data.astype('<f4', copy=False)  # type: ignore
+        h, w = raw_data.shape
+        pool = numpy.zeros((h, w, 2), dtype=numpy.float32)
+        nan_mask = numpy.isnan(raw_data)
+        pool[:, :, 0] = numpy.where(nan_mask, 0.0, raw_data)
+        pool[:, :, 1] = numpy.where(nan_mask, 0.0, 1.0)
         with timeit(f'image-stat-{ccd_ref.fullname}'):
-            stat = image_stat(pool)
+            stat = image_stat(pool[:, :, 0])
         return PreProcessedCcd(
             data_ref=ccd_ref,
             bbox=bbox,
@@ -87,7 +91,7 @@ def preprocess_ccd_raw(
         amps = [RawAmp.from_hdu(j, hdu) for j, hdu in enumerate(hdul) if hdu.name.startswith('Segment')]  # type: ignore
         assembly = assemble_raw_amps(amps, ccd_name)
         with timeit(f'image-stat-{ccd_ref.fullname}'):
-            stat = image_stat(assembly.data)
+            stat = image_stat(assembly.data[:, :, 0])
         return PreProcessedCcd(
             data_ref=ccd_ref,
             bbox=assembly.bbox,
@@ -109,17 +113,17 @@ def assemble_raw_amps(amps: Iterable[RawAmp], ccd_name: str) -> AssemblyResult:
     # bbox = functools.reduce(lambda a, b: a.union(b.wcs.bbox), amps[1:], amps[0].wcs.bbox)
     bbox = ccds_by_name()[ccd_name].bbox
     pool = numpy.zeros(
-        (int(bbox.maxy - bbox.miny) + 1, int(bbox.maxx - bbox.minx) + 1),
+        (int(bbox.maxy - bbox.miny) + 1, int(bbox.maxx - bbox.minx) + 1, 2),
         dtype=numpy.float32,
     )
     amp_metas: list[AmpMetadata] = []
     for amp in amps:
         aligned = amp.wcs.align(amp.data)
         b = amp.wcs.bbox
-        pool[
-            int(b.miny - bbox.miny) : int(b.maxy - bbox.miny + 1),
-            int(b.minx - bbox.minx) : int(b.maxx - bbox.minx + 1),
-        ] = aligned
+        y_slice = slice(int(b.miny - bbox.miny), int(b.maxy - bbox.miny + 1))
+        x_slice = slice(int(b.minx - bbox.minx), int(b.maxx - bbox.minx + 1))
+        pool[y_slice, x_slice, 0] = aligned
+        pool[y_slice, x_slice, 1] = 1.0
         amp_metas.append(
             AmpMetadata(
                 amp_id=amp.fits_index,
