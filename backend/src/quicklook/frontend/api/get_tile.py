@@ -117,8 +117,8 @@ async def _gather_single_fits_tiles(
         )
 
     return Response(
-        ndarray2npybytes(pool),
-        media_type='application/npy',
+        zstd.compress(ndarray2npybytes(pool)),
+        media_type='application/npy+zstd',
         headers=headers,
     )
 
