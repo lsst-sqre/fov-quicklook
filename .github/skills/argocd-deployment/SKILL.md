@@ -127,9 +127,24 @@ cd backend/dev
 - ArgoCD CLIのサーバ指定: `--server usdf-rsp-dev.slac.stanford.edu --grpc-web --grpc-web-root-path /argo-cd`
 - REST APIのベースURL: `https://usdf-rsp-dev.slac.stanford.edu/argo-cd/api/v1/applications/fov-quicklook/`
 
+## ブランチ名の制約
+
+**重要**: ブランチ名に `/` を含めるとGitHub Actionsのビルドがトリガーされない。
+Dockerイメージタグにブランチ名が使われるため、`/` はハイフン `-` に置き換えること。
+
+- ✗ `feature/alpha-channel` — ビルドがトリガーされない
+- ✓ `feature-alpha-channel` — 正常にビルドされる
+
+既存ブランチをリネームする場合:
+```bash
+git branch -m old-name new-name
+git push origin -u new-name
+git push origin --delete old-name
+```
+
 ## デプロイの典型的なフロー
 
-1. コードを変更してGitHubにpush
+1. コードを変更してGitHubにpush（ブランチ名に `/` を含めないこと）
 2. GitHub Actionsのビルド完了を待つ: `gh run watch --repo lsst-sqre/fov-quicklook`
 3. 参照ブランチが正しいか確認: `./argocd.sh get-branch`
 4. 必要ならブランチを切替: `./argocd.sh set-branch <branch>`
