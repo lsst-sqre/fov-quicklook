@@ -113,18 +113,18 @@ main:raw:2026012800215                              True      13.3 GB  2026-02-1
 ./verify-deploy.sh visits preliminary_visit_image embargo 20
 ```
 
-### タイル生成プロファイル
+### タイムプロファイル
 
 パイプラインの各フェーズ（generate → merge → upload）の所要時間を表示する。
 プロファイルは quicklook 生成完了時に自動的に object storage に保存される。
 
 ```bash
-./verify-deploy.sh tile-profile embargo:raw:2026012800326
+./verify-deploy.sh time-profile embargo:raw:2026012800326
 ```
 
 出力例:
 ```
-=== Tile Profile: embargo:raw:2026012800326 ===
+=== Time Profile: embargo:raw:2026012800326 ===
 
   generate_single_fits_tiles: 8.3s
   merge_tiles:                13.9s

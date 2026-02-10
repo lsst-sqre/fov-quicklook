@@ -2,6 +2,7 @@ import { angle } from "@stellar-globe/stellar-globe"
 import { Menu, MenuButton, MenuDivider, MenuItem } from "@szhsin/react-menu"
 import { useCallback } from "react"
 import { MaterialSymbol } from "../../../components/MaterialSymbol"
+import { env } from "../../../env"
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
 import { useGlobe, useResetView } from "../context"
@@ -34,6 +35,13 @@ export function MainMenu() {
     dispatch(homeSlice.actions.setShowMemoryUsageInCompactStatus(!showMemoryUsageInCompactStatus))
   }, [dispatch, showMemoryUsageInCompactStatus])
 
+  const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
+  const downloadTimeProfile = useCallback(() => {
+    if (!currentQuicklook) return
+    const url = `${env.baseUrl}/api/quicklooks/${encodeURIComponent(currentQuicklook)}/time_profile`
+    window.open(url, "_blank")
+  }, [currentQuicklook])
+
   return (
     <div>
       <Menu menuButton={<MenuButton><MaterialSymbol symbol="menu" /></MenuButton>} theming="dark"  >
@@ -44,6 +52,8 @@ export function MainMenu() {
         <MenuItem type="checkbox" checked={showFrame} onClick={toggleFrame}>Frame</MenuItem>
         <MenuItem type="checkbox" checked={showCompactStatus} onClick={toggleCompactStatus}>System Status</MenuItem>
         <MenuItem type="checkbox" checked={showMemoryUsageInCompactStatus} onClick={toggleMemoryUsageInCompactStatus}>Show Recoverable Memory</MenuItem>
+        <MenuDivider />
+        <MenuItem onClick={downloadTimeProfile} disabled={!currentQuicklook}>Time Profile</MenuItem>
       </Menu>
     </div>
   )
