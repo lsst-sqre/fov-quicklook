@@ -1,3 +1,4 @@
+import multiprocessing
 import queue
 import tempfile
 from pathlib import Path
@@ -36,13 +37,15 @@ def test_process_ccd():
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(data_bytes)
         f.flush()
-        args = ProcessCcdArgs(
-            job=job,
-            ref=CcdDataRef(visit=visit, ccd=ccd_name),
-            path=Path(f.name),
-            progress=queue.Queue(),
-        )
-        _process_ccd(args)
+        with multiprocessing.Manager() as manager:
+            args = ProcessCcdArgs(
+                job=job,
+                ref=CcdDataRef(visit=visit, ccd=ccd_name),
+                path=Path(f.name),
+                progress=queue.Queue(),
+                download_sem=manager.Semaphore(99),
+            )
+            _process_ccd(args)
 
 
 # def test_generate_single_fits_tiles(broccoli_visit: VisitName):

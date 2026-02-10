@@ -15,6 +15,7 @@ from quicklook.tileinfo import TileInfo
 from quicklook.types import CcdDataRef, CcdName, Tile, TilePos
 from quicklook.utils.fitsheader import HeaderType
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
+from quicklook.utils import zstd
 
 
 @dataclass(frozen=True)
@@ -130,16 +131,16 @@ class _SingleFitsTileStorage:
     storage: JobLocalStorage
 
     def _path(self, ccd_name: CcdName, pos: TilePos):
-        return Path(f'{self.storage.base_dir}/tiles/{pos.level}/{pos.i}/{pos.j}/{ccd_name}.npy')
+        return Path(f'{self.storage.base_dir}/tiles/{pos.level}/{pos.i}/{pos.j}/{ccd_name}.npy.zstd')
 
     def save(self, ccd_name: CcdName, tile: Tile):
         outfile = self._path(ccd_name, tile.pos)
         outfile.parent.mkdir(parents=True, exist_ok=True)
-        outfile.write_bytes(ndarray2npybytes(tile.data))
+        outfile.write_bytes(zstd.compress(ndarray2npybytes(tile.data)))
 
     def _load(self, ccd_name: CcdName, pos: TilePos) -> numpy.ndarray:
         infile = self._path(ccd_name, pos)
-        return npybytes2ndarray(infile.read_bytes())
+        return npybytes2ndarray(zstd.decompress(infile.read_bytes()))
 
     def _my_ccd_names(self, pos: TilePos):
         dist_config = self.storage.ccd_distribution_config.load()
