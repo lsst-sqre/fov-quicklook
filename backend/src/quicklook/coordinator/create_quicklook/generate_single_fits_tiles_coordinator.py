@@ -16,7 +16,11 @@ from datetime import datetime
 import aiohttp
 
 import quicklook.mylogging
-from quicklook.comm.coordinator import get_available_generators
+from quicklook.comm.coordinator import (
+    get_available_generators,
+    add_on_generator_registered_callback,
+    remove_on_generator_registered_callback,
+)
 from quicklook.comm.rpc_worker import rpc_scatter
 from quicklook.comm.types import GeneratorId, GeneratorInfo
 from quicklook.config import config
@@ -348,6 +352,16 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
     # 全workerを起動
     worker_tasks = [asyncio.create_task(worker(g)) for g in generator_list]
 
+    # 新しいgeneratorが登録されたときにworkerを動的に追加するコールバック
+    def on_new_generator(generator_info: GeneratorInfo) -> None:
+        if dispatcher.all_completed.is_set():
+            return
+        logger.info(f"New generator registered during pipeline: {generator_info.id}, spawning worker")
+        task = asyncio.create_task(worker(generator_info))
+        worker_tasks.append(task)
+
+    add_on_generator_registered_callback(on_new_generator)
+
     try:
         # 全CCD完了を待機（タイムアウト付き）
         timeout_seconds = config.generate_single_fits_tiles_timeout_seconds
@@ -359,6 +373,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
             f"got {len(dispatcher.ccd_metadata_dict)}/{len(ccd_refs)} metadata"
         )
     finally:
+        remove_on_generator_registered_callback(on_new_generator)
         # 残存workerをキャンセル
         for task in worker_tasks:
             if not task.done():

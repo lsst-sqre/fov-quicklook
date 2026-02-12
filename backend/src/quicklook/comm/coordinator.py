@@ -30,6 +30,20 @@ from .types import (
 logger = quicklook.mylogging.getLogger(__name__)
 _available_generators: dict[GeneratorId, GeneratorInfo] = {}
 _coordinator_id: CoordinatorId | None = None
+_on_generator_registered_callbacks: list[Any] = []
+
+
+def add_on_generator_registered_callback(callback: Any) -> None:
+    """新しいGeneratorが登録されたときに呼ばれるコールバックを追加する"""
+    _on_generator_registered_callbacks.append(callback)
+
+
+def remove_on_generator_registered_callback(callback: Any) -> None:
+    """コールバックを削除する"""
+    try:
+        _on_generator_registered_callbacks.remove(callback)
+    except ValueError:
+        pass
 
 
 router = APIRouter()
@@ -59,6 +73,11 @@ async def register_generator(
     if registration_data.generator_id not in _available_generators:
         _available_generators[registration_data.generator_id] = generator_info
         logger.info(f'Available generators: {_available_generators.values()}')
+        for callback in _on_generator_registered_callbacks:
+            try:
+                callback(generator_info)
+            except Exception as e:
+                logger.warning(f"Generator registration callback failed: {e}")
     
     return GeneratorRegistrationResponse(coordinator_id=_coordinator_id)
 
