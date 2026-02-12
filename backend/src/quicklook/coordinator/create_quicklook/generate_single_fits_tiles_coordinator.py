@@ -69,11 +69,15 @@ class CcdDispatcher:
         self._phase2_index = 0  # Phase 2用ラウンドロビンインデックス
         self._attempts: dict[CcdName, int] = defaultdict(int)  # submit回数追跡
         self._all_completed = asyncio.Event()  # 全完了通知用
+        self._ccd_available_condition = asyncio.Condition()  # CCD再割り当て可能通知
         self._lock = asyncio.Lock()
 
         # 再submit暴走防止パラメータ
         self._resubmit_min_age_seconds = resubmit_min_age_seconds
         self._resubmit_max_attempts_per_ccd = resubmit_max_attempts_per_ccd
+
+        # アクティブなGenerator追跡
+        self._active_generators: set[GeneratorId] = set()
 
         # CCD処理タイミング: 最初にassignした時刻を記録
         self._ccd_assign_time: dict[CcdName, float] = {}
@@ -95,6 +99,44 @@ class CcdDispatcher:
     @property
     def all_completed(self) -> asyncio.Event:
         return self._all_completed
+
+    @property
+    def ccd_available_condition(self) -> asyncio.Condition:
+        return self._ccd_available_condition
+
+    def register_generator(self, generator_id: GeneratorId) -> None:
+        """Generatorをアクティブとして登録する"""
+        self._active_generators.add(generator_id)
+
+    async def on_generator_lost(self, generator_id: GeneratorId) -> None:
+        """
+        Generator消失時の処理。
+
+        消失したGeneratorが処理中だったCCDのsubmit時刻を古い値に書き換え、
+        即座にPhase 2の再submit対象にする。
+        また、ccd_availableイベントを発火して他のworkerに通知する。
+        """
+        async with self._lock:
+            self._active_generators.discard(generator_id)
+            reassigned_count = 0
+            epoch = datetime(2000, 1, 1)  # 十分古い時刻
+            for submission in self._submitted_ccds:
+                if submission.generator_id == generator_id:
+                    ccd_name = submission.ccd_ref.ccd_name
+                    if ccd_name not in self._ccd_metadata_dict:
+                        submission.submitted_at = epoch
+                        reassigned_count += 1
+            if reassigned_count > 0:
+                logger.warning(
+                    f"Generator {generator_id} lost: {reassigned_count} CCDs now eligible for resubmit"
+                )
+
+            if not self._active_generators and len(self._ccd_metadata_dict) < len(self._ccd_refs):
+                logger.error("All generators lost before processing completed")
+
+        if reassigned_count > 0:
+            async with self._ccd_available_condition:
+                self._ccd_available_condition.notify_all()
 
     async def get_next_ccd(self, generator_id: GeneratorId) -> CcdDataRef | None:
         """
@@ -177,6 +219,7 @@ class CcdDispatcher:
 
     def record_generator_start(self, generator_id: GeneratorId) -> None:
         self._generator_start_time[generator_id] = time.time()
+        self.register_generator(generator_id)
 
     def record_generator_end(self, generator_id: GeneratorId) -> None:
         self._generator_end_time[generator_id] = time.time()
@@ -262,9 +305,8 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
                     if not has_initial_batch:
                         # 初期バッチがない場合、Phase 2での参加を待つ
-                        ccd_ref = await dispatcher.get_next_ccd(generator.id)
+                        ccd_ref = await _wait_for_next_ccd(dispatcher, generator.id)
                         if ccd_ref is None:
-                            # 終了シグナルを送信してクローズ
                             await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
                             return
                         await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
@@ -301,6 +343,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
             logger.error(f"Worker error for generator {generator.id}: {e}")
         finally:
             dispatcher.record_generator_end(generator.id)
+            await dispatcher.on_generator_lost(generator.id)
 
     # 全workerを起動
     worker_tasks = [asyncio.create_task(worker(g)) for g in generator_list]
@@ -370,14 +413,44 @@ async def _handle_generator_message(
             next_ccd = await dispatcher.get_next_ccd(generator.id)
             if next_ccd is not None:
                 await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=next_ccd)))
-            else:
-                # 追加CCDがない場合は終了シグナルを送信
-                # Generatorは既に投入済みのCCDを処理し終えたら終了する
-                logger.info(f"No more CCDs for generator {generator.id}, sending end signal")
+            elif dispatcher.all_completed.is_set():
+                logger.info(f"All CCDs completed, sending end signal to generator {generator.id}")
                 await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
+            else:
+                # 追加CCDがない場合でも、Generatorが消失して再割り当てが発生する可能性がある
+                # ccd_availableイベントを待つタスクを起動
+                async def wait_and_assign():
+                    ccd_ref = await _wait_for_next_ccd(dispatcher, generator.id)
+                    if ccd_ref is not None:
+                        await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
+                    else:
+                        logger.info(f"No more CCDs for generator {generator.id}, sending end signal")
+                        await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
+                asyncio.create_task(wait_and_assign())
 
         case ErrorMessage(ccd_name=ccd_name, error=error):
             logger.error(f"Generator {generator.id} error for CCD {ccd_name}: {error}")
+
+
+async def _wait_for_next_ccd(dispatcher: CcdDispatcher, generator_id: GeneratorId) -> CcdDataRef | None:
+    """
+    次のCCDが利用可能になるまで待機する。
+
+    Phase 2のresubmit対象がないときに、Generator消失によるCCD再割り当てを待つ。
+    全CCDが完了した場合はNoneを返す。
+    """
+    while True:
+        if dispatcher.all_completed.is_set():
+            return None
+        ccd_ref = await dispatcher.get_next_ccd(generator_id)
+        if ccd_ref is not None:
+            return ccd_ref
+        # ConditionでCCD再割り当て通知を待つ（タイムアウト付き）
+        try:
+            async with dispatcher.ccd_available_condition:
+                await asyncio.wait_for(dispatcher.ccd_available_condition.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            pass  # タイムアウト後に再度チェック
 
 
 def _save_job_metadata_rpc(job: Job) -> None:
