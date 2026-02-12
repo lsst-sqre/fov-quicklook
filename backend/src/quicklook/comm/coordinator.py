@@ -97,6 +97,29 @@ if config.environment == 'test':  # pragma: no branch
         return {"status": "ok"}
 
 
+if config.environment in ('test', 'development'):  # pragma: no branch
+
+    @router.post("/comm/kill-generator/{generator_id}")
+    async def kill_generator_by_id(generator_id: str):
+        """開発・テスト用: 指定したGeneratorを強制停止する"""
+        gid = GeneratorId(generator_id)
+        if gid not in _available_generators:
+            raise HTTPException(status_code=404, detail=f"Generator {generator_id} not found")
+        generator_info = _available_generators[gid]
+        await kill_generator(generator_info)
+        return {"status": "killed", "generator_id": generator_id}
+
+    @router.post("/comm/kill-random-generator")
+    async def kill_random_generator():
+        """開発・テスト用: ランダムに1台のGeneratorを強制停止する"""
+        import random
+        if not _available_generators:
+            raise HTTPException(status_code=404, detail="No generators available")
+        generator_info = random.choice(list(_available_generators.values()))
+        await kill_generator(generator_info)
+        return {"status": "killed", "generator_id": generator_info.id}
+
+
 @asynccontextmanager
 async def lifespan(app: Any) -> AsyncIterator[None]:
     global _coordinator_id

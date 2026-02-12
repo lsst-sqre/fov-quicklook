@@ -80,6 +80,10 @@ class Config(BaseSettings):
     comm_heartbeat_timeout: int = 2  # seconds
     comm_registration_interval: int = 10  # seconds
     rpc_timeout_total: float = 600  # seconds
+    rpc_open_timeout: float = 10  # seconds - timeout for WebSocket connection establishment
+    rpc_close_timeout: float = 5  # seconds - timeout for WebSocket close handshake
+    rpc_ping_interval: float = 5  # seconds - interval for WebSocket ping frames
+    rpc_ping_timeout: float = 10  # seconds - timeout for WebSocket pong response
     rpc_process_pool_workers: int = 4
 
     # Job settings

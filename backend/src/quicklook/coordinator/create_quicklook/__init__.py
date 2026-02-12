@@ -54,9 +54,6 @@ def quicklook_pipeline():
                     error_msg = f"Stage {stage_name} timed out after {config.pipeline_stage_timeout} seconds"
                     logger.error(error_msg)
                     await _finalize_error(result.job, error_msg)
-                    from quicklook.comm.coordinator import shutdown_all_generators
-
-                    await shutdown_all_generators()
                     raise
                 except Exception as e:
                     await _finalize_error(result.job, str(e))
@@ -283,7 +280,10 @@ async def _finalize_error(job: Job, error_message: str | None = None):
         else:
             logger.warning(f"Quicklook record for {job.visit} not found during error cleanup")
 
-    await rpc_scatter(_cleanup_rpc, job)
+    try:
+        await rpc_scatter(_cleanup_rpc, job)
+    except Exception as e:
+        logger.warning(f"Cleanup RPC failed during error finalization for {job.visit}: {e}")
     await run_housekeeping()
     return job
 
