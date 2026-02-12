@@ -279,84 +279,123 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
     generator_list = list(generators.values())
     dispatcher = CcdDispatcher(ccd_refs)
     max_concurrent_ccds = config.generator_max_concurrent_ccds_per_job
+    max_worker_connect_retries = 5
+    worker_connect_retry_interval = 3.0
+
+    async def _run_worker_session(generator: GeneratorInfo) -> None:
+        """
+        GeneratorへのWebSocket接続を確立し、CCD処理ループを実行する。
+        接続失敗時は呼び出し元でリトライする。
+        """
+        ws_url = f"{generator.ws_url}/jobs/{job.id}/generate-tiles"
+        logger.info(f"Worker connecting to {ws_url}")
+
+        async with aiohttp.ClientSession() as session:
+            async with session.ws_connect(ws_url) as ws:
+                logger.info(f"Connected to generator {generator.id}")
+                dispatcher.record_generator_start(generator.id)
+
+                # 最初にJobオブジェクトを送信
+                await ws.send_bytes(pickle.dumps(InitJobMessage(job=job)))
+                logger.debug(f"Sent InitJobMessage to generator {generator.id}")
+
+                # 初期バッチ割り当て
+                has_initial_batch = False
+                for _ in range(max_concurrent_ccds):
+                    ccd_ref = await dispatcher.get_next_ccd(generator.id)
+                    if ccd_ref is not None:
+                        logger.debug(f"Assigning CCD {ccd_ref.ccd_name} to generator {generator.id}")
+                        await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
+                        has_initial_batch = True
+
+                if not has_initial_batch:
+                    # 初期バッチがない場合、Phase 2での参加を待つ
+                    ccd_ref = await _wait_for_next_ccd(dispatcher, generator.id)
+                    if ccd_ref is None:
+                        await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
+                        return
+                    await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
+
+                logger.info(f"Initial batch sent to generator {generator.id}, waiting for responses")
+                # メッセージ処理ループ
+                async for msg in ws:
+                    if msg.type == aiohttp.WSMsgType.BINARY:
+                        data = pickle.loads(msg.data)
+                        logger.debug(f"Received message from generator {generator.id}: {type(data).__name__}")
+                        await _handle_generator_message(
+                            data, job, dispatcher, generator, ws
+                        )
+
+                        # 全完了チェック
+                        if dispatcher.all_completed.is_set():
+                            logger.info(f"All CCDs completed, closing connection to generator {generator.id}")
+                            # 終了シグナルを送信
+                            await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
+                            break
+
+                    elif msg.type == aiohttp.WSMsgType.CLOSED:
+                        logger.info(f"WebSocket closed by generator {generator.id}")
+                        break
+                    elif msg.type == aiohttp.WSMsgType.ERROR:
+                        logger.error(f"WebSocket error from generator {generator.id}: {ws.exception()}")
+                        break
 
     async def worker(generator: GeneratorInfo) -> None:
         """
         各Generatorのワーカー。
         WebSocket接続で動的にCCDを供給する。
+        接続失敗時はgeneratorの最新情報を取得してリトライする。
+        （rolling restart中はIPが変わるため）
         """
-        ws_url = f"{generator.ws_url}/jobs/{job.id}/generate-tiles"
-        logger.info(f"Worker connecting to {ws_url}")
+        generator_id = generator.id
+        current_generator = generator
+        for attempt in range(max_worker_connect_retries):
+            if dispatcher.all_completed.is_set():
+                return
+            try:
+                await _run_worker_session(current_generator)
+                dispatcher.record_generator_end(generator_id)
+                await dispatcher.on_generator_lost(generator_id)
+                return  # 正常終了
+            except aiohttp.ClientError as e:
+                logger.warning(
+                    f"Generator {generator_id} connection failed (attempt {attempt + 1}/{max_worker_connect_retries}): {e}"
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"Worker error for generator {generator_id}: {e}")
+                break  # 予期しないエラーはリトライしない
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(ws_url) as ws:
-                    logger.info(f"Connected to generator {generator.id}")
-                    dispatcher.record_generator_start(generator.id)
+            # リトライ前に待機し、最新のgenerator情報を取得
+            if attempt + 1 < max_worker_connect_retries:
+                await asyncio.sleep(worker_connect_retry_interval)
+                available = get_available_generators()
+                if generator_id in available:
+                    current_generator = available[generator_id]
+                    logger.info(f"Retrying with updated generator info: {current_generator.ws_url}")
+                else:
+                    logger.warning(f"Generator {generator_id} no longer available, stopping worker")
+                    break
 
-                    # 最初にJobオブジェクトを送信
-                    await ws.send_bytes(pickle.dumps(InitJobMessage(job=job)))
-                    logger.debug(f"Sent InitJobMessage to generator {generator.id}")
-
-                    # 初期バッチ割り当て
-                    has_initial_batch = False
-                    for _ in range(max_concurrent_ccds):
-                        ccd_ref = await dispatcher.get_next_ccd(generator.id)
-                        if ccd_ref is not None:
-                            logger.debug(f"Assigning CCD {ccd_ref.ccd_name} to generator {generator.id}")
-                            await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
-                            has_initial_batch = True
-
-                    if not has_initial_batch:
-                        # 初期バッチがない場合、Phase 2での参加を待つ
-                        ccd_ref = await _wait_for_next_ccd(dispatcher, generator.id)
-                        if ccd_ref is None:
-                            await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
-                            return
-                        await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
-
-                    logger.info(f"Initial batch sent to generator {generator.id}, waiting for responses")
-                    # メッセージ処理ループ
-                    async for msg in ws:
-                        if msg.type == aiohttp.WSMsgType.BINARY:
-                            data = pickle.loads(msg.data)
-                            logger.debug(f"Received message from generator {generator.id}: {type(data).__name__}")
-                            await _handle_generator_message(
-                                data, job, dispatcher, generator, ws
-                            )
-
-                            # 全完了チェック
-                            if dispatcher.all_completed.is_set():
-                                logger.info(f"All CCDs completed, closing connection to generator {generator.id}")
-                                # 終了シグナルを送信
-                                await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
-                                break
-
-                        elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            logger.info(f"WebSocket closed by generator {generator.id}")
-                            break
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
-                            logger.error(f"WebSocket error from generator {generator.id}: {ws.exception()}")
-                            break
-
-        except aiohttp.ClientError as e:
-            logger.warning(f"Generator {generator.id} connection failed: {e}")
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            logger.error(f"Worker error for generator {generator.id}: {e}")
-        finally:
-            dispatcher.record_generator_end(generator.id)
-            await dispatcher.on_generator_lost(generator.id)
+        dispatcher.record_generator_end(generator_id)
+        await dispatcher.on_generator_lost(generator_id)
 
     # 全workerを起動
+    active_worker_generator_ids: set[GeneratorId] = {g.id for g in generator_list}
     worker_tasks = [asyncio.create_task(worker(g)) for g in generator_list]
 
     # 新しいgeneratorが登録されたときにworkerを動的に追加するコールバック
     def on_new_generator(generator_info: GeneratorInfo) -> None:
         if dispatcher.all_completed.is_set():
             return
+        if generator_info.id in active_worker_generator_ids:
+            # 既にこのgenerator_idのworkerがリトライ中の可能性がある。
+            # workerのリトライ内で最新IPを取得するのでここでは起動しない。
+            logger.debug(f"Worker already exists for generator {generator_info.id}, skipping")
+            return
         logger.info(f"New generator registered during pipeline: {generator_info.id}, spawning worker")
+        active_worker_generator_ids.add(generator_info.id)
         task = asyncio.create_task(worker(generator_info))
         worker_tasks.append(task)
 
