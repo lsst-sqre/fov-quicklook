@@ -318,31 +318,46 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
                 logger.info(f"Initial batch sent to generator {generator.id}, waiting for responses")
                 end_signal_sent = False
-                # メッセージ処理ループ
-                # 注: all_completedがsetされてもbreakしない。
-                # generatorが処理中のCCDのCompletedMessageを返すまで受信し続ける必要がある。
-                # end signal送信後、generatorは新規CCD受付を停止するが、
-                # 処理中CCDの結果は引き続き送信し、完了後にWebSocketを閉じる。
-                async for msg in ws:
-                    if msg.type == aiohttp.WSMsgType.BINARY:
-                        data = pickle.loads(msg.data)
-                        logger.debug(f"Received message from generator {generator.id}: {type(data).__name__}")
-                        await _handle_generator_message(
-                            data, job, dispatcher, generator, ws
-                        )
 
-                        # 全完了時にend signalを送信（1回だけ）
-                        if not end_signal_sent and dispatcher.all_completed.is_set():
-                            logger.info(f"All CCDs completed, sending end signal to generator {generator.id}")
+                async def _send_end_signal_on_completion() -> None:
+                    """all_completedを監視し、セットされたらend signalを送信する。
+                    メインループがメッセージ待ちでブロックされている場合でも
+                    end signalが確実に送信されるようにする。"""
+                    nonlocal end_signal_sent
+                    await dispatcher.all_completed.wait()
+                    if not end_signal_sent:
+                        end_signal_sent = True
+                        logger.info(f"All CCDs completed, sending end signal to generator {generator.id}")
+                        try:
                             await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
-                            end_signal_sent = True
+                        except Exception as e:
+                            logger.debug(f"Failed to send end signal to {generator.id}: {e}")
 
-                    elif msg.type == aiohttp.WSMsgType.CLOSED:
-                        logger.info(f"WebSocket closed by generator {generator.id}")
-                        break
-                    elif msg.type == aiohttp.WSMsgType.ERROR:
-                        logger.error(f"WebSocket error from generator {generator.id}: {ws.exception()}")
-                        break
+                completion_task = asyncio.create_task(_send_end_signal_on_completion())
+                try:
+                    # メッセージ処理ループ
+                    # end signal送信後、generatorは新規CCD受付を停止するが、
+                    # 処理中CCDの結果は引き続き送信し、完了後にWebSocketを閉じる。
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.BINARY:
+                            data = pickle.loads(msg.data)
+                            logger.debug(f"Received message from generator {generator.id}: {type(data).__name__}")
+                            await _handle_generator_message(
+                                data, job, dispatcher, generator, ws
+                            )
+
+                        elif msg.type == aiohttp.WSMsgType.CLOSED:
+                            logger.info(f"WebSocket closed by generator {generator.id}")
+                            break
+                        elif msg.type == aiohttp.WSMsgType.ERROR:
+                            logger.error(f"WebSocket error from generator {generator.id}: {ws.exception()}")
+                            break
+                finally:
+                    completion_task.cancel()
+                    try:
+                        await completion_task
+                    except asyncio.CancelledError:
+                        pass
 
     async def worker(generator: GeneratorInfo) -> None:
         """
