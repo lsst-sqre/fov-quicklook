@@ -317,7 +317,12 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                     await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
 
                 logger.info(f"Initial batch sent to generator {generator.id}, waiting for responses")
+                end_signal_sent = False
                 # メッセージ処理ループ
+                # 注: all_completedがsetされてもbreakしない。
+                # generatorが処理中のCCDのCompletedMessageを返すまで受信し続ける必要がある。
+                # end signal送信後、generatorは新規CCD受付を停止するが、
+                # 処理中CCDの結果は引き続き送信し、完了後にWebSocketを閉じる。
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.BINARY:
                         data = pickle.loads(msg.data)
@@ -326,12 +331,11 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                             data, job, dispatcher, generator, ws
                         )
 
-                        # 全完了チェック
-                        if dispatcher.all_completed.is_set():
-                            logger.info(f"All CCDs completed, closing connection to generator {generator.id}")
-                            # 終了シグナルを送信
+                        # 全完了時にend signalを送信（1回だけ）
+                        if not end_signal_sent and dispatcher.all_completed.is_set():
+                            logger.info(f"All CCDs completed, sending end signal to generator {generator.id}")
                             await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
-                            break
+                            end_signal_sent = True
 
                     elif msg.type == aiohttp.WSMsgType.CLOSED:
                         logger.info(f"WebSocket closed by generator {generator.id}")
@@ -467,19 +471,14 @@ async def _handle_generator_message(
             next_ccd = await dispatcher.get_next_ccd(generator.id)
             if next_ccd is not None:
                 await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=next_ccd)))
-            elif dispatcher.all_completed.is_set():
-                logger.info(f"All CCDs completed, sending end signal to generator {generator.id}")
-                await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
-            else:
+            elif not dispatcher.all_completed.is_set():
                 # 追加CCDがない場合でも、Generatorが消失して再割り当てが発生する可能性がある
                 # ccd_availableイベントを待つタスクを起動
                 async def wait_and_assign():
                     ccd_ref = await _wait_for_next_ccd(dispatcher, generator.id)
                     if ccd_ref is not None:
                         await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
-                    else:
-                        logger.info(f"No more CCDs for generator {generator.id}, sending end signal")
-                        await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
+                    # else: all_completedの場合、メインループ側でend signalを送信する
                 asyncio.create_task(wait_and_assign())
 
         case ErrorMessage(ccd_name=ccd_name, error=error):
