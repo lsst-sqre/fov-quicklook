@@ -36,3 +36,27 @@ async def kill_coordinator() -> ShutdownResponse:
         ) as response:
             response.raise_for_status()
             return ShutdownResponse(status="shutting_down")
+
+
+class KillGeneratorResponse(BaseModel):
+    status: str
+    generator_id: str
+
+
+@router.post("/kill_random_generator")
+async def kill_random_generator() -> KillGeneratorResponse:
+    """
+    ランダムに1台の Generator を強制停止する。
+    development/test 環境のみ有効（coordinator 側で制御）。
+    """
+    logger.warning("Admin requested random generator kill")
+
+    timeout = aiohttp.ClientTimeout(total=10)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{config.coordinator_base_url}/comm/kill-random-generator",
+            timeout=timeout,
+        ) as response:
+            response.raise_for_status()
+            data = await response.json()
+            return KillGeneratorResponse(**data)
