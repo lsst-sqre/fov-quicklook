@@ -181,8 +181,9 @@ def _run_pipeline_sync(
                 break
 
     def put_result(msg: GeneratorMessage) -> None:
-        """結果キューにメッセージを追加"""
-        asyncio.run_coroutine_threadsafe(result_queue.put(msg), loop)
+        """結果キューにメッセージを追加（同期的に完了を待つ）"""
+        future = asyncio.run_coroutine_threadsafe(result_queue.put(msg), loop)
+        future.result(timeout=30.0)  # 結果喪失を防ぐため完了を待つ
 
     # 既存パイプラインを使用
     for msg in generate_single_fits_tiles_pipeline(job, ccd_generator()):

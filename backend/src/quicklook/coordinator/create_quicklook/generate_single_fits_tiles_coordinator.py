@@ -425,10 +425,17 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         timeout_seconds = config.generate_single_fits_tiles_timeout_seconds
         await asyncio.wait_for(dispatcher.all_completed.wait(), timeout=timeout_seconds)
     except asyncio.TimeoutError:
-        logger.error(f"Timeout waiting for CCDs: {len(dispatcher.ccd_metadata_dict)}/{len(ccd_refs)} completed")
+        completed_ccds = set(dispatcher.ccd_metadata_dict.keys())
+        all_ccds = {ref.ccd_name for ref in ccd_refs}
+        missing_ccds = all_ccds - completed_ccds
+        logger.error(
+            f"Timeout waiting for CCDs: {len(completed_ccds)}/{len(ccd_refs)} completed. "
+            f"Missing CCDs: {sorted(missing_ccds)}"
+        )
         raise RuntimeError(
             f"Timeout ({timeout_seconds}s) waiting for CCD processing: "
-            f"got {len(dispatcher.ccd_metadata_dict)}/{len(ccd_refs)} metadata"
+            f"got {len(dispatcher.ccd_metadata_dict)}/{len(ccd_refs)} metadata. "
+            f"Missing: {sorted(missing_ccds)}"
         )
     finally:
         remove_on_generator_registered_callback(on_new_generator)
@@ -480,7 +487,7 @@ async def _handle_generator_message(
                 bbox=bbox,  # type: ignore
             )
             await dispatcher.on_ccd_completed(ccd_name, metadata, generator.id)
-            logger.debug(f"CCD {ccd_name} completed from {generator.id}, total: {len(dispatcher.ccd_metadata_dict)}")
+            logger.info(f"CCD {ccd_name} completed from {generator.id}, total: {len(dispatcher.ccd_metadata_dict)}/{len(dispatcher._ccd_refs)}")
 
             # 追加CCD割り当て
             next_ccd = await dispatcher.get_next_ccd(generator.id)
