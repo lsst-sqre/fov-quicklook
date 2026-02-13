@@ -93,10 +93,10 @@ class Config(BaseSettings):
     transfer_tile_parallel: int = 4
 
     # CCD resubmit settings (for slow generator mitigation)
-    resubmit_min_age_seconds: float = 120.0  # CCDs older than this (in seconds) are eligible for resubmit
+    resubmit_min_age_seconds: float = 10.0  # CCDs older than this (in seconds) are eligible for resubmit
     resubmit_max_attempts_per_ccd: int = 1   # Maximum resubmit attempts per CCD (0 to disable resubmit)
     ccd_queue_timeout_seconds: float = 60.0  # Timeout for Generator-side queue.get() to detect connection loss (1 minute)
-    generate_single_fits_tiles_timeout_seconds: float = 600.0  # Timeout for entire CCD processing phase (10 minutes)
+    generate_single_fits_tiles_timeout_seconds: float = 45.0  # Timeout for entire CCD processing phase
 
     # Pipeline settings
     pipeline_queue_size: int = 64
@@ -123,7 +123,7 @@ class Config(BaseSettings):
     housekeeping_keep_recent_count: int = 10  # 最近作成されたquicklookをこの数だけ保持（アクセス頻度に関係なく）
 
     # Pipeline stage timeout settings (in seconds)
-    pipeline_stage_timeout: int = 180  # 3 minutes
+    pipeline_stage_timeout: int = 60  # 1 minute
 
     # CCD Data Types configuration
     ccd_data_types: list[CcdDataTypeConfig] = [
