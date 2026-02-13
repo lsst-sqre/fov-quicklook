@@ -65,6 +65,14 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/quicklooks/${queryArg.visitName}/quicklook_metadata`,
       }),
     }),
+    getTimeProfile: build.query<
+      GetTimeProfileApiResponse,
+      GetTimeProfileApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/quicklooks/${queryArg.visitName}/time_profile`,
+      }),
+    }),
     listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
       query: (queryArg) => ({
         url: `/api/visits`,
@@ -101,6 +109,15 @@ const injectedRtkApi = api.injectEndpoints({
       KillCoordinatorApiArg
     >({
       query: () => ({ url: `/api/admin/kill_coordinator`, method: "POST" }),
+    }),
+    killRandomGenerator: build.mutation<
+      KillRandomGeneratorApiResponse,
+      KillRandomGeneratorApiArg
+    >({
+      query: () => ({
+        url: `/api/admin/kill_random_generator`,
+        method: "POST",
+      }),
     }),
     listCacheEntries: build.query<
       ListCacheEntriesApiResponse,
@@ -182,14 +199,19 @@ export type GetQuicklookMetadataApiResponse =
 export type GetQuicklookMetadataApiArg = {
   visitName: string;
 };
+export type GetTimeProfileApiResponse =
+  /** status 200 Successful Response */ any;
+export type GetTimeProfileApiArg = {
+  visitName: string;
+};
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitEntry[];
 export type ListVisitsApiArg = {
   exposure?: number | null;
   dayObs?: number | null;
   limit?: number;
-  dataType?: string;
-  repositoryName?: string;
+  dataType: string;
+  repositoryName: string;
 };
 export type GetVisitMetadataApiResponse =
   /** status 200 Successful Response */ DataSourceCcdMetadata;
@@ -210,6 +232,9 @@ export type GetFitsFileApiArg = {
 export type KillCoordinatorApiResponse =
   /** status 200 Successful Response */ ShutdownResponse;
 export type KillCoordinatorApiArg = void;
+export type KillRandomGeneratorApiResponse =
+  /** status 200 Successful Response */ KillGeneratorResponse;
+export type KillRandomGeneratorApiArg = void;
 export type ListCacheEntriesApiResponse =
   /** status 200 Successful Response */ CacheEntry[];
 export type ListCacheEntriesApiArg = void;
@@ -415,6 +440,10 @@ export type DataSourceCcdMetadata = {
 export type ShutdownResponse = {
   status: string;
 };
+export type KillGeneratorResponse = {
+  status: string;
+  generator_id: string;
+};
 export type CacheEntry = {
   visit_name: string;
   ready: boolean;
@@ -437,11 +466,13 @@ export const {
   useUnvoteQuicklookMutation,
   useGetAllQuicklookJobsQuery,
   useGetQuicklookMetadataQuery,
+  useGetTimeProfileQuery,
   useListVisitsQuery,
   useGetVisitMetadataQuery,
   useGetExposureDataTypesQuery,
   useGetFitsFileQuery,
   useKillCoordinatorMutation,
+  useKillRandomGeneratorMutation,
   useListCacheEntriesQuery,
   useDeleteAllCacheEntriesMutation,
   useDeleteCacheEntryMutation,

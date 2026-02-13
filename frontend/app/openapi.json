@@ -69,7 +69,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^\\w+:\\w+$",
+                            "pattern": "^\\w+:\\w+:\\w+$",
                             "title": "Visit Name"
                         }
                     },
@@ -134,7 +134,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^\\w+:\\w+$",
+                            "pattern": "^\\w+:\\w+:\\w+$",
                             "title": "Visit Name"
                         }
                     },
@@ -225,7 +225,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^\\w+:\\w+$",
+                            "pattern": "^\\w+:\\w+:\\w+$",
                             "title": "Visit Name"
                         }
                     }
@@ -263,7 +263,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^\\w+:\\w+$",
+                            "pattern": "^\\w+:\\w+:\\w+$",
                             "title": "Visit Name"
                         }
                     }
@@ -319,7 +319,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^\\w+:\\w+$",
+                            "pattern": "^\\w+:\\w+:\\w+$",
                             "title": "Visit Name"
                         }
                     }
@@ -332,6 +332,44 @@
                                 "schema": {
                                     "$ref": "#/components/schemas/QuicklookMetadata"
                                 }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/quicklooks/{visit_name}/time_profile": {
+            "get": {
+                "summary": "Get Time Profile",
+                "operationId": "get_time_profile",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\w+:\\w+:\\w+$",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
                             }
                         }
                     },
@@ -545,7 +583,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^\\w+:\\w+$",
+                            "pattern": "^\\w+:\\w+:\\w+$",
                             "title": "Visit Name"
                         }
                     },
@@ -597,6 +635,28 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ShutdownResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/kill_random_generator": {
+            "post": {
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Kill Random Generator",
+                "description": "\u30e9\u30f3\u30c0\u30e0\u306b1\u53f0\u306e Generator \u3092\u5f37\u5236\u505c\u6b62\u3059\u308b\u3002\ndevelopment/test \u74b0\u5883\u306e\u307f\u6709\u52b9\uff08coordinator \u5074\u3067\u5236\u5fa1\uff09\u3002",
+                "operationId": "kill_random_generator",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/KillGeneratorResponse"
                                 }
                             }
                         }
@@ -1207,6 +1267,24 @@
                     "$ref": "#/components/schemas/JobStatus"
                 },
                 "type": "object"
+            },
+            "KillGeneratorResponse": {
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "title": "Status"
+                    },
+                    "generator_id": {
+                        "type": "string",
+                        "title": "Generator Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "status",
+                    "generator_id"
+                ],
+                "title": "KillGeneratorResponse"
             },
             "MemoryStats": {
                 "properties": {
