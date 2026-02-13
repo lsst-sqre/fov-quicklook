@@ -123,7 +123,7 @@ class Config(BaseSettings):
     housekeeping_keep_recent_count: int = 10  # 最近作成されたquicklookをこの数だけ保持（アクセス頻度に関係なく）
 
     # Pipeline stage timeout settings (in seconds)
-    pipeline_stage_timeout: int = 60  # 1 minute
+    pipeline_stage_timeout: int = 180  # 3 minutes
 
     # CCD Data Types configuration
     ccd_data_types: list[CcdDataTypeConfig] = [
