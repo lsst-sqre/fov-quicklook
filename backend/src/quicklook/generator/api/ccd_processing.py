@@ -105,10 +105,17 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
                 msg = await result_queue.get()
                 if msg is None:
                     break
+                if isinstance(msg, CompletedMessage):
+                    logger.info(f"send_results: sending CompletedMessage for {msg.ccd_name} over WebSocket")
                 if websocket.client_state == WebSocketState.CONNECTED:
                     await websocket.send_bytes(pickle.dumps(msg))
+                    if isinstance(msg, CompletedMessage):
+                        logger.info(f"send_results: CompletedMessage for {msg.ccd_name} sent successfully")
+                else:
+                    if isinstance(msg, CompletedMessage):
+                        logger.warning(f"send_results: WebSocket not connected, dropping CompletedMessage for {msg.ccd_name}")
         except WebSocketDisconnect:
-            pass
+            logger.warning("send_results: WebSocket disconnected")
         except Exception as e:
             logger.error(f"Error sending results: {e}")
 
@@ -182,8 +189,12 @@ def _run_pipeline_sync(
 
     def put_result(msg: GeneratorMessage) -> None:
         """結果キューにメッセージを追加（同期的に完了を待つ）"""
+        if isinstance(msg, CompletedMessage):
+            logger.info(f"put_result: sending CompletedMessage for {msg.ccd_name}")
         future = asyncio.run_coroutine_threadsafe(result_queue.put(msg), loop)
         future.result(timeout=30.0)  # 結果喪失を防ぐため完了を待つ
+        if isinstance(msg, CompletedMessage):
+            logger.info(f"put_result: CompletedMessage for {msg.ccd_name} queued successfully")
 
     # 既存パイプラインを使用
     for msg in generate_single_fits_tiles_pipeline(job, ccd_generator()):

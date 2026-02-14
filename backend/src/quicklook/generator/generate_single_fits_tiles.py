@@ -107,6 +107,7 @@ def generate_single_fits_tiles_pipeline(
                             for ref, path in ccd_paths()
                         ),
                     ):
+                        logger.info(f"imap_unordered yielded CcdMetadata for {ccd_metadata.ccd_name}, putting to queue")
                         q.put(ccd_metadata)
             finally:
                 q.put(None)  # type: ignore
@@ -140,7 +141,11 @@ def _process_ccd(args: ProcessCcdArgs):
         args.path.unlink(missing_ok=True)
         args.download_sem.release()
 
+    import time as _time
+    _gt_start = _time.time()
     generate_tiles(ppccd, args.job)
+    _gt_elapsed = _time.time() - _gt_start
+    print(f"Completed generate_tiles-{args.ref.visit}/{args.ref.ccd_name}: {_gt_elapsed:.3f}s", flush=True)
     args.progress.put(
         GenerateSingleFitsTilesProgress(
             ccd_name=ppccd.data_ref.ccd_name,
@@ -149,6 +154,7 @@ def _process_ccd(args: ProcessCcdArgs):
     )
 
     args.job.local_storage.fits_header.save(args.ref.ccd_name, ppccd.headers)
+    print(f"Returning CcdMetadata for {args.ref.ccd_name}", flush=True)
 
     return CcdMetadata(
         ccd_name=ppccd.data_ref.ccd,
