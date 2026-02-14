@@ -221,6 +221,22 @@ class CcdDispatcher:
                 if len(self._ccd_metadata_dict) == len(self._ccd_refs):
                     self._all_completed.set()
 
+    async def return_unassigned_ccd(self, ccd_ref: CcdDataRef) -> None:
+        """
+        割り当てに失敗したCCDを返却する。
+
+        WebSocket送信失敗時に呼ばれ、attemptカウンタを1つ戻して
+        再度resubmit対象にする。ccd_available通知も送る。
+        """
+        async with self._lock:
+            ccd_name = ccd_ref.ccd_name
+            if ccd_name not in self._ccd_metadata_dict:
+                if self._attempts[ccd_name] > 0:
+                    self._attempts[ccd_name] -= 1
+                logger.info(f"Returned unassigned CCD {ccd_name}, attempts now {self._attempts[ccd_name]}")
+        async with self._ccd_available_condition:
+            self._ccd_available_condition.notify_all()
+
     def record_generator_start(self, generator_id: GeneratorId) -> None:
         self._generator_start_time[generator_id] = time.time()
         self.register_generator(generator_id)
@@ -319,6 +335,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
                 logger.info(f"Initial batch sent to generator {generator.id}, waiting for responses")
                 end_signal_sent = False
+                pending_wait_tasks: list[asyncio.Task[None]] = []
 
                 async def _send_end_signal_on_completion() -> None:
                     """all_completedを監視し、セットされたらend signalを送信する。
@@ -344,7 +361,8 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                             data = pickle.loads(msg.data)
                             logger.debug(f"Received message from generator {generator.id}: {type(data).__name__}")
                             await _handle_generator_message(
-                                data, job, dispatcher, generator, ws
+                                data, job, dispatcher, generator, ws,
+                                pending_wait_tasks,
                             )
 
                         elif msg.type == aiohttp.WSMsgType.CLOSED:
@@ -355,10 +373,13 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                             break
                 finally:
                     completion_task.cancel()
-                    try:
-                        await completion_task
-                    except asyncio.CancelledError:
-                        pass
+                    for t in pending_wait_tasks:
+                        t.cancel()
+                    for t in [completion_task, *pending_wait_tasks]:
+                        try:
+                            await t
+                        except asyncio.CancelledError:
+                            pass
 
     async def worker(generator: GeneratorInfo) -> None:
         """
@@ -499,6 +520,7 @@ async def _handle_generator_message(
     dispatcher: CcdDispatcher,
     generator: GeneratorInfo,
     ws: aiohttp.ClientWebSocketResponse,
+    pending_wait_tasks: list[asyncio.Task[None]],
 ) -> None:
     """Generatorからのメッセージを処理"""
     match data:
@@ -527,9 +549,16 @@ async def _handle_generator_message(
                 async def wait_and_assign():
                     ccd_ref = await _wait_for_next_ccd(dispatcher, generator.id)
                     if ccd_ref is not None:
-                        await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
+                        try:
+                            await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
+                        except Exception as e:
+                            # WebSocketが閉じられている場合、worker()レベルの
+                            # resubmitループで処理されるため、ここではCCDを返却する
+                            logger.debug(f"Failed to assign resubmit CCD {ccd_ref.ccd_name} to {generator.id}: {e}")
+                            await dispatcher.return_unassigned_ccd(ccd_ref)
                     # else: all_completedの場合、メインループ側でend signalを送信する
-                asyncio.create_task(wait_and_assign())
+                task = asyncio.create_task(wait_and_assign())
+                pending_wait_tasks.append(task)
 
         case ErrorMessage(ccd_name=ccd_name, error=error):
             logger.error(f"Generator {generator.id} error for CCD {ccd_name}: {error}")
