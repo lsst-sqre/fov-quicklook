@@ -97,20 +97,24 @@ def generate_single_fits_tiles_pipeline(
                     # _process_ccd は CcdMetadata を q に直接入れるため、
                     # pool.imap_unordered の戻り値は使わない。
                     # ただし全タスク完了を待つ必要があるのでイテレータを消費する。
-                    for _ in pool.imap_unordered(
-                        _process_ccd,
-                        (
-                            ProcessCcdArgs(
-                                job,
-                                ref,
-                                path,
-                                q,  # type:ignore
-                                download_sem,
-                            )
-                            for ref, path in ccd_paths()
-                        ),
-                    ):
-                        pass
+                    # 例外が発生しても残りのタスクを待つために try-except する。
+                    try:
+                        for _ in pool.imap_unordered(
+                            _process_ccd,
+                            (
+                                ProcessCcdArgs(
+                                    job,
+                                    ref,
+                                    path,
+                                    q,  # type:ignore
+                                    download_sem,
+                                )
+                                for ref, path in ccd_paths()
+                            ),
+                        ):
+                            pass
+                    except Exception as e:
+                        logger.error(f"Error in imap_unordered: {e}")
             finally:
                 q.put(None)  # type: ignore
 
@@ -143,7 +147,11 @@ def _process_ccd(args: ProcessCcdArgs):
         args.path.unlink(missing_ok=True)
         args.download_sem.release()
 
-    generate_tiles(ppccd, args.job)
+    try:
+        generate_tiles(ppccd, args.job)
+    except Exception as e:
+        print(f"ERROR generate_tiles {args.ref.ccd_name}: {e}", flush=True)
+        raise
     args.progress.put(
         GenerateSingleFitsTilesProgress(
             ccd_name=ppccd.data_ref.ccd_name,
@@ -164,6 +172,7 @@ def _process_ccd(args: ProcessCcdArgs):
         bbox=ppccd.bbox,
     )
     args.progress.put(ccd_metadata)
+    print(f"CcdMetadata queued for {args.ref.ccd_name}", flush=True)
 
 
 def generate_tiles(
