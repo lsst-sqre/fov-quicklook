@@ -180,12 +180,16 @@ def _run_pipeline_sync(
                 )
                 ccd_ref = future.result(timeout=2.0)
                 if ccd_ref is None:
+                    logger.info("ccd_generator: received end signal (None)")
                     break
                 yield ccd_ref
             except asyncio.TimeoutError:
                 continue
-            except Exception:
+            except Exception as e:
+                logger.warning(f"ccd_generator: exception {e}, breaking")
                 break
+        else:
+            logger.info("ccd_generator: cancel_event is set, exiting")
 
     def put_result(msg: GeneratorMessage) -> None:
         """結果キューにメッセージを追加（同期的に完了を待つ）"""

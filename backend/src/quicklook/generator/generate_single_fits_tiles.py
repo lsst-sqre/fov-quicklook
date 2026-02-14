@@ -87,6 +87,7 @@ def generate_single_fits_tiles_pipeline(
             return (ref, outpath)
 
         def main():
+            ccd_count = 0
             try:
                 initializers = [GeneratorIdInitializer()]
                 with multiprocessing.Pool(
@@ -108,7 +109,13 @@ def generate_single_fits_tiles_pipeline(
                         ),
                     ):
                         q.put(ccd_metadata)
+                        ccd_count += 1
+                        logger.info(f"CcdMetadata queued in main: {ccd_metadata.ccd_name} ({ccd_count})")
+            except Exception as e:
+                logger.error(f"main() error after {ccd_count} CCDs: {e}")
+                raise
             finally:
+                logger.info(f"main() finished, total CcdMetadata queued: {ccd_count}")
                 q.put(None)  # type: ignore
 
         with ThreadPoolExecutor(1) as executor:
@@ -154,12 +161,14 @@ def _process_ccd(args: ProcessCcdArgs):
     # ワーカープロセスから Manager Queue proxy 経由で直接 put すると、
     # Pool の結果パイプとの間でレース条件が発生し、
     # main() の q.put(None) が CcdMetadata より先に到着することがある。
-    return CcdMetadata(
+    ccd_metadata = CcdMetadata(
         ccd_name=ppccd.data_ref.ccd,
         image_stat=ppccd.stat,
         amps=ppccd.amps,
         bbox=ppccd.bbox,
     )
+    logger.info(f"_process_ccd returning CcdMetadata for {args.ref.ccd_name}")
+    return ccd_metadata
 
 
 def generate_tiles(
