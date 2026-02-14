@@ -394,60 +394,61 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         generator_id = generator.id
         current_generator = generator
         consecutive_failures = 0
-        while not dispatcher.all_completed.is_set():
-            try:
-                await _run_worker_session(current_generator)
-                consecutive_failures = 0
+        try:
+            while not dispatcher.all_completed.is_set():
+                try:
+                    await _run_worker_session(current_generator)
+                    consecutive_failures = 0
 
-                if dispatcher.all_completed.is_set():
-                    dispatcher.record_generator_end(generator_id)
-                    return
+                    if dispatcher.all_completed.is_set():
+                        return
 
-                # 正常終了後、resubmit可能なCCDが出るまで待機
-                ccd_ref = await _wait_for_next_ccd(dispatcher, generator_id)
-                if ccd_ref is None:
-                    dispatcher.record_generator_end(generator_id)
-                    return  # 全完了
+                    # generatorがまだ利用可能か確認
+                    available = get_available_generators()
+                    if generator_id not in available:
+                        # Generator消失: on_generator_lostを呼んでresubmit対象にする
+                        logger.info(f"Generator {generator_id} no longer available after session")
+                        await dispatcher.on_generator_lost(generator_id)
+                        return
 
-                # resubmit用の新しいセッションに入る前にgenerator情報を更新
-                available = get_available_generators()
-                if generator_id in available:
+                    # 正常終了後、resubmit可能なCCDが出るまで待機
+                    ccd_ref = await _wait_for_next_ccd(dispatcher, generator_id)
+                    if ccd_ref is None:
+                        return  # 全完了
+
+                    # resubmit用の新しいセッションに入る前にgenerator情報を更新
                     current_generator = available[generator_id]
                     logger.info(f"Worker {generator_id} starting new session for resubmit CCD {ccd_ref.ccd_name}")
-                else:
-                    logger.info(f"Generator {generator_id} no longer available after session, stopping worker")
-                    dispatcher.record_generator_end(generator_id)
-                    return
 
-            except aiohttp.ClientError as e:
-                consecutive_failures += 1
-                if consecutive_failures >= max_worker_connect_retries:
+                except aiohttp.ClientError as e:
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_worker_connect_retries:
+                        logger.warning(
+                            f"Generator {generator_id} connection failed {consecutive_failures} times, giving up"
+                        )
+                        break
                     logger.warning(
-                        f"Generator {generator_id} connection failed {consecutive_failures} times, giving up"
+                        f"Generator {generator_id} connection failed (attempt {consecutive_failures}/{max_worker_connect_retries}): {e}"
                     )
-                    break
-                logger.warning(
-                    f"Generator {generator_id} connection failed (attempt {consecutive_failures}/{max_worker_connect_retries}): {e}"
-                )
 
-                # リトライ前に待機し、最新のgenerator情報を取得
-                await asyncio.sleep(worker_connect_retry_interval)
-                available = get_available_generators()
-                if generator_id in available:
-                    current_generator = available[generator_id]
-                    logger.info(f"Retrying with updated generator info: {current_generator.ws_url}")
-                else:
-                    logger.warning(f"Generator {generator_id} no longer available, stopping worker")
-                    break
+                    # リトライ前に待機し、最新のgenerator情報を取得
+                    await asyncio.sleep(worker_connect_retry_interval)
+                    available = get_available_generators()
+                    if generator_id in available:
+                        current_generator = available[generator_id]
+                        logger.info(f"Retrying with updated generator info: {current_generator.ws_url}")
+                    else:
+                        logger.warning(f"Generator {generator_id} no longer available, stopping worker")
+                        break
 
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                logger.error(f"Worker error for generator {generator_id}: {e}")
-                break  # 予期しないエラーはリトライしない
-
-        dispatcher.record_generator_end(generator_id)
-        await dispatcher.on_generator_lost(generator_id)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    logger.error(f"Worker error for generator {generator_id}: {e}")
+                    break  # 予期しないエラーはリトライしない
+        finally:
+            dispatcher.record_generator_end(generator_id)
+            await dispatcher.on_generator_lost(generator_id)
 
     # 全workerを起動
     active_worker_generator_ids: set[GeneratorId] = {g.id for g in generator_list}
