@@ -94,27 +94,20 @@ def generate_single_fits_tiles_pipeline(
                     initializer=_initialize_pool_worker,
                     initargs=(initializers,),
                 ) as pool:
-                    # _process_ccd は CcdMetadata を q に直接入れるため、
-                    # pool.imap_unordered の戻り値は使わない。
-                    # ただし全タスク完了を待つ必要があるのでイテレータを消費する。
-                    # 例外が発生しても残りのタスクを待つために try-except する。
-                    try:
-                        for _ in pool.imap_unordered(
-                            _process_ccd,
-                            (
-                                ProcessCcdArgs(
-                                    job,
-                                    ref,
-                                    path,
-                                    q,  # type:ignore
-                                    download_sem,
-                                )
-                                for ref, path in ccd_paths()
-                            ),
-                        ):
-                            pass
-                    except Exception as e:
-                        logger.error(f"Error in imap_unordered: {e}")
+                    for ccd_metadata in pool.imap_unordered(
+                        _process_ccd,
+                        (
+                            ProcessCcdArgs(
+                                job,
+                                ref,
+                                path,
+                                q,  # type:ignore
+                                download_sem,
+                            )
+                            for ref, path in ccd_paths()
+                        ),
+                    ):
+                        q.put(ccd_metadata)
             finally:
                 q.put(None)  # type: ignore
 
@@ -147,11 +140,7 @@ def _process_ccd(args: ProcessCcdArgs):
         args.path.unlink(missing_ok=True)
         args.download_sem.release()
 
-    try:
-        generate_tiles(ppccd, args.job)
-    except Exception as e:
-        print(f"ERROR generate_tiles {args.ref.ccd_name}: {e}", flush=True)
-        raise
+    generate_tiles(ppccd, args.job)
     args.progress.put(
         GenerateSingleFitsTilesProgress(
             ccd_name=ppccd.data_ref.ccd_name,
@@ -161,18 +150,16 @@ def _process_ccd(args: ProcessCcdArgs):
 
     args.job.local_storage.fits_header.save(args.ref.ccd_name, ppccd.headers)
 
-    # CcdMetadata を q に直接入れる。
-    # pool.imap_unordered 経由で main() に返して q.put する方式では、
-    # imap_unordered の入力ジェネレータがブロックしている間に
-    # main() の forループも停止し、CcdMetadata が q に入らないことがある。
-    ccd_metadata = CcdMetadata(
+    # CcdMetadata を return して main() 側で q.put する。
+    # ワーカープロセスから Manager Queue proxy 経由で直接 put すると、
+    # Pool の結果パイプとの間でレース条件が発生し、
+    # main() の q.put(None) が CcdMetadata より先に到着することがある。
+    return CcdMetadata(
         ccd_name=ppccd.data_ref.ccd,
         image_stat=ppccd.stat,
         amps=ppccd.amps,
         bbox=ppccd.bbox,
     )
-    args.progress.put(ccd_metadata)
-    print(f"CcdMetadata queued for {args.ref.ccd_name}", flush=True)
 
 
 def generate_tiles(
