@@ -94,7 +94,7 @@ class Config(BaseSettings):
 
     # CCD resubmit settings (for slow generator mitigation)
     resubmit_min_age_seconds: float = 10.0  # CCDs older than this (in seconds) are eligible for resubmit
-    resubmit_max_attempts_per_ccd: int = 1   # Maximum resubmit attempts per CCD (0 to disable resubmit)
+    resubmit_max_attempts_per_ccd: int = 3   # Maximum resubmit attempts per CCD (0 to disable resubmit)
     ccd_queue_timeout_seconds: float = 60.0  # Timeout for Generator-side queue.get() to detect connection loss (1 minute)
     generate_single_fits_tiles_timeout_seconds: float = 120.0  # Timeout for entire CCD processing phase
 

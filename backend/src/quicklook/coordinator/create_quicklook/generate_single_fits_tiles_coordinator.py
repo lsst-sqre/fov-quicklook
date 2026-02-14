@@ -366,29 +366,50 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         WebSocket接続で動的にCCDを供給する。
         接続失敗時はgeneratorの最新情報を取得してリトライする。
         （rolling restart中はIPが変わるため）
+
+        正常終了後も全CCD完了まで待機し、他のGenerator消失による
+        resubmit CCDを拾うために新しいセッションを開始できる。
         """
         generator_id = generator.id
         current_generator = generator
-        for attempt in range(max_worker_connect_retries):
-            if dispatcher.all_completed.is_set():
-                return
+        consecutive_failures = 0
+        while not dispatcher.all_completed.is_set():
             try:
                 await _run_worker_session(current_generator)
-                dispatcher.record_generator_end(generator_id)
-                await dispatcher.on_generator_lost(generator_id)
-                return  # 正常終了
-            except aiohttp.ClientError as e:
-                logger.warning(
-                    f"Generator {generator_id} connection failed (attempt {attempt + 1}/{max_worker_connect_retries}): {e}"
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                logger.error(f"Worker error for generator {generator_id}: {e}")
-                break  # 予期しないエラーはリトライしない
+                consecutive_failures = 0
 
-            # リトライ前に待機し、最新のgenerator情報を取得
-            if attempt + 1 < max_worker_connect_retries:
+                if dispatcher.all_completed.is_set():
+                    dispatcher.record_generator_end(generator_id)
+                    return
+
+                # 正常終了後、resubmit可能なCCDが出るまで待機
+                ccd_ref = await _wait_for_next_ccd(dispatcher, generator_id)
+                if ccd_ref is None:
+                    dispatcher.record_generator_end(generator_id)
+                    return  # 全完了
+
+                # resubmit用の新しいセッションに入る前にgenerator情報を更新
+                available = get_available_generators()
+                if generator_id in available:
+                    current_generator = available[generator_id]
+                    logger.info(f"Worker {generator_id} starting new session for resubmit CCD {ccd_ref.ccd_name}")
+                else:
+                    logger.info(f"Generator {generator_id} no longer available after session, stopping worker")
+                    dispatcher.record_generator_end(generator_id)
+                    return
+
+            except aiohttp.ClientError as e:
+                consecutive_failures += 1
+                if consecutive_failures >= max_worker_connect_retries:
+                    logger.warning(
+                        f"Generator {generator_id} connection failed {consecutive_failures} times, giving up"
+                    )
+                    break
+                logger.warning(
+                    f"Generator {generator_id} connection failed (attempt {consecutive_failures}/{max_worker_connect_retries}): {e}"
+                )
+
+                # リトライ前に待機し、最新のgenerator情報を取得
                 await asyncio.sleep(worker_connect_retry_interval)
                 available = get_available_generators()
                 if generator_id in available:
@@ -397,6 +418,12 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                 else:
                     logger.warning(f"Generator {generator_id} no longer available, stopping worker")
                     break
+
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"Worker error for generator {generator_id}: {e}")
+                break  # 予期しないエラーはリトライしない
 
         dispatcher.record_generator_end(generator_id)
         await dispatcher.on_generator_lost(generator_id)
