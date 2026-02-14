@@ -102,7 +102,7 @@ class Config(BaseSettings):
     pipeline_queue_size: int = 64
     pipeline_generate_single_fits_tiles: int = 1
     pipeline_transfer_queue_size: int = 8
-    pipeline_merge_tiles: int = 2
+    pipeline_merge_tiles: int = 1
     pipeline_transfer_tiles: int = 2
 
     # Logging settings
@@ -123,7 +123,7 @@ class Config(BaseSettings):
     housekeeping_keep_recent_count: int = 10  # 最近作成されたquicklookをこの数だけ保持（アクセス頻度に関係なく）
 
     # Pipeline stage timeout settings (in seconds)
-    pipeline_stage_timeout: int = 180  # 3 minutes
+    pipeline_stage_timeout: int = 600  # 10 minutes; merge_tiles can be slow with concurrent jobs
 
     # CCD Data Types configuration
     ccd_data_types: list[CcdDataTypeConfig] = [

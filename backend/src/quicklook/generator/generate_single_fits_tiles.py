@@ -3,6 +3,7 @@ import gc
 import multiprocessing
 import queue
 import tempfile
+import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -81,7 +82,7 @@ def generate_single_fits_tiles_pipeline(
             download_sem.acquire()
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 1)))
             data_bytes = ds.get_data_sync(ref)
-            outpath = Path(tmpdir) / f"{ref.ccd_name}.fits"
+            outpath = Path(tmpdir) / f"{ref.ccd_name}_{uuid.uuid4().hex[:8]}.fits"
             outpath.write_bytes(data_bytes)
             logger.info("Downloaded %s (%d bytes)", ref.ccd_name, len(data_bytes))
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 2)))
