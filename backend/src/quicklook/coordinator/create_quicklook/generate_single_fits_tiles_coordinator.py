@@ -301,10 +301,13 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
     max_worker_connect_retries = 3
     worker_connect_retry_interval = 2.0
 
-    async def _run_worker_session(generator: GeneratorInfo) -> None:
+    async def _run_worker_session(generator: GeneratorInfo, initial_ccd: CcdDataRef | None = None) -> None:
         """
         GeneratorへのWebSocket接続を確立し、CCD処理ループを実行する。
         接続失敗時は呼び出し元でリトライする。
+
+        initial_ccd: resubmitフローで事前に取得済みのCCD。
+                     指定時はこのCCDを初期バッチの最初に含める。
         """
         ws_url = f"{generator.ws_url}/jobs/{job.id}/generate-tiles"
         logger.info(f"Worker connecting to {ws_url}")
@@ -321,7 +324,15 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
                 # 初期バッチ割り当て
                 has_initial_batch = False
-                for _ in range(max_concurrent_ccds):
+
+                # resubmitフローで事前取得したCCDがある場合、最初に割り当て
+                if initial_ccd is not None:
+                    logger.info(f"Assigning pre-fetched resubmit CCD {initial_ccd.ccd_name} to generator {generator.id}")
+                    await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=initial_ccd)))
+                    has_initial_batch = True
+
+                remaining_slots = max_concurrent_ccds - (1 if initial_ccd is not None else 0)
+                for _ in range(remaining_slots):
                     ccd_ref = await dispatcher.get_next_ccd(generator.id)
                     if ccd_ref is not None:
                         logger.debug(f"Assigning CCD {ccd_ref.ccd_name} to generator {generator.id}")
@@ -397,10 +408,12 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         generator_id = generator.id
         current_generator = generator
         consecutive_failures = 0
+        pending_resubmit_ccd: CcdDataRef | None = None
         try:
             while not dispatcher.all_completed.is_set():
                 try:
-                    await _run_worker_session(current_generator)
+                    await _run_worker_session(current_generator, initial_ccd=pending_resubmit_ccd)
+                    pending_resubmit_ccd = None
                     consecutive_failures = 0
 
                     if dispatcher.all_completed.is_set():
@@ -426,6 +439,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                         await dispatcher.return_unassigned_ccd(ccd_ref)
                         return
                     current_generator = available[generator_id]
+                    pending_resubmit_ccd = ccd_ref
                     logger.info(f"Worker {generator_id} starting new session for resubmit CCD {ccd_ref.ccd_name}")
 
                 except aiohttp.ClientError as e:
@@ -455,6 +469,8 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                     logger.error(f"Worker error for generator {generator_id}: {e}")
                     break  # 予期しないエラーはリトライしない
         finally:
+            if pending_resubmit_ccd is not None:
+                await dispatcher.return_unassigned_ccd(pending_resubmit_ccd)
             dispatcher.record_generator_end(generator_id)
             await dispatcher.on_generator_lost(generator_id)
 
