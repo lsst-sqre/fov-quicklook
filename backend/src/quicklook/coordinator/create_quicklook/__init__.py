@@ -84,6 +84,11 @@ def quicklook_pipeline():
         result.time_profile.ccd_profiles = gen_result.ccd_profiles
         result.time_profile.generator_profiles = gen_result.generator_profiles
         result.ccd_metadata_list = gen_result.ccd_metadata_list
+
+        # merge_tilesキュー待ちの間もフロントエンドでタイル表示を可能にする
+        async with job.watcher.watch_status():
+            job.status.stage = 'merge_tiles'
+
         return result
 
     @with_stage_timeout('merge_tiles')
