@@ -31,6 +31,7 @@ logger = quicklook.mylogging.getLogger(__name__)
 _available_generators: dict[GeneratorId, GeneratorInfo] = {}
 _coordinator_id: CoordinatorId | None = None
 _on_generator_registered_callbacks: list[Any] = []
+_on_generator_removed_callbacks: list[Any] = []
 
 
 def add_on_generator_registered_callback(callback: Any) -> None:
@@ -42,6 +43,19 @@ def remove_on_generator_registered_callback(callback: Any) -> None:
     """コールバックを削除する"""
     try:
         _on_generator_registered_callbacks.remove(callback)
+    except ValueError:
+        pass
+
+
+def add_on_generator_removed_callback(callback: Any) -> None:
+    """Generatorが削除されたときに呼ばれるコールバックを追加する"""
+    _on_generator_removed_callbacks.append(callback)
+
+
+def remove_on_generator_removed_callback(callback: Any) -> None:
+    """コールバックを削除する"""
+    try:
+        _on_generator_removed_callbacks.remove(callback)
     except ValueError:
         pass
 
@@ -167,6 +181,11 @@ def remove_generator(generator_info: GeneratorInfo) -> None:
     if generator_info.id in _available_generators:  # pragma: no branch
         del _available_generators[generator_info.id]
         logger.info(f"Generator removed: {generator_info.id}")
+        for callback in _on_generator_removed_callbacks:
+            try:
+                callback(generator_info)
+            except Exception as e:
+                logger.warning(f"Generator removed callback failed: {e}")
 
 
 async def kill_generator(generator_info: GeneratorInfo) -> None:

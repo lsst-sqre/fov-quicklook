@@ -20,6 +20,8 @@ from quicklook.comm.coordinator import (
     get_available_generators,
     add_on_generator_registered_callback,
     remove_on_generator_registered_callback,
+    add_on_generator_removed_callback,
+    remove_on_generator_removed_callback,
 )
 from quicklook.comm.rpc_worker import rpc_scatter
 from quicklook.comm.types import GeneratorId, GeneratorInfo
@@ -308,7 +310,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
         timeout = aiohttp.ClientTimeout(total=None, connect=10, sock_connect=10, sock_read=None)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.ws_connect(ws_url) as ws:
+            async with session.ws_connect(ws_url, heartbeat=5.0) as ws:
                 logger.info(f"Connected to generator {generator.id}")
                 dispatcher.record_generator_start(generator.id)
 
@@ -470,6 +472,17 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
     add_on_generator_registered_callback(on_new_generator)
 
+    # Generatorが削除されたときにdispatcherのon_generator_lostを即座に呼ぶコールバック
+    # これにより、healthcheck失敗やkill_random_generatorによる削除時に
+    # workerのWebSocket切断を待たずに即座にresubmitが開始される
+    def on_generator_removed(generator_info: GeneratorInfo) -> None:
+        if dispatcher.all_completed.is_set():
+            return
+        logger.info(f"Generator {generator_info.id} removed, triggering on_generator_lost")
+        asyncio.create_task(dispatcher.on_generator_lost(generator_info.id))
+
+    add_on_generator_removed_callback(on_generator_removed)
+
     try:
         # 全CCD完了を待機（タイムアウト付き）
         timeout_seconds = config.generate_single_fits_tiles_timeout_seconds
@@ -489,6 +502,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         )
     finally:
         remove_on_generator_registered_callback(on_new_generator)
+        remove_on_generator_removed_callback(on_generator_removed)
         # 残存workerをキャンセル
         for task in worker_tasks:
             if not task.done():
