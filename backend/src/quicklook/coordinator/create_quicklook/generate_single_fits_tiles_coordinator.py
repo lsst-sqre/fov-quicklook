@@ -420,6 +420,11 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                         return  # 全完了
 
                     # resubmit用の新しいセッションに入る前にgenerator情報を更新
+                    available = get_available_generators()
+                    if generator_id not in available:
+                        logger.info(f"Generator {generator_id} no longer available before resubmit session")
+                        await dispatcher.return_unassigned_ccd(ccd_ref)
+                        return
                     current_generator = available[generator_id]
                     logger.info(f"Worker {generator_id} starting new session for resubmit CCD {ccd_ref.ccd_name}")
 
