@@ -279,8 +279,8 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
     generator_list = list(generators.values())
     dispatcher = CcdDispatcher(ccd_refs)
     max_concurrent_ccds = config.generator_max_concurrent_ccds_per_job
-    max_worker_connect_retries = 5
-    worker_connect_retry_interval = 3.0
+    max_worker_connect_retries = 3
+    worker_connect_retry_interval = 2.0
 
     async def _run_worker_session(generator: GeneratorInfo) -> None:
         """
@@ -290,7 +290,8 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         ws_url = f"{generator.ws_url}/jobs/{job.id}/generate-tiles"
         logger.info(f"Worker connecting to {ws_url}")
 
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=None, connect=10, sock_connect=10, sock_read=None)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.ws_connect(ws_url) as ws:
                 logger.info(f"Connected to generator {generator.id}")
                 dispatcher.record_generator_start(generator.id)
