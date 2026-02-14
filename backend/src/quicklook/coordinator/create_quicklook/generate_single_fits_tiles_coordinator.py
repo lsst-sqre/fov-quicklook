@@ -170,6 +170,7 @@ class CcdDispatcher:
                 # 初回assignの時刻を記録
                 if ccd_ref.ccd_name not in self._ccd_assign_time:
                     self._ccd_assign_time[ccd_ref.ccd_name] = time.time()
+                logger.info(f"Phase1 assign: CCD {ccd_ref.ccd_name} → {generator_id} (index={self._remaining_index-1}, total_submitted={self._remaining_index})")
                 return ccd_ref
 
             # Phase 2: 未完了CCDを（提出順の）ラウンドロビンで再submit
