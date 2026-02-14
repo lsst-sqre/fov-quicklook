@@ -1,4 +1,5 @@
 import contextlib
+import gc
 import multiprocessing
 import queue
 import tempfile
@@ -94,6 +95,7 @@ def generate_single_fits_tiles_pipeline(
                     config.generator_max_concurrent_ccds_per_job,
                     initializer=_initialize_pool_worker,
                     initargs=(initializers,),
+                    maxtasksperchild=1,
                 ) as pool:
                     for ccd_metadata in pool.imap_unordered(
                         _process_ccd,
@@ -123,6 +125,8 @@ def generate_single_fits_tiles_pipeline(
             while msg := q.get():
                 yield msg
             fut.result()
+
+    gc.collect()
 
 
 @dataclass

@@ -88,7 +88,7 @@ class Config(BaseSettings):
 
     # Job settings
     generator_max_concurrent_jobs: int = 4
-    generator_max_concurrent_ccds_per_job: int = 25 # ~4GB
+    generator_max_concurrent_ccds_per_job: int = 10 # ~1.6GB per generator; reduced from 25 to prevent OOMKill cascades
     merge_tile_parallel: int = 4
     transfer_tile_parallel: int = 4
 

@@ -86,7 +86,7 @@ async def register_generator(
     )
     if registration_data.generator_id not in _available_generators:
         _available_generators[registration_data.generator_id] = generator_info
-        logger.info(f'Available generators: {_available_generators.values()}')
+        logger.debug(f'Available generators: {_available_generators.values()}')
         for callback in _on_generator_registered_callbacks:
             try:
                 callback(generator_info)
