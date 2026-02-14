@@ -94,7 +94,10 @@ def generate_single_fits_tiles_pipeline(
                     initializer=_initialize_pool_worker,
                     initargs=(initializers,),
                 ) as pool:
-                    for ccd_metadata in pool.imap_unordered(
+                    # _process_ccd は CcdMetadata を q に直接入れるため、
+                    # pool.imap_unordered の戻り値は使わない。
+                    # ただし全タスク完了を待つ必要があるのでイテレータを消費する。
+                    for _ in pool.imap_unordered(
                         _process_ccd,
                         (
                             ProcessCcdArgs(
@@ -107,8 +110,7 @@ def generate_single_fits_tiles_pipeline(
                             for ref, path in ccd_paths()
                         ),
                     ):
-                        logger.info(f"imap_unordered yielded CcdMetadata for {ccd_metadata.ccd_name}, putting to queue")
-                        q.put(ccd_metadata)
+                        pass
             finally:
                 q.put(None)  # type: ignore
 
@@ -124,7 +126,7 @@ class ProcessCcdArgs:
     job: Job
     ref: CcdDataRef
     path: Path
-    progress: queue.Queue[GenerateSingleFitsTilesProgress]
+    progress: queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata]
     download_sem: Any  # multiprocessing.Manager().Semaphore() proxy
 
 
@@ -141,11 +143,7 @@ def _process_ccd(args: ProcessCcdArgs):
         args.path.unlink(missing_ok=True)
         args.download_sem.release()
 
-    import time as _time
-    _gt_start = _time.time()
     generate_tiles(ppccd, args.job)
-    _gt_elapsed = _time.time() - _gt_start
-    print(f"Completed generate_tiles-{args.ref.visit}/{args.ref.ccd_name}: {_gt_elapsed:.3f}s", flush=True)
     args.progress.put(
         GenerateSingleFitsTilesProgress(
             ccd_name=ppccd.data_ref.ccd_name,
@@ -154,14 +152,18 @@ def _process_ccd(args: ProcessCcdArgs):
     )
 
     args.job.local_storage.fits_header.save(args.ref.ccd_name, ppccd.headers)
-    print(f"Returning CcdMetadata for {args.ref.ccd_name}", flush=True)
 
-    return CcdMetadata(
+    # CcdMetadata を q に直接入れる。
+    # pool.imap_unordered 経由で main() に返して q.put する方式では、
+    # imap_unordered の入力ジェネレータがブロックしている間に
+    # main() の forループも停止し、CcdMetadata が q に入らないことがある。
+    ccd_metadata = CcdMetadata(
         ccd_name=ppccd.data_ref.ccd,
         image_stat=ppccd.stat,
         amps=ppccd.amps,
         bbox=ppccd.bbox,
     )
+    args.progress.put(ccd_metadata)
 
 
 def generate_tiles(
