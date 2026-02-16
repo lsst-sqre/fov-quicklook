@@ -78,7 +78,10 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
         """Coordinatorからの割り当てを受信"""
         try:
             while not cancel_event.is_set():
-                data = await websocket.receive_bytes()
+                try:
+                    data = await asyncio.wait_for(websocket.receive_bytes(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
                 msg = pickle.loads(data)
                 if isinstance(msg, AssignCcdMessage):
                     if msg.ccd_ref is None:
@@ -137,6 +140,7 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
             await result_queue.put(ErrorMessage(ccd_name=None, error=str(e)))
         finally:
             await result_queue.put(None)  # 送信ループ終了シグナル
+            cancel_event.set()  # receive_assignmentsも終了させる
 
     try:
         await asyncio.gather(
