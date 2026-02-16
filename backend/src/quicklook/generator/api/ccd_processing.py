@@ -174,6 +174,8 @@ def _run_pipeline_sync(
     def ccd_generator() -> Generator[CcdDataRef, None, None]:
         """asyncio.Queueから同期的にCCDを取得"""
         ccd_index = 0
+        consecutive_idle = 0
+        IDLE_TIMEOUT_POLLS = 3  # 3秒間新しいCCDが来なければ終了
         while not cancel_event.is_set():
             try:
                 t_wait_start = time.monotonic()
@@ -186,6 +188,7 @@ def _run_pipeline_sync(
                 if ccd_ref is None:
                     logger.info("ccd_generator: received end signal (None)")
                     break
+                consecutive_idle = 0
                 ccd_index += 1
                 logger.info(
                     "ccd_generator: yielding %s (index=%d, queue_wait=%.3fs)",
@@ -193,6 +196,13 @@ def _run_pipeline_sync(
                 )
                 yield ccd_ref
             except asyncio.TimeoutError:
+                consecutive_idle += 1
+                if ccd_index > 0 and consecutive_idle >= IDLE_TIMEOUT_POLLS:
+                    logger.info(
+                        "ccd_generator: idle timeout after %d CCDs (%d consecutive polls with no CCD)",
+                        ccd_index, consecutive_idle,
+                    )
+                    break
                 continue
             except Exception as e:
                 logger.warning(f"ccd_generator: exception {e}, breaking")

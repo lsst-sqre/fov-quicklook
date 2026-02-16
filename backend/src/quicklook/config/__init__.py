@@ -93,7 +93,7 @@ class Config(BaseSettings):
     transfer_tile_parallel: int = 4
 
     # CCD resubmit settings (for slow generator mitigation)
-    resubmit_min_age_seconds: float = 300.0  # Temporarily raised for tail-CCD latency investigation (was 10.0)
+    resubmit_min_age_seconds: float = 10.0
     resubmit_max_attempts_per_ccd: int = 3   # Maximum resubmit attempts per CCD (0 to disable resubmit)
     ccd_queue_timeout_seconds: float = 60.0  # Timeout for Generator-side queue.get() to detect connection loss (1 minute)
     generate_single_fits_tiles_timeout_seconds: float = 120.0  # Timeout for entire CCD processing phase

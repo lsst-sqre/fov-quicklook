@@ -37,15 +37,20 @@ def imap_unordered_threadpool(
         in_flight.add(executor.submit(func, x))
 
     # 完了分を返しつつ、終わった分だけ補充
+    # NOTE: yieldとrefillを分離する。以前は for fut in done ループ内で
+    # yield → next(it) を交互に行っていたが、next(it) がブロックすると
+    # 他の完了済み future が yield できなくなるバグがあった。
+    input_exhausted = False
     while in_flight:
         done, in_flight = wait(in_flight, return_when=FIRST_COMPLETED)
         for fut in done:
-            # ここで例外があれば送出される
             yield fut.result()
 
-            # 入力が続く限り補充
-            try:
-                x = next(it)
-            except StopIteration:
-                continue
-            in_flight.add(executor.submit(func, x))
+        if not input_exhausted:
+            for _ in range(len(done)):
+                try:
+                    x = next(it)
+                except StopIteration:
+                    input_exhausted = True
+                    break
+                in_flight.add(executor.submit(func, x))
