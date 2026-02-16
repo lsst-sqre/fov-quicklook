@@ -175,7 +175,7 @@ def _run_pipeline_sync(
         """asyncio.Queueから同期的にCCDを取得"""
         ccd_index = 0
         consecutive_idle = 0
-        IDLE_TIMEOUT_POLLS = 3  # 3秒間新しいCCDが来なければ終了
+        IDLE_TIMEOUT_POLLS = 2  # 2秒間新しいCCDが来なければ終了
         while not cancel_event.is_set():
             try:
                 t_wait_start = time.monotonic()

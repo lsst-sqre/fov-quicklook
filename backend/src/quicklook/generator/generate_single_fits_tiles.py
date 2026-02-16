@@ -78,8 +78,8 @@ def generate_single_fits_tiles_pipeline(
         ccd_timestamps: dict[str, float] = {}  # ccd_name → ccd_generator yield時刻
 
         def ccd_paths():
-            with ThreadPoolExecutor(2) as executor:
-                for path in imap_unordered_threadpool(executor, download, timestamped_refs(), max_in_flight=2):
+            with ThreadPoolExecutor(4) as executor:
+                for path in imap_unordered_threadpool(executor, download, timestamped_refs(), max_in_flight=4):
                     yield path
 
         def timestamped_refs():
@@ -114,7 +114,6 @@ def generate_single_fits_tiles_pipeline(
                     config.generator_max_concurrent_ccds_per_job,
                     initializer=_initialize_pool_worker,
                     initargs=(initializers,),
-                    maxtasksperchild=1,
                 ) as pool:
                     for ccd_metadata in pool.imap_unordered(
                         _process_ccd,
