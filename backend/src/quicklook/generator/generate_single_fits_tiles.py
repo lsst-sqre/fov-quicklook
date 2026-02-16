@@ -74,12 +74,21 @@ def generate_single_fits_tiles_pipeline(
         # Manager経由で作成し、プロセス間で共有可能にする。
         download_sem = manager.Semaphore(_download_semaphore_size)
 
+        # パイプライン各段階のタイムスタンプ記録用
+        ccd_timestamps: dict[str, float] = {}  # ccd_name → ccd_generator yield時刻
+
         def ccd_paths():
             with ThreadPoolExecutor(2) as executor:
-                for path in imap_unordered_threadpool(executor, download, refs, max_in_flight=2):
+                for path in imap_unordered_threadpool(executor, download, timestamped_refs(), max_in_flight=2):
                     yield path
 
+        def timestamped_refs():
+            for ref in refs:
+                ccd_timestamps[ref.ccd_name] = time.monotonic()
+                yield ref
+
         def download(ref: CcdDataRef):
+            t_yield = ccd_timestamps.get(ref.ccd_name, 0.0)
             t0 = time.monotonic()
             download_sem.acquire()
             t_sem = time.monotonic()
@@ -89,12 +98,13 @@ def generate_single_fits_tiles_pipeline(
             outpath = Path(tmpdir) / f"{ref.ccd_name}_{uuid.uuid4().hex[:8]}.fits"
             outpath.write_bytes(data_bytes)
             logger.info(
-                "Downloaded %s (%d bytes) sem_wait=%.3fs download=%.3fs total=%.3fs",
+                "Downloaded %s (%d bytes) queue_wait=%.3fs sem_wait=%.3fs download=%.3fs total=%.3fs",
                 ref.ccd_name, len(data_bytes),
-                t_sem - t0, t_dl - t_sem, t_dl - t0,
+                t0 - t_yield if t_yield > 0 else 0.0,
+                t_sem - t0, t_dl - t_sem, t_dl - t_yield if t_yield > 0 else t_dl - t0,
             )
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 2)))
-            return (ref, outpath)
+            return (ref, outpath, t_dl)
 
         def main():
             ccd_count = 0
@@ -115,8 +125,10 @@ def generate_single_fits_tiles_pipeline(
                                 path,
                                 q,  # type:ignore
                                 download_sem,
+                                pool_submit_time=time.monotonic(),
+                                download_done_time=dl_done_time,
                             )
-                            for ref, path in ccd_paths()
+                            for ref, path, dl_done_time in ccd_paths()
                         ),
                     ):
                         q.put(ccd_metadata)
@@ -145,10 +157,14 @@ class ProcessCcdArgs:
     path: Path
     progress: queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata]
     download_sem: Any  # multiprocessing.Manager().Semaphore() proxy
+    pool_submit_time: float = 0.0  # Pool投入時の monotonic 時刻
+    download_done_time: float = 0.0  # ダウンロード完了時の monotonic 時刻
 
 
 def _process_ccd(args: ProcessCcdArgs):
     t_start = time.monotonic()
+    pool_wait = t_start - args.pool_submit_time if args.pool_submit_time > 0 else 0.0
+    dl_to_pool = args.pool_submit_time - args.download_done_time if args.download_done_time > 0 and args.pool_submit_time > 0 else 0.0
     try:
         ppccd = preprocess_ccd(args.ref, args.path)
         t_preprocess = time.monotonic()
@@ -175,8 +191,10 @@ def _process_ccd(args: ProcessCcdArgs):
     t_end = time.monotonic()
 
     logger.info(
-        "_process_ccd %s: preprocess=%.3fs tiles=%.3fs save_header=%.3fs total=%.3fs",
+        "_process_ccd %s: dl_to_pool=%.3fs pool_wait=%.3fs preprocess=%.3fs tiles=%.3fs save=%.3fs total=%.3fs",
         args.ref.ccd_name,
+        dl_to_pool,
+        pool_wait,
         t_preprocess - t_start,
         t_tiles - t_preprocess,
         t_end - t_tiles,

@@ -7,6 +7,7 @@ CoordinatorからのCCD割り当てを受け、パイプラインで処理し、
 
 import asyncio
 import pickle
+import time
 import traceback
 from collections.abc import Generator
 from typing import Any
@@ -172,16 +173,24 @@ def _run_pipeline_sync(
 
     def ccd_generator() -> Generator[CcdDataRef, None, None]:
         """asyncio.Queueから同期的にCCDを取得"""
+        ccd_index = 0
         while not cancel_event.is_set():
             try:
+                t_wait_start = time.monotonic()
                 future = asyncio.run_coroutine_threadsafe(
                     asyncio.wait_for(ccd_queue.get(), timeout=1.0),
                     loop,
                 )
                 ccd_ref = future.result(timeout=2.0)
+                t_wait_end = time.monotonic()
                 if ccd_ref is None:
                     logger.info("ccd_generator: received end signal (None)")
                     break
+                ccd_index += 1
+                logger.info(
+                    "ccd_generator: yielding %s (index=%d, queue_wait=%.3fs)",
+                    ccd_ref.ccd_name, ccd_index, t_wait_end - t_wait_start,
+                )
                 yield ccd_ref
             except asyncio.TimeoutError:
                 continue
