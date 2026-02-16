@@ -48,7 +48,7 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         for data_type_config in config.ccd_data_types:
             datasource = _get_datasource(data_type_config.data_type, data_type_config.repository_name)
             if datasource.exposure_exists(exposure_id):
-                types.append(CcdDataType(data_type_config.data_type))
+                types.append(CcdDataType(f"{data_type_config.repository_name}:{data_type_config.data_type}"))
         return types
 
 
