@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 import quicklook.mylogging
 from quicklook.config import config
+from quicklook.utils.http_client import get_session
 
 logger = quicklook.mylogging.getLogger(__name__)
 
@@ -29,13 +30,13 @@ async def kill_coordinator() -> ShutdownResponse:
     logger.warning("Admin requested coordinator shutdown")
     
     timeout = aiohttp.ClientTimeout(total=10)
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{config.coordinator_base_url}/comm/shutdown",
-            timeout=timeout,
-        ) as response:
-            response.raise_for_status()
-            return ShutdownResponse(status="shutting_down")
+    session = get_session()
+    async with session.post(
+        f"{config.coordinator_base_url}/comm/shutdown",
+        timeout=timeout,
+    ) as response:
+        response.raise_for_status()
+        return ShutdownResponse(status="shutting_down")
 
 
 class KillGeneratorResponse(BaseModel):
@@ -52,11 +53,11 @@ async def kill_random_generator() -> KillGeneratorResponse:
     logger.warning("Admin requested random generator kill")
 
     timeout = aiohttp.ClientTimeout(total=10)
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{config.coordinator_base_url}/comm/kill-random-generator",
-            timeout=timeout,
-        ) as response:
-            response.raise_for_status()
-            data = await response.json()
-            return KillGeneratorResponse(**data)
+    session = get_session()
+    async with session.post(
+        f"{config.coordinator_base_url}/comm/kill-random-generator",
+        timeout=timeout,
+    ) as response:
+        response.raise_for_status()
+        data = await response.json()
+        return KillGeneratorResponse(**data)

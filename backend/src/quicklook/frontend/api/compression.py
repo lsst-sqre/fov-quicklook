@@ -158,10 +158,7 @@ def get_compressed_content(file_path: str, content: bytes) -> bytes:
     cache_hit = file_path in _compressed_content_cache
 
     if not cache_hit:
-        # original_size = len(content)
         compressed_content = gzip.compress(content)
-        # compressed_size = len(compressed_content)
-        # compression_ratio = (1 - compressed_size / original_size) * 100 if original_size > 0 else 0
         _compressed_content_cache[file_path] = compressed_content
 
     return _compressed_content_cache[file_path]

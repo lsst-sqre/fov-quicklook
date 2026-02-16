@@ -8,6 +8,7 @@ from quicklook.comm.types import GeneratorId
 from quicklook.config import config
 from quicklook.utils.system_status import ContainerStatus, get_container_status
 from quicklook.comm.coordinator import get_available_generators
+from quicklook.utils.http_client import get_session
 
 router = APIRouter()
 
@@ -36,11 +37,11 @@ async def route_get_status() -> CoordinatorStatus:
     ) -> tuple[GeneratorId, ContainerStatus]:
         url = f"{generator_info.url}/status"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=timeout) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    return generator_id, ContainerStatus(**data)
+            session = get_session()
+            async with session.get(url, timeout=timeout) as response:
+                response.raise_for_status()
+                data = await response.json()
+                return generator_id, ContainerStatus(**data)
         except Exception:
             # Return default status with zeros on error
             return generator_id, ContainerStatus(

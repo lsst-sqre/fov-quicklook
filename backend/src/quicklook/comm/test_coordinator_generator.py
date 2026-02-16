@@ -28,8 +28,8 @@ def test_coordinator_id_initialization():
     with TestClient(app) as client:
         response = client.get("/comm/healthz")
         assert response.status_code == 200
-        assert coordinator._coordinator_id is not None
-        assert coordinator._coordinator_id.startswith("c-")
+        assert coordinator.get_coordinator_id() is not None
+        assert coordinator.get_coordinator_id().startswith("c-")
 
 
 def test_generator_registration_initial():
@@ -38,7 +38,7 @@ def test_generator_registration_initial():
     app.include_router(coordinator.router)
     
     with TestClient(app) as client:
-        coordinator_id = coordinator._coordinator_id
+        coordinator_id = coordinator.get_coordinator_id()
         assert coordinator_id is not None
         
         registration_request = GeneratorRegistrationRequest(
@@ -61,7 +61,7 @@ def test_generator_registration_with_matching_coordinator_id():
     app.include_router(coordinator.router)
     
     with TestClient(app) as client:
-        coordinator_id = coordinator._coordinator_id
+        coordinator_id = coordinator.get_coordinator_id()
         assert coordinator_id is not None
         
         registration_request = GeneratorRegistrationRequest(
@@ -83,7 +83,7 @@ def test_generator_registration_with_mismatched_coordinator_id():
     app.include_router(coordinator.router)
     
     with TestClient(app) as client:
-        coordinator_id = coordinator._coordinator_id
+        coordinator_id = coordinator.get_coordinator_id()
         assert coordinator_id is not None
         
         wrong_coordinator_id = CoordinatorId("c-wrong-id")

@@ -3,7 +3,6 @@ import { angle, SkyCoord } from "@stellar-globe/stellar-globe"
 import { createContext, FC, ReactNode, RefObject, useCallback, useContext, useRef } from "react"
 import { QuicklookLayerHandle } from "../../../StellarGlobe/Quicklook/QuicklookLayer"
 import { useQuicklookMetadata } from "./quicklook"
-// import { RubinTileHandle } from "./RubinTileLayer/RubinTileComponent"
 
 
 type ContextType = {
@@ -73,9 +72,3 @@ export function useResetView() {
     globeHandle.current?.().camera.jumpTo({ fovy: angle.deg2rad(3.6), roll: 0 }, { coord: SkyCoord.fromDeg(0, 0), duration })
   }, [globeHandle])
 }
-
-
-// export function useRubinTileLayer() {
-//   const { tileLayerHandle } = useHomeContext()
-//   return tileLayerHandle.current?.layerRef.current
-// }

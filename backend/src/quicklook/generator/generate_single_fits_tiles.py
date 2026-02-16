@@ -84,26 +84,26 @@ def generate_single_fits_tiles_pipeline(
 
         def timestamped_refs():
             for ref in refs:
-                ccd_timestamps[ref.ccd_name] = time.monotonic()
+                ccd_timestamps[ref.ccd] = time.monotonic()
                 yield ref
 
         def download(ref: CcdDataRef):
-            t_yield = ccd_timestamps.get(ref.ccd_name, 0.0)
+            t_yield = ccd_timestamps.get(ref.ccd, 0.0)
             t0 = time.monotonic()
             download_sem.acquire()
             t_sem = time.monotonic()
-            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 1)))
+            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd, progress=Progress(4, 1)))
             data_bytes = ds.get_data_sync(ref)
             t_dl = time.monotonic()
-            outpath = Path(tmpdir) / f"{ref.ccd_name}_{uuid.uuid4().hex[:8]}.fits"
+            outpath = Path(tmpdir) / f"{ref.ccd}_{uuid.uuid4().hex[:8]}.fits"
             outpath.write_bytes(data_bytes)
             logger.info(
                 "Downloaded %s (%d bytes) queue_wait=%.3fs sem_wait=%.3fs download=%.3fs total=%.3fs",
-                ref.ccd_name, len(data_bytes),
+                ref.ccd, len(data_bytes),
                 t0 - t_yield if t_yield > 0 else 0.0,
                 t_sem - t0, t_dl - t_sem, t_dl - t_yield if t_yield > 0 else t_dl - t0,
             )
-            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 2)))
+            q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd, progress=Progress(4, 2)))
             return (ref, outpath, t_dl)
 
         def main():
@@ -170,7 +170,7 @@ def _process_ccd(args: ProcessCcdArgs):
         t_preprocess = time.monotonic()
         args.progress.put(
             GenerateSingleFitsTilesProgress(
-                ccd_name=ppccd.data_ref.ccd_name,
+                ccd_name=ppccd.data_ref.ccd,
                 progress=Progress(4, 3),
             )
         )
@@ -182,17 +182,17 @@ def _process_ccd(args: ProcessCcdArgs):
     t_tiles = time.monotonic()
     args.progress.put(
         GenerateSingleFitsTilesProgress(
-            ccd_name=ppccd.data_ref.ccd_name,
+            ccd_name=ppccd.data_ref.ccd,
             progress=Progress(4, 4),
         )
     )
 
-    args.job.local_storage.fits_header.save(args.ref.ccd_name, ppccd.headers)
+    args.job.local_storage.fits_header.save(args.ref.ccd, ppccd.headers)
     t_end = time.monotonic()
 
     logger.info(
         "_process_ccd %s: dl_to_pool=%.3fs pool_wait=%.3fs preprocess=%.3fs tiles=%.3fs save=%.3fs total=%.3fs",
-        args.ref.ccd_name,
+        args.ref.ccd,
         dl_to_pool,
         pool_wait,
         t_preprocess - t_start,
@@ -224,53 +224,3 @@ def generate_tiles(
         storage.single_fits_tile.save(ppccd.data_ref.ccd, tile)
 
     iterate_tiles(ppccd, cb)
-
-
-if False:
-    # これは以前使っていた並列度の低い遅い実装
-
-    import threading
-
-    def generate_single_fits_tiles(
-        job: Job,
-        ref: CcdDataRef,
-    ):
-        yield (progress := Progress(total=3))
-
-        data_bytes = ds.get_data_sync(ref)
-        yield progress.update()
-
-        try:
-            with _bytes_to_file(data_bytes) as path:
-                ppccd = preprocess_ccd(ref, path)
-                yield progress.update()
-
-            generate_tiles(ppccd, job)
-            yield progress.update()
-
-            job.local_storage.fits_header.save(ref, ppccd.headers)
-
-            yield ReturnValue(
-                CcdMetadata(
-                    ccd_name=ppccd.data_ref.ccd,
-                    image_stat=ppccd.stat,
-                    amps=ppccd.amps,
-                    bbox=ppccd.bbox,
-                )
-            )
-        finally:
-            # 遅いgeneratorでこの関数が実行された時
-            # coordinatorのcleanupの後にまだこの関数が実行されている可能性がるので
-            # ここでもcleanupする。
-            #
-            # from threading import Timer
-            # なぜかPython標準のTimerを使うとgenerator全体が停止してしまう。
-            Timer(600, job.local_storage.clear_all).start()
-
-    @contextlib.contextmanager
-    def _bytes_to_file(data: bytes, dir=config.fitsio_tmpdir):
-        dir.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=dir) as f:
-            f.write(data)
-            f.flush()
-            yield Path(f.name)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { websocketUrl } from "../utils/websocket"
+import { websocketUrl } from "../utils/websocketUrl"
 
 type UseWebsocketProps = {
   path: string

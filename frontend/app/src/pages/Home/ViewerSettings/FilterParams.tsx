@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
-import { RubinImageFilterParams } from "../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter"
+import { RubinImageFilterParams } from "../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter"
 import { QuicklookMetadata, QuicklookMetadataReady } from "../../../store/api/openapi"
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"

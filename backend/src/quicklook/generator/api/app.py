@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.comm.generator import lifespan as generator_lifespan
 from quicklook.comm.generator import router as comm_generator_router
+from quicklook.utils.http_client import managed_session
 from quicklook.config import config
 from quicklook.generator.api.ccd_processing import websocket_generate_tiles_raw
 from quicklook.job.job import Job
@@ -33,17 +34,18 @@ async def lifespan(app: fastapi.FastAPI):
     from quicklook.revision import GIT_REVISION
     logger.info("Generator starting, revision=%s", GIT_REVISION)
 
-    async with generator_lifespan(app):
-        async with rpc_lifespan(app):
-            async with create_async_process_pool(
-                max_workers=config.generator_max_concurrent_jobs,
-                initializers=[GeneratorIdInitializer()],
-            ) as pool:
-                _process_pool = pool
-                try:
-                    yield
-                finally:
-                    _process_pool = None
+    async with managed_session():
+        async with generator_lifespan(app):
+            async with rpc_lifespan(app):
+                async with create_async_process_pool(
+                    max_workers=config.generator_max_concurrent_jobs,
+                    initializers=[GeneratorIdInitializer()],
+                ) as pool:
+                    _process_pool = pool
+                    try:
+                        yield
+                    finally:
+                        _process_pool = None
 
 
 app = fastapi.FastAPI(lifespan=lifespan)

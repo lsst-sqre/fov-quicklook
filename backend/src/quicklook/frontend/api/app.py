@@ -8,6 +8,7 @@ from quicklook.frontend.api.compression import setup_compression
 from quicklook.frontend.api.staticassets import setup_static_assets
 from quicklook.frontend.api.use_route_names_as_operation_ids import use_route_names_as_operation_ids
 from quicklook.frontend.comm import lifespan as comm_lifespan
+from quicklook.utils.http_client import managed_session
 
 from .admin import router as admin_router
 from .get_fits_file import router as get_fits_file_router
@@ -30,9 +31,10 @@ async def lifespan(app: FastAPI):
     from quicklook.revision import GIT_REVISION
     logger.info("Frontend starting, revision=%s", GIT_REVISION)
 
-    async with quicklook_lifespan(app):
-        async with comm_lifespan(app):
-            yield
+    async with managed_session():
+        async with quicklook_lifespan(app):
+            async with comm_lifespan(app):
+                yield
 
 
 app = FastAPI(lifespan=lifespan)

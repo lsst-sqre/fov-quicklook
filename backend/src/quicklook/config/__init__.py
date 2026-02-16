@@ -86,6 +86,11 @@ class Config(BaseSettings):
     rpc_ping_timeout: float = 10  # seconds - timeout for WebSocket pong response
     rpc_process_pool_workers: int = 4
 
+    # HTTP client settings (aiohttp.TCPConnector)
+    http_client_connection_limit: int = 100
+    http_client_dns_cache_ttl: int = 300  # seconds
+    http_client_keepalive_timeout: int = 30  # seconds
+
     # Job settings
     generator_max_concurrent_jobs: int = 4
     generator_max_concurrent_ccds_per_job: int = 10 # ~1.6GB per generator; reduced from 25 to prevent OOMKill cascades

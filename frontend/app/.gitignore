@@ -25,3 +25,6 @@ dist-ssr
 *.sw?
 
 /.curl
+
+# Auto-generated SCSS type definitions
+*.scss.d.ts

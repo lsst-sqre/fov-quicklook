@@ -88,7 +88,7 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
                         logger.info(f"Received end signal for job {job.id}")
                         # 終了シグナル
                         break
-                    logger.info(f"Received CCD assignment: {msg.ccd_ref.ccd_name} for job {job.id}")
+                    logger.info(f"Received CCD assignment: {msg.ccd_ref.ccd} for job {job.id}")
                     await ccd_queue.put(msg.ccd_ref)
                 elif msg.type == "cancel":
                     cancel_event.set()
@@ -198,7 +198,7 @@ def _run_pipeline_sync(
                 ccd_index += 1
                 logger.info(
                     "ccd_generator: yielding %s (index=%d, queue_wait=%.3fs)",
-                    ccd_ref.ccd_name, ccd_index, t_wait_end - t_wait_start,
+                    ccd_ref.ccd, ccd_index, t_wait_end - t_wait_start,
                 )
                 yield ccd_ref
             except asyncio.TimeoutError:

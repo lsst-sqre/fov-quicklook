@@ -72,21 +72,10 @@ function Entry({
 }: {
   entry: EntryType,
 }) {
-  const { /* refetch, */ path, setPath } = useContext(StorageContext)!
+  const { path, setPath } = useContext(StorageContext)!
   const goIn = useCallback(() => {
     setPath(`${path}${entry.name}`)
   }, [entry.name, path, setPath])
-  // const [deleteEntry, { isLoading: isDeleting }] = useDeleteStorageEntryMutation()
-  // const [deleteEntryByPrefix, { isLoading: isDeletingByPrefix }] = useDeleteStorageEntriesByPrefixMutation()
-
-  // const handleDelete = useCallback(async () => {
-  //   if (entry.type === 'directory') {
-  //     await deleteEntryByPrefix({ prefix: `${path}${entry.name}` })
-  //   } else {
-  //     await deleteEntry({ path: `${path}${entry.name}` })
-  //   }
-  //   refetch()
-  // }, [deleteEntry, deleteEntryByPrefix, entry.name, entry.type, path, refetch])
 
   return (
     <tr>
@@ -105,9 +94,6 @@ function Entry({
             <MaterialSymbol symbol="arrow_forward" />
           </button>
         )}
-        {/* <button onClick={handleDelete} disabled={isDeleting || isDeletingByPrefix}>
-          <MaterialSymbol symbol="delete" />
-        </button> */}
       </th>
     </tr>
   )

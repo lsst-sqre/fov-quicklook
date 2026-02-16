@@ -4,6 +4,3 @@
 [submodule "frontend/lib/stellar-globe"]
 	path = frontend/lib/stellar-globe
 	url = https://hsc-gitlab.mtk.nao.ac.jp/michitaro/stellar-globe2
-[submodule "frontend/app/src/StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/viridisLite"]
-	path = frontend/app/src/StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/viridisLite
-	url = https://github.com/sjmgarnier/viridisLite.git

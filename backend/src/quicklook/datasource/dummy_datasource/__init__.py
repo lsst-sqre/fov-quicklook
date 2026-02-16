@@ -37,12 +37,12 @@ class DummyDataSource(DataSourceBase):
     def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
         i = Instrument.get("LSSTCam")
         return DataSourceCcdMetadata(
-            detector=i.ccd_2_detector[ref.ccd_name],
-            ccd_name=ref.ccd_name,
+            detector=i.ccd_2_detector[ref.ccd],
+            ccd_name=ref.ccd,
             day_obs=-1,
             exposure=-1,
             visit_name=ref.visit,
-            uuid=f"dummy-uuid-{ref.visit.name}-{ref.ccd_name}",
+            uuid=f"dummy-uuid-{ref.visit.name}-{ref.ccd}",
         )
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
@@ -50,13 +50,13 @@ class DummyDataSource(DataSourceBase):
 
 
 def _s3_get_visit_ccd_fits_raw(ref: CcdDataRef) -> bytes:
-    key = f"{ref.visit.data_type}/{ref.visit.name}/{ref.ccd_name}.fits"
+    key = f"{ref.visit.data_type}/{ref.visit.name}/{ref.ccd}.fits"
     return s3_download_object(config.s3_test_data, key)
 
 
 def _s3_get_visit_ccd_fits_calexp(ref: CcdDataRef) -> bytes:
     def read(start: int, end: int) -> bytes:
-        key = f'{ref.visit.data_type}/{ref.visit.name}/{ref.ccd_name}.fits'
+        key = f'{ref.visit.data_type}/{ref.visit.name}/{ref.ccd}.fits'
         return s3_download_object(config.s3_test_data, key, offset=start, length=end - start)
 
     return fits_partial_load(read, [0, 1])

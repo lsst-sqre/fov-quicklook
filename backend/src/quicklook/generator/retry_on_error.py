@@ -1,7 +1,5 @@
 import time
-from typing import Callable, TypeVar
-
-R = TypeVar('R')
+from typing import Callable
 
 
 def retry_on_error[R](

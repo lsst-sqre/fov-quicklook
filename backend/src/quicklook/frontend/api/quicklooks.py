@@ -1,8 +1,6 @@
 import asyncio
-import os
 import pickle
 import re
-import signal
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import cached_property
@@ -28,6 +26,7 @@ from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.job.shared_large_status import JobSharedLargeStatus
 from quicklook.job.status import JobStatus
 from quicklook.object_storage import VisitObjectStorage
+from quicklook.tileinfo import focal_plane_wcs
 from quicklook.types import CcdName, Progress, VisitName
 from quicklook.utils.broadcast import Broadcast
 from quicklook.utils.hash_utils import json_digest
@@ -198,7 +197,7 @@ async def _get_quicklook_metadata_from_db(visit: VisitName) -> QuicklookMetadata
             return QuicklookMetadataReady(
                 visit_name=visit,
                 ccd_metadata_list=ccd_metadata_list,
-                wcs=_quicklook_metadata_wcs(),
+                wcs=focal_plane_wcs(),
             )
 
 
@@ -221,7 +220,7 @@ async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncG
                 yield QuicklookMetadataReady(
                     visit_name=visit,
                     ccd_metadata_list=_job_shared_large_status_dict[visit].ccd_metadata_list,
-                    wcs=_quicklook_metadata_wcs(),
+                    wcs=focal_plane_wcs(),
                 )
             case JobStatus(stage='error'):
                 yield QuicklookMetadataError(visit_name=visit)
@@ -302,28 +301,6 @@ async def _status_relay_main_loop():
             traceback.print_exc()
             await asyncio.sleep(5)
     else:
-        await _shutdown()
+        from quicklook.utils.graceful_shutdown import graceful_shutdown
+        await graceful_shutdown(sigint_delay=10, sigkill_delay=10, reason="Failed to connect to coordinator WebSocket")
 
-
-def _quicklook_metadata_wcs():
-    scale = 0.2 / 3600.0  # pixel size in degree
-    return {
-        "NAXIS1": 63424,
-        "NAXIS2": 63376,
-        "CRVAL1": 0,
-        "CRVAL2": 0,
-        "CRPIX1": 31750.5,
-        "CRPIX2": 31750.5,
-        "CD1_1": -scale,
-        "CD1_2": 0,
-        "CD2_1": 0,
-        "CD2_2": scale,
-    }
-
-
-async def _shutdown():  # pragma: no cover
-    await asyncio.sleep(10)  # 繰り返しの再起動を防ぐために少し待つ
-    os.kill(os.getpid(), signal.SIGINT)
-    # さらに待って強制終了
-    await asyncio.sleep(10)
-    os.kill(os.getpid(), signal.SIGKILL)

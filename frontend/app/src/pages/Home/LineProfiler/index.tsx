@@ -2,7 +2,6 @@ import { SkyCoord, V2 } from "@stellar-globe/stellar-globe"
 import { memo, useEffect, useMemo, useRef } from "react"
 import { useGlobe, useHomeContext } from "../context"
 
-// import { useCrvalOriginWcs } from "../hooks"
 import { useAppSelector } from "../../../store/hooks"
 import { useWcs } from "../hooks"
 import { WebglPlot, WebglPlotProps } from "./WebglPlot"
@@ -25,8 +24,6 @@ export const LineProfiler = memo(() => {
       const xy = new Float32Array(n * 2)
       let max = -Infinity
       let min = Infinity
-      // const x: number[] = []
-      // const y: number[] = []
       for (let i = 0; i < n; ++i) {
         const m: V2 = [minX + (i / (n - 1)) * width, mouseY]
         const skyCoord: SkyCoord = globe.canvas.coordFromClientCoord({ clientX: m[0], clientY: m[1] })
@@ -36,8 +33,6 @@ export const LineProfiler = memo(() => {
         xy[i * 2 + 1] = value
         if (value > max) max = value
         if (value < min) min = value
-        // x.push(i)
-        // y.push(value)
       }
       return { xy, min, max }
     }
