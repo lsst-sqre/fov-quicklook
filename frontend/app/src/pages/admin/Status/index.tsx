@@ -1,4 +1,4 @@
-import { useRouteGetStatusQuery, ContainerStatus, useKillCoordinatorMutation } from "../../../store/api/openapi"
+import { useRouteGetStatusQuery, ContainerStatus, useKillCoordinatorMutation, useKillRandomGeneratorMutation } from "../../../store/api/openapi"
 import { useGetSystemStatus_WS_Query } from "../../../store/api/base"
 import { Progress } from "../../../components/Progress"
 import styles from './styles.module.scss'
@@ -8,6 +8,7 @@ export function Status() {
   const { data: status, isLoading, error } = useRouteGetStatusQuery(undefined, { refetchOnMountOrArgChange: true })
   const { data: wsStatus } = useGetSystemStatus_WS_Query()
   const [killCoordinator, { isLoading: isKilling }] = useKillCoordinatorMutation()
+  const [killRandomGenerator, { isLoading: isKillingGenerator }] = useKillRandomGeneratorMutation()
 
   const displayStatus = wsStatus || status
 
@@ -17,6 +18,18 @@ export function Status() {
         await killCoordinator().unwrap()
       } catch (e) {
         console.error('Failed to restart system:', e)
+      }
+    }
+  }
+
+  const handleKillRandomGenerator = async () => {
+    if (window.confirm('Kill a random generator?\nOne generator will be forcefully stopped. K8s will restart it automatically.')) {
+      try {
+        const result = await killRandomGenerator().unwrap()
+        alert(`Generator ${result.generator_id} killed.`)
+      } catch (e) {
+        console.error('Failed to kill generator:', e)
+        alert('Failed to kill generator. Check console for details.')
       }
     }
   }
@@ -45,6 +58,17 @@ export function Status() {
           </button>
           <p className={styles.restartDescription}>
             Restarts all components (coordinator, generators, frontend).
+          </p>
+          <button
+            className={styles.restartButton}
+            onClick={handleKillRandomGenerator}
+            disabled={isKillingGenerator}
+            style={{ marginTop: '8px' }}
+          >
+            {isKillingGenerator ? 'Killing...' : 'Kill Random Generator'}
+          </button>
+          <p className={styles.restartDescription}>
+            Forcefully stops a random generator for resilience testing.
           </p>
         </div>
       </section>

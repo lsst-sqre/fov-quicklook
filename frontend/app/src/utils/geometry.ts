@@ -21,8 +21,3 @@ export function includedInPolygon(p: V2, polygon: V2[]): boolean {
 
   return true
 }
-
-
-// export function mean(a: number[]) {
-//   return a.reduce((acc, v) => acc + v, 0) / a.length
-// }

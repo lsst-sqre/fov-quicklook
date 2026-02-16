@@ -11,6 +11,7 @@ from sqlalchemy import select
 import quicklook.mylogging
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
+from quicklook.utils.http_client import managed_session
 from quicklook.coordinator.api.deps import dep_visit_name
 from quicklook.coordinator.api.status import router as status_router
 from quicklook.coordinator.api.types import (
@@ -40,9 +41,10 @@ async def lifespan(app: FastAPI):
 
     await cleanup_at_startup()
 
-    async with coordinator_lifespan(app):
-        async with run_quicklook_pipeline() as running_pipeline:
-            yield
+    async with managed_session():
+        async with coordinator_lifespan(app):
+            async with run_quicklook_pipeline() as running_pipeline:
+                yield
 
 
 app = FastAPI(lifespan=lifespan)

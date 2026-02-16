@@ -1,4 +1,3 @@
-import asyncio
 import pickle
 from dataclasses import dataclass
 from functools import lru_cache
@@ -6,6 +5,7 @@ from typing import TYPE_CHECKING, Iterable, Literal
 
 from quicklook.config import config
 from quicklook.types import CcdName, PackedTilePos, TilePos, VisitName
+from quicklook.utils.async_wrap import async_wrap
 
 if TYPE_CHECKING:
     from quicklook.generator.generate_single_fits_tiles import CcdMetadata
@@ -113,33 +113,14 @@ class VisitObjectStorage:
         data = self._get_sync('time-profile.pickle')
         return pickle.loads(data)
 
-    # Async versions (run sync versions in thread pool)
-    async def put_packed_tile_array(self, packed_pos: PackedTilePos, array: list[bytes | None]) -> int:
-        return await asyncio.to_thread(self.put_packed_tile_array_sync, packed_pos, array)
-
-    async def get_packed_tile_array(self, packed_pos: PackedTilePos) -> list[bytes | None]:
-        return await asyncio.to_thread(self.get_packed_tile_array_sync, packed_pos)
-
-    async def get_quicklook_tile_bytes(self, pos: TilePos) -> bytes | None:
-        return await asyncio.to_thread(self.get_quicklook_tile_bytes_sync, pos)
-
-    async def delete_all(self) -> None:
-        await asyncio.to_thread(self.delete_all_sync)
-
-    async def put_fits_headers(self, ccd_name: CcdName, headers: list[HeaderType]) -> int:
-        return await asyncio.to_thread(self.put_fits_headers_sync, ccd_name, headers)
-
-    async def get_fits_headers(self, ccd_name: CcdName) -> list[HeaderType]:
-        return await asyncio.to_thread(self.get_fits_headers_sync, ccd_name)
-
-    async def put_ccd_metadata_list(self, metadata_list: list['CcdMetadata']) -> int:
-        return await asyncio.to_thread(self.put_ccd_metadata_list_sync, metadata_list)
-
-    async def get_ccd_metadata_list(self) -> list['CcdMetadata']:
-        return await asyncio.to_thread(self.get_ccd_metadata_list_sync)
-
-    async def put_time_profile(self, profile_data: dict) -> int:
-        return await asyncio.to_thread(self.put_time_profile_sync, profile_data)
-
-    async def get_time_profile(self) -> dict:
-        return await asyncio.to_thread(self.get_time_profile_sync)
+    # Async versions (auto-generated from sync methods)
+    put_packed_tile_array = async_wrap(put_packed_tile_array_sync)
+    get_packed_tile_array = async_wrap(get_packed_tile_array_sync)
+    get_quicklook_tile_bytes = async_wrap(get_quicklook_tile_bytes_sync)
+    delete_all = async_wrap(delete_all_sync)
+    put_fits_headers = async_wrap(put_fits_headers_sync)
+    get_fits_headers = async_wrap(get_fits_headers_sync)
+    put_ccd_metadata_list = async_wrap(put_ccd_metadata_list_sync)
+    get_ccd_metadata_list = async_wrap(get_ccd_metadata_list_sync)
+    put_time_profile = async_wrap(put_time_profile_sync)
+    get_time_profile = async_wrap(get_time_profile_sync)

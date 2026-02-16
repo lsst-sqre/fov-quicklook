@@ -22,7 +22,7 @@ def test_preprocess_ccd_calexp():
 
 
 def fits_bytes(ref: CcdDataRef) -> bytes:
-    key = f'{ref.visit.data_type}/{ref.visit.name}/{ref.ccd_name}.fits'
+    key = f'{ref.visit.data_type}/{ref.visit.name}/{ref.ccd}.fits'
     return s3_download_object(config.s3_test_data, key)
 
 

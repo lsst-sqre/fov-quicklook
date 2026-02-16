@@ -55,12 +55,6 @@ export function useHashSync({
 }
 
 export const initialSearchParams = ((): Partial<HashState> => {
-  // const hash = window.location.hash
-  // if (!hash) return {}
-
-  // const hashParts = hash.slice(1).split('?')
-  // if (hashParts.length < 2) return {}
-  // const searchParams = new URLSearchParams(hashParts[1])
   const searchParams = new URLSearchParams(window.location.search)
   const serialized = searchParams.get('_')
 

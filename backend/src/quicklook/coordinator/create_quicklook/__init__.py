@@ -54,9 +54,6 @@ def quicklook_pipeline():
                     error_msg = f"Stage {stage_name} timed out after {config.pipeline_stage_timeout} seconds"
                     logger.error(error_msg)
                     await _finalize_error(result.job, error_msg)
-                    from quicklook.comm.coordinator import shutdown_all_generators
-
-                    await shutdown_all_generators()
                     raise
                 except Exception as e:
                     await _finalize_error(result.job, str(e))
@@ -87,6 +84,11 @@ def quicklook_pipeline():
         result.time_profile.ccd_profiles = gen_result.ccd_profiles
         result.time_profile.generator_profiles = gen_result.generator_profiles
         result.ccd_metadata_list = gen_result.ccd_metadata_list
+
+        # merge_tilesキュー待ちの間もフロントエンドでタイル表示を可能にする
+        async with job.watcher.watch_status():
+            job.status.stage = 'merge_tiles'
+
         return result
 
     @with_stage_timeout('merge_tiles')
@@ -238,6 +240,22 @@ async def _finalize_success(result: _PipelineResult):
         profile_summary['upload_to_object_storage'],
         profile_summary['total'],
     )
+    # CCD別・Generator別の詳細プロファイルをログ出力
+    ccds = profile_summary.get('ccds', [])
+    if ccds:
+        top_n = min(10, len(ccds))
+        slowest = ccds[:top_n]
+        logger.info(
+            "Slowest %d CCDs: %s",
+            top_n,
+            ", ".join(f"{c['ccd_name']}({c['elapsed']:.1f}s,{c['generator_id']})" for c in slowest),
+        )
+    generators = profile_summary.get('generators', [])
+    if generators:
+        logger.info(
+            "Generator profiles: %s",
+            ", ".join(f"{g['generator_id']}({g['elapsed']:.1f}s,{g['ccd_count']}ccds)" for g in generators),
+        )
     await job.object_storage.put_time_profile(profile_summary)
 
     # DBレコードを更新
@@ -283,7 +301,10 @@ async def _finalize_error(job: Job, error_message: str | None = None):
         else:
             logger.warning(f"Quicklook record for {job.visit} not found during error cleanup")
 
-    await rpc_scatter(_cleanup_rpc, job)
+    try:
+        await rpc_scatter(_cleanup_rpc, job)
+    except Exception as e:
+        logger.warning(f"Cleanup RPC failed during error finalization for {job.visit}: {e}")
     await run_housekeeping()
     return job
 

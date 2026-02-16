@@ -15,6 +15,14 @@ from quicklook.utils.rtree import RectangleIndex
 
 ccd_info_path = Path(__file__).parent / 'ccd-info.json'
 
+# LSST Camera 焦点面の WCS パラメータ
+# pixel_scale: 1ピクセルあたりの角度 [arcsec/pixel]
+FOCAL_PLANE_PIXEL_SCALE_ARCSEC = 0.2
+FOCAL_PLANE_NAXIS1 = 63424
+FOCAL_PLANE_NAXIS2 = 63376
+FOCAL_PLANE_CRPIX1 = 31750.5
+FOCAL_PLANE_CRPIX2 = 31750.5
+
 
 @dataclass
 class TileInfo:
@@ -178,3 +186,20 @@ if __name__ == '__main__':  # pragma: no cover
             return dict(name=ccd_name, bbox=dataclasses.asdict(bbox))
 
     regenerate_ccd_info()
+
+
+def focal_plane_wcs() -> dict[str, float | int]:
+    """焦点面全体の WCS パラメータを返す（TAN投影）"""
+    scale = FOCAL_PLANE_PIXEL_SCALE_ARCSEC / 3600.0  # arcsec → degree
+    return {
+        "NAXIS1": FOCAL_PLANE_NAXIS1,
+        "NAXIS2": FOCAL_PLANE_NAXIS2,
+        "CRVAL1": 0,
+        "CRVAL2": 0,
+        "CRPIX1": FOCAL_PLANE_CRPIX1,
+        "CRPIX2": FOCAL_PLANE_CRPIX2,
+        "CD1_1": -scale,
+        "CD1_2": 0,
+        "CD2_1": 0,
+        "CD2_2": scale,
+    }

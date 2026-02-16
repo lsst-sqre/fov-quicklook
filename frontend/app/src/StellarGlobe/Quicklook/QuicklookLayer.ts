@@ -3,7 +3,7 @@ import { Globe, Layer, V2, View } from "@stellar-globe/stellar-globe"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
 import { QuicklookMetadata, QuicklookMetadataReady } from "../../store/api/openapi"
 import { QuicklookRenderer } from "./QuicklookTileRenderer"
-import { RubinImageFilterParams } from "./QuicklookTileRenderer/ImaegFilter"
+import { RubinImageFilterParams } from "./QuicklookTileRenderer/ImageFilter"
 
 
 class QuicklookLayer extends Layer {

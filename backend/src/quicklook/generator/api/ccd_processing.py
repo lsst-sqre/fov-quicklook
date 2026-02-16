@@ -7,6 +7,7 @@ CoordinatorからのCCD割り当てを受け、パイプラインで処理し、
 
 import asyncio
 import pickle
+import time
 import traceback
 from collections.abc import Generator
 from typing import Any
@@ -77,14 +78,17 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
         """Coordinatorからの割り当てを受信"""
         try:
             while not cancel_event.is_set():
-                data = await websocket.receive_bytes()
+                try:
+                    data = await asyncio.wait_for(websocket.receive_bytes(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
                 msg = pickle.loads(data)
                 if isinstance(msg, AssignCcdMessage):
                     if msg.ccd_ref is None:
                         logger.info(f"Received end signal for job {job.id}")
                         # 終了シグナル
                         break
-                    logger.info(f"Received CCD assignment: {msg.ccd_ref.ccd_name} for job {job.id}")
+                    logger.info(f"Received CCD assignment: {msg.ccd_ref.ccd} for job {job.id}")
                     await ccd_queue.put(msg.ccd_ref)
                 elif msg.type == "cancel":
                     cancel_event.set()
@@ -105,10 +109,17 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
                 msg = await result_queue.get()
                 if msg is None:
                     break
+                if isinstance(msg, CompletedMessage):
+                    logger.info(f"send_results: sending CompletedMessage for {msg.ccd_name} over WebSocket")
                 if websocket.client_state == WebSocketState.CONNECTED:
                     await websocket.send_bytes(pickle.dumps(msg))
+                    if isinstance(msg, CompletedMessage):
+                        logger.info(f"send_results: CompletedMessage for {msg.ccd_name} sent successfully")
+                else:
+                    if isinstance(msg, CompletedMessage):
+                        logger.warning(f"send_results: WebSocket not connected, dropping CompletedMessage for {msg.ccd_name}")
         except WebSocketDisconnect:
-            pass
+            logger.warning("send_results: WebSocket disconnected")
         except Exception as e:
             logger.error(f"Error sending results: {e}")
 
@@ -129,6 +140,7 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
             await result_queue.put(ErrorMessage(ccd_name=None, error=str(e)))
         finally:
             await result_queue.put(None)  # 送信ループ終了シグナル
+            cancel_event.set()  # receive_assignmentsも終了させる
 
     try:
         await asyncio.gather(
@@ -164,39 +176,61 @@ def _run_pipeline_sync(
     """
 
     def ccd_generator() -> Generator[CcdDataRef, None, None]:
-        """asyncio.Queueから同期的にCCDを取得"""
+        """asyncio.Queueから同期的にCCDを取得。
+
+        coordinatorからのend signal (None) または cancel_event で終了する。
+        idle timeoutは使わない: coordinatorが all_completed 時に end signal を
+        送信するため、generator側でのタイムアウト判定は不要。
+        """
+        ccd_index = 0
         while not cancel_event.is_set():
             try:
+                t_wait_start = time.monotonic()
                 future = asyncio.run_coroutine_threadsafe(
                     asyncio.wait_for(ccd_queue.get(), timeout=1.0),
                     loop,
                 )
                 ccd_ref = future.result(timeout=2.0)
+                t_wait_end = time.monotonic()
                 if ccd_ref is None:
+                    logger.info("ccd_generator: received end signal (None), yielded %d CCDs", ccd_index)
                     break
+                ccd_index += 1
+                logger.info(
+                    "ccd_generator: yielding %s (index=%d, queue_wait=%.3fs)",
+                    ccd_ref.ccd, ccd_index, t_wait_end - t_wait_start,
+                )
                 yield ccd_ref
             except asyncio.TimeoutError:
                 continue
-            except Exception:
+            except Exception as e:
+                logger.warning(f"ccd_generator: exception {e}, breaking")
                 break
+        else:
+            logger.info("ccd_generator: cancel_event is set, exiting after %d CCDs", ccd_index)
 
     def put_result(msg: GeneratorMessage) -> None:
-        """結果キューにメッセージを追加"""
-        asyncio.run_coroutine_threadsafe(result_queue.put(msg), loop)
+        """結果キューにメッセージを追加（同期的に完了を待つ）"""
+        if isinstance(msg, CompletedMessage):
+            logger.info(f"put_result: sending CompletedMessage for {msg.ccd_name}")
+        future = asyncio.run_coroutine_threadsafe(result_queue.put(msg), loop)
+        future.result(timeout=30.0)  # 結果喪失を防ぐため完了を待つ
+        if isinstance(msg, CompletedMessage):
+            logger.info(f"put_result: CompletedMessage for {msg.ccd_name} queued successfully")
 
     # 既存パイプラインを使用
     for msg in generate_single_fits_tiles_pipeline(job, ccd_generator()):
-        if cancel_event.is_set():
-            break
-
         match msg:
             case GenerateSingleFitsTilesProgress(ccd_name=ccd_name, progress=progress):
+                if cancel_event.is_set():
+                    break
                 put_result(ProgressMessage(
                     ccd_name=ccd_name,
                     stage="generating",
                     progress=progress,
                 ))
             case CcdMetadata(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox):
+                # CcdMetadata は cancel_event に関係なく必ず送信する
                 put_result(CompletedMessage(
                     ccd_name=ccd_name,
                     image_stat=image_stat,

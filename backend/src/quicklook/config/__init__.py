@@ -80,25 +80,34 @@ class Config(BaseSettings):
     comm_heartbeat_timeout: int = 2  # seconds
     comm_registration_interval: int = 10  # seconds
     rpc_timeout_total: float = 600  # seconds
+    rpc_open_timeout: float = 10  # seconds - timeout for WebSocket connection establishment
+    rpc_close_timeout: float = 5  # seconds - timeout for WebSocket close handshake
+    rpc_ping_interval: float = 5  # seconds - interval for WebSocket ping frames
+    rpc_ping_timeout: float = 10  # seconds - timeout for WebSocket pong response
     rpc_process_pool_workers: int = 4
+
+    # HTTP client settings (aiohttp.TCPConnector)
+    http_client_connection_limit: int = 100
+    http_client_dns_cache_ttl: int = 300  # seconds
+    http_client_keepalive_timeout: int = 30  # seconds
 
     # Job settings
     generator_max_concurrent_jobs: int = 4
-    generator_max_concurrent_ccds_per_job: int = 25 # ~4GB
+    generator_max_concurrent_ccds_per_job: int = 10 # ~1.6GB per generator; reduced from 25 to prevent OOMKill cascades
     merge_tile_parallel: int = 4
     transfer_tile_parallel: int = 4
 
     # CCD resubmit settings (for slow generator mitigation)
-    resubmit_min_age_seconds: float = 120.0  # CCDs older than this (in seconds) are eligible for resubmit
-    resubmit_max_attempts_per_ccd: int = 1   # Maximum resubmit attempts per CCD (0 to disable resubmit)
+    resubmit_min_age_seconds: float = 10.0
+    resubmit_max_attempts_per_ccd: int = 3   # Maximum resubmit attempts per CCD (0 to disable resubmit)
     ccd_queue_timeout_seconds: float = 60.0  # Timeout for Generator-side queue.get() to detect connection loss (1 minute)
-    generate_single_fits_tiles_timeout_seconds: float = 600.0  # Timeout for entire CCD processing phase (10 minutes)
+    generate_single_fits_tiles_timeout_seconds: float = 120.0  # Timeout for entire CCD processing phase
 
     # Pipeline settings
     pipeline_queue_size: int = 64
     pipeline_generate_single_fits_tiles: int = 1
     pipeline_transfer_queue_size: int = 8
-    pipeline_merge_tiles: int = 2
+    pipeline_merge_tiles: int = 1
     pipeline_transfer_tiles: int = 2
 
     # Logging settings
@@ -119,7 +128,7 @@ class Config(BaseSettings):
     housekeeping_keep_recent_count: int = 10  # 最近作成されたquicklookをこの数だけ保持（アクセス頻度に関係なく）
 
     # Pipeline stage timeout settings (in seconds)
-    pipeline_stage_timeout: int = 180  # 3 minutes
+    pipeline_stage_timeout: int = 600  # 10 minutes; merge_tiles can be slow with concurrent jobs
 
     # CCD Data Types configuration
     ccd_data_types: list[CcdDataTypeConfig] = [

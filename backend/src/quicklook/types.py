@@ -48,11 +48,6 @@ class CcdDataRef:
     def fullname(self) -> str:
         return f"{self.visit}/{self.ccd}"
 
-    @property
-    def ccd_name(self) -> CcdName:
-        # TODO: 代わりにself.ccdを使う
-        return self.ccd
-
     def __str__(self) -> str:  # pragma: no cover
         return self.fullname
 

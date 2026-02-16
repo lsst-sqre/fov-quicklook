@@ -6,8 +6,6 @@ Coordinatorとの疎通を定期的に確認し、Coordinator IDが変化した�
 """
 
 import asyncio
-import os
-import signal
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -17,6 +15,7 @@ import aiohttp
 import quicklook.mylogging
 from quicklook.comm.types import CoordinatorId
 from quicklook.config import config
+from quicklook.utils.http_client import get_session, managed_session
 
 logger = quicklook.mylogging.getLogger(__name__)
 
@@ -34,15 +33,16 @@ async def lifespan(app: Any) -> AsyncIterator[None]:
     """
     Frontend API起動時にCoordinator IDを取得し、定期的に確認するタスクを開始。
     """
-    check_task = asyncio.create_task(_coordinator_check_loop())
-    try:
-        yield
-    finally:
-        check_task.cancel()
+    async with managed_session():
+        check_task = asyncio.create_task(_coordinator_check_loop())
         try:
-            await check_task
-        except asyncio.CancelledError:
-            pass
+            yield
+        finally:
+            check_task.cancel()
+            try:
+                await check_task
+            except asyncio.CancelledError:
+                pass
 
 
 async def _coordinator_check_loop():
@@ -75,14 +75,14 @@ async def _fetch_coordinator_id() -> CoordinatorId | None:
     url = f"{config.coordinator_base_url}/comm/healthz"
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=timeout) as response:
-                response.raise_for_status()
-                data = await response.json()
-                coordinator_id = data.get("coordinator_id")
-                if coordinator_id:
-                    return CoordinatorId(coordinator_id)
-                return None
+        session = get_session()
+        async with session.get(url, timeout=timeout) as response:
+            response.raise_for_status()
+            data = await response.json()
+            coordinator_id = data.get("coordinator_id")
+            if coordinator_id:
+                return CoordinatorId(coordinator_id)
+            return None
     except Exception as e:
         logger.debug(f"Frontend: Failed to fetch coordinator ID: {e}")
         return None
@@ -90,8 +90,5 @@ async def _fetch_coordinator_id() -> CoordinatorId | None:
 
 async def _shutdown():
     """Frontend APIプロセスを終了"""
-    logger.warning("Frontend: Shutting down due to coordinator restart")
-    await asyncio.sleep(1)
-    os.kill(os.getpid(), signal.SIGINT)
-    await asyncio.sleep(5)
-    os.kill(os.getpid(), signal.SIGKILL)  # pragma: no cover
+    from quicklook.utils.graceful_shutdown import graceful_shutdown
+    await graceful_shutdown(sigint_delay=1, sigkill_delay=5, reason="Coordinator restart detected")

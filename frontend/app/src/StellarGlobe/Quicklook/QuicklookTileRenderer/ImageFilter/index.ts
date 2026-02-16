@@ -1,16 +1,6 @@
 import { ImageFilter } from "@stellar-globe/stellar-globe"
 import colormapGray from './colormap-Gray.glsl?raw'
 
-// 'optionA.csv': 'magma',
-// 'optionB.csv': 'inferno',
-// 'optionC.csv': 'plasma',
-// 'optionD.csv': 'viridis',
-// 'optionE.csv': 'cividis',
-// 'optionF.csv': 'rocket',
-// 'optionG.csv': 'mako',
-// 'optionH.csv': 'turbo',
-// 'viridis_map.csv': 'viridis',
-
 import colormapCividis from './viridisLite/colormap/cividis.glsl?raw'
 import colormapInferno from './viridisLite/colormap/inferno.glsl?raw'
 import colormapMagma from './viridisLite/colormap/magma.glsl?raw'

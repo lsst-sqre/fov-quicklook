@@ -3,7 +3,7 @@ import ccdNameTable from './ccdname-table.json'
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { angle, V2 } from "@stellar-globe/stellar-globe"
 import { initialSearchParams } from "../../hooks/useHashSync"
-import { RubinImageFilter, RubinImageFilterParams } from "../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter"
+import { RubinImageFilter, RubinImageFilterParams } from "../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter"
 import { ListVisitsApiArg, SystemInfo } from "../api/openapi"
 
 export type CcdDataType = NonNullable<ListVisitsApiArg["dataType"]>

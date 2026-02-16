@@ -2,24 +2,14 @@ import { memo, useEffect, useRef } from "react"
 import { AppState } from "../../../store"
 import { useAppSelector } from "../../../store/hooks"
 
-// 'optionA.csv': 'magma',
-// 'optionB.csv': 'inferno',
-// 'optionC.csv': 'plasma',
-// 'optionD.csv': 'viridis',
-// 'optionE.csv': 'cividis',
-// 'optionF.csv': 'rocket',
-// 'optionG.csv': 'mako',
-// 'optionH.csv': 'turbo',
-// 'viridis_map.csv': 'viridis',
-
-import magma from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/json/magma.json'
-import inferno from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/json/inferno.json'
-import plasma from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/json/plasma.json'
-import viridis from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/json/viridis.json'
-import cividis from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/json/cividis.json'
-import rocket from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/json/rocket.json'
-import mako from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/json/mako.json'
-import turbo from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImaegFilter/viridisLite/json/turbo.json'
+import magma from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter/viridisLite/json/magma.json'
+import inferno from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter/viridisLite/json/inferno.json'
+import plasma from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter/viridisLite/json/plasma.json'
+import viridis from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter/viridisLite/json/viridis.json'
+import cividis from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter/viridisLite/json/cividis.json'
+import rocket from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter/viridisLite/json/rocket.json'
+import mako from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter/viridisLite/json/mako.json'
+import turbo from '../../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter/viridisLite/json/turbo.json'
 import { V3 } from "@stellar-globe/stellar-globe"
 
 const colormaps = {

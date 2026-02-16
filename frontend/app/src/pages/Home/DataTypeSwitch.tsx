@@ -36,7 +36,7 @@ export function DataTypeSwitch() {
           <button
             key={key}
             className={classNames(currentType === key && styles.selectedType)}
-            disabled={!types.includes(data_type as DataType)}
+            disabled={!types.includes(key as DataType)}
             onClick={() => changeType(key as DataType)}
           >
             {display_name}

@@ -14,7 +14,7 @@ from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.types import CcdDataRef, CcdName, VisitName
 from quicklook.utils.geom import BBox
 
-from .generate_single_fits_tiles_coordinator import CcdDispatcher, CcdSubmission
+from .ccd_dispatcher import CcdDispatcher, CcdSubmission
 
 
 def make_ccd_ref(ccd_name: str) -> CcdDataRef:
@@ -47,7 +47,7 @@ class TestCcdDispatcherPhase1:
             ccd = await dispatcher.get_next_ccd(generator_id)
             if ccd is None:
                 break
-            results.append(ccd.ccd_name)
+            results.append(ccd.ccd)
 
         assert len(results) == 5
         assert results == [CcdName(f"R{i:02d}") for i in range(5)]
@@ -116,12 +116,12 @@ class TestCcdDispatcherPhase2:
         assert ccd1 is not None and ccd2 is not None
 
         # gen2のCCDを完了
-        await dispatcher.on_ccd_completed(ccd2.ccd_name, make_ccd_metadata(str(ccd2.ccd_name)), gen2)
+        await dispatcher.on_ccd_completed(ccd2.ccd, make_ccd_metadata(str(ccd2.ccd)), gen2)
 
         # Phase 2: gen2が再度CCDを要求 → gen1の未完了CCDが再割り当て
         resubmitted = await dispatcher.get_next_ccd(gen2)
         assert resubmitted is not None
-        assert resubmitted.ccd_name == ccd1.ccd_name  # gen1に割り当てられていたCCDが再割り当て
+        assert resubmitted.ccd == ccd1.ccd  # gen1に割り当てられていたCCDが再割り当て
 
     @pytest.mark.asyncio
     async def test_resubmit_respects_min_age(self):
@@ -141,7 +141,7 @@ class TestCcdDispatcherPhase2:
         assert ccd1 is not None and ccd2 is not None
 
         # gen2のCCDを完了
-        await dispatcher.on_ccd_completed(ccd2.ccd_name, make_ccd_metadata(str(ccd2.ccd_name)), gen2)
+        await dispatcher.on_ccd_completed(ccd2.ccd, make_ccd_metadata(str(ccd2.ccd)), gen2)
 
         # まだ60秒経過していないので再割り当てされない
         resubmitted = await dispatcher.get_next_ccd(gen2)
@@ -224,7 +224,7 @@ class TestCcdDispatcherPhase2:
         assert ccd2 is not None
 
         # gen2のCCDを完了
-        await dispatcher.on_ccd_completed(ccd2.ccd_name, make_ccd_metadata(str(ccd2.ccd_name)), gen2)
+        await dispatcher.on_ccd_completed(ccd2.ccd, make_ccd_metadata(str(ccd2.ccd)), gen2)
 
         # 再submitは無効なのでNone
         resubmitted = await dispatcher.get_next_ccd(gen2)
@@ -252,13 +252,13 @@ class TestCcdDispatcherConcurrency:
             while True:
                 ccd = await dispatcher.get_next_ccd(gen_id)
                 async with lock:
-                    results.append((gen_id, ccd.ccd_name if ccd else None))
+                    results.append((gen_id, ccd.ccd if ccd else None))
                 if ccd is None:
                     break
                 # 完了を記録
                 await dispatcher.on_ccd_completed(
-                    ccd.ccd_name,
-                    make_ccd_metadata(str(ccd.ccd_name)),
+                    ccd.ccd,
+                    make_ccd_metadata(str(ccd.ccd)),
                     gen_id,
                 )
 

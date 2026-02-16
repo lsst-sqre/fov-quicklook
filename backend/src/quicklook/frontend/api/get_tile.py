@@ -13,6 +13,7 @@ from quicklook.config import config
 from quicklook.generator.generator_assignment import GeneratorAssignment, NoGeneratorFoundError
 from quicklook.object_storage import VisitObjectStorage
 from quicklook.tileinfo import TileInfo
+from quicklook.utils.http_client import get_session
 from quicklook.types import TilePos, VisitName
 from quicklook.utils import zstd
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
@@ -50,13 +51,6 @@ async def get_tile(
     raise HTTPException(status_code=404, detail='Tile not found')
 
 
-# @ttlcache(60)
-# async def _object_storage_ready(visit: VisitName):
-#     async with get_db_session() as session:
-#         result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit, Quicklook.ready == True))
-#         return not not result.scalar_one_or_none()
-
-
 async def _get_tile_from_object_storage(visit: VisitName, pos: TilePos) -> Response:
     object_storage = VisitObjectStorage(visit)
     try:
@@ -78,17 +72,16 @@ async def _gather_single_fits_tiles(
         raise HTTPException(404)
 
     async def get_npy(generator: GeneratorInfo) -> numpy.ndarray:
-        async with aiohttp.ClientSession() as session:
-            # TODO: sessionを使い回すように
-            async with session.get(
-                f'{generator.url}/jobs/{job.id}/tiles/{pos.level}/{pos.i}/{pos.j}',
-                raise_for_status=True,
-                timeout=aiohttp.ClientTimeout(total=1),
-            ) as response:
-                assert (
-                    response.headers['Content-Type'] == 'application/npy'
-                ), f'Unexpected Content-Type: {response.headers["Content-Type"]}'
-                return npybytes2ndarray(await response.read())
+        session = get_session()
+        async with session.get(
+            f'{generator.url}/jobs/{job.id}/tiles/{pos.level}/{pos.i}/{pos.j}',
+            raise_for_status=True,
+            timeout=aiohttp.ClientTimeout(total=1),
+        ) as response:
+            assert (
+                response.headers['Content-Type'] == 'application/npy'
+            ), f'Unexpected Content-Type: {response.headers["Content-Type"]}'
+            return npybytes2ndarray(await response.read())
 
     generators = set(
         dist_config.generators[dist_config.ccd_generator_map[ccd]]
@@ -148,14 +141,13 @@ async def _fetch_merged_tile(
 
     generator = dist_config.generators[generator_id]
 
-    async with aiohttp.ClientSession() as session:
-        # TODO: sessionを使い回すように
-        async with session.get(
-            f'{generator.url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}',
-            raise_for_status=True,
-        ) as response:
-            assert response.headers['Content-Type'] == 'application/npy+zstd'
-            return Response(await response.read(), media_type='application/npy+zstd', headers=headers)
+    session = get_session()
+    async with session.get(
+        f'{generator.url}/jobs/{job.id}/merged-tiles/{pos.level}/{pos.i}/{pos.j}',
+        raise_for_status=True,
+    ) as response:
+        assert response.headers['Content-Type'] == 'application/npy+zstd'
+        return Response(await response.read(), media_type='application/npy+zstd', headers=headers)
 
 
 @cache

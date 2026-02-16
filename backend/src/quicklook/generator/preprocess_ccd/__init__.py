@@ -33,11 +33,9 @@ def preprocess_ccd_calexp(
     ccd_ref: CcdDataRef,
     path: Path,
 ) -> 'PreProcessedCcd':
-    ccd_name = ccd_ref.ccd_name
+    ccd_name = ccd_ref.ccd
     with timeit(f'preprocess-{ccd_ref.fullname}'):
         hdul = pyfits.open(path, memmap=False)
-        # header = hdul[0].header  # type: ignore
-        # assert ccd_name == f'{header["RAFTNAME"]}_{header["SENSNAME"]}'
         bbox = ccds_by_name()[ccd_name].bbox
         raw_data: numpy.ndarray = hdul[1].data.astype('<f4', copy=False)  # type: ignore
         h, w = raw_data.shape
@@ -83,7 +81,7 @@ def preprocess_ccd_raw(
     ccd_ref: CcdDataRef,
     path: Path,
 ) -> 'PreProcessedCcd':
-    ccd_name = ccd_ref.ccd_name
+    ccd_name = ccd_ref.ccd
     with timeit(f'preprocess-{ccd_ref.fullname}'):
         hdul = pyfits.open(path, memmap=False)
         header = hdul[0].header  # type: ignore
@@ -110,7 +108,6 @@ class AssemblyResult:
 
 
 def assemble_raw_amps(amps: Iterable[RawAmp], ccd_name: str) -> AssemblyResult:
-    # bbox = functools.reduce(lambda a, b: a.union(b.wcs.bbox), amps[1:], amps[0].wcs.bbox)
     bbox = ccds_by_name()[ccd_name].bbox
     pool = numpy.zeros(
         (int(bbox.maxy - bbox.miny) + 1, int(bbox.maxx - bbox.minx) + 1, 2),

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar
 
 import websockets
 
+from quicklook.config import config
 from .queue import _RpcQueue
 
 if TYPE_CHECKING:
@@ -54,7 +55,13 @@ class Rpc(Generic[P, R]):
         self.kwargs = kwargs
 
     async def run(self) -> R:
-        ws = await websockets.connect(self.endpoint_url)
+        ws = await websockets.connect(
+            self.endpoint_url,
+            open_timeout=config.rpc_open_timeout,
+            close_timeout=config.rpc_close_timeout,
+            ping_interval=config.rpc_ping_interval,
+            ping_timeout=config.rpc_ping_timeout,
+        )
 
         try:
             async with _handle_rpc_arguments(self.args, self.kwargs, ws):
@@ -86,7 +93,13 @@ class Rpc(Generic[P, R]):
             await self._close(ws)
 
     async def iterate(self) -> AsyncIterator[R]:
-        ws = await websockets.connect(self.endpoint_url)
+        ws = await websockets.connect(
+            self.endpoint_url,
+            open_timeout=config.rpc_open_timeout,
+            close_timeout=config.rpc_close_timeout,
+            ping_interval=config.rpc_ping_interval,
+            ping_timeout=config.rpc_ping_timeout,
+        )
 
         try:
             async with _handle_rpc_arguments(self.args, self.kwargs, ws):

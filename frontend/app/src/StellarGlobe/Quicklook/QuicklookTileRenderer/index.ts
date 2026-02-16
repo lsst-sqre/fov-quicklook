@@ -1,7 +1,7 @@
 import { Cache, Globe, ReleaseCallbacks, Tract, V2, angle, tile } from "@stellar-globe/stellar-globe"
 import npyjs from 'npyjs'
 import { QuicklookMetadata, QuicklookMetadataReady } from "../../../store/api/openapi"
-import { RubinImageFilter, RubinImageFilterParams } from "./ImaegFilter"
+import { RubinImageFilter, RubinImageFilterParams } from "./ImageFilter"
 import { zstdDecompress } from "./zstd"
 import { env } from "../../../env"
 

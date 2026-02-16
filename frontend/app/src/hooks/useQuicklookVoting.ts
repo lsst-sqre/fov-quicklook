@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { env } from "../env"
 import { useVoteQuicklookMutation, useUnvoteQuicklookMutation } from "../store/api/openapi"
 import { useWatch } from "./useWatch"
 
@@ -24,7 +25,7 @@ export function useQuicklookVoting(visitName: string | undefined) {
     const handleBeforeUnload = () => {
       if (visitName) {
         const blob = new Blob([JSON.stringify({})], { type: 'application/json' })
-        navigator.sendBeacon(`/api/quicklooks/${visitName}/unvote`, blob)
+        navigator.sendBeacon(`${env.baseUrl}/api/quicklooks/${visitName}/unvote`, blob)
       }
     }
 

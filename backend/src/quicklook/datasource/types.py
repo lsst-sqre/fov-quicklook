@@ -1,8 +1,8 @@
 import abc
-import asyncio
 from dataclasses import dataclass
 
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
+from quicklook.utils.async_wrap import async_wrap
 
 
 @dataclass
@@ -32,36 +32,31 @@ class DataSourceBase(abc.ABC):
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
         ...
 
-    async def query_visits(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
-        return await asyncio.to_thread(self.query_visits_sync, q)
+    query_visits = async_wrap(query_visits_sync)
 
     @abc.abstractmethod
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover
         ...
 
-    async def list_ccds(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover
-        return await asyncio.to_thread(self.list_ccds_sync, visit)
+    list_ccds = async_wrap(list_ccds_sync)
 
     @abc.abstractmethod
     def get_data_sync(self, ref: CcdDataRef) -> bytes:  # pragma: no cover
         ...
 
-    async def get_data(self, ref: CcdDataRef) -> bytes:  # pragma: no cover
-        return await asyncio.to_thread(self.get_data_sync, ref)
+    get_data = async_wrap(get_data_sync)
 
     @abc.abstractmethod
     def get_metadata_sync(self, ref: CcdDataRef) -> 'DataSourceCcdMetadata':  # pragma: no cover
         ...
 
-    async def get_metadata(self, ref: CcdDataRef) -> 'DataSourceCcdMetadata':  # pragma: no cover
-        return await asyncio.to_thread(self.get_metadata_sync, ref)
+    get_metadata = async_wrap(get_metadata_sync)
 
     @abc.abstractmethod
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:  # pragma: no cover
         ...
 
-    async def get_exposure_data_types(self, exposure_id: int) -> list[CcdDataType]:  # pragma: no cover
-        return await asyncio.to_thread(self.get_exposure_data_types_sync, exposure_id)
+    get_exposure_data_types = async_wrap(get_exposure_data_types_sync)
 
 
 @dataclass

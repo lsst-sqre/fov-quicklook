@@ -8,6 +8,7 @@ import quicklook.mylogging
 import quicklook.object_storage as storage
 from quicklook.frontend.api.quicklooks import QuicklookSharedStatus
 from quicklook.types import CcdName, VisitName
+from quicklook.utils.http_client import get_session
 from quicklook.utils.fitsheader import HeaderType
 
 from .deps import dep_ccd_name, dep_visit_name
@@ -57,8 +58,8 @@ async def _get_fits_header_from_generator(
 
     generator = dist_config.generators[dist_config.ccd_generator_map[ccd]]
     url = f'{generator.url}/jobs/{job.id}/fits-headers/{ccd}.pickle'
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, raise_for_status=True) as response:
-            assert response.content_type == 'application/python-pickle'
-            data_bytes = await response.read()
-            return pickle.loads(data_bytes)
+    session = get_session()
+    async with session.get(url, raise_for_status=True) as response:
+        assert response.content_type == 'application/python-pickle'
+        data_bytes = await response.read()
+        return pickle.loads(data_bytes)

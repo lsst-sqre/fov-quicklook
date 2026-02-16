@@ -48,7 +48,7 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         for data_type_config in config.ccd_data_types:
             datasource = _get_datasource(data_type_config.data_type, data_type_config.repository_name)
             if datasource.exposure_exists(exposure_id):
-                types.append(CcdDataType(data_type_config.data_type))
+                types.append(CcdDataType(f"{data_type_config.repository_name}:{data_type_config.data_type}"))
         return types
 
 
@@ -154,7 +154,7 @@ class DataTypeSpecificDataSource:
 
     def _getUri(self, ref: CcdDataRef) -> ResourcePath:
         b = self._butler
-        detector_id = Instrument.get(self.instrument).ccd_2_detector[ref.ccd_name]
+        detector_id = Instrument.get(self.instrument).ccd_2_detector[ref.ccd]
         butler_ref = self._refs_by_visit(ref.visit)[detector_id]
         return b.getURI(butler_ref)  # type: ignore
 
@@ -165,7 +165,7 @@ class DataTypeSpecificDataSource:
 
     def get_metadata(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
         b = self._butler
-        detector_id = Instrument.get(self.instrument).ccd_2_detector[ref.ccd_name]
+        detector_id = Instrument.get(self.instrument).ccd_2_detector[ref.ccd]
         butler_refs = b.query_datasets(
             self.butler_data_type,
             where=f"{self.data_id_dimension}={ref.visit.name} and detector={detector_id}",
@@ -177,7 +177,7 @@ class DataTypeSpecificDataSource:
         butler_ref = butler_refs[0]
         return DataSourceCcdMetadata(
             detector=detector_id,
-            ccd_name=ref.ccd_name,
+            ccd_name=ref.ccd,
             day_obs=butler_ref.dataId.get('day_obs', -1),
             exposure=butler_ref.dataId.get(self.data_id_dimension, -1),
             visit_name=ref.visit,
