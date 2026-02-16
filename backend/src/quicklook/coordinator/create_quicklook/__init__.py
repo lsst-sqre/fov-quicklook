@@ -240,6 +240,22 @@ async def _finalize_success(result: _PipelineResult):
         profile_summary['upload_to_object_storage'],
         profile_summary['total'],
     )
+    # CCD別・Generator別の詳細プロファイルをログ出力
+    ccds = profile_summary.get('ccds', [])
+    if ccds:
+        top_n = min(10, len(ccds))
+        slowest = ccds[:top_n]
+        logger.info(
+            "Slowest %d CCDs: %s",
+            top_n,
+            ", ".join(f"{c['ccd_name']}({c['elapsed']:.1f}s,{c['generator_id']})" for c in slowest),
+        )
+    generators = profile_summary.get('generators', [])
+    if generators:
+        logger.info(
+            "Generator profiles: %s",
+            ", ".join(f"{g['generator_id']}({g['elapsed']:.1f}s,{g['ccd_count']}ccds)" for g in generators),
+        )
     await job.object_storage.put_time_profile(profile_summary)
 
     # DBレコードを更新

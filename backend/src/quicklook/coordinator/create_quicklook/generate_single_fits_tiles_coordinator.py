@@ -178,6 +178,9 @@ class CcdDispatcher:
                 # 再submit無効化
                 return None
 
+            now = datetime.now()
+            skipped_young = 0
+            skipped_maxattempts = 0
             for offset in range(len(self._submitted_ccds)):
                 idx = (self._phase2_index + offset) % len(self._submitted_ccds)
                 submission = self._submitted_ccds[idx]
@@ -188,17 +191,33 @@ class CcdDispatcher:
                     continue
 
                 # 暴走防止: 一定時間以上"古い"in-flightのみ
-                age_seconds = (datetime.now() - submission.submitted_at).total_seconds()
+                age_seconds = (now - submission.submitted_at).total_seconds()
                 if age_seconds < self._resubmit_min_age_seconds:
+                    skipped_young += 1
                     continue
 
                 # 暴走防止: 再submit上限チェック
                 if self._attempts[ccd_name] > self._resubmit_max_attempts_per_ccd:
+                    skipped_maxattempts += 1
                     continue
 
                 self._attempts[ccd_name] += 1
                 self._phase2_index = (idx + 1) % len(self._submitted_ccds)
+                remaining_incomplete = len(self._ccd_refs) - len(self._ccd_metadata_dict)
+                logger.info(
+                    f"Phase2 resubmit: CCD {ccd_name} → {generator_id} "
+                    f"(age={age_seconds:.1f}s, attempt={self._attempts[ccd_name]}, "
+                    f"remaining_incomplete={remaining_incomplete})"
+                )
                 return submission.ccd_ref
+
+            if skipped_young > 0 or skipped_maxattempts > 0:
+                remaining_incomplete = len(self._ccd_refs) - len(self._ccd_metadata_dict)
+                logger.debug(
+                    f"Phase2 no resubmit candidate for {generator_id}: "
+                    f"skipped_young={skipped_young}, skipped_maxattempts={skipped_maxattempts}, "
+                    f"remaining_incomplete={remaining_incomplete}"
+                )
 
             return None
 
@@ -221,7 +240,17 @@ class CcdDispatcher:
                 self._ccd_complete_time[ccd_name] = time.time()
                 self._generator_ccd_count[generator_id] += 1
 
-                if len(self._ccd_metadata_dict) == len(self._ccd_refs):
+                completed = len(self._ccd_metadata_dict)
+                total = len(self._ccd_refs)
+                remaining = total - completed
+                assign_time = self._ccd_assign_time.get(ccd_name, 0.0)
+                elapsed = self._ccd_complete_time[ccd_name] - assign_time if assign_time > 0 else 0.0
+                logger.info(
+                    f"CCD {ccd_name} completed: {completed}/{total} (remaining={remaining}) "
+                    f"elapsed={elapsed:.1f}s generator={generator_id}"
+                )
+
+                if completed == total:
                     self._all_completed.set()
 
     async def return_unassigned_ccd(self, ccd_ref: CcdDataRef) -> None:
@@ -574,7 +603,6 @@ async def _handle_generator_message(
                 bbox=bbox,  # type: ignore
             )
             await dispatcher.on_ccd_completed(ccd_name, metadata, generator.id)
-            logger.info(f"CCD {ccd_name} completed from {generator.id}, total: {len(dispatcher.ccd_metadata_dict)}/{len(dispatcher._ccd_refs)}")
 
             # 追加CCD割り当て
             next_ccd = await dispatcher.get_next_ccd(generator.id)

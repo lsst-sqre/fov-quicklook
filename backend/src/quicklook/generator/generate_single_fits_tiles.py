@@ -3,6 +3,7 @@ import gc
 import multiprocessing
 import queue
 import tempfile
+import time
 import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -79,12 +80,19 @@ def generate_single_fits_tiles_pipeline(
                     yield path
 
         def download(ref: CcdDataRef):
+            t0 = time.monotonic()
             download_sem.acquire()
+            t_sem = time.monotonic()
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 1)))
             data_bytes = ds.get_data_sync(ref)
+            t_dl = time.monotonic()
             outpath = Path(tmpdir) / f"{ref.ccd_name}_{uuid.uuid4().hex[:8]}.fits"
             outpath.write_bytes(data_bytes)
-            logger.info("Downloaded %s (%d bytes)", ref.ccd_name, len(data_bytes))
+            logger.info(
+                "Downloaded %s (%d bytes) sem_wait=%.3fs download=%.3fs total=%.3fs",
+                ref.ccd_name, len(data_bytes),
+                t_sem - t0, t_dl - t_sem, t_dl - t0,
+            )
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd_name, progress=Progress(4, 2)))
             return (ref, outpath)
 
@@ -140,8 +148,10 @@ class ProcessCcdArgs:
 
 
 def _process_ccd(args: ProcessCcdArgs):
+    t_start = time.monotonic()
     try:
         ppccd = preprocess_ccd(args.ref, args.path)
+        t_preprocess = time.monotonic()
         args.progress.put(
             GenerateSingleFitsTilesProgress(
                 ccd_name=ppccd.data_ref.ccd_name,
@@ -153,6 +163,7 @@ def _process_ccd(args: ProcessCcdArgs):
         args.download_sem.release()
 
     generate_tiles(ppccd, args.job)
+    t_tiles = time.monotonic()
     args.progress.put(
         GenerateSingleFitsTilesProgress(
             ccd_name=ppccd.data_ref.ccd_name,
@@ -161,6 +172,16 @@ def _process_ccd(args: ProcessCcdArgs):
     )
 
     args.job.local_storage.fits_header.save(args.ref.ccd_name, ppccd.headers)
+    t_end = time.monotonic()
+
+    logger.info(
+        "_process_ccd %s: preprocess=%.3fs tiles=%.3fs save_header=%.3fs total=%.3fs",
+        args.ref.ccd_name,
+        t_preprocess - t_start,
+        t_tiles - t_preprocess,
+        t_end - t_tiles,
+        t_end - t_start,
+    )
 
     # CcdMetadata を return して main() 側で q.put する。
     # ワーカープロセスから Manager Queue proxy 経由で直接 put すると、
@@ -172,7 +193,6 @@ def _process_ccd(args: ProcessCcdArgs):
         amps=ppccd.amps,
         bbox=ppccd.bbox,
     )
-    logger.info(f"_process_ccd returning CcdMetadata for {args.ref.ccd_name}")
     return ccd_metadata
 
 
