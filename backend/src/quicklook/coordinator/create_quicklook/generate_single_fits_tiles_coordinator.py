@@ -170,7 +170,7 @@ class CcdDispatcher:
                 # 初回assignの時刻を記録
                 if ccd_ref.ccd_name not in self._ccd_assign_time:
                     self._ccd_assign_time[ccd_ref.ccd_name] = time.time()
-                logger.debug(f"Phase1 assign: CCD {ccd_ref.ccd_name} → {generator_id} (index={self._remaining_index-1}, total_submitted={self._remaining_index})")
+                logger.info(f"Phase1 assign: CCD {ccd_ref.ccd_name} \u2192 {generator_id} (index={self._remaining_index-1}, total_submitted={self._remaining_index})")
                 return ccd_ref
 
             # Phase 2: 未完了CCDを（提出順の）ラウンドロビンで再submit
@@ -213,7 +213,7 @@ class CcdDispatcher:
 
             if skipped_young > 0 or skipped_maxattempts > 0:
                 remaining_incomplete = len(self._ccd_refs) - len(self._ccd_metadata_dict)
-                logger.debug(
+                logger.info(
                     f"Phase2 no resubmit candidate for {generator_id}: "
                     f"skipped_young={skipped_young}, skipped_maxattempts={skipped_maxattempts}, "
                     f"remaining_incomplete={remaining_incomplete}"
