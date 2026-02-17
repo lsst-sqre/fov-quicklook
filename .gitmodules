@@ -1,6 +1,3 @@
-[submodule "k8s/phalanx"]
-	path = k8s/phalanx
-	url = git@github.com:lsst-sqre/phalanx.git
 [submodule "frontend/lib/stellar-globe"]
 	path = frontend/lib/stellar-globe
 	url = https://hsc-gitlab.mtk.nao.ac.jp/michitaro/stellar-globe2
