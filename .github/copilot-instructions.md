@@ -57,8 +57,11 @@
 |------|------|------|
 | `backend/` | Python バックエンド (FastAPI) | `backend/.github/DEVELOPMENT.md` |
 | `frontend/app/` | React フロントエンド | `frontend/app/.github/DEVELOPMENT.md` |
-| `k8s/phalanx/` | Helm チャート | `/docs/phalanx.ja.md` |
+| `k8s/phalanx/` | Helm チャート（独立gitリポジトリ） | `/docs/phalanx.ja.md` |
 | `docs/` | 設計・開発ドキュメント | - |
+
+> **注意**: `k8s/phalanx/` はプロジェクトルートとは別の独立した git リポジトリ（`https://github.com/lsst-sqre/phalanx.git`）です。
+> `.gitignore` で除外されており、サブモジュールではありません。ローカルにクローンして使用します。
 
 ---
 

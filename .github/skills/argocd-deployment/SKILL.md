@@ -87,7 +87,11 @@ Podが起動に失敗している場合、ログの末尾にエラーメッセ�
 ## Phalanxリポジトリの参照ブランチ管理
 
 ArgoCDのfov-quicklookアプリケーションは `lsst-sqre/phalanx` リポジトリの特定ブランチを参照している。
-ローカルの `k8s/phalanx` サブモジュールのブランチとArgoCDの参照ブランチが一致していない場合、設定のミスマッチが発生する。
+
+> **注意**: `k8s/phalanx/` はプロジェクトルートとは別の独立した git リポジトリ（`https://github.com/lsst-sqre/phalanx.git`）です。
+> `.gitignore` で除外されており、サブモジュールではありません。
+
+ローカルの `k8s/phalanx` のブランチとArgoCDの参照ブランチが一致していない場合、設定のミスマッチが発生する。
 
 ```bash
 cd backend/dev
