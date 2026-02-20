@@ -17,6 +17,8 @@ from quicklook.utils.fitsheader import HeaderType
 from quicklook.utils.numpyutils import ndarray2npybytes, npybytes2ndarray
 from quicklook.utils import zstd
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class JobLocalStorage:
@@ -158,8 +160,7 @@ class _SingleFitsTileStorage:
             if merged is None:
                 merged = data.copy()
             else:
-                merged[:, :, 0] += data[:, :, 0]
-                numpy.maximum(merged[:, :, 1], data[:, :, 1], out=merged[:, :, 1])
+                merged += data
         if merged is None:  # pragma: no cover
             # CcdInfo.ofが多少の誤差があるようなので。
             merged = numpy.zeros((config.tile_size, config.tile_size, 2), dtype=numpy.float32)
@@ -178,6 +179,29 @@ class _SingleFitsTileStorage:
 
     def clear(self):
         shutil.rmtree(f'{self.storage.base_dir}/tiles', ignore_errors=True)
+
+    def remove_non_owned_tiles(self):
+        """resubmitの敗者が保持するタイルファイルを削除する。
+
+        dist_config に基づき、このGeneratorが担当でないCCDのタイルファイルを削除する。
+        """
+        dist_config = self.storage.ccd_distribution_config.load()
+        my_id = self_generator_id()
+        owned_ccds = {
+            ccd for ccd, gen_id in dist_config.ccd_generator_map.items()
+            if gen_id == my_id
+        }
+        tiles_dir = Path(f'{self.storage.base_dir}/tiles')
+        if not tiles_dir.exists():
+            return
+        removed = 0
+        for tile_file in tiles_dir.rglob('*.npy.zstd'):
+            ccd_name = CcdName(tile_file.stem.removesuffix('.npy'))
+            if ccd_name not in owned_ccds:
+                tile_file.unlink(missing_ok=True)
+                removed += 1
+        if removed > 0:
+            logger.info(f'Removed {removed} non-owned tile files')
 
 
 @dataclass

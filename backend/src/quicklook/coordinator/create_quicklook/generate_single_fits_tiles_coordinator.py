@@ -402,5 +402,6 @@ def _save_job_metadata_rpc(job: Job) -> None:
 
 
 def _save_ccd_distribution_config_rpc(job: Job, dist_config: CcdDistributionConfig) -> None:
-    """CCD とジェネレータの対応関係をローカルストレージに保存。"""
+    """CCD とジェネレータの対応関係をローカルストレージに保存し、敗者タイルを削除。"""
     job.local_storage.ccd_distribution_config.save(dist_config)
+    job.local_storage.single_fits_tile.remove_non_owned_tiles()
