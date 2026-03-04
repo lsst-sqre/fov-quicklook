@@ -1,5 +1,4 @@
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -72,7 +71,18 @@ async def test_rpc_scatter_with_args_kwargs(mock_generators):
         assert all(r == 100 for r in results)
 
 
+async def test_rpc_scatter_uses_explicit_generators(mock_generators):
+    target = {GeneratorId('gen2'): mock_generators[GeneratorId('gen2')]}
+    with (
+        patch('quicklook.comm.rpc_worker.get_available_generators', return_value={}),
+        patch('quicklook.comm.rpc_worker.RpcClient') as mock_rpc_client,
+    ):
+        mock_rpc_client.return_value.run = AsyncMock(return_value=123)
 
+        results = await rpc_scatter(dummy_rpc_func, generators=target)
+
+        assert results == [123]
+        assert mock_rpc_client.call_count == 1
 
 
 async def test_rpc_scatter_stream_calls_on_yield(mock_generators):
@@ -104,6 +114,32 @@ async def test_rpc_scatter_stream_calls_on_yield(mock_generators):
         assert all(isinstance(v, YieledValue) for v in yielded_values)
         assert all(v.value in ['value1', 'value2', 'value3'] for v in yielded_values)
         assert all(v.generator_id in [GeneratorId('gen1'), GeneratorId('gen2')] for v in yielded_values)
+
+
+async def test_rpc_scatter_stream_uses_explicit_generators(mock_generators):
+    async def mock_generator():
+        yield 'value1'
+
+    yielded_values = []
+
+    async def on_yield(msg: YieledValue):
+        yielded_values.append(msg)
+
+    target = {GeneratorId('gen1'): mock_generators[GeneratorId('gen1')]}
+    with (
+        patch('quicklook.comm.rpc_worker.get_available_generators', return_value={}),
+        patch('quicklook.comm.rpc_worker.RpcClient') as mock_rpc_client,
+    ):
+        def mock_iterate_factory():
+            return mock_generator()
+
+        mock_rpc_client.return_value.iterate = mock_iterate_factory
+
+        await rpc_scatter_stream(on_yield, dummy_rpc_generator_func, generators=target)
+
+        assert len(yielded_values) == 1
+        assert yielded_values[0].generator_id == GeneratorId('gen1')
+        assert yielded_values[0].value == 'value1'
 
 
 async def test_rpc_scatter_with_empty_generators():

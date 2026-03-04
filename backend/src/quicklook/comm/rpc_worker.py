@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, ParamSpec, TypeVar
+from typing import Any, Awaitable, Callable, TypeVar
 
 import quicklook.mylogging
 from quicklook.comm.coordinator import get_available_generators
@@ -10,7 +10,6 @@ from quicklook.rpc import Rpc as RpcClient
 
 logger = quicklook.mylogging.getLogger(__name__)
 
-P = ParamSpec('P')
 R = TypeVar('R')
 
 
@@ -30,9 +29,10 @@ class GeneratorUnavailableError(Exception):
 
 
 async def rpc_scatter(
-    func: Callable[P, R],
-    *args: P.args,
-    **kwargs: P.kwargs,
+    func: Callable[..., R],
+    *args: Any,
+    generators: dict[GeneratorId, GeneratorInfo] | None = None,
+    **kwargs: Any,
 ) -> list[R]:
     """
     全てのジェネレータに対して同じRPC関数を並列実行し、結果を返す
@@ -47,16 +47,16 @@ async def rpc_scatter(
     Returns:
         各ジェネレータからの戻り値のリスト（失敗したGeneratorは除外）
     """
-    generators = get_available_generators()
+    target_generators = get_available_generators() if generators is None else generators
 
     async def single(g: GeneratorInfo) -> R:
         ws_url = f'{g.ws_url}/rpc'
         return await RpcClient(ws_url, func, *args, **kwargs).run()  # type: ignore[return-value]
 
-    results = await asyncio.gather(*[single(g) for g in generators.values()], return_exceptions=True)
+    results = await asyncio.gather(*[single(g) for g in target_generators.values()], return_exceptions=True)
 
     successful_results: list[R] = []
-    for g, result in zip(generators.values(), results):
+    for g, result in zip(target_generators.values(), results):
         if isinstance(result, BaseException):
             logger.error(f"RPC scatter failed for generator {g.id}: {result}")
         else:
@@ -67,9 +67,10 @@ async def rpc_scatter(
 
 async def rpc_scatter_stream(
     on_yield: Callable[[YieledValue], Awaitable],
-    func: Callable[P, Generator[R, Any, Any]],
-    *args: P.args,
-    **kwargs: P.kwargs,
+    func: Callable[..., Generator[R, Any, Any]],
+    *args: Any,
+    generators: dict[GeneratorId, GeneratorInfo] | None = None,
+    **kwargs: Any,
 ) -> None:
     """
     全てのジェネレータに対して同じRPC関数を並列実行し、ストリーム結果を処理する
@@ -85,7 +86,7 @@ async def rpc_scatter_stream(
     Returns:
         None（結果はon_yieldで処理される）
     """
-    generators = get_available_generators()
+    target_generators = get_available_generators() if generators is None else generators
 
     async def single(g: GeneratorInfo) -> None:
         try:
@@ -95,4 +96,4 @@ async def rpc_scatter_stream(
         except Exception as e:
             logger.error(f"RPC scatter stream failed for generator {g.id}: {e}")
 
-    await asyncio.gather(*[single(g) for g in generators.values()])
+    await asyncio.gather(*[single(g) for g in target_generators.values()])

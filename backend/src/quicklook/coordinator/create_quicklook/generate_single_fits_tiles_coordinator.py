@@ -66,11 +66,12 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
       - 最初に完了したGeneratorのみ採用、重複処理結果は破棄
     """
     ccd_refs = sorted(ccd_refs, key=lambda ref: ref.ccd)
-    generators = get_available_generators()
-    if not generators:
+    initial_generators = dict(get_available_generators())
+    if not initial_generators:
         raise RuntimeError("No generators available")
 
-    generator_list = list(generators.values())
+    known_generators = dict(initial_generators)
+    generator_list = list(initial_generators.values())
     dispatcher = CcdDispatcher(ccd_refs)
     max_concurrent_ccds = config.generator_max_concurrent_ccds_per_job
     max_worker_connect_retries = 3
@@ -214,6 +215,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                         await dispatcher.return_unassigned_ccd(ccd_ref)
                         return
                     current_generator = available[generator_id]
+                    known_generators[generator_id] = current_generator
                     pending_resubmit_ccd = ccd_ref
                     logger.info(f"Worker {generator_id} starting new session for resubmit CCD {ccd_ref.ccd}")
 
@@ -233,6 +235,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                     available = get_available_generators()
                     if generator_id in available:
                         current_generator = available[generator_id]
+                        known_generators[generator_id] = current_generator
                         logger.info(f"Retrying with updated generator info: {current_generator.ws_url}")
                     else:
                         logger.warning(f"Generator {generator_id} no longer available, stopping worker")
@@ -255,6 +258,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
     # 新しいgeneratorが登録されたときにworkerを動的に追加するコールバック
     def on_new_generator(generator_info: GeneratorInfo) -> None:
+        known_generators[generator_info.id] = generator_info
         if dispatcher.all_completed.is_set():
             return
         if generator_info.id in active_worker_generator_ids:
@@ -280,9 +284,9 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
     add_on_generator_removed_callback(on_generator_removed)
 
+    timeout_seconds = config.generate_single_fits_tiles_timeout_seconds
     try:
         # 全CCD完了を待機（タイムアウト付き）
-        timeout_seconds = config.generate_single_fits_tiles_timeout_seconds
         await asyncio.wait_for(dispatcher.all_completed.wait(), timeout=timeout_seconds)
     except asyncio.TimeoutError:
         completed_ccds = set(dispatcher.ccd_metadata_dict.keys())
@@ -311,13 +315,19 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
             f"Not all CCDs processed: got {len(dispatcher.ccd_metadata_dict)}/{len(ccd_refs)} metadata"
         )
 
-    dist_config = CcdDistributionConfig(dispatcher.ccd_generator_map, generators)
+    generator_ids = sorted(set(dispatcher.ccd_generator_map.values()))
+    missing_generator_ids = [gid for gid in generator_ids if gid not in known_generators]
+    if missing_generator_ids:
+        raise RuntimeError(f"Missing generator info for completed CCDs: {missing_generator_ids}")
+    job_generators = {gid: known_generators[gid] for gid in generator_ids}
+
+    dist_config = CcdDistributionConfig(dispatcher.ccd_generator_map, job_generators)
     async with job.watcher.notify_shared_large_status():
         job.shared_large_status.dist_config = dist_config
         job.shared_large_status.ccd_metadata_list = [*dispatcher.ccd_metadata_dict.values()]
 
-    await rpc_scatter(_save_job_metadata_rpc, job)
-    await rpc_scatter(_save_ccd_distribution_config_rpc, job, dist_config)
+    await rpc_scatter(_save_job_metadata_rpc, job, generators=job_generators)
+    await rpc_scatter(_save_ccd_distribution_config_rpc, job, dist_config, generators=job_generators)
 
     return GenerateSingleFitsTilesResult(
         ccd_metadata_list=[*dispatcher.ccd_metadata_dict.values()],

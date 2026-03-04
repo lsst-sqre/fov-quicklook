@@ -128,6 +128,18 @@ class _CcdDistributionConfigStorage:
             return pickle.load(f)
 
 
+def _normalize_tile_array(data: numpy.ndarray) -> numpy.ndarray:
+    if data.ndim == 3 and data.shape[2] == 2:
+        return data
+    if data.ndim == 2:
+        h, w = data.shape
+        normalized = numpy.zeros((h, w, 2), dtype=data.dtype)
+        normalized[:, :, 0] = data
+        normalized[:, :, 1] = data != 0
+        return normalized
+    raise ValueError(f'Unexpected tile array shape: {data.shape}')
+
+
 @dataclass
 class _SingleFitsTileStorage:
     storage: JobLocalStorage
@@ -156,7 +168,7 @@ class _SingleFitsTileStorage:
         if ccd_names is None:
             ccd_names = [*self._my_ccd_names(pos)]
         for ccd_name in ccd_names:
-            data = self._load(ccd_name, pos)
+            data = _normalize_tile_array(self._load(ccd_name, pos))
             if merged is None:
                 merged = data.copy()
             else:
