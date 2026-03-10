@@ -14,3 +14,75 @@
 .selectedType {
   color: lightgreen;
 }
+
+.shortcutHelpBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.shortcutHelpDialog {
+  min-width: min(90vw, 320px);
+  max-width: min(90vw, 440px);
+  padding: 16px;
+  color: #fff;
+  background: rgba(18, 18, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.shortcutHelpHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.shortcutHelpTitle {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.shortcutHelpCloseButton {
+  padding: 6px 10px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.shortcutHelpCloseButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.shortcutHelpList {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shortcutHelpItem {
+  display: grid;
+  grid-template-columns: minmax(40px, auto) 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.shortcutHelpKey {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 40px;
+  padding: 4px 8px;
+  font-family: ui-monospace, SFMono-Regular, SFMono, Menlo, Consolas, "Liberation Mono", monospace;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}

@@ -1,12 +1,15 @@
-import { memo, useEffect, useRef } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
 import { CcdDataType, homeSlice } from "../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../store/hooks"
+import { ShortcutHelpDialog } from "./ShortcutHelpDialog"
 import { wrapByHomeContext } from "./context"
+import { HomeShortcutHandlers, useHomeKeyboardShortcuts } from "./keyboardShortcuts"
 import { DataTypeSwitch } from "./DataTypeSwitch"
 import { LineProfiler } from "./LineProfiler"
 import { MainMenu } from "./MainMenu"
 import styles from './styles.module.scss'
+import { useHomeActions } from "./useHomeActions"
 import { Viewer } from "./Viewer"
 import { ViewerSettings } from "./ViewerSettings"
 import { Colorbar } from "./ViewerSettings/Colorbar"
@@ -14,7 +17,23 @@ import { VisitList } from "./VisitList"
 import { useOnChange } from "../../hooks/useOnChange"
 
 export const Home = wrapByHomeContext(memo(() => {
-  const lineProfilerEnabled = useAppSelector(state => state.home.lineProfiler.enabled)
+  const { lineProfilerEnabled, recenter, rotateClockwise, rotateCounterClockwise, toggleLineProfiler } = useHomeActions()
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
+  const toggleShortcutHelp = useCallback(() => {
+    setShortcutHelpOpen(current => !current)
+  }, [])
+  const closeShortcutHelp = useCallback(() => {
+    setShortcutHelpOpen(false)
+  }, [])
+  const shortcutHandlers = useMemo<HomeShortcutHandlers>(() => ({
+    recenter,
+    rotateClockwise,
+    rotateCounterClockwise,
+    toggleLineProfiler,
+    toggleShortcutHelp,
+  }), [recenter, rotateClockwise, rotateCounterClockwise, toggleLineProfiler, toggleShortcutHelp])
+
+  useHomeKeyboardShortcuts(shortcutHandlers)
   useSetInitialSearchConditions()
   useSyncHighlightCcdsWithUrl()
 
@@ -35,6 +54,7 @@ export const Home = wrapByHomeContext(memo(() => {
           </div>
         </div>
       </div>
+      <ShortcutHelpDialog onClose={closeShortcutHelp} open={shortcutHelpOpen} />
     </div>
   )
 }))

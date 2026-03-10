@@ -1,3 +1,11 @@
 export declare const buttons: string;
 export declare const home: string;
 export declare const selectedType: string;
+export declare const shortcutHelpBackdrop: string;
+export declare const shortcutHelpCloseButton: string;
+export declare const shortcutHelpDialog: string;
+export declare const shortcutHelpHeader: string;
+export declare const shortcutHelpItem: string;
+export declare const shortcutHelpKey: string;
+export declare const shortcutHelpList: string;
+export declare const shortcutHelpTitle: string;
