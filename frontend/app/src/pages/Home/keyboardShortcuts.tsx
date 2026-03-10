@@ -3,6 +3,7 @@ import { useEffect } from "react"
 type HomeShortcutDefinition = {
   keyBinding: string
   description: string
+  matches?: (event: KeyboardEvent) => boolean
 }
 
 export const homeShortcutDefinitions = {
@@ -25,6 +26,7 @@ export const homeShortcutDefinitions = {
   toggleShortcutHelp: {
     keyBinding: "?",
     description: "Show keyboard shortcuts",
+    matches: event => event.key === "?" || (event.key === "/" && event.shiftKey),
   },
 } satisfies Record<string, HomeShortcutDefinition>
 
@@ -43,7 +45,7 @@ export function useHomeKeyboardShortcuts(handlers: HomeShortcutHandlers) {
       if (isTextEntryTarget(event.target)) {
         return
       }
-      const shortcutId = findHomeShortcutId(event.key)
+      const shortcutId = findHomeShortcutId(event)
       if (!shortcutId) {
         return
       }
@@ -58,8 +60,13 @@ export function useHomeKeyboardShortcuts(handlers: HomeShortcutHandlers) {
   }, [handlers])
 }
 
-function findHomeShortcutId(keyBinding: string): HomeShortcutId | undefined {
-  const matchedShortcut = homeShortcutEntries.find(([, definition]) => definition.keyBinding === keyBinding)
+function findHomeShortcutId(event: KeyboardEvent): HomeShortcutId | undefined {
+  const matchedShortcut = homeShortcutEntries.find(([, definition]) => {
+    if (definition.matches) {
+      return definition.matches(event)
+    }
+    return definition.keyBinding === event.key
+  })
   return matchedShortcut?.[0]
 }
 

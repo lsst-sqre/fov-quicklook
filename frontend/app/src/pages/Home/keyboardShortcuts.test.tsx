@@ -41,6 +41,15 @@ describe("useHomeKeyboardShortcuts", () => {
     expect(handlers[shortcutId]).toHaveBeenCalledTimes(1)
   })
 
+  it("handles Shift+/ for shortcut help", () => {
+    const handlers = createHandlers()
+
+    render(<ShortcutHarness handlers={handlers} />)
+    fireEvent.keyDown(window, { key: "/", shiftKey: true })
+
+    expect(handlers.toggleShortcutHelp).toHaveBeenCalledTimes(1)
+  })
+
   it("ignores shortcuts while typing in editable fields", () => {
     const handlers = createHandlers()
 
