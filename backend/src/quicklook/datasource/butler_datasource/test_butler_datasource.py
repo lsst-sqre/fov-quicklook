@@ -6,6 +6,20 @@ from quicklook.datasource.types import Query
 from quicklook.types import CcdDataType, CcdName
 
 
+class FakeDimensionRecordResults:
+    def __init__(self, records: list[SimpleNamespace]):
+        self._records = records
+
+    def order_by(self, *args: str):
+        return self
+
+    def limit(self, limit: int):
+        return FakeDimensionRecordResults(self._records[:limit])
+
+    def __iter__(self):
+        return iter(self._records)
+
+
 def _make_datasource(*, data_type: str, data_id_dimension: str, order_by: list[str], registry: object):
     ds = DataTypeSpecificDataSource.__new__(DataTypeSpecificDataSource)
     ds._config = CcdDataTypeConfig(
@@ -37,7 +51,7 @@ def test_query_visits_uses_exposure_dimension_records(monkeypatch):
     class FakeRegistry:
         def queryDimensionRecords(self, dimension: str, **kwargs: object):
             calls.append((dimension, kwargs))
-            return [
+            return FakeDimensionRecordResults([
                 SimpleNamespace(
                     id=101,
                     obs_id='obs-101',
@@ -60,7 +74,7 @@ def test_query_visits_uses_exposure_dimension_records(monkeypatch):
                     observation_reason='test',
                     target_name='target-102',
                 ),
-            ]
+            ])
 
     ds = _make_datasource(
         data_type='raw',
@@ -84,8 +98,6 @@ def test_query_visits_uses_exposure_dimension_records(monkeypatch):
             {
                 'datasets': 'raw',
                 'where': 'day_obs=20250301',
-                'limit': 5,
-                'order_by': ['-day_obs', '-exposure'],
             },
         )
     ]
@@ -98,7 +110,7 @@ def test_query_visits_uses_configured_dimension_for_visit_dataset():
     class FakeRegistry:
         def queryDimensionRecords(self, dimension: str, **kwargs: object):
             calls.append((dimension, kwargs))
-            return [
+            return FakeDimensionRecordResults([
                 SimpleNamespace(
                     id=7001,
                     obs_id='obs-7001',
@@ -110,7 +122,7 @@ def test_query_visits_uses_configured_dimension_for_visit_dataset():
                     observation_reason='nightly',
                     target_name='target-7001',
                 )
-            ]
+            ])
 
     ds = _make_datasource(
         data_type='preliminary_visit_image',
@@ -135,9 +147,59 @@ def test_query_visits_uses_configured_dimension_for_visit_dataset():
             {
                 'datasets': 'preliminary_visit_image',
                 'where': 'visit=7001 and day_obs=20250302',
-                'limit': 1,
-                'order_by': ['-visit'],
             },
         )
     ]
     assert [entry.id for entry in entries] == ['repo:preliminary_visit_image:7001']
+
+
+def test_query_dimension_records_applies_order_and_limit_after_query():
+    calls: list[tuple[str, dict[str, object]]] = []
+    order_calls: list[tuple[str, ...]] = []
+    limit_calls: list[int] = []
+
+    class TrackingResults(FakeDimensionRecordResults):
+        def order_by(self, *args: str):
+            order_calls.append(args)
+            return self
+
+        def limit(self, limit: int):
+            limit_calls.append(limit)
+            return super().limit(limit)
+
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            calls.append((dimension, kwargs))
+            return TrackingResults([
+                SimpleNamespace(
+                    id=1,
+                    obs_id='obs-1',
+                    day_obs=20250303,
+                    physical_filter='g',
+                    exposure_time=10.0,
+                    science_program='program',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-1',
+                )
+            ])
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+
+    records = ds._query_dimension_records(
+        'exposure',
+        datasets='raw',
+        where='day_obs=20250303',
+        limit=7,
+        order_by=['-day_obs', '-exposure'],
+    )
+
+    assert [record.id for record in records] == [1]
+    assert calls == [('exposure', {'datasets': 'raw', 'where': 'day_obs=20250303'})]
+    assert order_calls == [('-day_obs', '-exposure')]
+    assert limit_calls == [7]

@@ -195,11 +195,12 @@ class DataTypeSpecificDataSource:
             kwargs['datasets'] = datasets
         if where:
             kwargs['where'] = where
-        if limit is not None:
-            kwargs['limit'] = limit
+        records = self._butler.registry.queryDimensionRecords(dimension, **kwargs)
         if order_by is not None:
-            kwargs['order_by'] = order_by
-        return list(self._butler.registry.queryDimensionRecords(dimension, **kwargs))
+            records = records.order_by(*order_by)
+        if limit is not None:
+            records = records.limit(limit)
+        return list(records)
 
     def _visit_entry_from_record(self, record: ButlerDimensionRecord) -> VisitEntry:
         return VisitEntry(
