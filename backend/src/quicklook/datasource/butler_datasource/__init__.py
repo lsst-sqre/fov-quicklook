@@ -95,38 +95,24 @@ class DataTypeSpecificDataSource:
         もしday_obsが指定されていない場合は、day_obsを最新の1日分に指定して実行する
         '''
 
-        from lsst.daf.butler import EmptyQueryResultError
-
         if q.day_obs is None:
             q.day_obs = self._get_latest_day_obs()
 
-        conds: list[str] = ['detector=0']
-        if q.exposure:
+        conds: list[str] = []
+        if q.exposure is not None:
             conds.append(f"{self.data_id_dimension}={q.exposure}")
-        if q.day_obs:
+        if q.day_obs is not None:
             conds.append(f"day_obs={q.day_obs}")
         where = " and ".join(conds)
-        try:
-            refs = self._butler.query_datasets(self.butler_data_type, where=where, limit=q.limit, order_by=self.order_by)
-        except EmptyQueryResultError:
-            return []
 
-        exposures = self._get_exposure_info(q.day_obs or -1)  # q.day_obsはNoneではありえない
-
-        return [
-            VisitEntry(
-                id=f'{self.repository_name}:{self.butler_data_type}:{ref.dataId[self.data_id_dimension]}',
-                obs_id=exp.obs_id,
-                day_obs=exp.day_obs,
-                physical_filter=exp.physical_filter,
-                exposure_time=exp.exposure_time,
-                science_program=exp.science_program,
-                observation_type=exp.observation_type,
-                observation_reason=exp.observation_reason,
-                target_name=exp.target_name,
-            )
-            for ref, exp in [(ref, exposures[cast(int, ref.dataId[self.data_id_dimension])]) for ref in refs]
-        ]
+        records = self._query_dimension_records(
+            self.data_id_dimension,
+            datasets=self.butler_data_type,
+            where=where,
+            limit=q.limit,
+            order_by=self.order_by,
+        )
+        return [self._visit_entry_from_record(record) for record in records]
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
         b = self._butler
@@ -185,11 +171,48 @@ class DataTypeSpecificDataSource:
         )
 
     def _get_latest_day_obs(self) -> int | None:
-        b = self._butler
-        refs = b.query_datasets(self.butler_data_type, where="detector=0", order_by=["-day_obs"], limit=1)
-        if len(refs) == 0:
+        records = self._query_dimension_records(
+            self.data_id_dimension,
+            datasets=self.butler_data_type,
+            limit=1,
+            order_by=["-day_obs"],
+        )
+        if len(records) == 0:
             return None
-        return refs[0].dataId['day_obs']  # type: ignore
+        return cast(int, records[0].day_obs)
+
+    def _query_dimension_records(
+        self,
+        dimension: str,
+        *,
+        datasets: str | None = None,
+        where: str | None = None,
+        limit: int | None = None,
+        order_by: list[str] | None = None,
+    ) -> list[ButlerDimensionRecord]:
+        kwargs: dict[str, Any] = {}
+        if datasets is not None:
+            kwargs['datasets'] = datasets
+        if where:
+            kwargs['where'] = where
+        if limit is not None:
+            kwargs['limit'] = limit
+        if order_by is not None:
+            kwargs['order_by'] = order_by
+        return list(self._butler.registry.queryDimensionRecords(dimension, **kwargs))
+
+    def _visit_entry_from_record(self, record: ButlerDimensionRecord) -> VisitEntry:
+        return VisitEntry(
+            id=f'{self.repository_name}:{self.butler_data_type}:{record.id}',
+            obs_id=record.obs_id,
+            day_obs=record.day_obs,
+            physical_filter=record.physical_filter,
+            exposure_time=record.exposure_time,
+            science_program=record.science_program,
+            observation_type=record.observation_type,
+            observation_reason=record.observation_reason,
+            target_name=record.target_name,
+        )
 
     def _get_exposure_info(self, day_obs: int) -> dict[int, ButlerDimensionRecord]:
         records = self._butler.registry.queryDimensionRecords('exposure', where=f"day_obs={day_obs}")
