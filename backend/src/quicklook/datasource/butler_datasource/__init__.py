@@ -1,6 +1,7 @@
 import threading
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
+from uuid import UUID
 
 from lsst.resources import ResourcePath
 
@@ -24,6 +25,8 @@ else:
 
 DataRef = Any
 
+BY_UUID_DATA_TYPE = CcdDataType('by_uuid')
+
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def __init__(self):
@@ -34,13 +37,19 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return _get_datasource(q.data_type, q.repository_name).query_visits(q)
 
+    def resolve_visit_sync(self, visit: VisitName) -> VisitName:
+        return _resolve_visit(visit)
+
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
+        visit = self.resolve_visit_sync(visit)
         return _get_datasource(visit.data_type, visit.repository_name).list_ccds(visit)
 
     def get_data_sync(self, ref: CcdDataRef) -> bytes:
+        ref = _resolve_ref(ref, self.resolve_visit_sync(ref.visit))
         return _get_datasource(ref.visit.data_type, ref.visit.repository_name).get_data(ref)
 
     def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
+        ref = _resolve_ref(ref, self.resolve_visit_sync(ref.visit))
         return _get_datasource(ref.visit.data_type, ref.visit.repository_name).get_metadata(ref)
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
@@ -220,6 +229,36 @@ class DataTypeSpecificDataSource:
         return {record.id: record for record in records}
 
 
+def _resolve_ref(ref: CcdDataRef, visit: VisitName) -> CcdDataRef:
+    if visit == ref.visit:
+        return ref
+    return CcdDataRef(visit=visit, ccd=ref.ccd)
+
+
+def _resolve_visit(visit: VisitName) -> VisitName:
+    if visit.data_type != BY_UUID_DATA_TYPE:
+        return visit
+    return _resolve_visit_cache(str(visit))
+
+
+@lru_cache(256)
+def _resolve_visit_cache(visit_name: str) -> VisitName:
+    visit = VisitName(visit_name)
+    repository_butler = _get_repository_butler(visit.repository_name)
+    dataset_ref = repository_butler.registry.getDataset(UUID(visit.name))
+    if dataset_ref is None:
+        raise ValueError(f'Unknown dataset UUID: {visit.name}')
+
+    dataset_type = cast(str, dataset_ref.datasetType.name)
+    datasource = _get_datasource(dataset_type, visit.repository_name)
+    data_id = dataset_ref.dataId.get(datasource.data_id_dimension)
+    if data_id is None:
+        raise ValueError(
+            f'UUID {visit.name} resolved to dataset type {dataset_type}, but dataId does not contain {datasource.data_id_dimension}'
+        )
+    return VisitName(f'{visit.repository_name}:{dataset_type}:{data_id}')
+
+
 def _get_datasource(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:
     thread_id = threading.get_ident()
     return _get_datasource_cache(data_type, repository_name, thread_id=thread_id)
@@ -236,3 +275,20 @@ def _get_datasource_no_cache(data_type: str, repository_name: str) -> DataTypeSp
             return DataTypeSpecificDataSource(data_type_config)
     available = [(dt.data_type, dt.repository_name) for dt in config.ccd_data_types]
     raise ValueError(f'Unknown data type: ({data_type}, {repository_name}). Available: {available}')
+
+
+def _get_repository_butler(repository_name: str) -> ButlerType:
+    thread_id = threading.get_ident()
+    return _get_repository_butler_cache(repository_name, thread_id=thread_id)
+
+
+@lru_cache(32)
+def _get_repository_butler_cache(repository_name: str, thread_id: int) -> ButlerType:
+    del thread_id
+    from lsst.daf.butler import Butler
+
+    for data_type_config in config.ccd_data_types:
+        if data_type_config.repository_name == repository_name:
+            return Butler(repository_name, instrument=data_type_config.instrument)  # type: ignore
+    available = sorted({dt.repository_name for dt in config.ccd_data_types})
+    raise ValueError(f'Unknown repository: {repository_name}. Available: {available}')

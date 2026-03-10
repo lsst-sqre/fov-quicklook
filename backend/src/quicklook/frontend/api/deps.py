@@ -2,13 +2,16 @@ from typing import Annotated
 
 import fastapi
 
+from quicklook.datasource import get_datasource
 from quicklook.types import CcdDataRef, CcdName, TilePos, VisitName
 
+VISIT_NAME_PATH_PATTERN = r'^[^:/]+:[^:/]+:[^:/]+$'
 
-def dep_visit_name(
-    visit_name: Annotated[str, fastapi.Path(..., pattern=r'^\w+:\w+:\w+$')],
+
+async def dep_visit_name(
+    visit_name: Annotated[str, fastapi.Path(..., pattern=VISIT_NAME_PATH_PATTERN)],
 ):
-    return VisitName(visit_name)
+    return await get_datasource().resolve_visit(VisitName(visit_name))
 
 
 def dep_ccd_name(

@@ -35,6 +35,12 @@ class DataSourceBase(abc.ABC):
     query_visits = async_wrap(query_visits_sync)
 
     @abc.abstractmethod
+    def resolve_visit_sync(self, visit: VisitName) -> VisitName:  # pragma: no cover
+        ...
+
+    resolve_visit = async_wrap(resolve_visit_sync)
+
+    @abc.abstractmethod
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover
         ...
 
