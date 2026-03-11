@@ -8,6 +8,8 @@ from quicklook.datasource.butler_datasource import (
     ButlerDataSource,
     DataTypeSpecificDataSource,
     Instrument,
+    _clear_resolved_visit_run_cache,
+    _get_resolved_visit_run,
     _resolve_visit_cache,
 )
 from quicklook.datasource.types import VisitResolutionError
@@ -256,6 +258,44 @@ def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):
     assert resolved.detector is None
 
 
+def test_resolve_visit_sync_supports_difference_image_dataset_type(monkeypatch):
+    _resolve_visit_cache.cache_clear()
+    _clear_resolved_visit_run_cache()
+
+    class ResolverRegistry:
+        def getDataset(self, dataset_uuid):
+            assert str(dataset_uuid) == '019bbefe-465a-7815-a05c-13dc47a78418'
+            return SimpleNamespace(
+                datasetType=SimpleNamespace(name='difference_image'),
+                dataId={'visit': 9876, 'detector': 90},
+                run='u/test/difference-run',
+            )
+
+    target_ds = _make_datasource(
+        data_type='difference_image',
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        registry=object(),
+    )
+
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_repository_butler',
+        lambda repository_name: cast(Any, SimpleNamespace(registry=ResolverRegistry())),
+    )
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_datasource',
+        lambda data_type, repository_name: target_ds,
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    visit = ds.resolve_visit_sync(VisitName('embargo:by_uuid:019bbefe-465a-7815-a05c-13dc47a78418'))
+    resolved = ds.resolve_visit_info_sync(VisitName('embargo:by_uuid:019bbefe-465a-7815-a05c-13dc47a78418'))
+
+    assert visit == VisitName('embargo:difference_image:9876')
+    assert _get_resolved_visit_run(visit) == 'u/test/difference-run'
+    assert resolved.detector == 90
+
+
 def test_get_repository_butler_cache_uses_repository_only(monkeypatch):
     from quicklook.datasource.butler_datasource import _get_repository_butler_cache
 
@@ -294,6 +334,32 @@ def test_get_metadata_sync_resolves_by_uuid_before_delegating(monkeypatch):
     assert captured_refs == [CcdDataRef(visit=resolved_visit, ccd=CcdName('R22_S00'))]
 
 
+def test_list_ccds_excludes_corner_rafts_for_difference_image(monkeypatch):
+    ds = _make_datasource(
+        data_type='difference_image',
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        registry=object(),
+    )
+    ds._butler = cast(
+        Any,
+        SimpleNamespace(
+            query_datasets=lambda dataset_type, where: [
+                SimpleNamespace(dataId={'detector': 1}),
+                SimpleNamespace(dataId={'detector': 2}),
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource.Instrument.get',
+        lambda instrument: SimpleNamespace(detector_2_ccd={1: 'R00_S00', 2: 'R22_S00'}),
+    )
+
+    ccds = ds.list_ccds(VisitName('repo:difference_image:42'))
+
+    assert ccds == [CcdName('R22_S00')]
+
+
 def test_resolve_visit_sync_raises_visit_resolution_error_for_unknown_uuid(monkeypatch):
     _resolve_visit_cache.cache_clear()
 
@@ -324,7 +390,7 @@ def test_resolve_visit_sync_raises_visit_resolution_error_for_unsupported_datase
         def getDataset(self, dataset_uuid):
             del dataset_uuid
             return SimpleNamespace(
-                datasetType=SimpleNamespace(name='difference_image'),
+                datasetType=SimpleNamespace(name='unsupported_image'),
                 dataId={'visit': 1234},
             )
 
@@ -340,7 +406,7 @@ def test_resolve_visit_sync_raises_visit_resolution_error_for_unsupported_datase
     except VisitResolutionError as e:
         assert (
             str(e)
-            == 'UUID 019bbefe-465a-7815-a05c-13dc47a78418 resolves to unsupported dataset type difference_image in repository embargo'
+            == 'UUID 019bbefe-465a-7815-a05c-13dc47a78418 resolves to unsupported dataset type unsupported_image in repository embargo'
         )
     else:  # pragma: no cover
         raise AssertionError('VisitResolutionError was not raised')

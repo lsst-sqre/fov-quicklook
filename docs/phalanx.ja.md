@@ -132,6 +132,14 @@ ccd_data_types:
     order_by:
       - -exposure
     partial: true
+  - name: difference_image
+    display_name: Difference Image
+    collections:
+      - LSSTCam/runs/nightlyValidation
+    data_id_dimension: visit
+    order_by:
+      - -visit
+    partial: true
   - name: preliminary_visit_image
     display_name: Preliminary
     collections:

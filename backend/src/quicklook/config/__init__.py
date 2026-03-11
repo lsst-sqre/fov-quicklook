@@ -153,6 +153,16 @@ class Config(BaseSettings):
             instrument='LSSTCam',
         ),
         CcdDataTypeConfig(
+            data_type='difference_image',
+            display_name='Difference Image',
+            collections=['LSSTCam/runs/nightlyValidation'],
+            data_id_dimension='visit',
+            order_by=['-visit'],
+            partial=True,
+            repository_name='embargo',
+            instrument='LSSTCam',
+        ),
+        CcdDataTypeConfig(
             data_type='preliminary_visit_image',
             display_name='Preliminary',
             collections=['LSSTCam/runs/nightlyValidation'],

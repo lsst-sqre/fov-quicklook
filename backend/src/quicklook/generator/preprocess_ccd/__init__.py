@@ -23,7 +23,7 @@ def preprocess_ccd(
     match ccd_ref.visit.data_type:
         case 'raw':
             return preprocess_ccd_raw(ccd_ref, path)
-        case 'post_isr_image' | 'calexp' | 'preliminary_visit_image':
+        case 'post_isr_image' | 'difference_image' | 'calexp' | 'preliminary_visit_image':
             return preprocess_ccd_calexp(ccd_ref, path)
         case _:  # pragma: no cover
             raise ValueError(f'Unknown data_type: {ccd_ref.visit.data_type}')
@@ -212,8 +212,8 @@ class RawFitsWcs:
 
 @dataclass
 class ImageStat:
-    median: float | None  # post_isr_image には NaN が含まれることがありこれがjsonになるとnullになる
-    mad: float | None  # post_isr_image には NaN が含まれることがありこれがjsonになるとnullになる
+    median: float | None  # post_isr_image / difference_image には NaN が含まれることがありこれがjsonになるとnullになる
+    mad: float | None  # post_isr_image / difference_image には NaN が含まれることがありこれがjsonになるとnullになる
     shape: tuple[int, ...]
 
 

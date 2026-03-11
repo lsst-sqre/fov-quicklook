@@ -21,6 +21,18 @@ def test_preprocess_ccd_calexp():
         preprocess_ccd(ccd_ref, path)
 
 
+def test_preprocess_ccd_difference_image_uses_calexp_path(monkeypatch):
+    expected = object()
+    ccd_ref = CcdDataRef(visit=VisitName('dummy:difference_image:192350'), ccd=CcdName('R01_S00'))
+
+    monkeypatch.setattr(
+        'quicklook.generator.preprocess_ccd.preprocess_ccd_calexp',
+        lambda arg_ref, arg_path: expected,
+    )
+
+    assert preprocess_ccd(ccd_ref, Path('difference_image.fits')) is expected
+
+
 def fits_bytes(ref: CcdDataRef) -> bytes:
     key = f'{ref.visit.data_type}/{ref.visit.name}/{ref.ccd}.fits'
     return s3_download_object(config.s3_test_data, key)
