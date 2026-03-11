@@ -229,14 +229,14 @@ class DataTypeSpecificDataSource:
     def _visit_entry_from_record(self, record: ButlerDimensionRecord) -> VisitEntry:
         return VisitEntry(
             id=f'{self.repository_name}:{self.butler_data_type}:{record.id}',
-            obs_id=record.obs_id,
-            day_obs=record.day_obs,
-            physical_filter=record.physical_filter,
-            exposure_time=record.exposure_time,
-            science_program=record.science_program,
-            observation_type=record.observation_type,
-            observation_reason=record.observation_reason,
-            target_name=record.target_name,
+            obs_id=_record_string_attr(record, 'obs_id', default=str(record.id)),
+            day_obs=cast(int, getattr(record, 'day_obs')),
+            physical_filter=_record_string_attr(record, 'physical_filter', 'band'),
+            exposure_time=_record_float_attr(record, 'exposure_time'),
+            science_program=_record_string_attr(record, 'science_program'),
+            observation_type=_record_string_attr(record, 'observation_type'),
+            observation_reason=_record_string_attr(record, 'observation_reason'),
+            target_name=_record_string_attr(record, 'target_name'),
         )
 
     def _get_exposure_info(self, day_obs: int) -> dict[int, ButlerDimensionRecord]:

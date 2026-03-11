@@ -422,6 +422,46 @@ def test_query_visits_difference_image_uses_all_run_collections():
     assert [entry.id for entry in entries] == ['repo:difference_image:7001']
 
 
+def test_query_visits_difference_image_falls_back_when_visit_record_lacks_obs_id():
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            del dimension, kwargs
+            return FakeDimensionRecordResults([
+                SimpleNamespace(
+                    id=7001,
+                    day_obs=20250302,
+                    band='z',
+                )
+            ])
+
+    ds = _make_datasource(
+        data_type='difference_image',
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        registry=FakeRegistry(),
+    )
+
+    [entry] = ds.query_visits(
+        Query(
+            data_type=CcdDataType('difference_image'),
+            repository_name='repo',
+            limit=1,
+            exposure=7001,
+            day_obs=20250302,
+        )
+    )
+
+    assert entry.id == 'repo:difference_image:7001'
+    assert entry.obs_id == '7001'
+    assert entry.day_obs == 20250302
+    assert entry.physical_filter == 'z'
+    assert entry.exposure_time == 0.0
+    assert entry.science_program == ''
+    assert entry.observation_type == ''
+    assert entry.observation_reason == ''
+    assert entry.target_name == ''
+
+
 def test_list_ccds_uses_resolved_run_for_difference_image(monkeypatch):
     _clear_resolved_visit_run_cache()
     captured: dict[str, object] = {}
