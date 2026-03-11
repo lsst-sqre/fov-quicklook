@@ -250,7 +250,12 @@ def _resolve_visit_cache(visit_name: str) -> VisitName:
         raise VisitResolutionError(f'Unknown dataset UUID: {visit.name}')
 
     dataset_type = cast(str, dataset_ref.datasetType.name)
-    datasource = _get_datasource(dataset_type, visit.repository_name)
+    try:
+        datasource = _get_datasource(dataset_type, visit.repository_name)
+    except ValueError as e:
+        raise VisitResolutionError(
+            f'UUID {visit.name} resolves to unsupported dataset type {dataset_type} in repository {visit.repository_name}'
+        ) from e
     data_id = dataset_ref.dataId.get(datasource.data_id_dimension)
     if data_id is None:
         raise VisitResolutionError(
