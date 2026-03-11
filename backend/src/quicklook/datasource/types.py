@@ -5,6 +5,10 @@ from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 from quicklook.utils.async_wrap import async_wrap
 
 
+class VisitResolutionError(ValueError):
+    pass
+
+
 @dataclass
 class Query:
     data_type: CcdDataType

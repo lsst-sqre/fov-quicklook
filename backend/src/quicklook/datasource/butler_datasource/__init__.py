@@ -9,7 +9,7 @@ from quicklook.config import CcdDataTypeConfig, config
 from quicklook.datasource.types import VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
-from ..types import DataSourceBase, DataSourceCcdMetadata, Query
+from ..types import DataSourceBase, DataSourceCcdMetadata, Query, VisitResolutionError
 from .instrument import Instrument
 from .retrieve_data import retrieve_data
 
@@ -247,13 +247,13 @@ def _resolve_visit_cache(visit_name: str) -> VisitName:
     repository_butler = _get_repository_butler(visit.repository_name)
     dataset_ref = repository_butler.registry.getDataset(UUID(visit.name))
     if dataset_ref is None:
-        raise ValueError(f'Unknown dataset UUID: {visit.name}')
+        raise VisitResolutionError(f'Unknown dataset UUID: {visit.name}')
 
     dataset_type = cast(str, dataset_ref.datasetType.name)
     datasource = _get_datasource(dataset_type, visit.repository_name)
     data_id = dataset_ref.dataId.get(datasource.data_id_dimension)
     if data_id is None:
-        raise ValueError(
+        raise VisitResolutionError(
             f'UUID {visit.name} resolved to dataset type {dataset_type}, but dataId does not contain {datasource.data_id_dimension}'
         )
     return VisitName(f'{visit.repository_name}:{dataset_type}:{data_id}')

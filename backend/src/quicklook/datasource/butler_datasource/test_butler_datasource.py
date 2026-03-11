@@ -8,6 +8,7 @@ from quicklook.datasource.butler_datasource import (
     Instrument,
     _resolve_visit_cache,
 )
+from quicklook.datasource.types import VisitResolutionError
 from quicklook.datasource.types import Query
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
@@ -271,3 +272,26 @@ def test_get_metadata_sync_resolves_by_uuid_before_delegating(monkeypatch):
 
     assert metadata is expected_metadata
     assert captured_refs == [CcdDataRef(visit=resolved_visit, ccd=CcdName('R22_S00'))]
+
+
+def test_resolve_visit_sync_raises_visit_resolution_error_for_unknown_uuid(monkeypatch):
+    _resolve_visit_cache.cache_clear()
+
+    class ResolverRegistry:
+        def getDataset(self, dataset_uuid):
+            del dataset_uuid
+            return None
+
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_repository_butler',
+        lambda repository_name: cast(Any, SimpleNamespace(registry=ResolverRegistry())),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+
+    try:
+        ds.resolve_visit_sync(VisitName('repo:by_uuid:726a5858-33d0-5d75-ab98-ea273c4c3792'))
+    except VisitResolutionError as e:
+        assert str(e) == 'Unknown dataset UUID: 726a5858-33d0-5d75-ab98-ea273c4c3792'
+    else:  # pragma: no cover
+        raise AssertionError('VisitResolutionError was not raised')

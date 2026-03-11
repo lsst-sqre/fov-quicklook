@@ -12,6 +12,7 @@ import quicklook.mylogging
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
 from quicklook.datasource import get_datasource
+from quicklook.datasource.types import VisitResolutionError
 from quicklook.utils.http_client import managed_session
 from quicklook.coordinator.api.deps import dep_visit_name
 from quicklook.coordinator.api.status import router as status_router
@@ -63,7 +64,10 @@ type JobDict = dict[VisitName, Job]
 
 @app.post('/quicklooks')
 async def route_create_quicklook(params: CreateQuicklookRequest):
-    visit = await get_datasource().resolve_visit(VisitName(params.visit))
+    try:
+        visit = await get_datasource().resolve_visit(VisitName(params.visit))
+    except VisitResolutionError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
     async with get_db_session() as session:
         result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
