@@ -218,6 +218,7 @@ def test_query_dimension_records_applies_order_and_limit_after_query():
 
 def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):
     _resolve_visit_cache.cache_clear()
+    _clear_resolved_visit_run_cache()
 
     class ResolverRegistry:
         def getDataset(self, dataset_uuid):
@@ -225,6 +226,7 @@ def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):
             return SimpleNamespace(
                 datasetType=SimpleNamespace(name='raw'),
                 dataId={'exposure': 4242},
+                run='u/test/raw-run',
             )
 
     resolver_ds = _make_datasource(
@@ -311,6 +313,8 @@ def test_get_repository_butler_cache_uses_repository_only(monkeypatch):
     _get_repository_butler_cache('main', thread_id=1)
 
     assert calls == [(('main',), {})]
+
+
 def test_get_metadata_sync_resolves_by_uuid_before_delegating(monkeypatch):
     resolved_visit = VisitName('repo:raw:4242')
     expected_metadata = SimpleNamespace(visit_name=resolved_visit)
@@ -335,20 +339,23 @@ def test_get_metadata_sync_resolves_by_uuid_before_delegating(monkeypatch):
 
 
 def test_list_ccds_excludes_corner_rafts_for_difference_image(monkeypatch):
+    _clear_resolved_visit_run_cache()
+    captured: dict[str, object] = {}
+
+    class FakeRegistry:
+        def queryDatasets(self, dataset_type: str, **kwargs: object):
+            captured['dataset_type'] = dataset_type
+            captured.update(kwargs)
+            return [
+                SimpleNamespace(dataId={'detector': 1}),
+                SimpleNamespace(dataId={'detector': 2}),
+            ]
+
     ds = _make_datasource(
         data_type='difference_image',
         data_id_dimension='visit',
         order_by=['-visit'],
-        registry=object(),
-    )
-    ds._butler = cast(
-        Any,
-        SimpleNamespace(
-            query_datasets=lambda dataset_type, where: [
-                SimpleNamespace(dataId={'detector': 1}),
-                SimpleNamespace(dataId={'detector': 2}),
-            ]
-        ),
+        registry=FakeRegistry(),
     )
     monkeypatch.setattr(
         'quicklook.datasource.butler_datasource.Instrument.get',
@@ -358,10 +365,103 @@ def test_list_ccds_excludes_corner_rafts_for_difference_image(monkeypatch):
     ccds = ds.list_ccds(VisitName('repo:difference_image:42'))
 
     assert ccds == [CcdName('R22_S00')]
+    assert captured == {
+        'dataset_type': 'difference_image',
+        'collections': ...,
+        'where': 'visit=42',
+    }
+
+
+def test_query_visits_difference_image_uses_all_run_collections():
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            calls.append((dimension, kwargs))
+            return FakeDimensionRecordResults([
+                SimpleNamespace(
+                    id=7001,
+                    obs_id='obs-7001',
+                    day_obs=20250302,
+                    physical_filter='z',
+                    exposure_time=15.0,
+                    science_program='program-visit',
+                    observation_type='science',
+                    observation_reason='nightly',
+                    target_name='target-7001',
+                )
+            ])
+
+    ds = _make_datasource(
+        data_type='difference_image',
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        registry=FakeRegistry(),
+    )
+
+    entries = ds.query_visits(
+        Query(
+            data_type=CcdDataType('difference_image'),
+            repository_name='repo',
+            limit=1,
+            exposure=7001,
+            day_obs=20250302,
+        )
+    )
+
+    assert calls == [
+        (
+            'visit',
+            {
+                'datasets': 'difference_image',
+                'collections': ...,
+                'where': 'visit=7001 and day_obs=20250302',
+            },
+        )
+    ]
+    assert [entry.id for entry in entries] == ['repo:difference_image:7001']
+
+
+def test_list_ccds_uses_resolved_run_for_difference_image(monkeypatch):
+    _clear_resolved_visit_run_cache()
+    captured: dict[str, object] = {}
+
+    class FakeRegistry:
+        def queryDatasets(self, dataset_type: str, **kwargs: object):
+            captured['dataset_type'] = dataset_type
+            captured.update(kwargs)
+            return [SimpleNamespace(dataId={'detector': 2})]
+
+    ds = _make_datasource(
+        data_type='difference_image',
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        registry=FakeRegistry(),
+    )
+    visit = VisitName('repo:difference_image:42')
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource.Instrument.get',
+        lambda instrument: SimpleNamespace(detector_2_ccd={2: 'R22_S00'}),
+    )
+
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_resolved_visit_run',
+        lambda arg_visit: 'u/test/run' if arg_visit == visit else None,
+    )
+
+    ccds = ds.list_ccds(visit)
+
+    assert ccds == [CcdName('R22_S00')]
+    assert captured == {
+        'dataset_type': 'difference_image',
+        'collections': ['u/test/run'],
+        'where': 'visit=42',
+    }
 
 
 def test_resolve_visit_sync_raises_visit_resolution_error_for_unknown_uuid(monkeypatch):
     _resolve_visit_cache.cache_clear()
+    _clear_resolved_visit_run_cache()
 
     class ResolverRegistry:
         def getDataset(self, dataset_uuid):
@@ -385,6 +485,7 @@ def test_resolve_visit_sync_raises_visit_resolution_error_for_unknown_uuid(monke
 
 def test_resolve_visit_sync_raises_visit_resolution_error_for_unsupported_dataset_type(monkeypatch):
     _resolve_visit_cache.cache_clear()
+    _clear_resolved_visit_run_cache()
 
     class ResolverRegistry:
         def getDataset(self, dataset_uuid):

@@ -135,7 +135,7 @@ ccd_data_types:
   - name: difference_image
     display_name: Difference Image
     collections:
-      - LSSTCam/runs
+      - LSSTCam/runs/nightlyValidation
     data_id_dimension: visit
     order_by:
       - -visit

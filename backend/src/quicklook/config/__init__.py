@@ -155,7 +155,7 @@ class Config(BaseSettings):
         CcdDataTypeConfig(
             data_type='difference_image',
             display_name='Difference Image',
-            collections=['LSSTCam/runs'],
+            collections=['LSSTCam/runs/nightlyValidation'],
             data_id_dimension='visit',
             order_by=['-visit'],
             partial=True,
