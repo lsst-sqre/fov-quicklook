@@ -1,6 +1,6 @@
 import fastapi
 
-from quicklook.datasource.types import VisitResolutionError
+from quicklook.datasource.types import ResolvedVisitInfo, VisitResolutionError
 from quicklook.frontend.api import deps
 from quicklook.types import VisitName
 
@@ -9,9 +9,9 @@ async def test_dep_visit_name_resolves_visit_with_datasource(monkeypatch):
     received: list[VisitName] = []
 
     class FakeDataSource:
-        async def resolve_visit(self, visit: VisitName) -> VisitName:
+        async def resolve_visit_info(self, visit: VisitName) -> ResolvedVisitInfo:
             received.append(visit)
-            return VisitName('repo:raw:4242')
+            return ResolvedVisitInfo(visit_name=VisitName('repo:raw:4242'))
 
     monkeypatch.setattr(deps, 'get_datasource', lambda: FakeDataSource())
 
@@ -23,7 +23,7 @@ async def test_dep_visit_name_resolves_visit_with_datasource(monkeypatch):
 
 async def test_dep_visit_name_returns_404_for_unknown_uuid(monkeypatch):
     class FakeDataSource:
-        async def resolve_visit(self, visit: VisitName) -> VisitName:
+        async def resolve_visit_info(self, visit: VisitName) -> ResolvedVisitInfo:
             del visit
             raise VisitResolutionError('Unknown dataset UUID: uuid-1')
 

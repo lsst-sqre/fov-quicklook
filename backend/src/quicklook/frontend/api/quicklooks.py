@@ -7,7 +7,7 @@ from functools import cached_property
 from typing import Annotated, AsyncGenerator, Callable, Literal, TypeVar
 
 import websockets
-from fastapi import APIRouter, Depends, FastAPI, WebSocket
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, WebSocket
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
@@ -20,6 +20,8 @@ from quicklook.coordinator.api.types import (
     SharedStatusMessageJobSharedLargeStatus,
     SharedStatusMessageJobStatusList,
 )
+from quicklook.datasource import get_datasource
+from quicklook.datasource.types import VisitResolutionError
 from quicklook.db import Quicklook, get_db_session
 from quicklook.frontend.api.deps import dep_visit_name
 from quicklook.generator.generate_single_fits_tiles import CcdMetadata
@@ -48,10 +50,14 @@ logger = quicklook.mylogging.getLogger(__name__)
 
 @router.post('/api/quicklooks', description='Create a quicklook')
 async def create_quicklook(params: CreateQuicklookRequest):
+    try:
+        visit = (await get_datasource().resolve_visit_info(VisitName(params.visit))).visit_name
+    except VisitResolutionError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     return await http_request(
         'post',
         f'{config.coordinator_base_url}/quicklooks',
-        json=params.model_dump(),
+        json=CreateQuicklookRequest(visit=str(visit)).model_dump(),
     )
 
 
@@ -303,4 +309,3 @@ async def _status_relay_main_loop():
     else:
         from quicklook.utils.graceful_shutdown import graceful_shutdown
         await graceful_shutdown(sigint_delay=10, sigkill_delay=10, reason="Failed to connect to coordinator WebSocket")
-

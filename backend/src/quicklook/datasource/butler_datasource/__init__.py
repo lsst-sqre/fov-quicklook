@@ -9,7 +9,7 @@ from quicklook.config import CcdDataTypeConfig, config
 from quicklook.datasource.types import VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
-from ..types import DataSourceBase, DataSourceCcdMetadata, Query, VisitResolutionError
+from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError
 from .instrument import Instrument
 from .retrieve_data import retrieve_data
 
@@ -38,7 +38,10 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         return _get_datasource(q.data_type, q.repository_name).query_visits(q)
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:
-        return _resolve_visit(visit)
+        return self.resolve_visit_info_sync(visit).visit_name
+
+    def resolve_visit_info_sync(self, visit: VisitName) -> ResolvedVisitInfo:
+        return _resolve_visit_info(visit)
 
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
         visit = self.resolve_visit_sync(visit)
@@ -236,13 +239,17 @@ def _resolve_ref(ref: CcdDataRef, visit: VisitName) -> CcdDataRef:
 
 
 def _resolve_visit(visit: VisitName) -> VisitName:
+    return _resolve_visit_info(visit).visit_name
+
+
+def _resolve_visit_info(visit: VisitName) -> ResolvedVisitInfo:
     if visit.data_type != BY_UUID_DATA_TYPE:
-        return visit
+        return ResolvedVisitInfo(visit_name=visit)
     return _resolve_visit_cache(str(visit))
 
 
 @lru_cache(256)
-def _resolve_visit_cache(visit_name: str) -> VisitName:
+def _resolve_visit_cache(visit_name: str) -> ResolvedVisitInfo:
     visit = VisitName(visit_name)
     repository_butler = _get_repository_butler(visit.repository_name)
     dataset_ref = repository_butler.registry.getDataset(UUID(visit.name))
@@ -261,7 +268,45 @@ def _resolve_visit_cache(visit_name: str) -> VisitName:
         raise VisitResolutionError(
             f'UUID {visit.name} resolved to dataset type {dataset_type}, but dataId does not contain {datasource.data_id_dimension}'
         )
-    return VisitName(f'{visit.repository_name}:{dataset_type}:{data_id}')
+    resolved_visit = VisitName(f'{visit.repository_name}:{dataset_type}:{data_id}')
+    _remember_resolved_visit_run(resolved_visit, cast(str, dataset_ref.run))
+    detector = dataset_ref.dataId.get('detector')
+    return ResolvedVisitInfo(
+        visit_name=resolved_visit,
+        detector=None if detector is None else int(detector),
+    )
+
+
+def _remember_resolved_visit_run(visit: VisitName, run: str) -> None:
+    with _resolved_visit_runs_lock:
+        if len(_resolved_visit_runs) >= 256 and str(visit) not in _resolved_visit_runs:
+            _resolved_visit_runs.pop(next(iter(_resolved_visit_runs)))
+        _resolved_visit_runs[str(visit)] = run
+
+
+def _get_resolved_visit_run(visit: VisitName) -> str | None:
+    with _resolved_visit_runs_lock:
+        return _resolved_visit_runs.get(str(visit))
+
+
+def _clear_resolved_visit_run_cache() -> None:
+    with _resolved_visit_runs_lock:
+        _resolved_visit_runs.clear()
+
+
+def _record_string_attr(record: ButlerDimensionRecord, *names: str, default: str = '') -> str:
+    for name in names:
+        value = getattr(record, name, None)
+        if value is not None:
+            return cast(str, value)
+    return default
+
+
+def _record_float_attr(record: ButlerDimensionRecord, name: str, default: float = 0.0) -> float:
+    value = getattr(record, name, None)
+    if value is None:
+        return default
+    return float(value)
 
 
 def _get_datasource(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:
@@ -292,8 +337,4 @@ def _get_repository_butler_cache(repository_name: str, thread_id: int) -> Butler
     del thread_id
     from lsst.daf.butler import Butler
 
-    for data_type_config in config.ccd_data_types:
-        if data_type_config.repository_name == repository_name:
-            return Butler(repository_name, instrument=data_type_config.instrument)  # type: ignore
-    available = sorted({dt.repository_name for dt in config.ccd_data_types})
-    raise ValueError(f'Unknown repository: {repository_name}. Available: {available}')
+    return Butler(repository_name)  # type: ignore

@@ -10,6 +10,12 @@ class VisitResolutionError(ValueError):
 
 
 @dataclass
+class ResolvedVisitInfo:
+    visit_name: VisitName
+    detector: int | None = None
+
+
+@dataclass
 class Query:
     data_type: CcdDataType
     repository_name: str
@@ -43,6 +49,11 @@ class DataSourceBase(abc.ABC):
         ...
 
     resolve_visit = async_wrap(resolve_visit_sync)
+
+    def resolve_visit_info_sync(self, visit: VisitName) -> ResolvedVisitInfo:
+        return ResolvedVisitInfo(visit_name=self.resolve_visit_sync(visit))
+
+    resolve_visit_info = async_wrap(resolve_visit_info_sync)
 
     @abc.abstractmethod
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover

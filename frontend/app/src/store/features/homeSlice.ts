@@ -114,6 +114,9 @@ export const homeSlice = createSlice({
     clearHighlightCcd: (state) => {
       state.hilightedCcdId = []
     },
+    setHighlightCcds: (state, action: PayloadAction<string[]>) => {
+      state.hilightedCcdId = action.payload
+    },
     setListGroupingTimeToleranceDigits: (state, action: PayloadAction<number>) => {
       state.listGroupingTimeToleranceDigits = action.payload
     },
@@ -122,7 +125,21 @@ export const homeSlice = createSlice({
 
 
 function initialHightlightCcds(): string[] {
-  const searchParams = new URLSearchParams(window.location.search)
+  return readHighlightedCcds(new URLSearchParams(window.location.search))
+}
+
+
+export function hasExplicitDetectorSelection(searchParams: URLSearchParams) {
+  return searchParams.has('detector') || searchParams.has('detectors')
+}
+
+
+export function readHighlightedCcds(searchParams: URLSearchParams): string[] {
+  const single = searchParams.get('detector')
+  if (single) {
+    return [parseDetectorName(single)]
+  }
+
   const serialized = searchParams.get('detectors')
   if (!serialized) return []
   try {
@@ -133,7 +150,24 @@ function initialHightlightCcds(): string[] {
   }
 }
 
-function parseDetectorName(name: string) {
+
+export function writeHighlightedCcds(searchParams: URLSearchParams, ccds: string[]) {
+  const next = new URLSearchParams(searchParams)
+  next.delete('detector')
+  next.delete('detectors')
+
+  if (ccds.length === 1) {
+    next.set('detector', ccds[0])
+  }
+  else if (ccds.length > 1) {
+    next.set('detectors', ccds.join(','))
+  }
+
+  return next
+}
+
+
+export function parseDetectorName(name: string) {
   if (name.match(/^\d+$/)) {
     // @ts-ignore
     const translated = ccdNameTable[name] as string | undefined

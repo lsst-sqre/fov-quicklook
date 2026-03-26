@@ -13,7 +13,7 @@ async def dep_visit_name(
     visit_name: Annotated[str, fastapi.Path(..., pattern=VISIT_NAME_PATH_PATTERN)],
 ):
     try:
-        return await get_datasource().resolve_visit(VisitName(visit_name))
+        return (await get_datasource().resolve_visit_info(VisitName(visit_name))).visit_name
     except VisitResolutionError as e:
         raise fastapi.HTTPException(status_code=404, detail=str(e)) from e
 

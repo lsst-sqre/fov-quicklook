@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from typing import Any, cast
 
+import lsst.daf.butler as butler_module
+
 from quicklook.config import CcdDataTypeConfig
 from quicklook.datasource.butler_datasource import (
     ButlerDataSource,
@@ -247,10 +249,28 @@ def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
     visit = ds.resolve_visit_sync(VisitName('repo:by_uuid:726a5858-33d0-5d75-ab98-ea273c4c3792'))
+    resolved = ds.resolve_visit_info_sync(VisitName('repo:by_uuid:726a5858-33d0-5d75-ab98-ea273c4c3792'))
 
     assert visit == VisitName('repo:raw:4242')
+    assert resolved.visit_name == VisitName('repo:raw:4242')
+    assert resolved.detector is None
 
 
+def test_get_repository_butler_cache_uses_repository_only(monkeypatch):
+    from quicklook.datasource.butler_datasource import _get_repository_butler_cache
+
+    _get_repository_butler_cache.cache_clear()
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def fake_butler(*args: object, **kwargs: object):
+        calls.append((args, kwargs))
+        return object()
+
+    monkeypatch.setattr(butler_module, 'Butler', fake_butler)
+
+    _get_repository_butler_cache('main', thread_id=1)
+
+    assert calls == [(('main',), {})]
 def test_get_metadata_sync_resolves_by_uuid_before_delegating(monkeypatch):
     resolved_visit = VisitName('repo:raw:4242')
     expected_metadata = SimpleNamespace(visit_name=resolved_visit)
