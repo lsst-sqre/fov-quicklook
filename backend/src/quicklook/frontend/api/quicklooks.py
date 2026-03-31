@@ -236,6 +236,7 @@ async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncG
 
 _job_shared_large_status_dict: dict[VisitName, JobSharedLargeStatus] = {}
 _job_status_dict = Broadcast[JobStatusList](max_queue_size=2)
+_STATUS_RELAY_RETRY_MAX_DELAY_SECONDS = 60
 
 
 @dataclass
@@ -278,34 +279,48 @@ async def _quicklook_status_relay():
 
 async def _status_relay_main_loop():
     global _job_shared_large_status_dict
-    ws_base_url = re.sub(r'^http://', 'ws://', config.coordinator_base_url)
-    for i in reversed(range(5)):
-        try:
-            async with websockets.connect(f'{ws_base_url}/quicklooks/*/shared_status.ws') as ws:
-                while True:
-                    msg_bytes = await ws.recv()
-                    assert isinstance(msg_bytes, bytes)
-                    msg: SharedStatusMessage = pickle.loads(msg_bytes)
+    ws_url = f"{re.sub(r'^http://', 'ws://', config.coordinator_base_url)}/quicklooks/*/shared_status.ws"
+    retry_count = 0
 
-                    match msg:
-                        case SharedStatusMessageJobStatusList(data=data):
-                            _job_status_dict.put(data)
-                        case SharedStatusMessageJobSharedLargeStatus(visit=visit, data=data):
-                            _job_shared_large_status_dict[visit] = data
-                            jobs = _job_status_dict.last_value()
-                            if jobs:
-                                _job_shared_large_status_dict = {
-                                    visit: _job_shared_large_status_dict[visit]
-                                    for visit in jobs
-                                    if visit in _job_shared_large_status_dict
-                                }
+    while True:
+        try:
+            async with websockets.connect(ws_url, max_size=None) as ws:
+                if retry_count:
+                    logger.info(f"Reconnected to {ws_url} after {retry_count} retries")
+                    retry_count = 0
+                while True:
+                    msg = _decode_shared_status_message(await ws.recv())
+                    _apply_shared_status_message(msg)
 
         except Exception as e:
-            logger.warning(f'Failed to connect to {ws_base_url}: {str(e)}. Remaining retries: {i}')
-            import traceback
+            retry_count += 1
+            delay_seconds = min(2 ** (retry_count - 1), _STATUS_RELAY_RETRY_MAX_DELAY_SECONDS)
+            logger.exception(
+                f"Shared-status relay disconnected from {ws_url}: {e}. "
+                f"Retrying in {delay_seconds} seconds (attempt {retry_count})"
+            )
+            await asyncio.sleep(delay_seconds)
 
-            traceback.print_exc()
-            await asyncio.sleep(5)
-    else:
-        from quicklook.utils.graceful_shutdown import graceful_shutdown
-        await graceful_shutdown(sigint_delay=10, sigkill_delay=10, reason="Failed to connect to coordinator WebSocket")
+
+def _decode_shared_status_message(msg_bytes: bytes | str) -> SharedStatusMessage:
+    if not isinstance(msg_bytes, bytes):
+        raise TypeError(f"Expected binary shared-status message, got {type(msg_bytes).__name__}")
+
+    return pickle.loads(msg_bytes)
+
+
+def _apply_shared_status_message(msg: SharedStatusMessage) -> None:
+    global _job_shared_large_status_dict
+
+    match msg:
+        case SharedStatusMessageJobStatusList(data=data):
+            _job_status_dict.put(data)
+        case SharedStatusMessageJobSharedLargeStatus(visit=visit, data=data):
+            _job_shared_large_status_dict[visit] = data
+            jobs = _job_status_dict.last_value()
+            if jobs:
+                _job_shared_large_status_dict = {
+                    visit: _job_shared_large_status_dict[visit]
+                    for visit in jobs
+                    if visit in _job_shared_large_status_dict
+                }

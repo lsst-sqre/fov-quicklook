@@ -1,8 +1,14 @@
+import pickle
+
+import pytest
 from fastapi import HTTPException
 
 from quicklook.coordinator.api.types import CreateQuicklookRequest
+from quicklook.coordinator.api.types import SharedStatusMessageJobStatusList
 from quicklook.datasource.types import ResolvedVisitInfo, VisitResolutionError
 from quicklook.frontend.api import quicklooks
+from quicklook.job.job import Job
+from quicklook.utils.broadcast import Broadcast
 from quicklook.types import VisitName
 
 
@@ -50,3 +56,82 @@ async def test_create_quicklook_returns_404_for_unknown_uuid(monkeypatch):
         assert e.detail == 'Unknown dataset UUID: uuid-1'
     else:  # pragma: no cover
         raise AssertionError('HTTPException was not raised')
+
+
+async def test_status_relay_keeps_retrying_without_shutdown(monkeypatch):
+    connect_calls: list[tuple[str, dict]] = []
+    sleep_calls: list[int] = []
+
+    class StopLoop(BaseException):
+        pass
+
+    class FakeConnect:
+        def __init__(self, exc: BaseException):
+            self._exc = exc
+
+        async def __aenter__(self):
+            raise self._exc
+
+        async def __aexit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+    def fake_connect(url: str, **kwargs):
+        connect_calls.append((url, kwargs))
+        if len(connect_calls) <= 6:
+            return FakeConnect(RuntimeError(f'boom-{len(connect_calls)}'))
+        return FakeConnect(StopLoop())
+
+    async def fake_sleep(delay: int | float):
+        sleep_calls.append(int(delay))
+
+    async def fail_shutdown(**kwargs):
+        del kwargs
+        raise AssertionError('graceful_shutdown should not be called for shared-status reconnect failures')
+
+    monkeypatch.setattr(quicklooks.websockets, 'connect', fake_connect)
+    monkeypatch.setattr(quicklooks.asyncio, 'sleep', fake_sleep)
+    monkeypatch.setattr('quicklook.utils.graceful_shutdown.graceful_shutdown', fail_shutdown)
+
+    with pytest.raises(StopLoop):
+        await quicklooks._status_relay_main_loop()
+
+    assert len(connect_calls) == 7
+    assert sleep_calls == [1, 2, 4, 8, 16, 32]
+    assert {kwargs['max_size'] for _, kwargs in connect_calls} == {None}
+
+
+async def test_status_relay_updates_job_status_from_binary_message(monkeypatch):
+    job = Job(VisitName('repo:raw:4242'))
+    msg = SharedStatusMessageJobStatusList(data={job.visit: job.status})
+    payload = pickle.dumps(msg)
+
+    class StopLoop(BaseException):
+        pass
+
+    class FakeWebSocket:
+        def __init__(self):
+            self._recv_count = 0
+
+        async def recv(self):
+            self._recv_count += 1
+            if self._recv_count == 1:
+                return payload
+            raise StopLoop()
+
+    class FakeConnect:
+        async def __aenter__(self):
+            return FakeWebSocket()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+    monkeypatch.setattr(quicklooks, '_job_status_dict', Broadcast(max_queue_size=2))
+    monkeypatch.setattr(quicklooks, '_job_shared_large_status_dict', {})
+    monkeypatch.setattr(quicklooks.websockets, 'connect', lambda url, **kwargs: FakeConnect())
+
+    with pytest.raises(StopLoop):
+        await quicklooks._status_relay_main_loop()
+
+    assert quicklooks._job_status_dict.last_value() == {job.visit: job.status}
