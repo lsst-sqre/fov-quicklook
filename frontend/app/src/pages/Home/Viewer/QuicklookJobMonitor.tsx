@@ -19,7 +19,7 @@ export function QuicklookJobMonitor() {
   const statusListCount = statusList ? Object.keys(statusList).length : 0
 
   useEffect(() => {
-    if (jobListRef.current && currentQuicklook.id && statusList) {
+    if (jobListRef.current && currentQuicklook.id && statusListCount > 0) {
       const element = jobListRef.current.querySelector(`[data-visit="${currentQuicklook.id}"]`)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })

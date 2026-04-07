@@ -36,6 +36,7 @@ function useQuicklookContext() {
   return context
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useQuicklookMetadata() {
   const currentId = useAppSelector(state => state.home.currentQuicklook)
   const { metadata, ready } = useQuicklookContext()

@@ -321,6 +321,7 @@ function SearchBox() {
         </button>
       </div>
       <input
+        className={styles.searchDateInput}
         aria-label="Observation date"
         type="date"
         value={searchString}

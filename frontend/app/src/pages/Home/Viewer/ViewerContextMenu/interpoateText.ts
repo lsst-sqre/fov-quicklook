@@ -54,11 +54,12 @@ export function interpoateText(template: string, meta: DataSourceCcdMetadata): s
 
   */
   type Meta2 = DataSourceCcdMetadata & {
+    visit: string
     dataType: string
   }
 
 
-  const meta2 = { ...meta } as Meta2
+  const meta2 = { ...meta, visit: meta.visit_name } as Meta2
   const visitParts = meta.visit_name.split(':')
   meta2.dataType = visitParts.slice(0, -1).join(':')
 

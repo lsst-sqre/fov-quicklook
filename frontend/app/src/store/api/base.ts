@@ -27,6 +27,7 @@ function wsQueryEndpoint<TData, TArg>(
           updateCachedData(() => data)
         })
       } catch {
+        // Cache setup can be interrupted when the subscriber goes away immediately.
       }
 
       await cacheEntryRemoved
