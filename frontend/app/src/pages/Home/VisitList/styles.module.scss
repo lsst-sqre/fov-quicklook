@@ -245,11 +245,22 @@
   &:disabled {
     cursor: default;
     color: rgba(255, 255, 255, 0.68);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &:disabled:hover {
+    background: rgba(255, 255, 255, 0.08);
   }
 }
 
 .dayButtonEmpty {
   color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dayButtonEmpty:disabled,
+.dayButtonEmpty:disabled:hover {
   background: rgba(255, 255, 255, 0.03);
   border-color: rgba(255, 255, 255, 0.08);
 }
@@ -261,6 +272,12 @@
 .dayButtonSelected {
   border-color: rgba(159, 227, 255, 0.85);
   background: rgba(95, 174, 255, 0.2);
+}
+
+.dayButtonSelected:disabled,
+.dayButtonSelected:disabled:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .dayButtonDate {
