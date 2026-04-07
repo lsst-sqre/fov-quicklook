@@ -2,9 +2,10 @@ import { Menu, MenuItem, SubMenu } from '@szhsin/react-menu'
 import classNames from 'classnames'
 import React, { memo, useEffect, useMemo, useRef } from "react"
 import { MaterialSymbol } from '../../../components/MaterialSymbol'
-import { ListVisitsApiArg, ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
+import { ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
 import { homeSlice } from '../../../store/features/homeSlice'
 import { useAppDispatch, useAppSelector } from '../../../store/hooks'
+import { buildVisitListQuery } from '../visitSearch'
 import styles from './styles.module.scss'
 import { LoadingSpinner } from '../../../components/Loading'
 import { useChangeCurrentQuicklook } from '../../../hooks/useChangeCurrentQuicklook'
@@ -30,29 +31,14 @@ function formatExposureTime(exposureTime: number, digits: number): string {
   return `${isRounded ? '~' : ''}${rounded}`
 }
 
-function isValidSearchString(s: string) {
-  // 20241021 or 2024102100002
-  return /^\d{8}(\d{5})?$/.test(s)
-}
-
 function useVisitList() {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
   const [repositoryName, dataType] = dataSource.split(':')
-  const query = useMemo(() => {
-    if (isValidSearchString(searchString)) {
-      switch (searchString.length) {
-        case 8:
-          return { dayObs: Number(searchString), dataType, repositoryName }
-        case 13:
-          return { exposure: Number.parseInt(searchString), dataType, repositoryName }
-      }
-    }
-    return {
-      dataType,
-      repositoryName,
-    } as ListVisitsApiArg
-  }, [dataType, repositoryName, searchString])
+  const query = useMemo(
+    () => buildVisitListQuery(searchString, dataType, repositoryName),
+    [dataType, repositoryName, searchString],
+  )
   const { data: list, refetch, isFetching } = useListVisitsQuery(query)
   return { list, refetch, isFetching }
 }
@@ -335,13 +321,10 @@ function SearchBox() {
         </button>
       </div>
       <input
-        type="search"
-        placeholder='Date or Exposure ex. 20241204 or 2024120400003'
+        aria-label="Observation date"
+        type="date"
         value={searchString}
         onChange={e => dispatch(homeSlice.actions.setSearchString(e.target.value))}
-        style={{
-          color: isValidSearchString(searchString) ? 'white' : 'gray',
-        }}
       />
     </div>
   )
