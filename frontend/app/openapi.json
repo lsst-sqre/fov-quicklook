@@ -481,6 +481,80 @@
                 }
             }
         },
+        "/api/visits/monthly_counts": {
+            "get": {
+                "summary": "List Visit Monthly Counts",
+                "operationId": "list_visit_monthly_counts",
+                "parameters": [
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 9999,
+                            "minimum": 1,
+                            "title": "Year"
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1,
+                            "title": "Month"
+                        }
+                    },
+                    {
+                        "name": "data_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Data Type"
+                        }
+                    },
+                    {
+                        "name": "repository_name",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Repository Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/VisitDayCount"
+                                    },
+                                    "title": "Response List Visit Monthly Counts Api Visits Monthly Counts Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/visits/{visit_name}/ccds/{ccd_name}": {
             "get": {
                 "summary": "Get Visit Metadata",
@@ -1678,6 +1752,24 @@
                     "type"
                 ],
                 "title": "ValidationError"
+            },
+            "VisitDayCount": {
+                "properties": {
+                    "day_obs": {
+                        "type": "integer",
+                        "title": "Day Obs"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "title": "Count"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "day_obs",
+                    "count"
+                ],
+                "title": "VisitDayCount"
             },
             "VisitEntry": {
                 "properties": {

@@ -62,7 +62,7 @@ _pool_exit_stack: ExitStack | None = None
 def generate_single_fits_tiles_pipeline(
     job: Job,
     refs: Iterable[CcdDataRef],
-) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
+) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata, None, None]:
     with tempfile.TemporaryDirectory() as tmpdir, multiprocessing.Manager() as manager:
         q = cast(
             queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata | None],

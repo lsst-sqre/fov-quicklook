@@ -13,7 +13,7 @@ from quicklook.datasource.butler_datasource import (
     _resolve_visit_cache,
 )
 from quicklook.datasource.types import VisitResolutionError
-from quicklook.datasource.types import Query
+from quicklook.datasource.types import MonthlyEntryCountQuery, Query, VisitDayCount
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 
@@ -214,6 +214,49 @@ def test_query_dimension_records_applies_order_and_limit_after_query():
     assert calls == [('exposure', {'datasets': 'raw', 'where': 'day_obs=20250303'})]
     assert order_calls == [('-day_obs', '-exposure')]
     assert limit_calls == [7]
+
+
+def test_query_monthly_entry_counts_uses_configured_dimension_without_listing_ccds():
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            calls.append((dimension, kwargs))
+            return FakeDimensionRecordResults([
+                SimpleNamespace(id=1, day_obs=20250301),
+                SimpleNamespace(id=2, day_obs=20250301),
+                SimpleNamespace(id=3, day_obs=20250303),
+            ])
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+
+    counts = ds.query_monthly_entry_counts(
+        MonthlyEntryCountQuery(
+            data_type=CcdDataType('raw'),
+            repository_name='repo',
+            year=2025,
+            month=3,
+        )
+    )
+
+    assert counts == [
+        VisitDayCount(day_obs=20250301, count=2),
+        VisitDayCount(day_obs=20250303, count=1),
+    ]
+    assert calls == [
+        (
+            'exposure',
+            {
+                'datasets': 'raw',
+                'where': 'day_obs>=20250301 and day_obs<=20250331',
+            },
+        )
+    ]
 
 
 def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):

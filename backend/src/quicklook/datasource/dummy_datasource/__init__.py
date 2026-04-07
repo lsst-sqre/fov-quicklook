@@ -1,8 +1,9 @@
+from collections import Counter
 from pathlib import Path
 
 from quicklook.config import config
 from quicklook.datasource.butler_datasource.instrument import Instrument
-from quicklook.datasource.types import VisitEntry
+from quicklook.datasource.types import MonthlyEntryCountQuery, VisitDayCount, VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import s3_download_object, s3_list_objects
@@ -50,6 +51,15 @@ class DummyDataSource(DataSourceBase):
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         return [CcdDataType(f"{dt.repository_name}:{dt.data_type}") for dt in config.ccd_data_types]
+
+    def query_monthly_entry_counts_sync(self, q: MonthlyEntryCountQuery) -> list[VisitDayCount]:
+        visits = [entry for entry in self.query_visits_sync(Query(
+            data_type=q.data_type,
+            repository_name=q.repository_name,
+            limit=1000,
+        )) if entry.day_obs // 100 == q.year * 100 + q.month]
+        counts = Counter(entry.day_obs for entry in visits)
+        return [VisitDayCount(day_obs=day_obs, count=counts[day_obs]) for day_obs in sorted(counts)]
 
 
 def _s3_get_visit_ccd_fits_raw(ref: CcdDataRef) -> bytes:

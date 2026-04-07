@@ -1,6 +1,6 @@
 import { Menu, MenuItem, SubMenu } from '@szhsin/react-menu'
 import classNames from 'classnames'
-import React, { memo, useEffect, useMemo, useRef } from "react"
+import React, { memo, useEffect, useMemo, useRef, useState } from "react"
 import { MaterialSymbol } from '../../../components/MaterialSymbol'
 import { ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
 import { homeSlice } from '../../../store/features/homeSlice'
@@ -9,6 +9,7 @@ import { buildVisitListQuery } from '../visitSearch'
 import styles from './styles.module.scss'
 import { LoadingSpinner } from '../../../components/Loading'
 import { useChangeCurrentQuicklook } from '../../../hooks/useChangeCurrentQuicklook'
+import { VisitAvailabilityDialog } from './VisitAvailabilityDialog'
 
 
 type VisitListProps = {
@@ -273,6 +274,7 @@ function SearchBox() {
   const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
   const ccdDataTypes = useAppSelector(state => state.copyTemplate.ccdDataTypes)
   const { refetch } = useVisitList()
+  const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false)
 
   return (
     <div className={styles.searchBox}>
@@ -320,12 +322,28 @@ function SearchBox() {
           <MaterialSymbol symbol='refresh' />
         </button>
       </div>
-      <input
-        className={styles.searchDateInput}
-        aria-label="Observation date"
-        type="date"
-        value={searchString}
-        onChange={e => dispatch(homeSlice.actions.setSearchString(e.target.value))}
+      <div className={styles.searchDateRow}>
+        <input
+          className={styles.searchDateInput}
+          aria-label="Observation date"
+          type="date"
+          value={searchString}
+          onChange={e => dispatch(homeSlice.actions.setSearchString(e.target.value))}
+        />
+        <button
+          aria-label="Browse date availability"
+          className={styles.searchDateDialogButton}
+          onClick={() => setAvailabilityDialogOpen(true)}
+          title="Browse date availability"
+          type="button"
+        >
+          <MaterialSymbol symbol='calendar_month' />
+        </button>
+      </div>
+      <VisitAvailabilityDialog
+        dataSource={dataSource}
+        onClose={() => setAvailabilityDialogOpen(false)}
+        open={availabilityDialogOpen}
       />
     </div>
   )

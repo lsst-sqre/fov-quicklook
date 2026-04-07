@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from quicklook.datasource import get_datasource
 from quicklook.datasource.butler_datasource import VisitEntry
-from quicklook.datasource.types import DataSourceCcdMetadata, ResolvedVisitInfo
+from quicklook.datasource.types import DataSourceCcdMetadata, MonthlyEntryCountQuery, ResolvedVisitInfo, VisitDayCount
 from quicklook.datasource.types import VisitResolutionError
 from quicklook.datasource.types import Query as DataSourceQuery
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
@@ -25,6 +25,24 @@ async def list_visits(
             exposure=exposure,
             day_obs=day_obs,
             limit=limit,
+        )
+    )
+
+
+@router.get('/api/visits/monthly_counts', response_model=list[VisitDayCount])
+async def list_visit_monthly_counts(
+    year: int = Query(..., ge=1, le=9999),
+    month: int = Query(..., ge=1, le=12),
+    data_type: CcdDataType = Query(...),
+    repository_name: str = Query(...),
+):
+    ds = get_datasource()
+    return await ds.query_monthly_entry_counts(
+        MonthlyEntryCountQuery(
+            data_type=data_type,
+            repository_name=repository_name,
+            year=year,
+            month=month,
         )
     )
 
