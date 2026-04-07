@@ -41,6 +41,26 @@ from .ccd_dispatcher import CcdDispatcher
 logger = quicklook.mylogging.getLogger(__name__)
 
 
+def _merge_generate_progress(existing: Progress | None, incoming: Progress) -> Progress:
+    """Keep per-CCD progress monotonic when the same CCD is resubmitted."""
+    if existing is None:
+        return Progress(total=incoming.total, count=incoming.count)
+
+    existing_total = existing.total or 1
+    incoming_total = incoming.total or 1
+    existing_ratio = existing.count / existing_total
+    incoming_ratio = incoming.count / incoming_total
+
+    if incoming_ratio > existing_ratio:
+        return Progress(total=incoming.total, count=incoming.count)
+    if incoming_ratio < existing_ratio:
+        return Progress(total=existing.total, count=existing.count)
+
+    if incoming.count >= existing.count:
+        return Progress(total=incoming.total, count=incoming.count)
+    return Progress(total=existing.total, count=existing.count)
+
+
 @dataclass
 class GenerateSingleFitsTilesResult:
     ccd_metadata_list: list[CcdMetadata]
@@ -349,7 +369,11 @@ async def _handle_generator_message(
         case ProgressMessage(ccd_name=ccd_name, progress=progress):
             if progress is not None:
                 async with job.watcher.watch_status():
-                    job.status.generate_single_fits_tiles[ccd_name] = progress
+                    current = job.status.generate_single_fits_tiles.get(ccd_name)
+                    job.status.generate_single_fits_tiles[ccd_name] = _merge_generate_progress(
+                        current,
+                        progress,
+                    )
 
         case CompletedMessage(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox):
             metadata = CcdMetadata(
