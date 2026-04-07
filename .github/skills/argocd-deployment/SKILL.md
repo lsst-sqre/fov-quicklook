@@ -13,6 +13,10 @@ description: >
 標準の agent-safe 経路では `dev/deploy-broker/` を使い、必要な場合だけ
 `dev/argocd.sh` を使って ArgoCD 上の fov-quicklook アプリケーションを操作する。
 
+> **デフォルト前提**: 特に指定がない限り、agent は **deploy daemon が
+> `http://127.0.0.1:8010` で動いている**前提で `deploy-broker-client` を使ってよい。
+> 必要なら SSH tunnel でこの localhost endpoint に届くようにする。
+
 > **agent-safe 運用**: agent に GitHub / ArgoCD への直接権限を渡さない場合は、
 > `dev/deploy-broker/` の broker daemon を優先する。broker は ArgoCD token を
 > daemon 側に保持し、status / branch / logs / sync / restart などの制限された操作だけを
