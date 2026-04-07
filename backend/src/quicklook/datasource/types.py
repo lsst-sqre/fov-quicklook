@@ -5,6 +5,16 @@ from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 from quicklook.utils.async_wrap import async_wrap
 
 
+class VisitResolutionError(ValueError):
+    pass
+
+
+@dataclass
+class ResolvedVisitInfo:
+    visit_name: VisitName
+    detector: int | None = None
+
+
 @dataclass
 class Query:
     data_type: CcdDataType
@@ -33,6 +43,17 @@ class DataSourceBase(abc.ABC):
         ...
 
     query_visits = async_wrap(query_visits_sync)
+
+    @abc.abstractmethod
+    def resolve_visit_sync(self, visit: VisitName) -> VisitName:  # pragma: no cover
+        ...
+
+    resolve_visit = async_wrap(resolve_visit_sync)
+
+    def resolve_visit_info_sync(self, visit: VisitName) -> ResolvedVisitInfo:
+        return ResolvedVisitInfo(visit_name=self.resolve_visit_sync(visit))
+
+    resolve_visit_info = async_wrap(resolve_visit_info_sync)
 
     @abc.abstractmethod
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover

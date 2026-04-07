@@ -63,7 +63,6 @@ type JobDict = dict[VisitName, Job]
 @app.post('/quicklooks')
 async def route_create_quicklook(params: CreateQuicklookRequest):
     visit = VisitName(params.visit)
-
     async with get_db_session() as session:
         result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
         quicklook = result.scalar_one_or_none()

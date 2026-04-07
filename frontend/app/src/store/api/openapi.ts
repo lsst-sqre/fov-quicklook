@@ -93,6 +93,14 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/visits/${queryArg.visitName}/ccds/${queryArg.ccdName}`,
       }),
     }),
+    getVisitResolution: build.query<
+      GetVisitResolutionApiResponse,
+      GetVisitResolutionApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/visits/${queryArg.visitName}/resolution`,
+      }),
+    }),
     getExposureDataTypes: build.query<
       GetExposureDataTypesApiResponse,
       GetExposureDataTypesApiArg
@@ -218,6 +226,11 @@ export type GetVisitMetadataApiResponse =
 export type GetVisitMetadataApiArg = {
   visitName: string;
   ccdName: string;
+};
+export type GetVisitResolutionApiResponse =
+  /** status 200 Successful Response */ ResolvedVisitInfo;
+export type GetVisitResolutionApiArg = {
+  visitName: string;
 };
 export type GetExposureDataTypesApiResponse =
   /** status 200 Successful Response */ string[];
@@ -437,6 +450,10 @@ export type DataSourceCcdMetadata = {
   day_obs: number;
   uuid: string;
 };
+export type ResolvedVisitInfo = {
+  visit_name: string;
+  detector?: number | null;
+};
 export type ShutdownResponse = {
   status: string;
 };
@@ -469,6 +486,7 @@ export const {
   useGetTimeProfileQuery,
   useListVisitsQuery,
   useGetVisitMetadataQuery,
+  useGetVisitResolutionQuery,
   useGetExposureDataTypesQuery,
   useGetFitsFileQuery,
   useKillCoordinatorMutation,

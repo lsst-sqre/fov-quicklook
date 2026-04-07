@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
-import { CcdDataType, homeSlice } from "../../store/features/homeSlice"
+import { useGetVisitResolutionQuery } from "../../store/api/openapi"
+import { CcdDataType, hasExplicitDetectorSelection, homeSlice, parseDetectorName, writeHighlightedCcds } from "../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../store/hooks"
 import { ShortcutHelpDialog } from "./ShortcutHelpDialog"
 import { wrapByHomeContext } from "./context"
@@ -35,6 +36,7 @@ export const Home = wrapByHomeContext(memo(() => {
 
   useHomeKeyboardShortcuts(shortcutHandlers)
   useSetInitialSearchConditions()
+  useApplyResolvedVisitState()
   useSyncHighlightCcdsWithUrl()
 
   return (
@@ -111,6 +113,44 @@ function extractDataTypeFromVisitId(visitId: string): CcdDataType | undefined {
 }
 
 
+function isByUuidVisitId(visitId: string | undefined) {
+  return visitId?.split(':').slice(-2, -1)[0] === 'by_uuid'
+}
+
+
+function useApplyResolvedVisitState() {
+  const dispatch = useAppDispatch()
+  const { visitId } = useParams()
+  const [searchParams] = useSearchParams()
+  const dataSource = useAppSelector(state => state.home.dataSource)
+  const highlightedCcds = useAppSelector(state => state.home.hilightedCcdId)
+  const hasExplicitDetector = hasExplicitDetectorSelection(searchParams)
+  const isByUuidVisit = isByUuidVisitId(visitId)
+  const { data: resolution } = useGetVisitResolutionQuery(
+    { visitName: visitId! },
+    { skip: !visitId || !isByUuidVisit },
+  )
+
+  useEffect(() => {
+    if (!resolution) return
+
+    const resolvedDataSource = extractDataTypeFromVisitId(resolution.visit_name)
+    if (resolvedDataSource && dataSource !== resolvedDataSource) {
+      dispatch(homeSlice.actions.setDataSource(resolvedDataSource))
+    }
+
+    if (
+      !hasExplicitDetector &&
+      highlightedCcds.length === 0 &&
+      resolution.detector !== null &&
+      resolution.detector !== undefined
+    ) {
+      dispatch(homeSlice.actions.setHighlightCcds([parseDetectorName(`${resolution.detector}`)]))
+    }
+  }, [dataSource, dispatch, hasExplicitDetector, highlightedCcds.length, resolution])
+}
+
+
 function useSyncHighlightCcdsWithUrl() {
   const dispatch = useAppDispatch()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -122,8 +162,9 @@ function useSyncHighlightCcdsWithUrl() {
   })
 
   useEffect(() => {
-    const serialized = ccds.join(',')
-    searchParams.set('detectors', serialized)
-    setSearchParams(searchParams, { replace: true })
+    const next = writeHighlightedCcds(searchParams, ccds)
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true })
+    }
   }, [ccds, searchParams, setSearchParams])
 }

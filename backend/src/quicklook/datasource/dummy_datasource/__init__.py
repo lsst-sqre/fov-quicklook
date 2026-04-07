@@ -18,6 +18,9 @@ class DummyDataSource(DataSourceBase):
             *[create_dummy_visit_entry(f"dummy:raw:dummy-{i}", 20230104, "z") for i in range(50)],
         ][: q.limit]
 
+    def resolve_visit_sync(self, visit: VisitName) -> VisitName:
+        return visit
+
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
         ccds = [*_s3_list_visit_ccds(visit)]
         match config.environment:

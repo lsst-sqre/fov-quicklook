@@ -1,6 +1,7 @@
 import threading
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
+from uuid import UUID
 
 from lsst.resources import ResourcePath
 
@@ -8,7 +9,7 @@ from quicklook.config import CcdDataTypeConfig, config
 from quicklook.datasource.types import VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
-from ..types import DataSourceBase, DataSourceCcdMetadata, Query
+from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError
 from .instrument import Instrument
 from .retrieve_data import retrieve_data
 
@@ -24,6 +25,8 @@ else:
 
 DataRef = Any
 
+BY_UUID_DATA_TYPE = CcdDataType('by_uuid')
+
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def __init__(self):
@@ -34,13 +37,22 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return _get_datasource(q.data_type, q.repository_name).query_visits(q)
 
+    def resolve_visit_sync(self, visit: VisitName) -> VisitName:
+        return self.resolve_visit_info_sync(visit).visit_name
+
+    def resolve_visit_info_sync(self, visit: VisitName) -> ResolvedVisitInfo:
+        return _resolve_visit_info(visit)
+
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
+        visit = self.resolve_visit_sync(visit)
         return _get_datasource(visit.data_type, visit.repository_name).list_ccds(visit)
 
     def get_data_sync(self, ref: CcdDataRef) -> bytes:
+        ref = _resolve_ref(ref, self.resolve_visit_sync(ref.visit))
         return _get_datasource(ref.visit.data_type, ref.visit.repository_name).get_data(ref)
 
     def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
+        ref = _resolve_ref(ref, self.resolve_visit_sync(ref.visit))
         return _get_datasource(ref.visit.data_type, ref.visit.repository_name).get_metadata(ref)
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
@@ -220,6 +232,83 @@ class DataTypeSpecificDataSource:
         return {record.id: record for record in records}
 
 
+def _resolve_ref(ref: CcdDataRef, visit: VisitName) -> CcdDataRef:
+    if visit == ref.visit:
+        return ref
+    return CcdDataRef(visit=visit, ccd=ref.ccd)
+
+
+def _resolve_visit(visit: VisitName) -> VisitName:
+    return _resolve_visit_info(visit).visit_name
+
+
+def _resolve_visit_info(visit: VisitName) -> ResolvedVisitInfo:
+    if visit.data_type != BY_UUID_DATA_TYPE:
+        return ResolvedVisitInfo(visit_name=visit)
+    return _resolve_visit_cache(str(visit))
+
+
+@lru_cache(256)
+def _resolve_visit_cache(visit_name: str) -> ResolvedVisitInfo:
+    visit = VisitName(visit_name)
+    repository_butler = _get_repository_butler(visit.repository_name)
+    dataset_ref = repository_butler.registry.getDataset(UUID(visit.name))
+    if dataset_ref is None:
+        raise VisitResolutionError(f'Unknown dataset UUID: {visit.name}')
+
+    dataset_type = cast(str, dataset_ref.datasetType.name)
+    try:
+        datasource = _get_datasource(dataset_type, visit.repository_name)
+    except ValueError as e:
+        raise VisitResolutionError(
+            f'UUID {visit.name} resolves to unsupported dataset type {dataset_type} in repository {visit.repository_name}'
+        ) from e
+    data_id = dataset_ref.dataId.get(datasource.data_id_dimension)
+    if data_id is None:
+        raise VisitResolutionError(
+            f'UUID {visit.name} resolved to dataset type {dataset_type}, but dataId does not contain {datasource.data_id_dimension}'
+        )
+    resolved_visit = VisitName(f'{visit.repository_name}:{dataset_type}:{data_id}')
+    _remember_resolved_visit_run(resolved_visit, cast(str, dataset_ref.run))
+    detector = dataset_ref.dataId.get('detector')
+    return ResolvedVisitInfo(
+        visit_name=resolved_visit,
+        detector=None if detector is None else int(detector),
+    )
+
+
+def _remember_resolved_visit_run(visit: VisitName, run: str) -> None:
+    with _resolved_visit_runs_lock:
+        if len(_resolved_visit_runs) >= 256 and str(visit) not in _resolved_visit_runs:
+            _resolved_visit_runs.pop(next(iter(_resolved_visit_runs)))
+        _resolved_visit_runs[str(visit)] = run
+
+
+def _get_resolved_visit_run(visit: VisitName) -> str | None:
+    with _resolved_visit_runs_lock:
+        return _resolved_visit_runs.get(str(visit))
+
+
+def _clear_resolved_visit_run_cache() -> None:
+    with _resolved_visit_runs_lock:
+        _resolved_visit_runs.clear()
+
+
+def _record_string_attr(record: ButlerDimensionRecord, *names: str, default: str = '') -> str:
+    for name in names:
+        value = getattr(record, name, None)
+        if value is not None:
+            return cast(str, value)
+    return default
+
+
+def _record_float_attr(record: ButlerDimensionRecord, name: str, default: float = 0.0) -> float:
+    value = getattr(record, name, None)
+    if value is None:
+        return default
+    return float(value)
+
+
 def _get_datasource(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:
     thread_id = threading.get_ident()
     return _get_datasource_cache(data_type, repository_name, thread_id=thread_id)
@@ -236,3 +325,16 @@ def _get_datasource_no_cache(data_type: str, repository_name: str) -> DataTypeSp
             return DataTypeSpecificDataSource(data_type_config)
     available = [(dt.data_type, dt.repository_name) for dt in config.ccd_data_types]
     raise ValueError(f'Unknown data type: ({data_type}, {repository_name}). Available: {available}')
+
+
+def _get_repository_butler(repository_name: str) -> ButlerType:
+    thread_id = threading.get_ident()
+    return _get_repository_butler_cache(repository_name, thread_id=thread_id)
+
+
+@lru_cache(32)
+def _get_repository_butler_cache(repository_name: str, thread_id: int) -> ButlerType:
+    del thread_id
+    from lsst.daf.butler import Butler
+
+    return Butler(repository_name)  # type: ignore

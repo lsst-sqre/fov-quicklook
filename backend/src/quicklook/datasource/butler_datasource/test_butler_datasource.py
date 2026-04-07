@@ -1,9 +1,18 @@
 from types import SimpleNamespace
+from typing import Any, cast
+
+import lsst.daf.butler as butler_module
 
 from quicklook.config import CcdDataTypeConfig
-from quicklook.datasource.butler_datasource import DataTypeSpecificDataSource, Instrument
+from quicklook.datasource.butler_datasource import (
+    ButlerDataSource,
+    DataTypeSpecificDataSource,
+    Instrument,
+    _resolve_visit_cache,
+)
+from quicklook.datasource.types import VisitResolutionError
 from quicklook.datasource.types import Query
-from quicklook.types import CcdDataType, CcdName
+from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 
 class FakeDimensionRecordResults:
@@ -32,7 +41,7 @@ def _make_datasource(*, data_type: str, data_id_dimension: str, order_by: list[s
         repository_name='repo',
         instrument='LSSTCam',
     )
-    ds._butler = SimpleNamespace(registry=registry)
+    ds._butler = cast(Any, SimpleNamespace(registry=registry))
     return ds
 
 
@@ -203,3 +212,135 @@ def test_query_dimension_records_applies_order_and_limit_after_query():
     assert calls == [('exposure', {'datasets': 'raw', 'where': 'day_obs=20250303'})]
     assert order_calls == [('-day_obs', '-exposure')]
     assert limit_calls == [7]
+
+
+def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):
+    _resolve_visit_cache.cache_clear()
+
+    class ResolverRegistry:
+        def getDataset(self, dataset_uuid):
+            assert str(dataset_uuid) == '726a5858-33d0-5d75-ab98-ea273c4c3792'
+            return SimpleNamespace(
+                datasetType=SimpleNamespace(name='raw'),
+                dataId={'exposure': 4242},
+            )
+
+    resolver_ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-exposure'],
+        registry=ResolverRegistry(),
+    )
+    target_ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-exposure'],
+        registry=object(),
+    )
+
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_repository_butler',
+        lambda repository_name: cast(Any, SimpleNamespace(registry=resolver_ds._butler.registry)),
+    )
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_datasource',
+        lambda data_type, repository_name: target_ds,
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    visit = ds.resolve_visit_sync(VisitName('repo:by_uuid:726a5858-33d0-5d75-ab98-ea273c4c3792'))
+    resolved = ds.resolve_visit_info_sync(VisitName('repo:by_uuid:726a5858-33d0-5d75-ab98-ea273c4c3792'))
+
+    assert visit == VisitName('repo:raw:4242')
+    assert resolved.visit_name == VisitName('repo:raw:4242')
+    assert resolved.detector is None
+
+
+def test_get_repository_butler_cache_uses_repository_only(monkeypatch):
+    from quicklook.datasource.butler_datasource import _get_repository_butler_cache
+
+    _get_repository_butler_cache.cache_clear()
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def fake_butler(*args: object, **kwargs: object):
+        calls.append((args, kwargs))
+        return object()
+
+    monkeypatch.setattr(butler_module, 'Butler', fake_butler)
+
+    _get_repository_butler_cache('main', thread_id=1)
+
+    assert calls == [(('main',), {})]
+def test_get_metadata_sync_resolves_by_uuid_before_delegating(monkeypatch):
+    resolved_visit = VisitName('repo:raw:4242')
+    expected_metadata = SimpleNamespace(visit_name=resolved_visit)
+    captured_refs: list[CcdDataRef] = []
+
+    class TargetDataSource:
+        def get_metadata(self, ref: CcdDataRef):
+            captured_refs.append(ref)
+            return expected_metadata
+
+    monkeypatch.setattr(ButlerDataSource, 'resolve_visit_sync', lambda self, visit: resolved_visit)
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_datasource',
+        lambda data_type, repository_name: TargetDataSource(),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    metadata = ds.get_metadata_sync(CcdDataRef(VisitName('repo:by_uuid:uuid-1'), CcdName('R22_S00')))
+
+    assert metadata is expected_metadata
+    assert captured_refs == [CcdDataRef(visit=resolved_visit, ccd=CcdName('R22_S00'))]
+
+
+def test_resolve_visit_sync_raises_visit_resolution_error_for_unknown_uuid(monkeypatch):
+    _resolve_visit_cache.cache_clear()
+
+    class ResolverRegistry:
+        def getDataset(self, dataset_uuid):
+            del dataset_uuid
+            return None
+
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_repository_butler',
+        lambda repository_name: cast(Any, SimpleNamespace(registry=ResolverRegistry())),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+
+    try:
+        ds.resolve_visit_sync(VisitName('repo:by_uuid:726a5858-33d0-5d75-ab98-ea273c4c3792'))
+    except VisitResolutionError as e:
+        assert str(e) == 'Unknown dataset UUID: 726a5858-33d0-5d75-ab98-ea273c4c3792'
+    else:  # pragma: no cover
+        raise AssertionError('VisitResolutionError was not raised')
+
+
+def test_resolve_visit_sync_raises_visit_resolution_error_for_unsupported_dataset_type(monkeypatch):
+    _resolve_visit_cache.cache_clear()
+
+    class ResolverRegistry:
+        def getDataset(self, dataset_uuid):
+            del dataset_uuid
+            return SimpleNamespace(
+                datasetType=SimpleNamespace(name='difference_image'),
+                dataId={'visit': 1234},
+            )
+
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_repository_butler',
+        lambda repository_name: cast(Any, SimpleNamespace(registry=ResolverRegistry())),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+
+    try:
+        ds.resolve_visit_sync(VisitName('embargo:by_uuid:019bbefe-465a-7815-a05c-13dc47a78418'))
+    except VisitResolutionError as e:
+        assert (
+            str(e)
+            == 'UUID 019bbefe-465a-7815-a05c-13dc47a78418 resolves to unsupported dataset type difference_image in repository embargo'
+        )
+    else:  # pragma: no cover
+        raise AssertionError('VisitResolutionError was not raised')

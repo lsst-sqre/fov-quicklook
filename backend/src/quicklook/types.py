@@ -11,12 +11,12 @@ CcdDataType = NewType('CcdDataType', str)
 
 
 class VisitName(str):
-    """Visit識別子。フォーマット: ``{repository_name}:{data_type}:{exposure_id}``"""
+    """Visit識別子。フォーマット: ``{repository_name}:{data_type}:{identifier}``"""
 
     def _parts(self) -> list[str]:
         parts = self.split(':')
         if len(parts) < 3:  # pragma: no cover
-            raise ValueError(f'Invalid visit name: {self!r}  (expected format: repository_name:data_type:exposure_id)')
+            raise ValueError(f'Invalid visit name: {self!r}  (expected format: repository_name:data_type:identifier)')
         return parts
 
     @property

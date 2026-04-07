@@ -4,8 +4,10 @@ import fastapi
 
 from quicklook.types import VisitName
 
+VISIT_NAME_PATH_PATTERN = r'^[^:/]+:[^:/]+:[^:/]+$'
 
-def dep_visit_name(
-    visit_name: Annotated[str, fastapi.Path(..., pattern=r'^\w+:\w+:\w+$')],
+
+async def dep_visit_name(
+    visit_name: Annotated[str, fastapi.Path(..., pattern=VISIT_NAME_PATH_PATTERN)],
 ):
     return VisitName(visit_name)
