@@ -57,6 +57,7 @@
 |------|------|------|
 | `backend/` | Python バックエンド (FastAPI) | `backend/.github/DEVELOPMENT.md` |
 | `frontend/app/` | React フロントエンド | `frontend/app/.github/DEVELOPMENT.md` |
+| `dev/deploy-broker/` | agent-safe deploy/sync/restart broker (Python daemon/client) | `/docs/phalanx.ja.md` |
 | `k8s/phalanx/` | Helm チャート（独立gitリポジトリ） | `/docs/phalanx.ja.md` |
 | `docs/` | 設計・開発ドキュメント | - |
 
@@ -106,6 +107,7 @@
 
 ### デプロイ
 - `/docs/phalanx.ja.md` — Phalanx デプロイメント ガイド
+- `dev/deploy-broker/` — agent-safe deploy / sync / restart broker 実装
 - `/k8s/phalanx/applications/fov-quicklook/README.md` — Helm チャート
 
 ---

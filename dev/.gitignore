@@ -1,0 +1,5 @@
+.argocd-token
+.gafaelfawr-token
+.curl
+deploy-broker/.venv/
+deploy-broker/state/

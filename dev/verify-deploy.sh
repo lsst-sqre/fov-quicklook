@@ -27,7 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BASE_URL="https://usdf-rsp-dev.slac.stanford.edu/fov-quicklook"
 TOKEN_FILE="$SCRIPT_DIR/.gafaelfawr-token"
-PYTHON="${SCRIPT_DIR}/../.venv/bin/python"
+PYTHON=python3
 
 # --- トークン管理 ---
 
