@@ -15,6 +15,7 @@ import { Viewer } from "./Viewer"
 import { ViewerSettings } from "./ViewerSettings"
 import { Colorbar } from "./ViewerSettings/Colorbar"
 import { VisitList } from "./VisitList"
+import { extractSearchDateFromVisitId } from "./visitSearch"
 import { useOnChange } from "../../hooks/useOnChange"
 
 export const Home = wrapByHomeContext(memo(() => {
@@ -69,7 +70,7 @@ const useSetInitialSearchConditions = () => {
 
   useEffect(() => {
     if (searchString === '' && visitId) {
-      dispatch(homeSlice.actions.setSearchString(extractDateFromVisitId(visitId)))
+      dispatch(homeSlice.actions.setSearchString(extractSearchDateFromVisitId(visitId)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -83,20 +84,6 @@ const useSetInitialSearchConditions = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-}
-
-
-function extractDateFromVisitId(visitId: string) {
-  /*
-   * embargo:raw:2025051900437 のようなテキストから20250519を抽出する
-   * 形式がマッチしなければ '' を返す
-   */
-  const parts = visitId.split(':')
-  const last = parts[parts.length - 1]
-  if (!last?.match(/^\d{13}$/)) {
-    return ''
-  }
-  return last.slice(0, 8)
 }
 
 

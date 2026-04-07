@@ -9,4 +9,5 @@ export declare const listWrapper: string;
 export declare const loading: string;
 export declare const loadingOverlay: string;
 export declare const searchBox: string;
+export declare const searchDateInput: string;
 export declare const selected: string;
