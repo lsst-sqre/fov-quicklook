@@ -97,8 +97,7 @@ async def _gather_single_fits_tiles(
             if pool is None:
                 pool = arr.copy()
             else:
-                pool[:, :, 0] += arr[:, :, 0]
-                numpy.maximum(pool[:, :, 1], arr[:, :, 1], out=pool[:, :, 1])
+                pool += arr
 
     headers = get_cache_headers()
 

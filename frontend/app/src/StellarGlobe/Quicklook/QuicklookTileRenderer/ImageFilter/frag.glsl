@@ -16,8 +16,9 @@ vec3 colormap(float x);
 
 void main(void) {
     vec2 raw = texture(u_texture0, v_coord).rg;
-    float value = raw.r;
     float alpha = raw.g;
+    // Premultiplied alpha: value チャネルを alpha で割って実値を復元
+    float value = alpha > 0.0 ? raw.r / alpha : 0.0;
     float v = scale(value);
     v = clamp(v, 0.f, 1.f);
     outputColor = vec4(colormap(v), alpha);

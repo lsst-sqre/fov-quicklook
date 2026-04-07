@@ -22,6 +22,18 @@ from quicklook.utils.stacklib import Stack, pool_args, thread_local_context
 logger = quicklook.mylogging.getLogger(__name__)
 
 
+def _normalize_tile_array(data: numpy.ndarray) -> numpy.ndarray:
+    if data.ndim == 3 and data.shape[2] == 2:
+        return data
+    if data.ndim == 2:
+        h, w = data.shape
+        normalized = numpy.zeros((h, w, 2), dtype=data.dtype)
+        normalized[:, :, 0] = data
+        normalized[:, :, 1] = data != 0
+        return normalized
+    raise ValueError(f'Unexpected tile array shape: {data.shape}')
+
+
 def merge_single_fits_tiles(job: Job):
     # 全てのタイルを走査しタイルについて
     # そのタイルのprimary generatorが自身だった場合、そのタイルをマージ対象とする。
@@ -83,11 +95,10 @@ def _process_tile(args: _ProcessTileArgs):
         else:
             external_generators.add(dist_config.generators[generator_id])
 
-    arr = storage.single_fits_tile.load_local_merged(pos=args.pos, ccd_names=internal_ccd_names)
+    arr = _normalize_tile_array(storage.single_fits_tile.load_local_merged(pos=args.pos, ccd_names=internal_ccd_names))
     if len(external_generators) > 0:
         for _arr in _gather_external_tile_data(storage.job.id, args.pos, external_generators):
-            arr[:, :, 0] += _arr[:, :, 0]
-            numpy.maximum(arr[:, :, 1], _arr[:, :, 1], out=arr[:, :, 1])
+            arr += _normalize_tile_array(_arr)
     storage.merged_fits_tile.save_compressed_data(
         pos=args.pos,
         compressed_data=zstd.compress(ndarray2npybytes(arr)),
@@ -105,7 +116,7 @@ def _gather_external_tile_data(
         yield fut.result()
 
 
-def _get_external_tile(generator: GeneratorInfo, job_id: str, pos: TilePos) -> numpy.ndarray | None:
+def _get_external_tile(generator: GeneratorInfo, job_id: str, pos: TilePos) -> numpy.ndarray:
     session = process_context().thread_local_requests_session()
     response = retry_on_error(
         lambda: session.get(f'{generator.url}/jobs/{job_id}/tiles/{pos.level}/{pos.i}/{pos.j}'),

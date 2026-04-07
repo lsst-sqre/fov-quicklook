@@ -102,14 +102,9 @@ def shrink_image(
 
     h, w, _ = data.shape
     new_h, new_w = h // 2, w // 2
-    values = data[:, :, 0].reshape(new_h, 2, new_w, 2)
-    alphas = data[:, :, 1].reshape(new_h, 2, new_w, 2)
 
-    alpha_sum = alphas.sum(axis=(1, 3))
-    safe_denom = numpy.where(alpha_sum > 0, alpha_sum, 1.0)
-
-    result = numpy.empty((new_h, new_w, 2), dtype=numpy.float32)
-    result[:, :, 0] = (values * alphas).sum(axis=(1, 3)) / safe_denom
-    result[:, :, 1] = alpha_sum / 4.0
+    # Premultiplied alpha: 両チャネルとも2x2ブロックの単純平均
+    # channel 0 は premultiplied value (= value * alpha) なので単純平均で正しい
+    result = data.reshape(new_h, 2, new_w, 2, 2).mean(axis=(1, 3))
 
     return result

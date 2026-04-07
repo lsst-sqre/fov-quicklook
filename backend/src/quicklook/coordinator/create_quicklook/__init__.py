@@ -150,6 +150,13 @@ def _ensure_users_exist_for_job(job: Job):
         raise RuntimeError(f'No users for job {job.id} (visit={job.visit}), so skipping.')
 
 
+def _job_generators(job: Job):
+    generators = job.shared_large_status.dist_config.generators
+    if not generators:
+        raise RuntimeError(f"No generator config found for job {job.id}")
+    return generators
+
+
 async def _merge_tiles(job: Job):
     _ensure_users_exist_for_job(job)
 
@@ -164,7 +171,7 @@ async def _merge_tiles(job: Job):
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
-    await rpc_scatter_stream(on_yield, merge_single_fits_tiles, job)
+    await rpc_scatter_stream(on_yield, merge_single_fits_tiles, job, generators=_job_generators(job))
 
 
 def _clear_single_fits_tiles_rpc(job: Job):
@@ -173,13 +180,14 @@ def _clear_single_fits_tiles_rpc(job: Job):
 
 async def _transfer_tiles(job: Job):
     _ensure_users_exist_for_job(job)
+    job_generators = _job_generators(job)
 
     async with job.watcher.watch_status():
         job.status.stage = 'upload_to_object_storage'
 
     # TODO: 本当はディスク節約のため_merge_tilesの最後でやりたいのだが
     # 先にstageをupload_to_object_storageに変更する必要がある。
-    await rpc_scatter(_clear_single_fits_tiles_rpc, job)
+    await rpc_scatter(_clear_single_fits_tiles_rpc, job, generators=job_generators)
 
     uploaded_size = 0
 
@@ -194,7 +202,7 @@ async def _transfer_tiles(job: Job):
             case _:  # pragma: no cover
                 raise ValueError(f"Unexpected message: {msg}")
 
-    await rpc_scatter_stream(on_yield, transfer_tiles, job)
+    await rpc_scatter_stream(on_yield, transfer_tiles, job, generators=job_generators)
     return uploaded_size
 
 
@@ -205,7 +213,7 @@ async def _transfer_quicklook_metadata(job: Job, ccd_metadata_list: list[CcdMeta
 
 async def _transfer_fits_headers(job: Job) -> int:
     """FITS headerをobject storageにアップロードする"""
-    uploaded_sizes = await rpc_scatter(transfer_fits_headers, job)
+    uploaded_sizes = await rpc_scatter(transfer_fits_headers, job, generators=_job_generators(job))
     return sum(uploaded_sizes)
 
 

@@ -172,9 +172,12 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
         const i = (y >> level) % TILE_SIZE
         const j = (x >> level) % TILE_SIZE
         const idx = (i * TILE_SIZE + j) * 2
+        const rawValue = npy.data[idx] as number
+        const alpha = npy.data[idx + 1] as number
         return {
           level,
-          value: npy.data[idx] as number,
+          // Premultiplied alpha: value / alpha で実値を復元
+          value: alpha > 0 ? rawValue / alpha : 0,
         }
       }
     }
