@@ -52,6 +52,7 @@ describe("VisitAvailabilityDialog", () => {
       { skip: false },
     )
     expect(screen.getByText("embargo:raw")).toBeTruthy()
+    expect(screen.getByRole("option", { name: "5" })).toBeTruthy()
 
     fireEvent.click(screen.getByRole("button", { name: "Set 2025-05-19 (2 entries)" }))
 
