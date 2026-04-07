@@ -1,0 +1,226 @@
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import httpx
+
+from .config import Settings
+from .gitops import EXPECTED_PHALANX_REMOTE_URLS
+from .models import (
+    ArgoCdBranchResponse,
+    ArgoCdLogsResponse,
+    ArgoCdRestartResponse,
+    ArgoCdSyncResponse,
+    ArgoCdStatusResponse,
+    DeploymentStatusEntry,
+)
+from .storage import TokenStore
+
+DEPLOYMENTS = ("coordinator", "generator", "frontend", "db", "debug")
+DEFAULT_RESTART_DEPLOYMENTS = ("coordinator", "generator", "frontend", "debug")
+
+
+class ArgoCdClient:
+    def __init__(self, settings: Settings, token_store: TokenStore) -> None:
+        self._settings = settings
+        self._token_store = token_store
+
+    def _headers(self) -> dict[str, str]:
+        token = self._token_store.get_argocd_token()
+        return {"Cookie": f"argocd.token={token}"}
+
+    def _json_headers(self) -> dict[str, str]:
+        return {**self._headers(), "Content-Type": "application/json"}
+
+    def _http(self) -> httpx.Client:
+        timeout = httpx.Timeout(self._settings.argocd_timeout_seconds)
+        return httpx.Client(timeout=timeout)
+
+    def _resource_name(self, component: str) -> str:
+        if component in DEPLOYMENTS:
+            return f"fov-quicklook-{component}"
+        if component.startswith("fov-quicklook-"):
+            return component
+        raise ValueError(f"unknown component: {component}")
+
+    def _validate_target_revision(self, branch: str) -> None:
+        if branch == "main" or branch.startswith("u/michitaro/fov-quicklook-"):
+            return
+        raise ValueError(
+            f"expected main or u/michitaro/fov-quicklook-* branch, got: {branch}"
+        )
+
+    def get_app_info(self) -> dict[str, Any]:
+        with self._http() as client:
+            response = client.get(
+                f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}",
+                headers=self._headers(),
+            )
+            response.raise_for_status()
+            app_info = response.json()
+        self.validate_app_source(app_info)
+        return app_info
+
+    def validate_app_source(self, app_info: dict[str, Any]) -> None:
+        source = app_info["spec"]["source"]
+        repo_url = source["repoURL"]
+        if repo_url not in EXPECTED_PHALANX_REMOTE_URLS:
+            raise RuntimeError(f"unexpected ArgoCD repo URL: {repo_url}")
+        path = source["path"]
+        if path != self._settings.expected_argocd_path:
+            raise RuntimeError(f"unexpected ArgoCD source path: {path}")
+
+    def get_branch(self) -> ArgoCdBranchResponse:
+        app_info = self.get_app_info()
+        source = app_info["spec"]["source"]
+        return ArgoCdBranchResponse(
+            repo=source["repoURL"],
+            path=source["path"],
+            branch=source["targetRevision"],
+        )
+
+    def status(self) -> ArgoCdStatusResponse:
+        entries: list[DeploymentStatusEntry] = []
+        with self._http() as client:
+            for component in DEPLOYMENTS:
+                deployment = self._resource_name(component)
+                response = client.get(
+                    f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/resource",
+                    params={
+                        "namespace": self._settings.argocd_namespace,
+                        "resourceName": deployment,
+                        "version": "v1",
+                        "group": "apps",
+                        "kind": "Deployment",
+                    },
+                    headers=self._headers(),
+                )
+                if response.is_error:
+                    entries.append(
+                        DeploymentStatusEntry(
+                            deployment=deployment,
+                            ready_replicas="?",
+                            replicas="?",
+                            image="取得失敗",
+                        )
+                    )
+                    continue
+                manifest = json.loads(response.json()["manifest"])
+                entries.append(
+                    DeploymentStatusEntry(
+                        deployment=deployment,
+                        ready_replicas=str(manifest["status"].get("readyReplicas", "0")),
+                        replicas=str(manifest["status"].get("replicas", "?")),
+                        image=manifest["spec"]["template"]["spec"]["containers"][0]["image"],
+                    )
+                )
+        return ArgoCdStatusResponse(deployments=entries)
+
+    def logs(self, component: str, since_seconds: int = 600) -> ArgoCdLogsResponse:
+        deployment = self._resource_name(component)
+        with self._http() as client:
+            tree_response = client.get(
+                f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/resource-tree",
+                headers=self._headers(),
+            )
+            tree_response.raise_for_status()
+            nodes = tree_response.json().get("nodes", [])
+
+            pod_name = ""
+            for node in nodes:
+                if node.get("kind") == "Pod" and node.get("name", "").startswith(
+                    f"{deployment}-"
+                ):
+                    pod_name = node["name"]
+                    break
+            if not pod_name:
+                raise RuntimeError(f"pod not found for component: {component}")
+
+            logs_response = client.get(
+                f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/logs",
+                params={
+                    "namespace": self._settings.argocd_namespace,
+                    "podName": pod_name,
+                    "container": deployment,
+                    "sinceSeconds": since_seconds,
+                },
+                headers=self._headers(),
+            )
+            logs_response.raise_for_status()
+
+        lines: list[str] = []
+        for line in logs_response.text.splitlines():
+            try:
+                lines.append(json.loads(line)["result"]["content"])
+            except Exception:
+                continue
+        return ArgoCdLogsResponse(component=component, pod_name=pod_name, logs="".join(lines))
+
+    def set_branch(self, branch: str, image_tag: str | None = None) -> None:
+        self._validate_target_revision(branch)
+        app_info = self.get_app_info()
+        patch_source: dict[str, Any] = {"targetRevision": branch}
+        if image_tag is not None:
+            current_parameters = app_info["spec"]["source"].get("helm", {}).get("parameters", [])
+            updated_parameters = [
+                parameter
+                for parameter in current_parameters
+                if parameter.get("name") != "image.tag"
+            ]
+            updated_parameters.append({"name": "image.tag", "value": image_tag})
+            patch_source["helm"] = {"parameters": updated_parameters}
+        payload = {
+            "name": self._settings.argocd_app_name,
+            "patch": json.dumps({"spec": {"source": patch_source}}),
+            "patchType": "merge",
+        }
+        with self._http() as client:
+            response = client.patch(
+                f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}",
+                headers=self._json_headers(),
+                content=json.dumps(payload),
+            )
+            response.raise_for_status()
+            self.validate_app_source(response.json())
+
+    def sync(self) -> ArgoCdSyncResponse:
+        self.get_app_info()
+        with self._http() as client:
+            response = client.post(
+                f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/sync",
+                headers=self._json_headers(),
+                content=json.dumps({"name": self._settings.argocd_app_name}),
+            )
+            response.raise_for_status()
+        return ArgoCdSyncResponse()
+
+    def restart(self, components: list[str] | None = None) -> ArgoCdRestartResponse:
+        targets = components or list(DEFAULT_RESTART_DEPLOYMENTS)
+        restarted: list[str] = []
+        self.get_app_info()
+        with self._http() as client:
+            for component in targets:
+                deployment = self._resource_name(component)
+                response = client.post(
+                    f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/resource/actions/v2",
+                    headers=self._json_headers(),
+                    content=json.dumps(
+                        {
+                            "name": self._settings.argocd_app_name,
+                            "namespace": self._settings.argocd_namespace,
+                            "resourceName": deployment,
+                            "version": "v1",
+                            "group": "apps",
+                            "kind": "Deployment",
+                            "action": "restart",
+                        }
+                    ),
+                )
+                response.raise_for_status()
+                restarted.append(deployment)
+        return ArgoCdRestartResponse(restarted=restarted)
+
+    def set_branch_and_sync(self, branch: str, image_tag: str | None = None) -> None:
+        self.set_branch(branch, image_tag=image_tag)
+        self.sync()

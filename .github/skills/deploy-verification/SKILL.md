@@ -11,11 +11,15 @@ description: >
 
 ## 概要
 
-`backend/dev/verify-deploy.sh` を使って、デプロイ後のfov-quicklookアプリケーションの動作を確認する。
+`dev/verify-deploy.sh` を使って、デプロイ後のfov-quicklookアプリケーションの動作を確認する。
+
+> **agent-safe 運用**: deploy broker を使う構成では、app access token は broker
+> daemon が保持し、agent は `get-app-token` 相当の broker API から受け取って
+> 直接 HTTP 検証に使える。app token 自体の登録は daemon ノード側で行う。
 
 ## 前提条件
 
-- gafaelfawr トークンが `backend/dev/.gafaelfawr-token` に保存されていること
+- gafaelfawr トークンが `dev/.gafaelfawr-token` に保存されていること
 - トークンはブラウザの認証セッションに紐づくため、セッション切れの場合は再取得が必要
 - WebSocket進捗監視には `websockets` ライブラリが必要（`backend/.venv` 内に含まれている）
 
@@ -27,7 +31,7 @@ description: >
 4. 以下のコマンドでトークンを抽出・保存:
 
 ```bash
-cd backend/dev
+cd dev
 ./verify-deploy.sh extract-token "<コピーしたcurlコマンド>"
 ```
 
@@ -183,7 +187,7 @@ WebSocket で進捗を監視中...
 ## デプロイ後の典型的な検証フロー
 
 ```bash
-cd backend/dev
+cd dev
 
 # 1. ArgoCD でデプロイ状態を確認
 ./argocd.sh status
