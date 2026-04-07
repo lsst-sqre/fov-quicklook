@@ -1,15 +1,15 @@
 import classNames from "classnames"
 import { memo, useEffect, useMemo, useState } from "react"
 import { LoadingSpinner } from "../../../components/Loading"
-import { useChangeCurrentQuicklook } from "../../../hooks/useChangeCurrentQuicklook"
-import { ListVisitsApiResponse, useListVisitMonthlyCountsQuery, useListVisitsQuery } from "../../../store/api/openapi"
+import { useListVisitMonthlyCountsQuery } from "../../../store/api/openapi"
 import { CcdDataType, homeSlice } from "../../../store/features/homeSlice"
-import { useAppDispatch } from "../../../store/hooks"
+import { useAppDispatch, useAppSelector } from "../../../store/hooks"
 import {
-  buildMonthDayCounts,
+  buildCalendarDayCounts,
   buildVisitMonthlyCountsQuery,
   dayObsToSearchDate,
-  getCurrentMonthValue,
+  getCurrentYearMonth,
+  searchDateToDayObs,
 } from "../visitSearch"
 import styles from "./styles.module.scss"
 
@@ -19,51 +19,65 @@ type VisitAvailabilityDialogProps = {
   onClose: () => void
 }
 
-type VisitListEntryType = ListVisitsApiResponse[number]
+const monthOptions = [
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+] as const
+
+const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
 
 export const VisitAvailabilityDialog = memo(({ dataSource, open, onClose }: VisitAvailabilityDialogProps) => {
   const dispatch = useAppDispatch()
-  const changeCurrentQuicklook = useChangeCurrentQuicklook()
-  const [monthValue, setMonthValue] = useState(() => getCurrentMonthValue())
-  const [selectedDayObs, setSelectedDayObs] = useState<number | undefined>()
+  const searchString = useAppSelector((state) => state.home.searchString)
   const [repositoryName = "", dataType = ""] = dataSource.split(":")
-
-  const monthlyCountsQuery = useMemo(
-    () => buildVisitMonthlyCountsQuery(monthValue, dataType, repositoryName),
-    [dataType, monthValue, repositoryName],
-  )
-  const monthlyCountsResult = useListVisitMonthlyCountsQuery(
-    monthlyCountsQuery ?? { year: 1970, month: 1, dataType, repositoryName },
-    { skip: !open || monthlyCountsQuery === undefined },
-  )
-  const dayEntriesResult = useListVisitsQuery(
-    selectedDayObs === undefined
-      ? { dayObs: 0, dataType, repositoryName, limit: 1000 }
-      : { dayObs: selectedDayObs, dataType, repositoryName, limit: 1000 },
-    { skip: !open || selectedDayObs === undefined },
-  )
-  const dayCounts = useMemo(
-    () => buildMonthDayCounts(monthValue, monthlyCountsResult.data ?? []),
-    [monthValue, monthlyCountsResult.data],
-  )
-  const selectedDay = useMemo(
-    () => dayCounts.find((dayCount) => dayCount.day_obs === selectedDayObs),
-    [dayCounts, selectedDayObs],
-  )
+  const currentYearMonth = useMemo(() => getCurrentYearMonth(), [])
+  const [selectedYear, setSelectedYear] = useState(() => String(currentYearMonth.year))
+  const [selectedMonth, setSelectedMonth] = useState(() => String(currentYearMonth.month))
+  const year = Number(selectedYear)
+  const month = Number(selectedMonth)
+  const canQueryMonth = Number.isInteger(year) && year > 0 && month >= 1 && month <= 12
+  const currentDayObs = searchDateToDayObs(searchString)
 
   useEffect(() => {
-    if (open) {
-      setSelectedDayObs(undefined)
+    if (!open) {
+      return
     }
-  }, [dataSource, monthValue, open])
+
+    const next = getCurrentYearMonth()
+    setSelectedYear(String(next.year))
+    setSelectedMonth(String(next.month))
+  }, [open])
+
+  const monthlyCountsResult = useListVisitMonthlyCountsQuery(
+    buildVisitMonthlyCountsQuery(
+      canQueryMonth ? year : currentYearMonth.year,
+      canQueryMonth ? month : currentYearMonth.month,
+      dataType,
+      repositoryName,
+    ),
+    { skip: !open || !canQueryMonth },
+  )
+  const calendarDayCounts = useMemo(
+    () => (canQueryMonth ? buildCalendarDayCounts(year, month, monthlyCountsResult.data ?? []) : []),
+    [canQueryMonth, month, monthlyCountsResult.data, year],
+  )
 
   if (!open) {
     return null
   }
 
-  const selectEntry = (entry: VisitListEntryType) => {
-    dispatch(homeSlice.actions.setSearchString(dayObsToSearchDate(entry.day_obs)))
-    changeCurrentQuicklook(entry.id)
+  const selectDay = (dayObs: number) => {
+    dispatch(homeSlice.actions.setSearchString(dayObsToSearchDate(dayObs)))
     onClose()
   }
 
@@ -79,86 +93,78 @@ export const VisitAvailabilityDialog = memo(({ dataSource, open, onClose }: Visi
           <h2 className={styles.availabilityTitle} id="date-availability-title">Date availability</h2>
           <button className={styles.availabilityCloseButton} onClick={onClose} type="button">Close</button>
         </div>
-        <label className={styles.monthField}>
-          <span className={styles.monthFieldLabel}>Month</span>
-          <input
-            aria-label="Observation month"
-            className={styles.monthInput}
-            onChange={(event) => setMonthValue(event.target.value)}
-            type="month"
-            value={monthValue}
-          />
-        </label>
-        <div className={styles.availabilityColumns}>
-          <section className={styles.availabilityPanel}>
-            <div className={styles.panelHeader}>
-              <h3 className={styles.panelTitle}>Daily entry counts</h3>
+        <div className={styles.availabilityFilters}>
+          <label className={styles.filterField}>
+            <span className={styles.monthFieldLabel}>Year</span>
+            <input
+              aria-label="Observation year"
+              className={styles.yearInput}
+              min="1"
+              onChange={(event) => setSelectedYear(event.target.value)}
+              step="1"
+              type="number"
+              value={selectedYear}
+            />
+          </label>
+          <label className={styles.filterField}>
+            <span className={styles.monthFieldLabel}>Month</span>
+            <select
+              aria-label="Observation month"
+              className={styles.monthSelect}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+              value={selectedMonth}
+            >
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <section className={styles.availabilityPanel}>
+          <div className={styles.panelHeader}>
+            <h3 className={styles.panelTitle}>Daily entry counts</h3>
+            <span className={styles.panelSource}>{repositoryName}:{dataType}</span>
+          </div>
+          <p className={styles.panelMessage}>Click a day to update the main date filter.</p>
+          {monthlyCountsResult.isFetching ? (
+            <div className={styles.panelLoading}>
+              <LoadingSpinner />
             </div>
-            {monthlyCountsResult.isFetching ? (
-              <div className={styles.panelLoading}>
-                <LoadingSpinner />
-              </div>
-            ) : monthlyCountsResult.isError ? (
-              <p className={styles.panelMessage}>Failed to load daily counts.</p>
-            ) : (
-              <div className={styles.dayGrid}>
-                {dayCounts.map((dayCount) => (
-                  <button
-                    aria-label={`Select ${dayObsToSearchDate(dayCount.day_obs)} (${dayCount.count} entries)`}
-                    className={classNames(
-                      styles.dayButton,
-                      dayCount.count === 0 && styles.dayButtonEmpty,
-                      dayCount.day_obs === selectedDayObs && styles.dayButtonSelected,
-                    )}
-                    disabled={dayCount.count === 0}
-                    key={dayCount.day_obs}
-                    onClick={() => setSelectedDayObs(dayCount.day_obs)}
-                    type="button"
-                  >
-                    <span className={styles.dayButtonDate}>{dayCount.day}</span>
-                    <span className={styles.dayButtonCount}>{dayCount.count}</span>
-                  </button>
+          ) : monthlyCountsResult.isError ? (
+            <p className={styles.panelMessage}>Failed to load daily counts.</p>
+          ) : (
+            <>
+              <div className={styles.weekdayHeader}>
+                {weekdayLabels.map((label) => (
+                  <div className={styles.weekdayLabel} key={label}>{label}</div>
                 ))}
               </div>
-            )}
-          </section>
-          <section className={styles.availabilityPanel}>
-            <div className={styles.panelHeader}>
-              <h3 className={styles.panelTitle}>
-                {selectedDay ? `Entries on ${dayObsToSearchDate(selectedDay.day_obs)}` : "Entries"}
-              </h3>
-              {selectedDay && <span className={styles.panelCount}>{selectedDay.count}</span>}
-            </div>
-            {selectedDayObs === undefined ? (
-              <p className={styles.panelMessage}>Select a day to view entries.</p>
-            ) : dayEntriesResult.isFetching ? (
-              <div className={styles.panelLoading}>
-                <LoadingSpinner />
-              </div>
-            ) : dayEntriesResult.isError ? (
-              <p className={styles.panelMessage}>Failed to load entries.</p>
-            ) : (dayEntriesResult.data?.length ?? 0) === 0 ? (
-              <p className={styles.panelMessage}>No entries found for this day.</p>
-            ) : (
-              <ul className={styles.entrySelectionList}>
-                {dayEntriesResult.data?.map((entry) => (
-                  <li key={entry.id}>
+              <div className={styles.dayGrid}>
+                {calendarDayCounts.map((dayCount, index) => (
+                  dayCount === null ? (
+                    <div className={styles.dayPlaceholder} key={`empty-${index}`} />
+                  ) : (
                     <button
-                      className={styles.entrySelectionButton}
-                      onClick={() => selectEntry(entry)}
+                      aria-label={`Set ${dayObsToSearchDate(dayCount.day_obs)} (${dayCount.count} entries)`}
+                      className={classNames(
+                        styles.dayButton,
+                        dayCount.count === 0 && styles.dayButtonEmpty,
+                        dayCount.day_obs === currentDayObs && styles.dayButtonSelected,
+                      )}
+                      disabled={dayCount.count === 0}
+                      key={dayCount.day_obs}
+                      onClick={() => selectDay(dayCount.day_obs)}
                       type="button"
                     >
-                      <span className={styles.entrySelectionId}>{entry.id.split(":").slice(-1)[0]}</span>
-                      <span className={styles.entrySelectionMeta}>
-                        {[entry.obs_id, entry.physical_filter, `${entry.exposure_time}s`].filter(Boolean).join(" · ")}
-                      </span>
+                      <span className={styles.dayButtonDate}>{dayCount.day}</span>
+                      <span className={styles.dayButtonCount}>{dayCount.count}</span>
                     </button>
-                  </li>
+                  )
                 ))}
-              </ul>
-            )}
-          </section>
-        </div>
+              </div>
+            </>
+          )}
+        </section>
       </div>
     </div>
   )

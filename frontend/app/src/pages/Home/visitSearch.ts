@@ -33,61 +33,36 @@ export function dayObsToSearchDate(dayObs: number): string {
 }
 
 
-export function isValidMonthValue(value: string): boolean {
-  return /^\d{4}-\d{2}$/.test(value)
-}
-
-
-export function monthValueToYearMonth(value: string): { year: number, month: number } | undefined {
-  if (!isValidMonthValue(value)) {
-    return undefined
-  }
-
-  const [year, month] = value.split("-")
+export function getCurrentYearMonth(now: Date = new Date()): { year: number, month: number } {
   return {
-    year: Number(year),
-    month: Number(month),
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
   }
-}
-
-
-export function getCurrentMonthValue(now: Date = new Date()): string {
-  const year = now.getFullYear()
-  const month = `${now.getMonth() + 1}`.padStart(2, "0")
-  return `${year}-${month}`
 }
 
 
 export function buildVisitMonthlyCountsQuery(
-  monthValue: string,
+  year: number,
+  month: number,
   dataType: ListVisitMonthlyCountsApiArg["dataType"],
   repositoryName: ListVisitMonthlyCountsApiArg["repositoryName"],
-): ListVisitMonthlyCountsApiArg | undefined {
-  const yearMonth = monthValueToYearMonth(monthValue)
-  if (yearMonth === undefined) {
-    return undefined
-  }
-
+): ListVisitMonthlyCountsApiArg {
   return {
-    ...yearMonth,
+    year,
+    month,
     dataType,
     repositoryName,
   }
 }
 
 
-export function buildMonthDayCounts(monthValue: string, counts: VisitDayCount[]): Array<VisitDayCount & { day: number }> {
-  const yearMonth = monthValueToYearMonth(monthValue)
-  if (yearMonth === undefined) {
-    return []
-  }
-
-  const daysInMonth = new Date(yearMonth.year, yearMonth.month, 0).getDate()
+export function buildMonthDayCounts(year: number, month: number, counts: VisitDayCount[]): Array<VisitDayCount & { day: number }> {
+  const daysInMonth = new Date(year, month, 0).getDate()
   const countsByDayObs = new Map(counts.map((count) => [count.day_obs, count.count]))
 
   return Array.from({ length: daysInMonth }, (_, index) => {
     const day = index + 1
-    const dayObs = yearMonth.year * 10000 + yearMonth.month * 100 + day
+    const dayObs = year * 10000 + month * 100 + day
 
     return {
       day,
@@ -95,6 +70,26 @@ export function buildMonthDayCounts(monthValue: string, counts: VisitDayCount[])
       count: countsByDayObs.get(dayObs) ?? 0,
     }
   })
+}
+
+
+export function buildCalendarDayCounts(
+  year: number,
+  month: number,
+  counts: VisitDayCount[],
+): Array<(VisitDayCount & { day: number }) | null> {
+  const dayCounts = buildMonthDayCounts(year, month, counts)
+  const firstWeekday = new Date(year, month - 1, 1).getDay()
+  const calendarDays: Array<(VisitDayCount & { day: number }) | null> = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...dayCounts,
+  ]
+
+  while (calendarDays.length % 7 !== 0) {
+    calendarDays.push(null)
+  }
+
+  return calendarDays
 }
 
 

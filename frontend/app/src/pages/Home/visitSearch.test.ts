@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest"
 import {
+  buildCalendarDayCounts,
   buildMonthDayCounts,
   buildVisitListQuery,
   buildVisitMonthlyCountsQuery,
   dayObsToSearchDate,
   extractSearchDateFromVisitId,
-  getCurrentMonthValue,
-  monthValueToYearMonth,
+  getCurrentYearMonth,
   searchDateToDayObs,
 } from "./visitSearch"
 
@@ -43,12 +43,8 @@ describe("visit search helpers", () => {
     expect(dayObsToSearchDate(20250519)).toBe("2025-05-19")
   })
 
-  it("parses a month input value", () => {
-    expect(monthValueToYearMonth("2025-05")).toEqual({ year: 2025, month: 5 })
-  })
-
   it("builds a monthly counts query", () => {
-    expect(buildVisitMonthlyCountsQuery("2025-05", "raw", "embargo")).toEqual({
+    expect(buildVisitMonthlyCountsQuery(2025, 5, "raw", "embargo")).toEqual({
       year: 2025,
       month: 5,
       dataType: "raw",
@@ -57,14 +53,21 @@ describe("visit search helpers", () => {
   })
 
   it("expands sparse daily counts to the full month", () => {
-    const dayCounts = buildMonthDayCounts("2025-02", [{ day_obs: 20250214, count: 3 }])
+    const dayCounts = buildMonthDayCounts(2025, 2, [{ day_obs: 20250214, count: 3 }])
 
     expect(dayCounts).toHaveLength(28)
     expect(dayCounts[0]).toEqual({ day: 1, day_obs: 20250201, count: 0 })
     expect(dayCounts[13]).toEqual({ day: 14, day_obs: 20250214, count: 3 })
   })
 
-  it("uses the provided date to compute the default month value", () => {
-    expect(getCurrentMonthValue(new Date(2025, 4, 19))).toBe("2025-05")
+  it("pads calendar rows so the first week starts on Sunday", () => {
+    const calendarDayCounts = buildCalendarDayCounts(2025, 6, [{ day_obs: 20250601, count: 5 }])
+
+    expect(calendarDayCounts[0]).toEqual({ day: 1, day_obs: 20250601, count: 5 })
+    expect(calendarDayCounts).toHaveLength(35)
+  })
+
+  it("uses the provided date to compute the default year and month", () => {
+    expect(getCurrentYearMonth(new Date(2025, 4, 19))).toEqual({ year: 2025, month: 5 })
   })
 })

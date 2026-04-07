@@ -117,10 +117,16 @@
   }
 }
 
-.monthField {
+.availabilityFilters {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.filterField {
   display: grid;
   gap: 0.4rem;
-  margin-top: 1rem;
 }
 
 .monthFieldLabel {
@@ -128,7 +134,8 @@
   color: rgba(255, 255, 255, 0.75);
 }
 
-.monthInput {
+.yearInput,
+.monthSelect {
   width: min(100%, 220px);
   padding: 0.5rem 0.75rem;
   color: rgba(255, 255, 255, 0.92);
@@ -139,18 +146,12 @@
   color-scheme: dark;
 }
 
-.availabilityColumns {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(280px, 1.1fr);
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
 .availabilityPanel {
   display: flex;
   flex-direction: column;
   min-height: 320px;
   padding: 0.9rem;
+  margin-top: 1rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
@@ -169,12 +170,9 @@
   font-size: 1rem;
 }
 
-.panelCount {
-  min-width: 2rem;
-  padding: 0.1rem 0.5rem;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
+.panelSource {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
 }
 
 .panelLoading {
@@ -185,14 +183,31 @@
 }
 
 .panelMessage {
-  margin: 0;
+  margin: 0 0 0.8rem;
   color: rgba(255, 255, 255, 0.72);
+}
+
+.weekdayHeader {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.weekdayLabel {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.82rem;
 }
 
 .dayGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.dayPlaceholder {
+  min-height: 64px;
 }
 
 .dayButton {
@@ -200,7 +215,7 @@
   gap: 0.2rem;
   justify-items: start;
   min-height: 64px;
-  padding: 0.65rem;
+  padding: 0.55rem;
   color: #fff;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -359,7 +374,12 @@
 }
 
 @media (max-width: 720px) {
-  .availabilityColumns {
-    grid-template-columns: 1fr;
+  .availabilityFilters {
+    flex-direction: column;
+  }
+
+  .yearInput,
+  .monthSelect {
+    width: 100%;
   }
 }
