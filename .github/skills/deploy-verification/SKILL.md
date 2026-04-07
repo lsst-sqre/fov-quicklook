@@ -207,7 +207,7 @@ cd backend/dev
 
 ## visit_nameの形式
 
-`{repository_name}:{data_type}:{exposure_id}`
+`{repository_name}:{data_type}:{identifier}`
 
 利用可能なdata_type/repository_nameの組み合わせ:
 
@@ -215,9 +215,11 @@ cd backend/dev
 |---|---|---|
 | `embargo` | `raw` | Raw (Embargo) |
 | `embargo` | `post_isr_image` | Post-ISR (Embargo) |
+| `embargo` | `difference_image` | Difference Image (Embargo) |
 | `embargo` | `preliminary_visit_image` | Preliminary (Embargo) |
 | `main` | `raw` | Raw (Main) |
 | `main` | `post_isr_image` | Post-ISR (Main) |
+| `main` | `difference_image` | Difference Image (Main) |
 | `main` | `preliminary_visit_image` | Preliminary (Main) |
 
 ## トークンの仕組み

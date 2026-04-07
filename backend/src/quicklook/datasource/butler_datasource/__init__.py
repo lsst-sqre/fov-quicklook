@@ -1,5 +1,7 @@
 import threading
 from functools import lru_cache
+from itertools import islice
+from types import EllipsisType
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
@@ -17,15 +19,19 @@ if TYPE_CHECKING:
     from lsst.daf.butler import Butler as ButlerType
     from lsst.daf.butler import DatasetRef as ButlerDatasetRef
     from lsst.daf.butler import DimensionRecord as ButlerDimensionRecord
+    from lsst.daf.butler.registry import CollectionArgType as ButlerCollectionArgType
 else:
     ButlerType = Any
     ButlerDatasetRef = Any
     ButlerDimensionRecord = Any
+    ButlerCollectionArgType = Any
 
 
 DataRef = Any
 
 BY_UUID_DATA_TYPE = CcdDataType('by_uuid')
+_resolved_visit_runs: dict[str, str] = {}
+_resolved_visit_runs_lock = threading.Lock()
 
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
@@ -127,11 +133,10 @@ class DataTypeSpecificDataSource:
         return [self._visit_entry_from_record(record) for record in records]
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
-        b = self._butler
-        refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_dimension}={visit.name}")
+        refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit)
         i = Instrument.get(self.instrument)
-        ccd_names = [CcdName(i.detector_2_ccd[ref.dataId['detector']]) for ref in refs]  # type: ignore
-        if self.butler_data_type == 'post_isr_image':
+        ccd_names = list(dict.fromkeys(CcdName(i.detector_2_ccd[ref.dataId['detector']]) for ref in refs))  # type: ignore
+        if self.butler_data_type in {'post_isr_image', 'difference_image'}:
             # ４隅のraftは位置情報がrawと違うため除外する
             ccd_names = [ccd_name for ccd_name in ccd_names if ccd_name[:3] not in {'R00', 'R40', 'R04', 'R44'}]
         return ccd_names
@@ -139,9 +144,8 @@ class DataTypeSpecificDataSource:
     def exposure_exists(self, exposure_id: int) -> bool:
         from lsst.daf.butler._exceptions import EmptyQueryResultError, MissingCollectionError
 
-        b = self._butler
         try:
-            refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_dimension}={exposure_id}", limit=1)
+            refs = self._query_datasets(f"{self.data_id_dimension}={exposure_id}", limit=1)
 
         except (EmptyQueryResultError, MissingCollectionError):
             return False
@@ -157,16 +161,22 @@ class DataTypeSpecificDataSource:
         return b.getURI(butler_ref)  # type: ignore
 
     def _refs_by_visit(self, visit: VisitName) -> dict[int, ButlerDatasetRef]:
-        b = self._butler
-        refs = b.query_datasets(self.butler_data_type, where=f"{self.data_id_dimension}={visit.name}")
-        return {cast(int, ref.dataId['detector']): ref for ref in refs}
+        refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit)
+        refs_by_detector: dict[int, ButlerDatasetRef] = {}
+        for ref in refs:
+            detector = cast(int, ref.dataId['detector'])
+            if detector in refs_by_detector:
+                raise ValueError(
+                    f'Cannot find unique dataset for {visit.name} and detector {detector}. found multiple matches'
+                )
+            refs_by_detector[detector] = ref
+        return refs_by_detector
 
     def get_metadata(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
-        b = self._butler
         detector_id = Instrument.get(self.instrument).ccd_2_detector[ref.ccd]
-        butler_refs = b.query_datasets(
-            self.butler_data_type,
-            where=f"{self.data_id_dimension}={ref.visit.name} and detector={detector_id}",
+        butler_refs = self._query_datasets(
+            f"{self.data_id_dimension}={ref.visit.name} and detector={detector_id}",
+            visit=ref.visit,
         )
         if len(butler_refs) != 1:
             raise ValueError(
@@ -205,6 +215,8 @@ class DataTypeSpecificDataSource:
         kwargs: dict[str, Any] = {}
         if datasets is not None:
             kwargs['datasets'] = datasets
+            if self.butler_data_type == 'difference_image':
+                kwargs['collections'] = self._query_collections()
         if where:
             kwargs['where'] = where
         records = self._butler.registry.queryDimensionRecords(dimension, **kwargs)
@@ -217,19 +229,46 @@ class DataTypeSpecificDataSource:
     def _visit_entry_from_record(self, record: ButlerDimensionRecord) -> VisitEntry:
         return VisitEntry(
             id=f'{self.repository_name}:{self.butler_data_type}:{record.id}',
-            obs_id=record.obs_id,
-            day_obs=record.day_obs,
-            physical_filter=record.physical_filter,
-            exposure_time=record.exposure_time,
-            science_program=record.science_program,
-            observation_type=record.observation_type,
-            observation_reason=record.observation_reason,
-            target_name=record.target_name,
+            obs_id=_record_string_attr(record, 'obs_id', default=str(record.id)),
+            day_obs=cast(int, getattr(record, 'day_obs')),
+            physical_filter=_record_string_attr(record, 'physical_filter', 'band'),
+            exposure_time=_record_float_attr(record, 'exposure_time'),
+            science_program=_record_string_attr(record, 'science_program'),
+            observation_type=_record_string_attr(record, 'observation_type'),
+            observation_reason=_record_string_attr(record, 'observation_reason'),
+            target_name=_record_string_attr(record, 'target_name'),
         )
 
     def _get_exposure_info(self, day_obs: int) -> dict[int, ButlerDimensionRecord]:
         records = self._butler.registry.queryDimensionRecords('exposure', where=f"day_obs={day_obs}")
         return {record.id: record for record in records}
+
+    def _query_datasets(
+        self,
+        where: str,
+        *,
+        visit: VisitName | None = None,
+        limit: int | None = None,
+    ) -> list[ButlerDatasetRef]:
+        if self.butler_data_type != 'difference_image':
+            refs = self._butler.query_datasets(self.butler_data_type, where=where, limit=limit)
+            return list(refs)
+
+        results = self._butler.registry.queryDatasets(
+            self.butler_data_type,
+            collections=self._query_collections(visit),
+            where=where,
+        )
+        if limit is not None:
+            return list(islice(results, limit))
+        return list(results)
+
+    def _query_collections(self, visit: VisitName | None = None) -> ButlerCollectionArgType | EllipsisType:
+        if self.butler_data_type != 'difference_image':
+            return self._config.collections
+        if visit is not None and (run := _get_resolved_visit_run(visit)) is not None:
+            return [run]
+        return ...
 
 
 def _resolve_ref(ref: CcdDataRef, visit: VisitName) -> CcdDataRef:
