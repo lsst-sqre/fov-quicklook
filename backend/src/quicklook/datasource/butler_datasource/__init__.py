@@ -1,3 +1,5 @@
+from calendar import monthrange
+from collections import Counter
 import threading
 from functools import lru_cache
 from itertools import islice
@@ -8,7 +10,7 @@ from uuid import UUID
 from lsst.resources import ResourcePath
 
 from quicklook.config import CcdDataTypeConfig, config
-from quicklook.datasource.types import VisitEntry
+from quicklook.datasource.types import MonthlyEntryCountQuery, VisitDayCount, VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError
@@ -68,6 +70,9 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             if datasource.exposure_exists(exposure_id):
                 types.append(CcdDataType(f"{data_type_config.repository_name}:{data_type_config.data_type}"))
         return types
+
+    def query_monthly_entry_counts_sync(self, q: MonthlyEntryCountQuery) -> list[VisitDayCount]:
+        return _get_datasource(q.data_type, q.repository_name).query_monthly_entry_counts(q)
 
 
 class DataTypeSpecificDataSource:
@@ -131,6 +136,17 @@ class DataTypeSpecificDataSource:
             order_by=self.order_by,
         )
         return [self._visit_entry_from_record(record) for record in records]
+
+    def query_monthly_entry_counts(self, q: MonthlyEntryCountQuery) -> list[VisitDayCount]:
+        month_start = q.year * 10000 + q.month * 100 + 1
+        month_end = q.year * 10000 + q.month * 100 + monthrange(q.year, q.month)[1]
+        records = self._query_dimension_records(
+            self.data_id_dimension,
+            datasets=self.butler_data_type,
+            where=f"day_obs>={month_start} and day_obs<={month_end}",
+        )
+        counts = Counter(cast(int, getattr(record, 'day_obs')) for record in records)
+        return [VisitDayCount(day_obs=day_obs, count=counts[day_obs]) for day_obs in sorted(counts)]
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
         refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit)
