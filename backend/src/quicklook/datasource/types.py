@@ -37,6 +37,20 @@ class VisitEntry:
     target_name: str
 
 
+@dataclass
+class MonthlyEntryCountQuery:
+    data_type: CcdDataType
+    repository_name: str
+    year: int
+    month: int
+
+
+@dataclass
+class VisitDayCount:
+    day_obs: int
+    count: int
+
+
 class DataSourceBase(abc.ABC):
     @abc.abstractmethod
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
@@ -78,6 +92,12 @@ class DataSourceBase(abc.ABC):
         ...
 
     get_exposure_data_types = async_wrap(get_exposure_data_types_sync)
+
+    @abc.abstractmethod
+    def query_monthly_entry_counts_sync(self, q: MonthlyEntryCountQuery) -> list[VisitDayCount]:  # pragma: no cover
+        ...
+
+    query_monthly_entry_counts = async_wrap(query_monthly_entry_counts_sync)
 
 
 @dataclass

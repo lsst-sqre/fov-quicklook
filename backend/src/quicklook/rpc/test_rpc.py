@@ -66,7 +66,7 @@ def queue_consumer_function(q: queue.Queue) -> list[int]:
     return results
 
 
-def queue_generator_function(q: queue.Queue[int]) -> Generator[int]:
+def queue_generator_function(q: queue.Queue[int]) -> Generator[int, None, None]:
     """キューから値を受け取ってyieldする関数"""
     while True:
         item = q.get()
