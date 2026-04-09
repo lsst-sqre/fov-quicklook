@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     build_wait_seconds: int = 1800
     build_poll_seconds: int = 15
 
+    log_level: str = "INFO"
+    log_max_bytes: int = 5_000_000
+    log_backup_count: int = 5
+
     @property
     def repo_root(self) -> Path:
         return _repo_root()
@@ -68,6 +72,17 @@ class Settings(BaseSettings):
     @property
     def token_dir(self) -> Path:
         return self.state_dir / "tokens"
+
+    @property
+    def log_dir(self) -> Path:
+        return self.state_dir / "logs"
+
+    @property
+    def audit_log_path(self) -> Path:
+        return self.log_dir / "broker-audit.jsonl"
+
+    def request_log_path(self, request_id: str) -> Path:
+        return self.request_dir / request_id / "broker.log"
 
     @property
     def bootstrap_dir(self) -> Path:
@@ -102,6 +117,7 @@ class Settings(BaseSettings):
     def ensure_state_dirs(self) -> None:
         for path in (
             self.state_dir,
+            self.log_dir,
             self.bootstrap_dir,
             self.token_dir,
             self.job_dir,

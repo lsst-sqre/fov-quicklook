@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import argparse
-import sys
+import logging
 
 import uvicorn
 
+from .broker_logging import audit_event, configure_logging, summarize_exception
 from .config import get_settings
 from .server import create_app
 from .storage import TokenStore
@@ -17,9 +18,28 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = get_settings()
+    configure_logging(settings)
     bootstrapped = TokenStore(settings).bootstrap_from_curl_files()
-    if bootstrapped:
-        kinds = ", ".join(sorted(bootstrapped))
-        print(f"Bootstrapped tokens from startup files: {kinds}", file=sys.stderr)
-    app = create_app(settings)
-    uvicorn.run(app, host=args.host or settings.host, port=args.port or settings.port)
+    host = args.host or settings.host
+    port = args.port or settings.port
+    audit_event(
+        "daemon.start",
+        host=host,
+        port=port,
+        state_dir=settings.state_dir,
+        bootstrapped=sorted(bootstrapped),
+    )
+    try:
+        app = create_app(settings)
+        uvicorn.run(app, host=host, port=port)
+        audit_event("daemon.stop", host=host, port=port, state_dir=settings.state_dir)
+    except Exception as exc:
+        audit_event(
+            "daemon.crash",
+            level=logging.ERROR,
+            host=host,
+            port=port,
+            state_dir=settings.state_dir,
+            error=summarize_exception(exc),
+        )
+        raise

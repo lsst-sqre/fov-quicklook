@@ -93,6 +93,7 @@ class JobStore:
         request_id = uuid.uuid4().hex
         record = DeployRequestRecord(
             request_id=request_id,
+            request_log_path=str(self._settings.request_log_path(request_id)),
             status="queued",
             tracked_branch=tracked_branch,
             verify_mode=verify_mode,  # type: ignore[arg-type]
