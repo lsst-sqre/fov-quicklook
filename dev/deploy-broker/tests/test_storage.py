@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from deploy_broker.config import Settings
-from deploy_broker.storage import TokenStore
+from deploy_broker.storage import JobStore, TokenStore
 
 
 def _settings(tmp_path: Path) -> Settings:
@@ -40,3 +40,15 @@ def test_bootstrap_from_curl_files_rejects_empty_files(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="is empty"):
         TokenStore(settings).bootstrap_from_curl_files()
+
+
+def test_job_store_create_sets_request_log_path(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    settings.ensure_state_dirs()
+
+    record = JobStore(settings).create(
+        tracked_branch="u/michitaro/fov-quicklook-test",
+        verify_mode="auto",
+    )
+
+    assert record.request_log_path == str(settings.request_log_path(record.request_id))

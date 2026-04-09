@@ -52,6 +52,7 @@ class JobLogEntry(BaseModel):
 
 class DeployRequestRecord(BaseModel):
     request_id: str
+    request_log_path: str | None = None
     status: Literal["queued", "running", "succeeded", "failed"]
     tracked_branch: str
     verify_mode: Literal["none", "auto", "all"]

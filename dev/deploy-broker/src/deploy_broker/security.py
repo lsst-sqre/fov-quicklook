@@ -54,6 +54,14 @@ def require_bearer_token(request: Request) -> None:
         )
 
 
+def auth_mode_for_request(request: Request) -> str:
+    if _is_local_unauthenticated_request(request):
+        return "loopback-bypass"
+    if request.headers.get("Authorization", "").startswith("Bearer "):
+        return "bearer"
+    return "missing"
+
+
 def _is_local_unauthenticated_request(request: Request) -> bool:
     settings: Settings = request.app.state.settings
     return settings.host == "127.0.0.1" and request.url.hostname == "127.0.0.1"

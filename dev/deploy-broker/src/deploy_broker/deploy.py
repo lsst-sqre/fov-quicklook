@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import logging
 import threading
 from pathlib import Path
 
 from .argocd import ArgoCdClient
+from .broker_logging import (
+    audit_event,
+    bind_request_log,
+    current_deploy_context,
+    log_request_detail,
+    set_deploy_step,
+    summarize_exception,
+)
 from .config import Settings
 from .gitops import (
     EXPECTED_APP_REMOTE_URLS,
@@ -42,7 +51,13 @@ class DeployBrokerService:
         self._token_store.set_app_token(extract_app_token(curl_command))
 
     def get_app_token(self) -> str:
-        return self._token_store.get_app_token()
+        token = self._token_store.get_app_token()
+        audit_event(
+            "app-token.read",
+            resource="app-token",
+            operation="read",
+        )
+        return token
 
     def argocd_status(self):
         return self._argocd.status()
@@ -54,10 +69,24 @@ class DeployBrokerService:
         return self._argocd.logs(component, since_seconds=since_seconds)
 
     def argocd_sync(self):
-        return self._argocd.sync()
+        result = self._argocd.sync()
+        audit_event(
+            "argocd.sync",
+            resource="argocd-sync",
+            operation="mutate",
+            synced=result.synced,
+        )
+        return result
 
     def argocd_restart(self, components: list[str] | None = None):
-        return self._argocd.restart(components)
+        result = self._argocd.restart(components)
+        audit_event(
+            "argocd.restart",
+            resource="argocd-restart",
+            operation="mutate",
+            restarted=result.restarted,
+        )
+        return result
 
     def get_deploy_status(self, request_id: str) -> DeployRequestRecord:
         return self._job_store.load(request_id)
@@ -85,6 +114,30 @@ class DeployBrokerService:
             app_branch_name=metadata.app_branch_name,
             phalanx_branch_name=metadata.phalanx_branch_name,
         )
+        with bind_request_log(
+            self._settings,
+            record.request_id,
+            tracked_branch=metadata.tracked_branch,
+        ):
+            log_request_detail(
+                logging.INFO,
+                "Accepted deploy request",
+                verify_mode=metadata.verify_mode,
+                app_branch_name=metadata.app_branch_name,
+                phalanx_branch_name=metadata.phalanx_branch_name,
+                request_log_path=record.request_log_path,
+            )
+        audit_event(
+            "deploy.request.accepted",
+            resource="deploy-request",
+            operation="mutate",
+            request_id=record.request_id,
+            tracked_branch=metadata.tracked_branch,
+            verify_mode=metadata.verify_mode,
+            app_branch_name=metadata.app_branch_name,
+            phalanx_branch_name=metadata.phalanx_branch_name,
+            request_log_path=record.request_log_path,
+        )
 
         thread = threading.Thread(
             target=self._run_deploy,
@@ -101,108 +154,182 @@ class DeployBrokerService:
         app_bundle_path: Path,
         phalanx_bundle_path: Path | None,
     ) -> None:
-        try:
-            self._job_store.update(request_id, status="running", step="preparing")
-            app_base_repo, phalanx_base_repo = settings_repos(self._settings)
-
-            self._log(request_id, "Ensuring clean base clones are available")
-            ensure_clone(app_base_repo, self._settings.app_repo_url)
-            ensure_clone(phalanx_base_repo, self._settings.phalanx_repo_url)
-            validate_remote_url(app_base_repo, EXPECTED_APP_REMOTE_URLS)
-            validate_remote_url(phalanx_base_repo, EXPECTED_PHALANX_REMOTE_URLS)
-
-            workspace_root = self._settings.request_dir / request_id / "workspaces"
-            app_workspace = workspace_root / "app"
-            phalanx_workspace = workspace_root / "phalanx"
-            clone_workspace(app_base_repo, app_workspace, self._settings.app_repo_url)
-            clone_workspace(
-                phalanx_base_repo,
-                phalanx_workspace,
-                self._settings.phalanx_repo_url,
-            )
-            validate_remote_url(app_workspace, EXPECTED_APP_REMOTE_URLS)
-            validate_remote_url(phalanx_workspace, EXPECTED_PHALANX_REMOTE_URLS)
-
-            self._job_store.update(request_id, step="importing-bundles")
-            self._log(request_id, "Importing app bundle into clean workspace")
-            app_import_branch = f"broker-app-{request_id}"
-            app_commit_sha = import_bundle(
-                app_workspace,
-                app_bundle_path,
-                metadata.app_branch_name,
-                app_import_branch,
-            )
-            if app_commit_sha != metadata.app_head_sha:
-                raise RuntimeError(
-                    f"app bundle head SHA mismatch: expected {metadata.app_head_sha}, got {app_commit_sha}"
+        with bind_request_log(self._settings, request_id, tracked_branch=metadata.tracked_branch):
+            try:
+                self._job_store.update(request_id, status="running", step="preparing")
+                set_deploy_step("preparing")
+                self._log(request_id, "Ensuring clean base clones are available")
+                audit_event(
+                    "deploy.started",
+                    request_id=request_id,
+                    tracked_branch=metadata.tracked_branch,
+                    verify_mode=metadata.verify_mode,
+                    request_log_path=str(self._settings.request_log_path(request_id)),
                 )
-            self._job_store.update(request_id, app_commit_sha=app_commit_sha)
+                app_base_repo, phalanx_base_repo = settings_repos(self._settings)
 
-            phalanx_import_branch: str | None = None
-            if phalanx_bundle_path is not None and metadata.phalanx_branch_name is not None:
-                self._log(request_id, "Importing optional phalanx bundle")
-                phalanx_import_branch = f"broker-phalanx-{request_id}"
-                phalanx_commit_sha = import_bundle(
+                ensure_clone(app_base_repo, self._settings.app_repo_url)
+                ensure_clone(phalanx_base_repo, self._settings.phalanx_repo_url)
+                validate_remote_url(app_base_repo, EXPECTED_APP_REMOTE_URLS)
+                validate_remote_url(phalanx_base_repo, EXPECTED_PHALANX_REMOTE_URLS)
+
+                workspace_root = self._settings.request_dir / request_id / "workspaces"
+                app_workspace = workspace_root / "app"
+                phalanx_workspace = workspace_root / "phalanx"
+                clone_workspace(app_base_repo, app_workspace, self._settings.app_repo_url)
+                clone_workspace(
+                    phalanx_base_repo,
                     phalanx_workspace,
-                    phalanx_bundle_path,
-                    metadata.phalanx_branch_name,
-                    phalanx_import_branch,
+                    self._settings.phalanx_repo_url,
                 )
-                if metadata.phalanx_head_sha and phalanx_commit_sha != metadata.phalanx_head_sha:
+                validate_remote_url(app_workspace, EXPECTED_APP_REMOTE_URLS)
+                validate_remote_url(phalanx_workspace, EXPECTED_PHALANX_REMOTE_URLS)
+
+                self._job_store.update(request_id, step="importing-bundles")
+                set_deploy_step("importing-bundles")
+                self._log(request_id, "Importing app bundle into clean workspace")
+                app_import_branch = f"broker-app-{request_id}"
+                app_commit_sha = import_bundle(
+                    app_workspace,
+                    app_bundle_path,
+                    metadata.app_branch_name,
+                    app_import_branch,
+                )
+                if app_commit_sha != metadata.app_head_sha:
                     raise RuntimeError(
-                        f"phalanx bundle head SHA mismatch: expected {metadata.phalanx_head_sha}, got {phalanx_commit_sha}"
+                        f"app bundle head SHA mismatch: expected {metadata.app_head_sha}, got {app_commit_sha}"
                     )
+                self._job_store.update(request_id, app_commit_sha=app_commit_sha)
+                log_request_detail(
+                    logging.INFO,
+                    "Imported app bundle",
+                    app_commit_sha=app_commit_sha,
+                    app_branch_name=metadata.app_branch_name,
+                )
+
+                phalanx_import_branch: str | None = None
+                if phalanx_bundle_path is not None and metadata.phalanx_branch_name is not None:
+                    self._log(request_id, "Importing optional phalanx bundle")
+                    phalanx_import_branch = f"broker-phalanx-{request_id}"
+                    phalanx_commit_sha = import_bundle(
+                        phalanx_workspace,
+                        phalanx_bundle_path,
+                        metadata.phalanx_branch_name,
+                        phalanx_import_branch,
+                    )
+                    if metadata.phalanx_head_sha and phalanx_commit_sha != metadata.phalanx_head_sha:
+                        raise RuntimeError(
+                            f"phalanx bundle head SHA mismatch: expected {metadata.phalanx_head_sha}, got {phalanx_commit_sha}"
+                        )
+                    self._job_store.update(request_id, phalanx_commit_sha=phalanx_commit_sha)
+                    log_request_detail(
+                        logging.INFO,
+                        "Imported phalanx bundle",
+                        phalanx_commit_sha=phalanx_commit_sha,
+                        phalanx_branch_name=metadata.phalanx_branch_name,
+                    )
+
+                build_branch = derive_build_branch(metadata.tracked_branch)
+                validate_build_branch(build_branch)
+                self._job_store.update(request_id, build_branch=build_branch, step="building")
+                set_deploy_step("building")
+                self._log(request_id, f"Pushing app commit to build branch {build_branch}")
+                self._github.push_build_branch(app_workspace, app_commit_sha, build_branch)
+                run_id = self._github.wait_for_build(build_branch, app_commit_sha)
+                image_tag = self._github.resolve_image_tag(run_id)
+                self._job_store.update(request_id, run_id=run_id, image_tag=image_tag)
+                self._log(request_id, f"Resolved image tag {image_tag}")
+                log_request_detail(
+                    logging.INFO,
+                    "Resolved build artifacts",
+                    build_branch=build_branch,
+                    run_id=run_id,
+                    image_tag=image_tag,
+                )
+
+                self._job_store.update(request_id, step="materializing-phalanx")
+                set_deploy_step("materializing-phalanx")
+                self._log(request_id, "Preparing Phalanx workspace")
+                self._phalanx.prepare_workspace(
+                    phalanx_workspace,
+                    metadata.tracked_branch,
+                    imported_branch=phalanx_import_branch,
+                )
+                self._phalanx.validate_changes(phalanx_workspace)
+                self._phalanx.update_image_tag(phalanx_workspace, image_tag)
+                self._phalanx.validate_changes(phalanx_workspace)
+                phalanx_commit_sha = self._phalanx.commit_and_push(
+                    phalanx_workspace,
+                    metadata.tracked_branch,
+                    app_commit_sha,
+                    image_tag,
+                )
                 self._job_store.update(request_id, phalanx_commit_sha=phalanx_commit_sha)
+                self._log(request_id, f"Pushed phalanx branch {metadata.tracked_branch}")
+                log_request_detail(
+                    logging.INFO,
+                    "Updated phalanx branch",
+                    phalanx_commit_sha=phalanx_commit_sha,
+                    image_tag=image_tag,
+                )
 
-            build_branch = derive_build_branch(metadata.tracked_branch)
-            validate_build_branch(build_branch)
-            self._job_store.update(request_id, build_branch=build_branch, step="building")
-            self._log(request_id, f"Pushing app commit to build branch {build_branch}")
-            self._github.push_build_branch(app_workspace, app_commit_sha, build_branch)
-            run_id = self._github.wait_for_build(build_branch, app_commit_sha)
-            image_tag = self._github.resolve_image_tag(run_id)
-            self._job_store.update(request_id, run_id=run_id, image_tag=image_tag)
-            self._log(request_id, f"Resolved image tag {image_tag}")
+                self._job_store.update(request_id, step="argocd-sync")
+                set_deploy_step("argocd-sync")
+                self._argocd.set_branch_and_sync(metadata.tracked_branch, image_tag=image_tag)
+                self._log(request_id, "ArgoCD branch updated and sync triggered")
 
-            self._job_store.update(request_id, step="materializing-phalanx")
-            self._phalanx.prepare_workspace(
-                phalanx_workspace,
-                metadata.tracked_branch,
-                imported_branch=phalanx_import_branch,
-            )
-            self._phalanx.validate_changes(phalanx_workspace)
-            self._phalanx.update_image_tag(phalanx_workspace, image_tag)
-            self._phalanx.validate_changes(phalanx_workspace)
-            phalanx_commit_sha = self._phalanx.commit_and_push(
-                phalanx_workspace,
-                metadata.tracked_branch,
-                app_commit_sha,
-                image_tag,
-            )
-            self._job_store.update(request_id, phalanx_commit_sha=phalanx_commit_sha)
-            self._log(request_id, f"Pushed phalanx branch {metadata.tracked_branch}")
+                self._job_store.update(request_id, step="verification")
+                set_deploy_step("verification")
+                self._log(request_id, "Running verification checks")
+                verification = self._verification.run_basic_checks(metadata.verify_mode)
 
-            self._job_store.update(request_id, step="argocd-sync")
-            self._argocd.set_branch_and_sync(metadata.tracked_branch, image_tag=image_tag)
-            self._log(request_id, "ArgoCD branch updated and sync triggered")
-
-            self._job_store.update(request_id, step="verification")
-            verification = self._verification.run_basic_checks(metadata.verify_mode)
-
-            self._job_store.update(
-                request_id,
-                status="succeeded",
-                step="complete",
-                verification=verification,
-            )
-        except Exception as exc:
-            self._job_store.append_log(request_id, f"ERROR: {exc}")
-            self._job_store.update(
-                request_id,
-                status="failed",
-                error=str(exc),
-                step="failed",
-            )
+                self._job_store.update(
+                    request_id,
+                    status="succeeded",
+                    step="complete",
+                    verification=verification,
+                )
+                set_deploy_step("complete")
+                self._log(request_id, "Deploy request completed successfully")
+                log_request_detail(
+                    logging.INFO,
+                    "Verification finished",
+                    verification=verification,
+                )
+                audit_event(
+                    "deploy.completed",
+                    request_id=request_id,
+                    tracked_branch=metadata.tracked_branch,
+                    run_id=run_id,
+                    image_tag=image_tag,
+                    verification=verification,
+                )
+            except Exception as exc:
+                error_message = summarize_exception(exc)
+                context = current_deploy_context()
+                log_request_detail(
+                    logging.ERROR,
+                    "Deploy request failed",
+                    error=error_message,
+                )
+                self._job_store.append_log(request_id, f"ERROR: {error_message}")
+                self._job_store.update(
+                    request_id,
+                    status="failed",
+                    error=error_message,
+                    step="failed",
+                )
+                set_deploy_step("failed")
+                audit_event(
+                    "deploy.failed",
+                    level=logging.ERROR,
+                    request_id=request_id,
+                    tracked_branch=metadata.tracked_branch,
+                    step=context.step if context is not None else "failed",
+                    error=error_message,
+                )
+                return
 
     def _log(self, request_id: str, message: str) -> None:
         self._job_store.append_log(request_id, message)
+        log_request_detail(logging.INFO, message)

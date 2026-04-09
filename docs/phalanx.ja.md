@@ -268,6 +268,31 @@ client は **`http://127.0.0.1:8010` をデフォルト接続先**とする。da
 (`broker.key` / `DEPLOY_BROKER_API_TOKEN`) は、broker を non-loopback に
 公開するときだけ使う。
 
+#### broker の監査ログ
+
+broker daemon は state dir 配下に永続ログを残す。
+
+| パス | 用途 |
+|---|---|
+| `state/logs/broker-audit.jsonl` | daemon 起動/停止、HTTP request、`argocd sync` / `restart`、deploy request の受理・成功・失敗などの監査ログ |
+| `state/requests/<request_id>/broker.log` | 1 deploy request ごとの詳細ログ。step 遷移、git / gh command 実行、build / ArgoCD / verification の詳細を残す |
+| `state/jobs/<request_id>.json` | client が poll する軽量ステータス。`logs[]` は progress 要約で、詳細は `request_log_path` を参照する |
+
+監査ログは 1 行 1 JSON の JSONL 形式で保存する。現在の broker 認証は shared bearer token
+なので、**誰が** の識別は当面 `remote host` と `auth_mode`（`bearer` /
+`loopback-bypass`）が上限である。
+
+token / cookie / Authorization header / bundle 本体はログに残さない。command 失敗時の
+stdout / stderr は必要な範囲で要約して記録し、secret 文字列はマスクする。
+
+必要に応じて以下でローテーション設定を変えられる。
+
+```bash
+export DEPLOY_BROKER_LOG_LEVEL=DEBUG
+export DEPLOY_BROKER_LOG_MAX_BYTES=10000000
+export DEPLOY_BROKER_LOG_BACKUP_COUNT=10
+```
+
 #### 別サーバーで broker daemon を動かす
 
 別サーバー運用では、broker daemon を **trusted user** で常駐させ、そのホストだけに
@@ -489,6 +514,12 @@ uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-cli
 # broker 経由のログ確認
 uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-client \
   argocd-logs coordinator
+
+# broker 自身の監査ログ
+tail -f /path/to/your/broker-state/logs/broker-audit.jsonl
+
+# request_id ごとの詳細ログ
+tail -f /path/to/your/broker-state/requests/<request_id>/broker.log
 
 # app token を取って直接 HTTP 確認
 uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-client \

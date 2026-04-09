@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+import logging
+import time
+import uuid
 
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+
+from .broker_logging import bind_audit_context, audit_event, configure_logging, summarize_exception
 from .config import Settings, get_settings
 from .deploy import DeployBrokerService
 from .models import (
@@ -9,20 +14,58 @@ from .models import (
     DeployRequestArtifacts,
     TokenResponse,
 )
-from .security import require_bearer_token
+from .security import auth_mode_for_request, require_bearer_token
 from .storage import JobStore, TokenStore
 
 
 def _raise_http_error(exc: Exception) -> None:
+    detail = summarize_exception(exc)
     if isinstance(exc, ValueError):
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
     if isinstance(exc, RuntimeError):
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail=detail) from exc
+    raise HTTPException(status_code=500, detail=detail) from exc
+
+
+def _audit_level_for_status(status_code: int) -> int:
+    if status_code >= 500:
+        return logging.ERROR
+    if status_code >= 400:
+        return logging.WARNING
+    return logging.INFO
+
+
+def _audit_resource(path: str) -> str:
+    if path == "/healthz":
+        return "healthz"
+    if path == "/v1/tokens/app":
+        return "app-token"
+    if path == "/v1/argocd/status":
+        return "argocd-status"
+    if path == "/v1/argocd/branch":
+        return "argocd-branch"
+    if path.startswith("/v1/argocd/logs/"):
+        return "argocd-logs"
+    if path == "/v1/argocd/sync":
+        return "argocd-sync"
+    if path == "/v1/argocd/restart":
+        return "argocd-restart"
+    if path == "/v1/deploy-requests":
+        return "deploy-request"
+    if path.startswith("/v1/deploy-requests/"):
+        return "deploy-request-status"
+    return "unknown"
+
+
+def _audit_operation(method: str) -> str:
+    if method.upper() == "GET":
+        return "read"
+    return "mutate"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     resolved_settings = settings or get_settings()
+    configure_logging(resolved_settings)
     token_store = TokenStore(resolved_settings)
     job_store = JobStore(resolved_settings)
     service = DeployBrokerService(resolved_settings, job_store, token_store)
@@ -30,6 +73,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="fov-quicklook deploy broker")
     app.state.settings = resolved_settings
     app.state.service = service
+
+    @app.middleware("http")
+    async def audit_requests(request: Request, call_next):
+        correlation_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        auth_mode = auth_mode_for_request(request)
+        remote_host = request.client.host if request.client is not None else None
+        path = request.url.path
+        query = dict(request.query_params)
+        started = time.perf_counter()
+        with bind_audit_context(
+            correlation_id=correlation_id,
+            remote_host=remote_host,
+            auth_mode=auth_mode,
+        ):
+            try:
+                response = await call_next(request)
+            except Exception as exc:
+                audit_event(
+                    "http.request",
+                    level=logging.ERROR,
+                    correlation_id=correlation_id,
+                    method=request.method,
+                    path=path,
+                    resource=_audit_resource(path),
+                    operation=_audit_operation(request.method),
+                    status_code=500,
+                    duration_ms=round((time.perf_counter() - started) * 1000, 3),
+                    query=query or None,
+                    error=summarize_exception(exc),
+                )
+                raise
+        response.headers["X-Request-ID"] = correlation_id
+        audit_event(
+            "http.request",
+            level=_audit_level_for_status(response.status_code),
+            correlation_id=correlation_id,
+            remote_host=remote_host,
+            auth_mode=auth_mode,
+            method=request.method,
+            path=path,
+            resource=_audit_resource(path),
+            operation=_audit_operation(request.method),
+            status_code=response.status_code,
+            duration_ms=round((time.perf_counter() - started) * 1000, 3),
+            query=query or None,
+        )
+        return response
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

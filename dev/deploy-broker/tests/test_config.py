@@ -26,3 +26,13 @@ def test_settings_use_repo_default_state_dir_inside_repo(monkeypatch) -> None:
 
     assert settings.state_dir == project_dir / "state"
     assert settings.api_token_path == project_dir / "state" / "broker.key"
+
+
+def test_settings_define_log_paths(tmp_path: Path) -> None:
+    settings = Settings(state_dir=tmp_path / "state")
+
+    assert settings.log_dir == tmp_path / "state" / "logs"
+    assert settings.audit_log_path == tmp_path / "state" / "logs" / "broker-audit.jsonl"
+    assert settings.request_log_path("request-123") == (
+        tmp_path / "state" / "requests" / "request-123" / "broker.log"
+    )
