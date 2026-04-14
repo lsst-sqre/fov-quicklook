@@ -9,6 +9,7 @@ import { ConfigPage } from './pages/ConfigPage'
 import { FItsHeaderPage } from './pages/FitsHeader'
 import { Home } from './pages/Home'
 import { Layout } from './pages/Layout'
+import { QueryPage } from './pages/QueryPage'
 import { AppStore } from './store'
 
 
@@ -24,6 +25,7 @@ export const AppRouter = () => {
           <Route path=":visitId" element={<Home />} />
         </Route>
         <Route path="header/:visitId/:ccdName" element={<FItsHeaderPage />} />
+        <Route path="query" element={<QueryPage />} />
         <Route path="config" element={<ConfigPage />} />
         <Route path="admin">
           <Route path="storage" element={<StorageExplorer />} />

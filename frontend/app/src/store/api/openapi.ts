@@ -13,6 +13,39 @@ const injectedRtkApi = api.injectEndpoints({
     healthz: build.query<HealthzApiResponse, HealthzApiArg>({
       query: () => ({ url: `/api/healthz` }),
     }),
+    queryButler: build.query<QueryButlerApiResponse, QueryButlerApiArg>({
+      query: (queryArg) => ({
+        url: `/api/butler/query`,
+        params: {
+          data_type: queryArg.dataType,
+          repository_name: queryArg.repositoryName,
+          limit: queryArg.limit,
+          offset: queryArg.offset,
+        },
+      }),
+    }),
+    listButlerDatasetTypes: build.query<
+      ListButlerDatasetTypesApiResponse,
+      ListButlerDatasetTypesApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/butler/dataset_types`,
+        params: {
+          repository_name: queryArg.repositoryName,
+        },
+      }),
+    }),
+    getButlerDatasetTypeDimensions: build.query<
+      GetButlerDatasetTypeDimensionsApiResponse,
+      GetButlerDatasetTypeDimensionsApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/butler/dataset_types/${queryArg.dataType}/dimensions`,
+        params: {
+          repository_name: queryArg.repositoryName,
+        },
+      }),
+    }),
     getTile: build.query<GetTileApiResponse, GetTileApiArg>({
       query: (queryArg) => ({
         url: `/api/quicklooks/${queryArg.visitName}/tiles/${queryArg.z}/${queryArg.y}/${queryArg.x}`,
@@ -185,6 +218,25 @@ export type RouteGetStatusApiResponse =
 export type RouteGetStatusApiArg = void;
 export type HealthzApiResponse = /** status 200 Successful Response */ any;
 export type HealthzApiArg = void;
+export type QueryButlerApiResponse =
+  /** status 200 Successful Response */ ButlerQueryResult;
+export type QueryButlerApiArg = {
+  dataType: string;
+  repositoryName?: string | null;
+  limit?: number;
+  offset?: number;
+};
+export type ListButlerDatasetTypesApiResponse =
+  /** status 200 Successful Response */ ButlerDatasetTypeInfo[];
+export type ListButlerDatasetTypesApiArg = {
+  repositoryName?: string | null;
+};
+export type GetButlerDatasetTypeDimensionsApiResponse =
+  /** status 200 Successful Response */ ButlerDatasetTypeDimensions;
+export type GetButlerDatasetTypeDimensionsApiArg = {
+  dataType: string;
+  repositoryName?: string | null;
+};
 export type GetTileApiResponse = /** status 200 Successful Response */ any;
 export type GetTileApiArg = {
   visitName: string;
@@ -360,6 +412,28 @@ export type SystemStatus = {
     [key: string]: ContainerStatus;
   };
 };
+export type ButlerQueryRow = {
+  visit_name: string;
+  record: {
+    [key: string]: any;
+  };
+};
+export type ButlerQueryResult = {
+  repository_name: string;
+  data_type: string;
+  data_id_dimension: string;
+  applied_collections: string[] | null;
+  applied_filters: {
+    [key: string]: string;
+  };
+  order: string[];
+  limit: number;
+  offset: number;
+  returned_count: number;
+  has_more: boolean;
+  columns: string[];
+  rows: ButlerQueryRow[];
+};
 export type ValidationError = {
   loc: (string | number)[];
   msg: string;
@@ -367,6 +441,23 @@ export type ValidationError = {
 };
 export type HttpValidationError = {
   detail?: ValidationError[];
+};
+export type ButlerDatasetTypeInfo = {
+  repository_name: string;
+  data_type: string;
+  display_name: string;
+  data_id_dimension: string;
+  default_collections: string[];
+  default_order: string[];
+};
+export type ButlerDatasetTypeDimensions = {
+  repository_name: string;
+  data_type: string;
+  data_id_dimension: string;
+  dimensions: string[];
+  filter_aliases: {
+    [key: string]: string;
+  };
 };
 export type CardType = [string, string, string, string];
 export type HeaderType = CardType[];
@@ -502,6 +593,9 @@ export const {
   useGetSystemInfoQuery,
   useRouteGetStatusQuery,
   useHealthzQuery,
+  useQueryButlerQuery,
+  useListButlerDatasetTypesQuery,
+  useGetButlerDatasetTypeDimensionsQuery,
   useGetTileQuery,
   useGetFitsHeaderQuery,
   useCreateQuicklookMutation,

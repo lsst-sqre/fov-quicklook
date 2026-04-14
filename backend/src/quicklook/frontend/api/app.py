@@ -11,6 +11,7 @@ from quicklook.frontend.comm import lifespan as comm_lifespan
 from quicklook.utils.http_client import managed_session
 
 from .admin import router as admin_router
+from .butler_query import router as butler_query_router
 from .get_fits_file import router as get_fits_file_router
 from .get_fits_header import router as get_fits_header_router
 from .get_tile import router as gettile_router
@@ -42,6 +43,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(systeminfo_router, prefix=config.frontend_app_prefix)
 app.include_router(status_router, prefix=config.frontend_app_prefix)
 app.include_router(health_router, prefix=config.frontend_app_prefix)
+app.include_router(butler_query_router, prefix=config.frontend_app_prefix)
 app.include_router(gettile_router, prefix=config.frontend_app_prefix)
 app.include_router(get_fits_header_router, prefix=config.frontend_app_prefix)
 app.include_router(quicklooks_router, prefix=config.frontend_app_prefix)

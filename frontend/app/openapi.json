@@ -58,6 +58,190 @@
                 }
             }
         },
+        "/api/butler/query": {
+            "get": {
+                "summary": "Query Butler dimension records",
+                "description": "Searches the configured Butler dataset type and returns paged dimension-record results. Reserved parameters are data_type, repository_name, collection, limit, offset, and order. Any other query parameter is forwarded as a Butler dimension filter.",
+                "operationId": "query_butler",
+                "parameters": [
+                    {
+                        "name": "data_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Data Type"
+                        }
+                    },
+                    {
+                        "name": "repository_name",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Repository Name"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1,
+                            "default": 100,
+                            "title": "Limit"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0,
+                            "title": "Offset"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ButlerQueryResult"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/butler/dataset_types": {
+            "get": {
+                "summary": "List supported Butler dataset types",
+                "operationId": "list_butler_dataset_types",
+                "parameters": [
+                    {
+                        "name": "repository_name",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Repository Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ButlerDatasetTypeInfo"
+                                    },
+                                    "title": "Response List Butler Dataset Types Api Butler Dataset Types Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/butler/dataset_types/{data_type}/dimensions": {
+            "get": {
+                "summary": "Describe Butler dataset query dimensions",
+                "operationId": "get_butler_dataset_type_dimensions",
+                "parameters": [
+                    {
+                        "name": "data_type",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Data Type"
+                        }
+                    },
+                    {
+                        "name": "repository_name",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Repository Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ButlerDatasetTypeDimensions"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/quicklooks/{visit_name}/tiles/{z}/{y}/{x}": {
             "get": {
                 "summary": "Get Tile",
@@ -942,6 +1126,198 @@
                     "maxx"
                 ],
                 "title": "BBox"
+            },
+            "ButlerDatasetTypeDimensions": {
+                "properties": {
+                    "repository_name": {
+                        "type": "string",
+                        "title": "Repository Name"
+                    },
+                    "data_type": {
+                        "type": "string",
+                        "title": "Data Type"
+                    },
+                    "data_id_dimension": {
+                        "type": "string",
+                        "title": "Data Id Dimension"
+                    },
+                    "dimensions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Dimensions"
+                    },
+                    "filter_aliases": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object",
+                        "title": "Filter Aliases"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "repository_name",
+                    "data_type",
+                    "data_id_dimension",
+                    "dimensions",
+                    "filter_aliases"
+                ],
+                "title": "ButlerDatasetTypeDimensions"
+            },
+            "ButlerDatasetTypeInfo": {
+                "properties": {
+                    "repository_name": {
+                        "type": "string",
+                        "title": "Repository Name"
+                    },
+                    "data_type": {
+                        "type": "string",
+                        "title": "Data Type"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "title": "Display Name"
+                    },
+                    "data_id_dimension": {
+                        "type": "string",
+                        "title": "Data Id Dimension"
+                    },
+                    "default_collections": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Default Collections"
+                    },
+                    "default_order": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Default Order"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "repository_name",
+                    "data_type",
+                    "display_name",
+                    "data_id_dimension",
+                    "default_collections",
+                    "default_order"
+                ],
+                "title": "ButlerDatasetTypeInfo"
+            },
+            "ButlerQueryResult": {
+                "properties": {
+                    "repository_name": {
+                        "type": "string",
+                        "title": "Repository Name"
+                    },
+                    "data_type": {
+                        "type": "string",
+                        "title": "Data Type"
+                    },
+                    "data_id_dimension": {
+                        "type": "string",
+                        "title": "Data Id Dimension"
+                    },
+                    "applied_collections": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Applied Collections"
+                    },
+                    "applied_filters": {
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "type": "object",
+                        "title": "Applied Filters"
+                    },
+                    "order": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Order"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset"
+                    },
+                    "returned_count": {
+                        "type": "integer",
+                        "title": "Returned Count"
+                    },
+                    "has_more": {
+                        "type": "boolean",
+                        "title": "Has More"
+                    },
+                    "columns": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Columns"
+                    },
+                    "rows": {
+                        "items": {
+                            "$ref": "#/components/schemas/ButlerQueryRow"
+                        },
+                        "type": "array",
+                        "title": "Rows"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "repository_name",
+                    "data_type",
+                    "data_id_dimension",
+                    "applied_collections",
+                    "applied_filters",
+                    "order",
+                    "limit",
+                    "offset",
+                    "returned_count",
+                    "has_more",
+                    "columns",
+                    "rows"
+                ],
+                "title": "ButlerQueryResult"
+            },
+            "ButlerQueryRow": {
+                "properties": {
+                    "visit_name": {
+                        "type": "string",
+                        "title": "Visit Name"
+                    },
+                    "record": {
+                        "additionalProperties": true,
+                        "type": "object",
+                        "title": "Record"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "visit_name",
+                    "record"
+                ],
+                "title": "ButlerQueryRow"
             },
             "CacheEntry": {
                 "properties": {

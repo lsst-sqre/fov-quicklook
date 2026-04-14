@@ -12,7 +12,7 @@ from quicklook.datasource.butler_datasource import (
     _get_resolved_visit_run,
     _resolve_visit_cache,
 )
-from quicklook.datasource.types import VisitResolutionError
+from quicklook.datasource.types import ButlerQuery, ButlerQueryRow, VisitResolutionError
 from quicklook.datasource.types import MonthlyEntryCountQuery, Query, VisitDayCount
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
@@ -248,15 +248,115 @@ def test_query_monthly_entry_counts_uses_configured_dimension_without_listing_cc
         VisitDayCount(day_obs=20250301, count=2),
         VisitDayCount(day_obs=20250303, count=1),
     ]
+
+
+def test_query_butler_applies_aliases_collections_offset_and_has_more():
+    calls: list[tuple[str, dict[str, object]]] = []
+    order_calls: list[tuple[str, ...]] = []
+    limit_calls: list[int] = []
+
+    class TrackingResults(FakeDimensionRecordResults):
+        def order_by(self, *args: str):
+            order_calls.append(args)
+            return self
+
+        def limit(self, limit: int):
+            limit_calls.append(limit)
+            return TrackingResults(self._records[:limit])
+
+    class FakeRecord(SimpleNamespace):
+        def toDict(self, splitTimespan: bool = False):
+            assert splitTimespan is True
+            return {
+                'obs_id': self.obs_id,
+                'day_obs': self.day_obs,
+                'physical_filter': self.physical_filter,
+            }
+
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            calls.append((dimension, kwargs))
+            return TrackingResults([
+                FakeRecord(id=9001, obs_id='obs-9001', day_obs=20260503, physical_filter='g'),
+                FakeRecord(id=9002, obs_id='obs-9002', day_obs=20260503, physical_filter='g'),
+                FakeRecord(id=9003, obs_id='obs-9003', day_obs=20260503, physical_filter='g'),
+            ])
+
+        def getDatasetType(self, name: str):
+            assert name == 'raw'
+            return SimpleNamespace(dimensions=SimpleNamespace(names={'exposure', 'detector', 'physical_filter'}))
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+
+    result = ds.query_butler(
+        ButlerQuery(
+            data_type=CcdDataType('raw'),
+            repository_name='repo',
+            limit=1,
+            offset=1,
+            collections=['LSSTCam/raw/all'],
+            order=['-day_obs'],
+            filters={'day_obs': '20260503', 'filter': 'g'},
+        )
+    )
+
     assert calls == [
         (
             'exposure',
             {
                 'datasets': 'raw',
-                'where': 'day_obs>=20250301 and day_obs<=20250331',
+                'collections': ['LSSTCam/raw/all'],
+                'where': "day_obs=20260503 and physical_filter='g'",
             },
         )
     ]
+    assert order_calls == [('-day_obs',)]
+    assert limit_calls == [3]
+    assert result.order == ['-day_obs']
+    assert result.applied_filters == {'day_obs': '20260503', 'physical_filter': 'g'}
+    assert result.applied_collections == ['LSSTCam/raw/all']
+    assert result.returned_count == 1
+    assert result.has_more is True
+    assert result.columns == ['exposure', 'id', 'day_obs', 'obs_id', 'physical_filter']
+    assert result.rows == [
+        ButlerQueryRow(
+            visit_name=VisitName('repo:raw:9002'),
+            record={
+                'obs_id': 'obs-9002',
+                'day_obs': 20260503,
+                'physical_filter': 'g',
+                'id': 9002,
+                'exposure': 9002,
+            },
+        )
+    ]
+
+
+def test_get_butler_dataset_type_dimensions_uses_registry_dataset_type():
+    class FakeRegistry:
+        def getDatasetType(self, name: str):
+            assert name == 'raw'
+            return SimpleNamespace(dimensions=SimpleNamespace(names={'detector', 'exposure', 'physical_filter'}))
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+
+    result = ds.get_butler_dataset_type_dimensions()
+
+    assert result.repository_name == 'repo'
+    assert result.data_type == 'raw'
+    assert result.data_id_dimension == 'exposure'
+    assert result.dimensions == ['detector', 'exposure', 'physical_filter']
+    assert result.filter_aliases == {'filter': 'physical_filter'}
 
 
 def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):

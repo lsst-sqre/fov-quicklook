@@ -10,8 +10,18 @@ from uuid import UUID
 from lsst.resources import ResourcePath
 
 from quicklook.config import CcdDataTypeConfig, config
-from quicklook.datasource.types import MonthlyEntryCountQuery, VisitDayCount, VisitEntry
+from quicklook.datasource.types import (
+    ButlerDatasetTypeDimensions,
+    ButlerDatasetTypeInfo,
+    ButlerQuery,
+    ButlerQueryResult,
+    ButlerQueryRow,
+    MonthlyEntryCountQuery,
+    VisitDayCount,
+    VisitEntry,
+)
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
+from quicklook.utils.async_wrap import async_wrap
 
 from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError
 from .instrument import Instrument
@@ -32,6 +42,7 @@ else:
 DataRef = Any
 
 BY_UUID_DATA_TYPE = CcdDataType('by_uuid')
+QUERY_FILTER_ALIASES = {'filter': 'physical_filter'}
 _resolved_visit_runs: dict[str, str] = {}
 _resolved_visit_runs_lock = threading.Lock()
 
@@ -73,6 +84,40 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
 
     def query_monthly_entry_counts_sync(self, q: MonthlyEntryCountQuery) -> list[VisitDayCount]:
         return _get_datasource(q.data_type, q.repository_name).query_monthly_entry_counts(q)
+
+    def query_butler_sync(self, q: ButlerQuery) -> ButlerQueryResult:
+        config_entry = _resolve_data_type_config(q.data_type, q.repository_name)
+        return _get_datasource(config_entry.data_type, config_entry.repository_name).query_butler(
+            ButlerQuery(
+                data_type=q.data_type,
+                repository_name=config_entry.repository_name,
+                limit=q.limit,
+                offset=q.offset,
+                collections=q.collections,
+                order=q.order,
+                filters=q.filters,
+            )
+        )
+
+    query_butler = async_wrap(query_butler_sync)
+
+    def list_butler_dataset_types_sync(self, repository_name: str | None = None) -> list[ButlerDatasetTypeInfo]:
+        configs = config.ccd_data_types
+        if repository_name is not None:
+            configs = [item for item in configs if item.repository_name == repository_name]
+        return [_dataset_type_info_from_config(item) for item in configs]
+
+    list_butler_dataset_types = async_wrap(list_butler_dataset_types_sync)
+
+    def get_butler_dataset_type_dimensions_sync(
+        self,
+        data_type: CcdDataType,
+        repository_name: str | None = None,
+    ) -> ButlerDatasetTypeDimensions:
+        config_entry = _resolve_data_type_config(data_type, repository_name)
+        return _get_datasource(config_entry.data_type, config_entry.repository_name).get_butler_dataset_type_dimensions()
+
+    get_butler_dataset_type_dimensions = async_wrap(get_butler_dataset_type_dimensions_sync)
 
 
 class DataTypeSpecificDataSource:
@@ -147,6 +192,53 @@ class DataTypeSpecificDataSource:
         )
         counts = Counter(cast(int, getattr(record, 'day_obs')) for record in records)
         return [VisitDayCount(day_obs=day_obs, count=counts[day_obs]) for day_obs in sorted(counts)]
+
+    def query_butler(self, q: ButlerQuery) -> ButlerQueryResult:
+        order = q.order or self.order_by
+        filters = { _normalize_query_filter_key(key): value for key, value in q.filters.items() }
+        fetch_limit = q.offset + q.limit + 1
+        records = self._query_dimension_records(
+            self.data_id_dimension,
+            datasets=self.butler_data_type,
+            collections=q.collections if q.collections is not None else self._query_collections(),
+            where=_build_where(filters),
+            limit=fetch_limit,
+            order_by=order,
+        )
+        has_more = len(records) > (q.offset + q.limit)
+        page_records = records[q.offset:q.offset + q.limit]
+        rows = [
+            ButlerQueryRow(
+                visit_name=VisitName(f'{self.repository_name}:{self.butler_data_type}:{record.id}'),
+                record=_serialize_dimension_record(record, self.data_id_dimension),
+            )
+            for record in page_records
+        ]
+        return ButlerQueryResult(
+            repository_name=self.repository_name,
+            data_type=CcdDataType(self.butler_data_type),
+            data_id_dimension=self.data_id_dimension,
+            applied_collections=_serialize_collections(q.collections if q.collections is not None else self._query_collections()),
+            applied_filters=filters,
+            order=order,
+            limit=q.limit,
+            offset=q.offset,
+            returned_count=len(rows),
+            has_more=has_more,
+            columns=_collect_query_columns(rows, self.data_id_dimension),
+            rows=rows,
+        )
+
+    def get_butler_dataset_type_dimensions(self) -> ButlerDatasetTypeDimensions:
+        dataset_type = self._butler.registry.getDatasetType(self.butler_data_type)
+        dimensions = sorted(cast(list[str], list(dataset_type.dimensions.names)))
+        return ButlerDatasetTypeDimensions(
+            repository_name=self.repository_name,
+            data_type=CcdDataType(self.butler_data_type),
+            data_id_dimension=self.data_id_dimension,
+            dimensions=dimensions,
+            filter_aliases=QUERY_FILTER_ALIASES,
+        )
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
         refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit)
@@ -224,6 +316,7 @@ class DataTypeSpecificDataSource:
         dimension: str,
         *,
         datasets: str | None = None,
+        collections: ButlerCollectionArgType | EllipsisType | None = None,
         where: str | None = None,
         limit: int | None = None,
         order_by: list[str] | None = None,
@@ -231,7 +324,9 @@ class DataTypeSpecificDataSource:
         kwargs: dict[str, Any] = {}
         if datasets is not None:
             kwargs['datasets'] = datasets
-            if self.butler_data_type == 'difference_image':
+            if collections is not None:
+                kwargs['collections'] = collections
+            elif self.butler_data_type == 'difference_image':
                 kwargs['collections'] = self._query_collections()
         if where:
             kwargs['where'] = where
@@ -364,6 +459,120 @@ def _record_float_attr(record: ButlerDimensionRecord, name: str, default: float 
     return float(value)
 
 
+def _serialize_dimension_record(record: ButlerDimensionRecord, primary_dimension: str) -> dict[str, object]:
+    if hasattr(record, 'toDict'):
+        raw = cast(dict[str, object], record.toDict(splitTimespan=True))
+    else:
+        raw = cast(dict[str, object], vars(record))
+    primary_value = cast(object, getattr(record, 'id', raw.get(primary_dimension)))
+    raw.setdefault('id', primary_value)
+    raw.setdefault(primary_dimension, primary_value)
+    return {key: _jsonify_value(value) for key, value in raw.items()}
+
+
+def _jsonify_value(value: object) -> object:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _jsonify_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonify_value(item) for item in value]
+    return str(value)
+
+
+def _build_where(filters: dict[str, str]) -> str | None:
+    if not filters:
+        return None
+    return ' and '.join(f'{key}={_format_butler_literal(value)}' for key, value in filters.items())
+
+
+def _format_butler_literal(value: str) -> str:
+    if value == '':
+        return "''"
+    lowered = value.lower()
+    if lowered in {'true', 'false'}:
+        return lowered
+    try:
+        int(value)
+    except ValueError:
+        try:
+            float(value)
+        except ValueError:
+            return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+        else:
+            return value
+    else:
+        return value
+
+
+def _normalize_query_filter_key(key: str) -> str:
+    return QUERY_FILTER_ALIASES.get(key, key)
+
+
+def _collect_query_columns(rows: list[ButlerQueryRow], primary_dimension: str) -> list[str]:
+    preferred = [
+        primary_dimension,
+        'id',
+        'day_obs',
+        'obs_id',
+        'physical_filter',
+        'band',
+        'science_program',
+        'observation_type',
+        'observation_reason',
+        'target_name',
+    ]
+    seen: set[str] = set()
+    columns: list[str] = []
+    for column in preferred:
+        if any(column in row.record for row in rows):
+            columns.append(column)
+            seen.add(column)
+    for column in sorted({key for row in rows for key in row.record if key not in seen}):
+        columns.append(column)
+    return columns
+
+
+def _serialize_collections(collections: ButlerCollectionArgType | EllipsisType | None) -> list[str] | None:
+    if collections is None or collections is ...:
+        return None
+    if isinstance(collections, str):
+        return [collections]
+    return [str(item) for item in collections]
+
+
+def _dataset_type_info_from_config(data_type_config: CcdDataTypeConfig) -> ButlerDatasetTypeInfo:
+    return ButlerDatasetTypeInfo(
+        repository_name=data_type_config.repository_name,
+        data_type=CcdDataType(data_type_config.data_type),
+        display_name=data_type_config.display_name,
+        data_id_dimension=data_type_config.data_id_dimension,
+        default_collections=data_type_config.collections,
+        default_order=data_type_config.order_by,
+    )
+
+
+def _resolve_data_type_config(data_type: str, repository_name: str | None = None) -> CcdDataTypeConfig:
+    matches = [
+        data_type_config
+        for data_type_config in config.ccd_data_types
+        if data_type_config.data_type == data_type
+        and (repository_name is None or data_type_config.repository_name == repository_name)
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) == 0:
+        available = [(item.repository_name, item.data_type) for item in config.ccd_data_types]
+        raise ValueError(
+            f'Unknown data type: ({repository_name}, {data_type}). Available: {available}'
+        )
+    repositories = sorted({item.repository_name for item in matches})
+    raise ValueError(
+        f'Data type {data_type} is configured for multiple repositories. Specify repository_name. '
+        f'Available repositories: {repositories}'
+    )
+
+
 def _get_datasource(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:
     thread_id = threading.get_ident()
     return _get_datasource_cache(data_type, repository_name, thread_id=thread_id)
@@ -375,11 +584,7 @@ def _get_datasource_cache(data_type: str, repository_name: str, thread_id: int) 
 
 
 def _get_datasource_no_cache(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:
-    for data_type_config in config.ccd_data_types:
-        if data_type_config.data_type == data_type and data_type_config.repository_name == repository_name:
-            return DataTypeSpecificDataSource(data_type_config)
-    available = [(dt.data_type, dt.repository_name) for dt in config.ccd_data_types]
-    raise ValueError(f'Unknown data type: ({data_type}, {repository_name}). Available: {available}')
+    return DataTypeSpecificDataSource(_resolve_data_type_config(data_type, repository_name))
 
 
 def _get_repository_butler(repository_name: str) -> ButlerType:
