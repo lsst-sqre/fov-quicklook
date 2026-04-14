@@ -8,6 +8,7 @@ import {
   buildCalendarDayCounts,
   buildVisitMonthlyCountsQuery,
   dayObsToSearchDate,
+  extractListableDataSourceParts,
   getCurrentYearMonth,
   searchDateToDayObs,
 } from "../visitSearch"
@@ -30,7 +31,9 @@ const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
 export const VisitAvailabilityDialog = memo(({ dataSource, open, onClose }: VisitAvailabilityDialogProps) => {
   const dispatch = useAppDispatch()
   const searchString = useAppSelector((state) => state.home.searchString)
-  const [repositoryName = "", dataType = ""] = dataSource.split(":")
+  const dataSourceParts = useMemo(() => extractListableDataSourceParts(dataSource), [dataSource])
+  const repositoryName = dataSourceParts?.repositoryName ?? ""
+  const dataType = dataSourceParts?.dataType ?? ""
   const currentYearMonth = useMemo(() => getCurrentYearMonth(), [])
   const [selectedYear, setSelectedYear] = useState(() => String(currentYearMonth.year))
   const [selectedMonth, setSelectedMonth] = useState(() => String(currentYearMonth.month))
@@ -56,7 +59,7 @@ export const VisitAvailabilityDialog = memo(({ dataSource, open, onClose }: Visi
       dataType,
       repositoryName,
     ),
-    { skip: !open || !canQueryMonth },
+    { skip: !open || !canQueryMonth || !dataSourceParts },
   )
   const calendarDayCounts = useMemo(
     () => (canQueryMonth ? buildCalendarDayCounts(year, month, monthlyCountsResult.data ?? []) : []),

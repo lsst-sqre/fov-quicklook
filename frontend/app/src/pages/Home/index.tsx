@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
 import { useGetVisitResolutionQuery } from "../../store/api/openapi"
-import { CcdDataType, hasExplicitDetectorSelection, homeSlice, parseDetectorName, writeHighlightedCcds } from "../../store/features/homeSlice"
+import { hasExplicitDetectorSelection, homeSlice, parseDetectorName, writeHighlightedCcds } from "../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../store/hooks"
 import { ShortcutHelpDialog } from "./ShortcutHelpDialog"
 import { wrapByHomeContext } from "./context"
@@ -15,7 +15,7 @@ import { Viewer } from "./Viewer"
 import { ViewerSettings } from "./ViewerSettings"
 import { Colorbar } from "./ViewerSettings/Colorbar"
 import { VisitList } from "./VisitList"
-import { extractSearchDateFromVisitId } from "./visitSearch"
+import { extractListableDataSourceFromVisitId, extractSearchDateFromVisitId, isByUuidVisitId } from "./visitSearch"
 import { useOnChange } from "../../hooks/useOnChange"
 
 export const Home = wrapByHomeContext(memo(() => {
@@ -77,31 +77,13 @@ const useSetInitialSearchConditions = () => {
 
   useEffect(() => {
     if (visitId) {
-      const dataSource = extractDataTypeFromVisitId(visitId)
+      const dataSource = extractListableDataSourceFromVisitId(visitId)
       if (dataSource) {
         dispatch(homeSlice.actions.setDataSource(dataSource))
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-}
-
-
-function extractDataTypeFromVisitId(visitId: string): CcdDataType | undefined {
-  /*
-   * embargo:raw:2025051900437 のようなテキストから embargo:raw を抽出する
-   * 形式がマッチしなければ undefined を返す
-   */
-  const parts = visitId.split(':')
-  if (parts.length < 3) {
-    return undefined
-  }
-  return parts.slice(0, -1).join(':') as CcdDataType
-}
-
-
-function isByUuidVisitId(visitId: string | undefined) {
-  return visitId?.split(':').slice(-2, -1)[0] === 'by_uuid'
 }
 
 
@@ -121,7 +103,7 @@ function useApplyResolvedVisitState() {
   useEffect(() => {
     if (!resolution) return
 
-    const resolvedDataSource = extractDataTypeFromVisitId(resolution.visit_name)
+    const resolvedDataSource = extractListableDataSourceFromVisitId(resolution.visit_name)
     if (resolvedDataSource && dataSource !== resolvedDataSource) {
       dispatch(homeSlice.actions.setDataSource(resolvedDataSource))
     }

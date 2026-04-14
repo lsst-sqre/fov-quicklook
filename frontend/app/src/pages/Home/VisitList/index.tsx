@@ -5,7 +5,7 @@ import { MaterialSymbol } from '../../../components/MaterialSymbol'
 import { ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
 import { homeSlice } from '../../../store/features/homeSlice'
 import { useAppDispatch, useAppSelector } from '../../../store/hooks'
-import { buildVisitListQuery } from '../visitSearch'
+import { buildVisitListQuery, extractListableDataSourceParts } from '../visitSearch'
 import styles from './styles.module.scss'
 import { LoadingSpinner } from '../../../components/Loading'
 import { useChangeCurrentQuicklook } from '../../../hooks/useChangeCurrentQuicklook'
@@ -35,12 +35,16 @@ function formatExposureTime(exposureTime: number, digits: number): string {
 function useVisitList() {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
-  const [repositoryName, dataType] = dataSource.split(':')
+  const dataSourceParts = useMemo(() => extractListableDataSourceParts(dataSource), [dataSource])
   const query = useMemo(
-    () => buildVisitListQuery(searchString, dataType, repositoryName),
-    [dataType, repositoryName, searchString],
+    () => buildVisitListQuery(
+      searchString,
+      dataSourceParts?.dataType ?? '',
+      dataSourceParts?.repositoryName ?? '',
+    ),
+    [dataSourceParts?.dataType, dataSourceParts?.repositoryName, searchString],
   )
-  const { data: list, refetch, isFetching } = useListVisitsQuery(query)
+  const { data: list, refetch, isFetching } = useListVisitsQuery(query, { skip: !dataSourceParts })
   return { list, refetch, isFetching }
 }
 

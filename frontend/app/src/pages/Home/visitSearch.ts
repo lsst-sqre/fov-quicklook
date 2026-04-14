@@ -1,5 +1,7 @@
 import { ListVisitMonthlyCountsApiArg, ListVisitsApiArg, VisitDayCount } from "../../store/api/openapi"
 
+type ListableDataSourceParts = Pick<ListVisitsApiArg, "dataType" | "repositoryName">
+
 export function isValidSearchDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
@@ -90,6 +92,41 @@ export function buildCalendarDayCounts(
   }
 
   return calendarDays
+}
+
+
+export function extractListableDataSourceParts(dataSource: string): ListableDataSourceParts | undefined {
+  const [repositoryName, dataType, ...rest] = dataSource.split(":")
+  if (!repositoryName || !dataType || rest.length > 0 || dataType === "by_uuid") {
+    return undefined
+  }
+
+  return { repositoryName, dataType }
+}
+
+
+export function extractListableDataSourceFromVisitId(visitId: string): string | undefined {
+  const parts = visitId.split(":")
+  if (parts.length < 3) {
+    return undefined
+  }
+
+  const dataSource = extractListableDataSourceParts(`${parts[0]}:${parts[1]}`)
+  if (!dataSource) {
+    return undefined
+  }
+
+  return `${dataSource.repositoryName}:${dataSource.dataType}`
+}
+
+
+export function isByUuidVisitId(visitId: string | undefined): boolean {
+  if (!visitId) {
+    return false
+  }
+
+  const parts = visitId.split(":")
+  return parts.length >= 3 && parts[1] === "by_uuid"
 }
 
 

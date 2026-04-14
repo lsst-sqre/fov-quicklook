@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest"
 import {
   buildCalendarDayCounts,
   buildMonthDayCounts,
+  extractListableDataSourceFromVisitId,
+  extractListableDataSourceParts,
   buildVisitListQuery,
   buildVisitMonthlyCountsQuery,
   dayObsToSearchDate,
   extractSearchDateFromVisitId,
   getCurrentYearMonth,
+  isByUuidVisitId,
   searchDateToDayObs,
 } from "./visitSearch"
 
@@ -50,6 +53,21 @@ describe("visit search helpers", () => {
       dataType: "raw",
       repositoryName: "embargo",
     })
+  })
+
+  it("extracts listable data source parts", () => {
+    expect(extractListableDataSourceParts("embargo:raw")).toEqual({
+      dataType: "raw",
+      repositoryName: "embargo",
+    })
+    expect(extractListableDataSourceFromVisitId("embargo:raw:2025051900437")).toBe("embargo:raw")
+  })
+
+  it("does not treat by_uuid aliases as listable data sources", () => {
+    expect(extractListableDataSourceParts("embargo:by_uuid")).toBeUndefined()
+    expect(extractListableDataSourceFromVisitId("embargo:by_uuid:019bbefe-465a-7815-a05c-13dc47a78418")).toBeUndefined()
+    expect(isByUuidVisitId("embargo:by_uuid:019bbefe-465a-7815-a05c-13dc47a78418")).toBe(true)
+    expect(isByUuidVisitId("embargo:raw:2025051900437")).toBe(false)
   })
 
   it("expands sparse daily counts to the full month", () => {
