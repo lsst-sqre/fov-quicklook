@@ -29,8 +29,6 @@ def _fallback_api_token_files() -> tuple[Path, ...]:
     broker_config_dir = _broker_config_dir()
     return (
         broker_config_dir / "broker-key",
-        broker_config_dir / "broker-token",
-        Path.home() / ".keys" / "FOV_QUICKLOOK_BROKER_TOKEN",
     )
 
 

@@ -52,21 +52,6 @@ def test_client_reads_broker_key_fallback(monkeypatch, tmp_path: Path) -> None:
     assert api_token == "home-token"
 
 
-def test_client_reads_legacy_broker_token_fallback(monkeypatch, tmp_path: Path) -> None:
-    token_file = tmp_path / "broker-token"
-    token_file.write_text("legacy-token", encoding="utf-8")
-    monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN", raising=False)
-    monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN_FILE", raising=False)
-    monkeypatch.setattr(
-        "deploy_broker.client._fallback_api_token_files",
-        lambda: (tmp_path / "broker-key", token_file),
-    )
-
-    _, api_token = _settings_defaults()
-
-    assert api_token == "legacy-token"
-
-
 def test_client_reads_broker_url_fallback(monkeypatch) -> None:
     monkeypatch.setattr(
         "deploy_broker.client._fallback_base_url",

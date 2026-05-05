@@ -284,8 +284,7 @@ client は **`~/.fov-quicklook2/broker-url`** をデフォルト接続先とし�
 この file が無い場合だけ `http://127.0.0.1:8010` を使う。SSH tunnel で
 daemon ノードの localhost へ転送している場合は `broker-url` にその URL を書けばよい。
 client は `DEPLOY_BROKER_API_TOKEN_FILE` が無ければ `state/broker.key` を見て、さらに
-`~/.fov-quicklook2/broker-key`、互換用に `~/.fov-quicklook2/broker-token`、
-最後に旧パス `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` を bearer token として使う。
+`~/.fov-quicklook2/broker-key` を bearer token として使う。
 
 #### 別サーバーで broker daemon を動かす
 

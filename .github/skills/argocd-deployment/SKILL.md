@@ -79,9 +79,8 @@ uv run deploy-broker-verify
 ```
 
 `deploy-broker-client` / `deploy-broker-verify` は、明示指定が無ければ
-`state/broker.key` を見て、さらに `~/.fov-quicklook2/broker-key`、
-互換用に `~/.fov-quicklook2/broker-token`、最後に旧パス
-`$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` を bearer token として使う。
+`state/broker.key` を見て、さらに `~/.fov-quicklook2/broker-key`
+を bearer token として使う。
 
 ### sync / restart
 
