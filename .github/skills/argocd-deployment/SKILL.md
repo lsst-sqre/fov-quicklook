@@ -28,28 +28,30 @@ description: >
 
 - `cd dev/deploy-broker`
 - broker daemon が起動していること
-- ArgoCD token は broker daemon に登録済みであること
+- ArgoCD token / app token を返す command が broker daemon 側で設定済みであること
 - 標準運用では client から `http://127.0.0.1:8010` に届くこと（通常は SSH tunnel）
 
 ### トークンの取得と設定
 
-1. ブラウザで https://usdf-rsp-dev.slac.stanford.edu/argo-cd/applications/fov-quicklook にアクセス
-2. 開発者ツールを開く
-3. 任意のAPIリクエストを選択し「Copy as cURL」を実行
-4. daemon ノードの state dir に `bootstrap/argocd.curl` として保存してから daemon を起動:
+1. daemon ノード側で token を返す command を用意する
+2. command の stdout が `{"argocd_token":"...","gafaelfawr_token":"..."}` を返すようにする
+3. `DEPLOY_BROKER_TOKEN_COMMAND` でその command を指定して daemon を起動する
 
 ```bash
 cd /srv/fov-quicklook-broker-state
-mkdir -p bootstrap
-cat > bootstrap/argocd.curl <<'EOF'
-  curl 'https://usdf-rsp-dev.slac.stanford.edu/argo-cd/api/v1/applications/fov-quicklook' \
-  -H 'Cookie: argocd.token=...'
+cat > fetch-tokens.sh <<'EOF'
+#!/bin/sh
+exec /path/to/real-token-command
 EOF
+chmod 700 fetch-tokens.sh
 
-uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
+DEPLOY_BROKER_TOKEN_COMMAND=/srv/fov-quicklook-broker-state/fetch-tokens.sh \
+  uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
 ```
 
-daemon は起動時に `bootstrap/argocd.curl` を読んで token を保存し、元 file を削除する。
+daemon 起動時には、現在使われる broker bearer token も端末に表示される。`DEPLOY_BROKER_TOKEN_COMMAND` が未設定なら daemon は起動せずエラー終了する。
+
+daemon は token cache が無いとき、または認証失敗 (`401` / `403`) を受けたときに command を再実行して token を更新する。cache は `state/tokens/*.token` に保存され、別プロセスからも再利用される。
 
 ### デプロイ要求
 
@@ -69,6 +71,9 @@ cd dev/deploy-broker
 uv run deploy-broker-client argocd-status
 uv run deploy-broker-client argocd-get-branch
 uv run deploy-broker-client argocd-logs coordinator
+
+# broker 全体の smoke test
+uv run deploy-broker-verify
 ```
 
 ### sync / restart

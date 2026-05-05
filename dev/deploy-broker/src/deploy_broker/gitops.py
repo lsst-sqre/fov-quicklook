@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
@@ -29,6 +30,13 @@ ALLOWED_PHALANX_PATHS = (
     "docs/applications/fov-quicklook/",
     "environments/templates/applications/rsp/fov-quicklook.yaml",
 )
+FOV_QUICKLOOK_VALUES_PATH = "applications/fov-quicklook/values.yaml"
+ALLOWED_PHALANX_CHANGE_POLICIES = (
+    "fov-quicklook-paths",
+    "values-yaml-only",
+    "image-tag-only",
+)
+_IMAGE_TAG_DIFF_RE = re.compile(r"^tag:\s*\S.*$")
 
 
 def validate_tracked_branch(branch: str) -> None:
@@ -146,32 +154,136 @@ def is_allowed_phalanx_path(path: str) -> bool:
     )
 
 
-def collect_changed_files(repo_path: Path, base_ref: str, head_ref: str = "HEAD") -> list[str]:
+def _diff_range_args(base_ref: str, head_ref: str | None = None) -> list[str]:
+    if head_ref is None:
+        return [base_ref]
+    return [base_ref, head_ref]
+
+
+def collect_changed_files(
+    repo_path: Path,
+    base_ref: str,
+    head_ref: str | None = None,
+) -> list[str]:
     output = run_command(
         [
             "git",
             "diff",
             "--name-only",
-            "--diff-filter=ACMR",
-            f"{base_ref}..{head_ref}",
+            "--diff-filter=ACDMRT",
+            *_diff_range_args(base_ref, head_ref),
         ],
         cwd=repo_path,
     )
     return [line for line in output.splitlines() if line.strip()]
 
 
-def validate_phalanx_changes(repo_path: Path) -> None:
-    merge_base = maybe_merge_base(repo_path, "HEAD", "origin/main")
-    if merge_base is None:
-        files = collect_changed_files(repo_path, "HEAD^")
-    else:
-        files = collect_changed_files(repo_path, merge_base)
+def collect_diff_text(
+    repo_path: Path,
+    base_ref: str,
+    path: str,
+    head_ref: str | None = None,
+) -> str:
+    return run_command(
+        [
+            "git",
+            "diff",
+            "--no-color",
+            "--unified=0",
+            *_diff_range_args(base_ref, head_ref),
+            "--",
+            path,
+        ],
+        cwd=repo_path,
+    )
 
+
+def _resolve_phalanx_base_ref(repo_path: Path) -> str:
+    merge_base = maybe_merge_base(repo_path, "HEAD", "origin/main")
+    if merge_base is not None:
+        return merge_base
+    try:
+        return rev_parse(repo_path, "HEAD^")
+    except Exception as exc:
+        raise RuntimeError(
+            "phalanx validation requires origin/main or at least one parent commit"
+        ) from exc
+
+
+def _validate_phalanx_change_policy(policy: str) -> None:
+    if policy not in ALLOWED_PHALANX_CHANGE_POLICIES:
+        raise ValueError(
+            "unknown phalanx change policy: "
+            f"{policy} (expected one of {', '.join(ALLOWED_PHALANX_CHANGE_POLICIES)})"
+        )
+
+
+def _validate_path_allowlist(files: list[str]) -> None:
     unsafe = [path for path in files if not is_allowed_phalanx_path(path)]
     if unsafe:
         raise RuntimeError(
             "phalanx changes include unsafe paths: " + ", ".join(sorted(unsafe))
         )
+
+
+def _validate_values_yaml_only(files: list[str]) -> None:
+    unsafe = [path for path in files if path != FOV_QUICKLOOK_VALUES_PATH]
+    if unsafe:
+        raise RuntimeError(
+            "phalanx policy values-yaml-only rejects changes outside "
+            f"{FOV_QUICKLOOK_VALUES_PATH}: {', '.join(sorted(unsafe))}"
+        )
+
+
+def _validate_image_tag_only(repo_path: Path, base_ref: str, files: list[str]) -> None:
+    _validate_values_yaml_only(files)
+    diff_text = collect_diff_text(repo_path, base_ref, FOV_QUICKLOOK_VALUES_PATH)
+    meaningful_lines: list[str] = []
+    for line in diff_text.splitlines():
+        if (
+            not line
+            or line.startswith("diff --git ")
+            or line.startswith("index ")
+            or line.startswith("--- ")
+            or line.startswith("+++ ")
+            or line.startswith("@@")
+            or line.startswith("\\ No newline at end of file")
+        ):
+            continue
+        if line[0] not in "+-":
+            raise RuntimeError("phalanx policy image-tag-only encountered unexpected diff")
+        changed = line[1:].strip()
+        meaningful_lines.append(changed)
+        if not _IMAGE_TAG_DIFF_RE.match(changed):
+            raise RuntimeError(
+                "phalanx policy image-tag-only allows only image.tag line changes"
+            )
+    if not meaningful_lines:
+        raise RuntimeError("phalanx policy image-tag-only found no image.tag changes")
+
+
+def validate_phalanx_changes(
+    repo_path: Path,
+    policy: str = "fov-quicklook-paths",
+) -> None:
+    _validate_phalanx_change_policy(policy)
+    base_ref = _resolve_phalanx_base_ref(repo_path)
+    files = collect_changed_files(repo_path, base_ref)
+
+    if not files:
+        return
+
+    if policy == "fov-quicklook-paths":
+        _validate_path_allowlist(files)
+        return
+    if policy == "values-yaml-only":
+        _validate_values_yaml_only(files)
+        return
+    if policy == "image-tag-only":
+        _validate_image_tag_only(repo_path, base_ref, files)
+        return
+
+    raise AssertionError(f"unhandled phalanx change policy: {policy}")
 
 
 def update_image_tag(values_path: Path, image_tag: str) -> None:

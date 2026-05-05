@@ -193,7 +193,7 @@ ccd_data_types:
 - trusted maintainer 用マシンであること
 - app repo (`lsst-sqre/fov-quicklook`) への push 権限があること
 - `k8s/phalanx/` に `lsst-sqre/phalanx` を clone 済みであること
-- broker の state dir に ArgoCD token / app token が登録済みであること
+- broker の state dir に token cache があるか、`DEPLOY_BROKER_TOKEN_COMMAND` が設定済みであること
 
 ### 標準手順
 
@@ -237,20 +237,26 @@ broker 側で保持し、agent は必要時に broker から受け取って `hea
 #### 開発時のローカル起動
 
 開発中は broker をひとまずローカルで起動してよい。ArgoCD token と app token は
-**daemon ノード側の state dir** に置いた bootstrap file から、**daemon 起動時**に取り込む。
+**daemon ノード側の token command** が返す JSON から取得する。
 
 ```bash
-mkdir -p dev/deploy-broker/state/bootstrap
+mkdir -p dev/deploy-broker/state
 
-# daemon ノード側で Copy as cURL をそのまま保存しておく
-$EDITOR dev/deploy-broker/state/bootstrap/argocd.curl
-$EDITOR dev/deploy-broker/state/bootstrap/app.curl
+# daemon ノード側で token を返すコマンドを用意しておく
+cat > dev/deploy-broker/state/fetch-tokens.sh <<'EOF'
+#!/bin/sh
+exec /path/to/real-token-command
+EOF
+chmod 700 dev/deploy-broker/state/fetch-tokens.sh
+
+# 期待する stdout:
+# {"argocd_token":"...","gafaelfawr_token":"..."}
 
 cd dev/deploy-broker
 
 # ローカル daemon を起動
-# 起動時に state/bootstrap/*.curl を読んで tokens/*.token に保存し、元ファイルは削除する
-uv run deploy-broker-daemon
+# token は初回利用時に取得され、401/403 を受けたら再取得される
+DEPLOY_BROKER_TOKEN_COMMAND="$PWD/state/fetch-tokens.sh" uv run deploy-broker-daemon
 
 # 別ターミナルで
 # broker 経由で app token を取得
@@ -262,6 +268,9 @@ uv run deploy-broker-client request-deploy \
   --app-repo ../.. \
   --verify-mode none
 ```
+
+起動時に broker daemon は、現在使う `broker bearer token` を端末へ表示する。  
+また、`DEPLOY_BROKER_TOKEN_COMMAND` が未設定ならその場でエラー終了する。
 
 client は **`http://127.0.0.1:8010` をデフォルト接続先**とする。daemon が
 `127.0.0.1` bind の場合は、**broker token は不要**である。broker token
@@ -280,7 +289,7 @@ GitHub push / GitHub Actions / ArgoCD token / app token を持たせる。
 | ノード | 必要な権限・設定 | 不要なもの |
 |---|---|---|
 | thin client / agent ノード | app repo の checkout、`deploy-broker-client`、daemon node の `127.0.0.1:8010` へ届く経路（通常は SSH tunnel） | `gh auth`、app repo への `git push`、Phalanx への `git push`、ArgoCD token、app token |
-| broker daemon ノード | `gh auth`、app repo build branch (`fov-quicklook-local-*`) への `git push`、Phalanx tracked branch (`u/michitaro/fov-quicklook-*`) への `git push`、ArgoCD token / app token の保存、daemon 用 state dir (`bootstrap/*.curl` または `tokens/*.token`) | agent 側の作業ツリーや editor |
+| broker daemon ノード | `gh auth`、app repo build branch (`fov-quicklook-local-*`) への `git push`、Phalanx tracked branch (`u/michitaro/fov-quicklook-*`) への `git push`、ArgoCD token / app token を返す command、daemon 用 state dir (`tokens/*.token` cache を含む) | agent 側の作業ツリーや editor |
 
 つまり、**agent 用ノードは app repo に `git push` できなくてよい**。その代わり、
 **broker daemon ノードは app repo の build branch に push できる必要がある**。
@@ -344,13 +353,16 @@ listen host の default は **`127.0.0.1`** なので、通常は host の指定
 ```bash
 cd /srv/fov-quicklook-broker-state
 
-# daemon ノード側で token bootstrap file を配置しておく
-mkdir -p bootstrap
-$EDITOR bootstrap/argocd.curl
-$EDITOR bootstrap/app.curl
+# daemon ノード側で token command を配置しておく
+cat > fetch-tokens.sh <<'EOF'
+#!/bin/sh
+exec /path/to/real-token-command
+EOF
+chmod 700 fetch-tokens.sh
 
-# 起動時に bootstrap/*.curl を読んで tokens/*.token に保存し、元ファイルは削除する
-uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
+# token は必要時に取得され、認証失敗時に再取得される
+DEPLOY_BROKER_TOKEN_COMMAND=/srv/fov-quicklook-broker-state/fetch-tokens.sh \
+  uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
 ```
 
 - default のままで broker は `127.0.0.1:8010` に bind する
@@ -397,34 +409,47 @@ uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-cli
   argocd-get-branch
 ```
 
-##### daemon 起動時の token bootstrap
+##### token command の設定
 
 ArgoCD token と app token の**登録は daemon ノード側で行う**。`deploy-broker-client`
 から broker に token を送ることはしない。
 
-daemon は起動時に state dir 配下の以下を探し、存在すれば cURL 文字列から token を抽出して
-`tokens/*.token` に保存する。取り込み後、元の `*.curl` file は削除する。
+daemon は `DEPLOY_BROKER_TOKEN_COMMAND` で指定したコマンドを必要時に実行し、
+標準出力の JSON から token を `tokens/*.token` にキャッシュする。
 
-- `bootstrap/argocd.curl`
-- `bootstrap/app.curl`
+- stdout は `{"argocd_token":"...","gafaelfawr_token":"..."}` を返すこと
+- token cache は `tokens/*.token` に保存され、daemon 再起動や別プロセスからも再利用される
+- cache miss / refresh 時は lock file で排他し、token command の多重実行を避ける
+- token cache が無いときに初回取得する
+- ArgoCD API または app verification で `401` / `403` を受けたら command を再実行して更新する
+- command 実行の timeout は `DEPLOY_BROKER_TOKEN_COMMAND_TIMEOUT_SECONDS`（既定 30 秒）
+- Phalanx change policy は `DEPLOY_BROKER_PHALANX_CHANGE_POLICY` で設定できる
+
+##### Phalanx change policy の設定
+
+Phalanx 側の変更許可範囲は `DEPLOY_BROKER_PHALANX_CHANGE_POLICY` で切り替えられる。
+
+| mode | 許可する変更 | 想定用途 |
+|---|---|---|
+| `fov-quicklook-paths` | `applications/fov-quicklook/` など既存 allowlist path 配下 | 現行互換。fov-quicklook 関連の Phalanx 修正をまとめて通したいとき |
+| `values-yaml-only` | `applications/fov-quicklook/values.yaml` のみ | values だけを手動調整したいが、他 path は止めたいとき |
+| `image-tag-only` | `applications/fov-quicklook/values.yaml` の `image.tag` 行のみ | broker が付ける image tag 更新以外は止めたいとき |
+
+`image-tag-only` と `values-yaml-only` は、Phalanx bundle に別の変更が混ざっていた場合も reject する。  
+判定は `origin/main` との差分を基準に行い、未コミット差分も含めて検証する。
 
 ```bash
 # daemon host 側
 cd /srv/fov-quicklook-broker-state
-mkdir -p bootstrap
-
-cat > bootstrap/argocd.curl <<'EOF'
-curl 'https://usdf-rsp-dev.slac.stanford.edu/argo-cd/api/v1/applications/fov-quicklook' \
-  -H 'Cookie: argocd.token=...'
+cat > fetch-tokens.sh <<'EOF'
+#!/bin/sh
+exec /path/to/real-token-command
 EOF
-
-cat > bootstrap/app.curl <<'EOF'
-curl 'https://usdf-rsp-dev.slac.stanford.edu/fov-quicklook/api/healthz' \
-  -H 'Cookie: gafaelfawr="..."'
-EOF
+chmod 700 fetch-tokens.sh
 
 # 前景で起動する。client 操作は別ターミナルから行う
-uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
+DEPLOY_BROKER_TOKEN_COMMAND=/srv/fov-quicklook-broker-state/fetch-tokens.sh \
+  uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
 ```
 
 保存先は state dir 配下の以下。
@@ -434,6 +459,39 @@ uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
 - `jobs/*.json` - deploy job status
 - `repos/` - daemon 側の cached clone
 - `requests/` - bundle と per-request workspace
+
+HTTP surface の詳細は `dev/deploy-broker/API.md` を参照。
+
+##### deploy broker の動作確認テスト
+
+deploy broker 実行マシンで `DEPLOY_BROKER_TOKEN_COMMAND` が準備済みなら、`deploy-broker-verify`
+で broker API の smoke test を行える。
+
+```bash
+cd /srv/fov-quicklook/dev/deploy-broker
+
+# 既定は read-only な確認だけ
+uv run deploy-broker-verify
+
+# sync / restart も確認
+uv run deploy-broker-verify --include-sync --restart-components frontend
+
+# deploy request まで確認（実際に build / push / sync が走る）
+uv run deploy-broker-verify \
+  --deploy-tracked-branch u/michitaro/fov-quicklook-verify-20260505 \
+  --app-repo /srv/fov-quicklook \
+  --verify-mode auto
+```
+
+既定で確認する項目:
+
+1. broker 自身の `healthz`
+2. `get-app-token`
+3. `argocd-status`
+4. `argocd-get-branch`
+5. `argocd-logs coordinator`
+
+`--include-sync`、`--restart-components ...`、`--deploy-tracked-branch ...` はいずれも mutating operation なので、検証用 branch / 時間帯でだけ使うこと。
 
 ##### systemd で常駐させる例
 
@@ -446,6 +504,8 @@ Wants=network-online.target
 [Service]
 User=fovquicklook
 WorkingDirectory=/srv/fov-quicklook-broker-state
+Environment=DEPLOY_BROKER_TOKEN_COMMAND=/srv/fov-quicklook-broker-state/fetch-tokens.sh
+Environment=DEPLOY_BROKER_PHALANX_CHANGE_POLICY=image-tag-only
 ExecStart=/usr/local/bin/uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
 Restart=on-failure
 
@@ -460,13 +520,16 @@ WantedBy=multi-user.target
 ```bash
 cd /path/to/your/broker-state
 
-# daemon 側で token bootstrap file を配置してから daemon を起動
-mkdir -p bootstrap
-$EDITOR bootstrap/argocd.curl
-$EDITOR bootstrap/app.curl
+# daemon 側で token command を配置してから daemon を起動
+cat > fetch-tokens.sh <<'EOF'
+#!/bin/sh
+exec /path/to/real-token-command
+EOF
+chmod 700 fetch-tokens.sh
 
 # このコマンドは前景で動くので、以降は別ターミナルで実行する
-uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-daemon
+DEPLOY_BROKER_TOKEN_COMMAND=/path/to/your/broker-state/fetch-tokens.sh \
+  uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-daemon
 
 # broker 経由の状態確認
 uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-client \
@@ -509,7 +572,7 @@ uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-cli
 - ArgoCD の対象 application が `fov-quicklook` であること
 - ArgoCD の source path が `applications/fov-quicklook` であること
 - Phalanx push branch が `u/michitaro/fov-quicklook-*` であること
-- push 対象ファイルが `applications/fov-quicklook/` など許可済み path のみであること
+- `DEPLOY_BROKER_PHALANX_CHANGE_POLICY` に応じて、Phalanx 変更を `applications/fov-quicklook/` allowlist / `values.yaml` 限定 / `image.tag` 限定で検証すること
 - ArgoCD token を daemon 内に閉じ込めること
 - sync / restart の操作対象を `fov-quicklook` 配下の Deployment に限定すること
 - stale な ArgoCD `image.tag` override が残っていても、新しい deploy tag に更新すること

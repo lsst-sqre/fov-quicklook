@@ -7,7 +7,6 @@ import uvicorn
 
 from .config import get_settings
 from .server import create_app
-from .storage import TokenStore
 
 
 def main() -> None:
@@ -17,9 +16,14 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = get_settings()
-    bootstrapped = TokenStore(settings).bootstrap_from_curl_files()
-    if bootstrapped:
-        kinds = ", ".join(sorted(bootstrapped))
-        print(f"Bootstrapped tokens from startup files: {kinds}", file=sys.stderr)
+    if not (settings.token_command or "").strip():
+        print(
+            "ERROR: DEPLOY_BROKER_TOKEN_COMMAND must be configured before starting deploy-broker-daemon",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(1)
+    api_token = settings.resolve_api_token()
+    print(f"Broker bearer token: {api_token}", file=sys.stderr, flush=True)
     app = create_app(settings)
     uvicorn.run(app, host=args.host or settings.host, port=args.port or settings.port)

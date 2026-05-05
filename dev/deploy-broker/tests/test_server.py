@@ -13,6 +13,7 @@ def _settings(tmp_path: Path) -> Settings:
     return Settings(
         api_token="secret-token",
         state_dir=tmp_path / "state",
+        token_command=None,
     )
 
 
