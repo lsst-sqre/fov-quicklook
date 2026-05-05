@@ -1,10 +1,19 @@
 import { Menu, MenuItem, SubMenu } from '@szhsin/react-menu'
 import classNames from 'classnames'
-import React, { memo, useEffect, useMemo, useRef } from "react"
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MaterialSymbol } from '../../../components/MaterialSymbol'
 import { ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
 import { homeSlice } from '../../../store/features/homeSlice'
 import { useAppDispatch, useAppSelector } from '../../../store/hooks'
+import homeStyles from '../styles.module.scss'
+import {
+  buildCalendarDayCells,
+  buildVisitCountsByDate,
+  formatCalendarMonthLabel,
+  getInitialCalendarMonth,
+  getSelectedCalendarDate,
+  shiftCalendarMonth,
+} from '../visitCalendar'
 import { buildVisitListQuery } from '../visitSearch'
 import styles from './styles.module.scss'
 import { LoadingSpinner } from '../../../components/Loading'
@@ -270,63 +279,196 @@ function SearchBox() {
   const dispatch = useAppDispatch()
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
+  const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
   const ccdDataTypes = useAppSelector(state => state.copyTemplate.ccdDataTypes)
   const { refetch } = useVisitList()
+  const [repositoryName, dataType] = dataSource.split(':')
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [calendarMonth, setCalendarMonth] = useState(() => getInitialCalendarMonth(currentQuicklook))
+  const { data: calendarVisits, isFetching: isCalendarFetching } = useListVisitsQuery(
+    { dataType, repositoryName, limit: 10000 },
+    { skip: !calendarOpen },
+  )
+
+  const selectedCalendarDate = useMemo(
+    () => getSelectedCalendarDate(searchString, currentQuicklook),
+    [currentQuicklook, searchString],
+  )
+  const calendarDayCells = useMemo(
+    () => buildCalendarDayCells(calendarMonth),
+    [calendarMonth],
+  )
+  const visitCountsByDate = useMemo(
+    () => buildVisitCountsByDate(calendarVisits, calendarMonth),
+    [calendarMonth, calendarVisits],
+  )
+
+  const closeCalendar = useCallback(() => {
+    setCalendarOpen(false)
+  }, [])
+
+  const openCalendar = useCallback(() => {
+    setCalendarMonth(getInitialCalendarMonth(currentQuicklook))
+    setCalendarOpen(true)
+  }, [currentQuicklook])
+
+  useEffect(() => {
+    if (!calendarOpen) {
+      return
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeCalendar()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [calendarOpen, closeCalendar])
 
   return (
-    <div className={styles.searchBox}>
-      <div style={{ display: 'flex' }} >
-        <select
-          value={dataSource}
-          onChange={e => dispatch(homeSlice.actions.setDataSource(e.target.value as typeof dataSource))}
-          style={{
-            flexGrow: 1,
-          }}
-        >
-          {ccdDataTypes.map((dt) => {
-            const key = `${dt.repository_name}:${dt.data_type}`
-            return <option key={key} value={key}>{dt.display_name}</option>
-          })}
-        </select>
-        <Menu
-          menuButton={
-            <button >
-              <MaterialSymbol symbol='settings' />
-            </button>
-          }
-          theming='dark'
-        >
-          <SubMenu label="Exposure Time Grouping Tolerance">
-            {[
-              { digits: 100, label: "No grouping", description: "No grouping (exact match)" },
-              { digits: 0, label: "1 second tolerance", description: "1 second tolerance" },
-              { digits: 1, label: "1 digit (0.1 seconds)", description: "1 digit (0.1 seconds)" },
-              { digits: 2, label: "2 digits (0.01 seconds)", description: "2 digits (0.01 seconds)" },
-              { digits: 3, label: "3 digits (0.001 seconds)", description: "3 digits (0.001 seconds)" }
-            ].map(({ digits, label, description }) => (
-              <MenuItem
-                key={digits}
-                onClick={() => dispatch(homeSlice.actions.setListGroupingTimeToleranceDigits(digits))}
-                type='checkbox'
-                checked={digits === listGroupingTimeToleranceDigits}
-              >
-                {label}
-              </MenuItem>
-            ))}
-          </SubMenu>
-        </Menu>
-        <button onClick={refetch}>
-          <MaterialSymbol symbol='refresh' />
-        </button>
+    <>
+      <div className={styles.searchBox}>
+        <div style={{ display: 'flex' }} >
+          <select
+            value={dataSource}
+            onChange={e => dispatch(homeSlice.actions.setDataSource(e.target.value as typeof dataSource))}
+            style={{
+              flexGrow: 1,
+            }}
+          >
+            {ccdDataTypes.map((dt) => {
+              const key = `${dt.repository_name}:${dt.data_type}`
+              return <option key={key} value={key}>{dt.display_name}</option>
+            })}
+          </select>
+          <Menu
+            menuButton={
+              <button >
+                <MaterialSymbol symbol='settings' />
+              </button>
+            }
+            theming='dark'
+          >
+            <SubMenu label="Exposure Time Grouping Tolerance">
+              {[
+                { digits: 100, label: "No grouping", description: "No grouping (exact match)" },
+                { digits: 0, label: "1 second tolerance", description: "1 second tolerance" },
+                { digits: 1, label: "1 digit (0.1 seconds)", description: "1 digit (0.1 seconds)" },
+                { digits: 2, label: "2 digits (0.01 seconds)", description: "2 digits (0.01 seconds)" },
+                { digits: 3, label: "3 digits (0.001 seconds)", description: "3 digits (0.001 seconds)" }
+              ].map(({ digits, label }) => (
+                <MenuItem
+                  key={digits}
+                  onClick={() => dispatch(homeSlice.actions.setListGroupingTimeToleranceDigits(digits))}
+                  type='checkbox'
+                  checked={digits === listGroupingTimeToleranceDigits}
+                >
+                  {label}
+                </MenuItem>
+              ))}
+            </SubMenu>
+          </Menu>
+          <button onClick={refetch}>
+            <MaterialSymbol symbol='refresh' />
+          </button>
+        </div>
+        <div className={styles.searchDateField}>
+          <input
+            className={styles.searchDateInput}
+            aria-label="Observation date"
+            type="date"
+            value={searchString}
+            onChange={e => dispatch(homeSlice.actions.setSearchString(e.target.value))}
+          />
+          <button
+            aria-label="Open calendar"
+            className={styles.searchCalendarButton}
+            onClick={openCalendar}
+            type="button"
+          >
+            <MaterialSymbol symbol="calendar_month" />
+          </button>
+        </div>
       </div>
-      <input
-        className={styles.searchDateInput}
-        aria-label="Observation date"
-        type="date"
-        value={searchString}
-        onChange={e => dispatch(homeSlice.actions.setSearchString(e.target.value))}
-      />
-    </div>
+      {calendarOpen && (
+        <div className={homeStyles.shortcutHelpBackdrop} onClick={closeCalendar}>
+          <div
+            aria-labelledby="visit-calendar-title"
+            aria-modal="true"
+            className={classNames(homeStyles.shortcutHelpDialog, styles.calendarDialog)}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className={classNames(homeStyles.shortcutHelpHeader, styles.calendarHeader)}>
+              <button
+                aria-label="Previous month"
+                className={styles.calendarMonthButton}
+                onClick={() => setCalendarMonth(current => shiftCalendarMonth(current, -1))}
+                type="button"
+              >
+                <MaterialSymbol symbol="chevron_left" />
+              </button>
+              <h2 className={classNames(homeStyles.shortcutHelpTitle, styles.calendarTitle)} id="visit-calendar-title">
+                {formatCalendarMonthLabel(calendarMonth)}
+              </h2>
+              <div className={styles.calendarHeaderActions}>
+                <button
+                  aria-label="Next month"
+                  className={styles.calendarMonthButton}
+                  onClick={() => setCalendarMonth(current => shiftCalendarMonth(current, 1))}
+                  type="button"
+                >
+                  <MaterialSymbol symbol="chevron_right" />
+                </button>
+                <button className={homeStyles.shortcutHelpCloseButton} onClick={closeCalendar} type="button">
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className={styles.calendarWeekdays}>
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+                <span className={styles.calendarWeekday} key={day}>{day}</span>
+              ))}
+            </div>
+            <div className={styles.calendarGrid}>
+              {calendarDayCells.map((cell) => (
+                <button
+                  className={classNames(
+                    styles.calendarDay,
+                    !cell.inCurrentMonth && styles.calendarDayOutsideMonth,
+                    selectedCalendarDate === cell.date && styles.calendarDaySelected,
+                  )}
+                  key={cell.date}
+                  onClick={() => {
+                    if (!cell.inCurrentMonth) {
+                      setCalendarMonth(cell.date.slice(0, 7))
+                      return
+                    }
+                    dispatch(homeSlice.actions.setSearchString(cell.date))
+                    closeCalendar()
+                  }}
+                  type="button"
+                >
+                  <span className={styles.calendarDayLabel}>
+                    <span>{cell.day}</span>
+                    <span className={styles.calendarDayCount}>{visitCountsByDate[cell.date] ?? 0}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+            {isCalendarFetching && (
+              <div className={styles.calendarLoading}>
+                <LoadingSpinner />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
