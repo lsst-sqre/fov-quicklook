@@ -8,7 +8,8 @@ from deploy_broker.client import _settings_defaults
 def test_client_defaults_to_local_broker(monkeypatch) -> None:
     monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN", raising=False)
     monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN_FILE", raising=False)
-    monkeypatch.setattr("deploy_broker.client._fallback_api_token_file", lambda: Path("/missing"))
+    monkeypatch.setattr("deploy_broker.client._fallback_api_token_files", lambda: ())
+    monkeypatch.setattr("deploy_broker.client._fallback_base_url", lambda: "http://127.0.0.1:8010")
 
     server, api_token = _settings_defaults()
 
@@ -29,20 +30,50 @@ def test_client_reads_explicit_api_token_file(monkeypatch, tmp_path: Path) -> No
     token_file.write_text("file-token", encoding="utf-8")
     monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN", raising=False)
     monkeypatch.setenv("DEPLOY_BROKER_API_TOKEN_FILE", str(token_file))
-    monkeypatch.setattr("deploy_broker.client._fallback_api_token_file", lambda: Path("/missing"))
+    monkeypatch.setattr("deploy_broker.client._fallback_api_token_files", lambda: ())
 
     _, api_token = _settings_defaults()
 
     assert api_token == "file-token"
 
 
-def test_client_reads_default_home_token_file(monkeypatch, tmp_path: Path) -> None:
-    token_file = tmp_path / "FOV_QUICKLOOK_BROKER_TOKEN"
+def test_client_reads_broker_key_fallback(monkeypatch, tmp_path: Path) -> None:
+    token_file = tmp_path / "broker-key"
     token_file.write_text("home-token", encoding="utf-8")
     monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN", raising=False)
     monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN_FILE", raising=False)
-    monkeypatch.setattr("deploy_broker.client._fallback_api_token_file", lambda: token_file)
+    monkeypatch.setattr(
+        "deploy_broker.client._fallback_api_token_files",
+        lambda: (token_file,),
+    )
 
     _, api_token = _settings_defaults()
 
     assert api_token == "home-token"
+
+
+def test_client_reads_legacy_broker_token_fallback(monkeypatch, tmp_path: Path) -> None:
+    token_file = tmp_path / "broker-token"
+    token_file.write_text("legacy-token", encoding="utf-8")
+    monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN", raising=False)
+    monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN_FILE", raising=False)
+    monkeypatch.setattr(
+        "deploy_broker.client._fallback_api_token_files",
+        lambda: (tmp_path / "broker-key", token_file),
+    )
+
+    _, api_token = _settings_defaults()
+
+    assert api_token == "legacy-token"
+
+
+def test_client_reads_broker_url_fallback(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "deploy_broker.client._fallback_base_url",
+        lambda: "https://broker.example.invalid",
+    )
+    monkeypatch.setattr("deploy_broker.client._fallback_api_token_files", lambda: ())
+
+    server, _ = _settings_defaults()
+
+    assert server == "https://broker.example.invalid"

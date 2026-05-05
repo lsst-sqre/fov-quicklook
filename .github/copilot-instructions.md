@@ -75,7 +75,8 @@
 
 - このリポジトリで作業する agent は **deploy broker daemon が動いていないノード** にいる前提で扱う
 - agent は常に deploy broker の **caller 側** であり、通常は daemon を起動しない
-- broker bearer token は既定で `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` を使う
+- broker URL は既定で `~/.fov-quicklook2/broker-url` を使う
+- broker bearer token は既定で `~/.fov-quicklook2/broker-key` を使う
 - app token / ArgoCD token の実体は daemon ノード側で管理する
 - deploy や検証では `dev/deploy-broker/` の client / verify CLI を優先し、必要なら SSH tunnel や `--server` で daemon に接続する
 

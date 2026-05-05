@@ -12,8 +12,26 @@ from .config import Settings
 from .gitops import create_bundle
 
 
-def _fallback_api_token_file() -> Path:
-    return Path.home() / ".keys" / "FOV_QUICKLOOK_BROKER_TOKEN"
+def _broker_config_dir() -> Path:
+    return Path.home() / ".fov-quicklook2"
+
+
+def _fallback_base_url() -> str:
+    broker_url_path = _broker_config_dir() / "broker-url"
+    if broker_url_path.exists():
+        broker_url = broker_url_path.read_text(encoding="utf-8").strip()
+        if broker_url:
+            return broker_url
+    return "http://127.0.0.1:8010"
+
+
+def _fallback_api_token_files() -> tuple[Path, ...]:
+    broker_config_dir = _broker_config_dir()
+    return (
+        broker_config_dir / "broker-key",
+        broker_config_dir / "broker-token",
+        Path.home() / ".keys" / "FOV_QUICKLOOK_BROKER_TOKEN",
+    )
 
 
 class BrokerClient:
@@ -132,11 +150,16 @@ def _settings_defaults() -> tuple[str, str | None]:
         api_token = settings.api_token_file.read_text(encoding="utf-8").strip() or None
     if api_token is None and settings.api_token_path.exists():
         api_token = settings.api_token_path.read_text(encoding="utf-8").strip() or None
-    fallback_token_file = _fallback_api_token_file()
-    if api_token is None and fallback_token_file.exists():
-        api_token = fallback_token_file.read_text(encoding="utf-8").strip() or None
+    if api_token is None:
+        for fallback_token_file in _fallback_api_token_files():
+            if fallback_token_file.exists():
+                api_token = (
+                    fallback_token_file.read_text(encoding="utf-8").strip() or None
+                )
+                if api_token is not None:
+                    break
     return (
-        "http://127.0.0.1:8010",
+        _fallback_base_url(),
         api_token,
     )
 

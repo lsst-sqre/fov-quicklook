@@ -15,8 +15,8 @@ description: >
 
 > **デフォルト前提**: agent は **deploy broker daemon が動いていないノード**
 > で作業する。agent は caller 側として `deploy-broker-client` を使い、必要なら
-> SSH tunnel や `--server` で daemon ノードへ接続する。local endpoint に転送して
-> いる場合は `http://127.0.0.1:8010` をそのまま使ってよい。
+> SSH tunnel や `--server` で daemon ノードへ接続する。既定では
+> `~/.fov-quicklook2/broker-url` の値を使う。
 
 > **agent-safe 運用**: agent に GitHub / ArgoCD への直接権限を渡さない場合は、
 > `dev/deploy-broker/` の broker daemon を優先する。broker は ArgoCD token を
@@ -31,7 +31,7 @@ description: >
 - broker daemon は別ノードで起動していること
 - ArgoCD token / app token を返す command が broker daemon 側で設定済みであること
 - 標準運用では client から broker daemon に届くこと（通常は SSH tunnel）
-- broker bearer token は `DEPLOY_BROKER_API_TOKEN_FILE` か `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` で渡す
+- broker bearer token は `DEPLOY_BROKER_API_TOKEN_FILE` か `~/.fov-quicklook2/broker-key` で渡す
 
 ### トークンの取得と設定
 
@@ -79,8 +79,9 @@ uv run deploy-broker-verify
 ```
 
 `deploy-broker-client` / `deploy-broker-verify` は、明示指定が無ければ
-`state/broker.key` を見て、さらに無ければ `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN`
-を bearer token として使う。
+`state/broker.key` を見て、さらに `~/.fov-quicklook2/broker-key`、
+互換用に `~/.fov-quicklook2/broker-token`、最後に旧パス
+`$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` を bearer token として使う。
 
 ### sync / restart
 

@@ -18,7 +18,7 @@ description: >
 > 直接 HTTP 検証に使える。app token 自体の登録は daemon ノード側で行う。
 
 > **agent ノード前提**: agent は deploy broker daemon を起動しない。caller 側で
-> `deploy-broker-client` を使い、必要なら `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN`
+> `deploy-broker-client` を使い、必要なら `~/.fov-quicklook2/broker-key`
 > を bearer token として使う。
 
 ## 前提条件
