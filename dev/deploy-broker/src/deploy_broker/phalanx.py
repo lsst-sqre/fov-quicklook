@@ -43,7 +43,7 @@ class PhalanxManager:
         update_image_tag(values_path, image_tag)
 
     def validate_changes(self, workspace: Path) -> None:
-        validate_phalanx_changes(workspace)
+        validate_phalanx_changes(workspace, policy=self._settings.phalanx_change_policy)
 
     def commit_and_push(
         self,

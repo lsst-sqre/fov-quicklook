@@ -24,6 +24,11 @@ class BrokerClient:
     def close(self) -> None:
         self._client.close()
 
+    def healthz(self) -> dict[str, Any]:
+        response = self._client.get("/healthz")
+        response.raise_for_status()
+        return response.json()
+
     def get_app_token(self) -> dict[str, Any]:
         response = self._client.get("/v1/tokens/app")
         response.raise_for_status()

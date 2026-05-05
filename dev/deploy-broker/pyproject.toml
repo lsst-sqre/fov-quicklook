@@ -19,6 +19,7 @@ dev = [
 [project.scripts]
 deploy-broker-daemon = "deploy_broker.daemon_cli:main"
 deploy-broker-client = "deploy_broker.client:main"
+deploy-broker-verify = "deploy_broker.verify_cli:main"
 
 [build-system]
 requires = ["hatchling"]
