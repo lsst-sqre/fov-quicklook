@@ -9,6 +9,7 @@ broker 自身が GitHub / Phalanx / ArgoCD / app access token を保持し、age
 - `127.0.0.1` に bind した daemon へ `127.0.0.1` 宛てで接続する場合は bearer token 不要
 - それ以外の接続では `Authorization: Bearer <broker token>` が必要
 - broker token は `DEPLOY_BROKER_API_TOKEN` または `DEPLOY_BROKER_API_TOKEN_FILE` で設定できる
+- client 側では `DEPLOY_BROKER_API_TOKEN_FILE` 未指定時に `state/broker.key` を見て、さらに無ければ `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` を読む
 - `deploy-broker-daemon` は `DEPLOY_BROKER_TOKEN_COMMAND` が未設定なら起動時にエラー終了する
 - `deploy-broker-daemon` 起動時には、現在使われる broker bearer token を端末へ表示する
 

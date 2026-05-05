@@ -63,6 +63,21 @@
 
 > **注意**: `k8s/phalanx/` はプロジェクトルートとは別の独立した git リポジトリ（`https://github.com/lsst-sqre/phalanx.git`）です。
 > `.gitignore` で除外されており、サブモジュールではありません。ローカルにクローンして使用します。
+>
+> clone / worktree 作成直後に `make setup/agent-worktree` を実行し、次を current worktree に materialize してください。
+> - `frontend/lib/stellar-globe` submodule (`https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe`)
+> - `k8s/phalanx/` clone (`https://github.com/lsst-sqre/phalanx.git`)
+> - `.githooks/post-checkout` / `.githooks/post-merge` の worktree hook
+>
+> Git に clone hook は無いので、このセットアップは clone 後に行います。
+
+### エージェントの deploy broker 前提
+
+- このリポジトリで作業する agent は **deploy broker daemon が動いていないノード** にいる前提で扱う
+- agent は常に deploy broker の **caller 側** であり、通常は daemon を起動しない
+- broker bearer token は既定で `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` を使う
+- app token / ArgoCD token の実体は daemon ノード側で管理する
+- deploy や検証では `dev/deploy-broker/` の client / verify CLI を優先し、必要なら SSH tunnel や `--server` で daemon に接続する
 
 ---
 

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+setup_script="${repo_root}/dev/setup-agent-worktree.sh"
+
+if [[ -x "$setup_script" ]]; then
+    "$setup_script" --missing-only --best-effort --no-hooks >/dev/null
+fi
+
+exit 0

@@ -12,6 +12,10 @@ from .config import Settings
 from .gitops import create_bundle
 
 
+def _fallback_api_token_file() -> Path:
+    return Path.home() / ".keys" / "FOV_QUICKLOOK_BROKER_TOKEN"
+
+
 class BrokerClient:
     def __init__(self, base_url: str, api_token: str | None) -> None:
         headers = {"Authorization": f"Bearer {api_token}"} if api_token else None
@@ -126,6 +130,11 @@ def _settings_defaults() -> tuple[str, str | None]:
     api_token = settings.api_token
     if api_token is None and settings.api_token_file and settings.api_token_file.exists():
         api_token = settings.api_token_file.read_text(encoding="utf-8").strip() or None
+    if api_token is None and settings.api_token_path.exists():
+        api_token = settings.api_token_path.read_text(encoding="utf-8").strip() or None
+    fallback_token_file = _fallback_api_token_file()
+    if api_token is None and fallback_token_file.exists():
+        api_token = fallback_token_file.read_text(encoding="utf-8").strip() or None
     return (
         "http://127.0.0.1:8010",
         api_token,

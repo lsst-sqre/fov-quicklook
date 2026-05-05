@@ -17,6 +17,10 @@ description: >
 > daemon が保持し、agent は `get-app-token` 相当の broker API から受け取って
 > 直接 HTTP 検証に使える。app token 自体の登録は daemon ノード側で行う。
 
+> **agent ノード前提**: agent は deploy broker daemon を起動しない。caller 側で
+> `deploy-broker-client` を使い、必要なら `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN`
+> を bearer token として使う。
+
 ## 前提条件
 
 - gafaelfawr トークンが `dev/.gafaelfawr-token` に保存されていること
@@ -25,10 +29,17 @@ description: >
 
 ## トークンの取得と設定
 
-1. ブラウザで https://usdf-rsp-dev.slac.stanford.edu/fov-quicklook/ にアクセス（認証済み状態）
-2. 開発者ツールを開く
-3. 任意のリクエストを選択し「Copy as cURL」を実行
-4. 以下のコマンドでトークンを抽出・保存:
+1. broker 経由で取得する場合は次を実行:
+
+```bash
+cd dev
+./verify-deploy.sh fetch-token-from-broker
+```
+
+2. ブラウザから取得する場合は https://usdf-rsp-dev.slac.stanford.edu/fov-quicklook/ にアクセス（認証済み状態）
+3. 開発者ツールを開く
+4. 任意のリクエストを選択し「Copy as cURL」を実行
+5. 以下のコマンドでトークンを抽出・保存:
 
 ```bash
 cd dev
@@ -190,7 +201,7 @@ WebSocket で進捗を監視中...
 cd dev
 
 # 1. ArgoCD でデプロイ状態を確認
-./argocd.sh status
+cd deploy-broker && uv run deploy-broker-client argocd-status && cd ..
 
 # 2. 基本チェック
 ./verify-deploy.sh all

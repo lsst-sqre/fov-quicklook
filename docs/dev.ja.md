@@ -2,7 +2,7 @@
 
 ## クイックスタート チェックリスト
 
-1. **クローンとセットアップ**: `git clone ...`, `cd backend && python3.13 -m venv .venv && ./.venv/bin/pip install -e .`
+1. **クローンとセットアップ**: `git clone ...`, `make setup/agent-worktree`, `cd backend && python3.13 -m venv .venv && ./.venv/bin/pip install -e .`
 2. **ローカルで実行**: `make dev/coordinator`, `make dev/generator`, `make dev/frontend` (3ターミナル)
 3. **テスト実行**: `make test` (高速) または `make test/all` (遅いテスト含む)
 4. **コンポーネントドキュメント読み込み**: Python パターン については `backend/.github/copilot-instructions.md` を参照
@@ -15,6 +15,27 @@
 * MinIOなどのオブジェクトストレージ
 * サンプルデータ
 
+## clone / worktree 作成後の外部リポジトリ初期化
+
+このリポジトリは clone 後に次の外部依存を materialize する必要がある。
+
+- `frontend/lib/stellar-globe` — Git submodule。取得先は `https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe`
+- `k8s/phalanx` — `.gitignore` 対象の独立した Git repo。取得先は `https://github.com/lsst-sqre/phalanx.git`
+
+まず一度だけ次を実行する:
+
+```bash
+make setup/agent-worktree
+```
+
+このセットアップは現在の worktree 向けに次を行う。
+
+1. `frontend/lib/stellar-globe` submodule の URL 同期と `git submodule update --init --recursive`
+2. `k8s/phalanx` の clone（既存なら `fetch --prune origin`）
+3. `.githooks/post-checkout` / `.githooks/post-merge` をこの worktree に登録
+
+Git に clone hook は無いので、clone の瞬間に自動化することはできない。代わりに `make setup/agent-worktree` を clone / worktree 作成直後に必ず実行する。
+
 ## MinIO
 
 * `fov-quicklook-datasource`バケットを作成
@@ -25,6 +46,7 @@
 
 **初期セットアップ**:
 ```bash
+make setup/agent-worktree
 cd backend
 python3.13 -m venv .venv
 ./.venv/bin/pip install -e .
@@ -68,6 +90,7 @@ make test/all          # tests/integration_tests/ の統合テストはすべて
 
 **初期セットアップ**:
 ```bash
+make setup/agent-worktree
 cd frontend/app
 npm install
 ```

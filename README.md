@@ -142,6 +142,22 @@ notes/
 - S3-compatible object storage (MinIO or AWS S3)
 - Kubernetes cluster (for production) or local Docker
 
+### External Repository Setup
+
+After cloning this repository or creating a new worktree, materialize the external repositories once:
+
+```bash
+make setup/agent-worktree
+```
+
+This does three things for the current worktree:
+
+- syncs and initializes the `frontend/lib/stellar-globe` submodule from `https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe`
+- clones `k8s/phalanx` from `https://github.com/lsst-sqre/phalanx.git` if it is missing
+- installs best-effort `post-checkout` / `post-merge` hooks for this worktree so missing external repos are recreated automatically
+
+Git does not provide a client-side clone hook, so this step must be run after clone/worktree creation.
+
 ### Backend Setup
 
 ```bash

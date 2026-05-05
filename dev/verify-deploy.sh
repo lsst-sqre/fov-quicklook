@@ -7,6 +7,9 @@
 #   ./verify-deploy.sh extract-token "curl 'https://...' -H 'Cookie: gafaelfawr=\"eyJ...\"'"
 #   # → .gafaelfawr-token ファイルにトークンが保存される
 #
+#   # broker 経由で app token を取得
+#   ./verify-deploy.sh fetch-token-from-broker
+#
 #   # 2. 基本チェック
 #   ./verify-deploy.sh healthz           # healthzエンドポイント
 #   ./verify-deploy.sh frontend          # フロントエンド応答
@@ -43,6 +46,7 @@ get_token() {
     fi
 
     echo "エラー: gafaelfawr トークンが設定されていません。" >&2
+    echo "  $0 fetch-token-from-broker" >&2
     echo "  $0 extract-token \"<ブラウザのCopy as cURL出力>\"" >&2
     return 1
 }
@@ -68,6 +72,21 @@ cmd_extract_token() {
 
     echo -n "$token" > "$TOKEN_FILE"
     echo "トークンを ${TOKEN_FILE} に保存しました。" >&2
+}
+
+cmd_fetch_token_from_broker() {
+    local output token
+    output="$(cd "${SCRIPT_DIR}/deploy-broker" && uv run deploy-broker-client get-app-token)"
+    token="$(printf '%s' "$output" | $PYTHON -c "import json,sys; print(json.load(sys.stdin)['token'])")"
+
+    if [[ -z "$token" ]]; then
+        echo "エラー: broker から app token を取得できませんでした。" >&2
+        return 1
+    fi
+
+    umask 077
+    printf '%s' "$token" > "$TOKEN_FILE"
+    echo "broker から取得したトークンを ${TOKEN_FILE} に保存しました。" >&2
 }
 
 # --- ヘルパー ---
@@ -379,6 +398,7 @@ usage() {
     echo ""
     echo "基本チェック:"
     echo "  extract-token <curl>         curlコマンドからgafaelfawrトークンを抽出して保存"
+    echo "  fetch-token-from-broker      deploy broker から app token を取得して保存"
     echo "  healthz                      healthzエンドポイントの確認"
     echo "  frontend                     フロントエンドへのアクセス確認"
     echo "  all                          全基本チェック実行"
@@ -410,6 +430,9 @@ shift
 case "$command" in
     extract-token)
         cmd_extract_token "$@"
+        ;;
+    fetch-token-from-broker)
+        cmd_fetch_token_from_broker
         ;;
     healthz)
         cmd_healthz

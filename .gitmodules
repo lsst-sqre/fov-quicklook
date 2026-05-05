@@ -1,3 +1,3 @@
 [submodule "frontend/lib/stellar-globe"]
 	path = frontend/lib/stellar-globe
-	url = https://hsc-gitlab.mtk.nao.ac.jp/michitaro/stellar-globe2
+	url = https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe

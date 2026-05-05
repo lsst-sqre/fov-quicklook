@@ -190,10 +190,11 @@ ccd_data_types:
 
 ### 前提条件
 
-- trusted maintainer 用マシンであること
-- app repo (`lsst-sqre/fov-quicklook`) への push 権限があること
-- `k8s/phalanx/` に `lsst-sqre/phalanx` を clone 済みであること
-- broker の state dir に token cache があるか、`DEPLOY_BROKER_TOKEN_COMMAND` が設定済みであること
+- trusted maintainer 用の daemon ノード、またはその daemon へ到達できる thin client / agent ノードであること
+- app repo (`lsst-sqre/fov-quicklook`) への push 権限は daemon ノード側にあること
+- 現在の worktree で `make setup/agent-worktree` を実行済みであること
+- `k8s/phalanx/` が `https://github.com/lsst-sqre/phalanx.git` を指していること
+- broker bearer token が `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` にあるか、同等の内容を `DEPLOY_BROKER_API_TOKEN` / `DEPLOY_BROKER_API_TOKEN_FILE` で渡せること
 
 ### 標準手順
 
@@ -218,6 +219,10 @@ uv run deploy-broker-client request-deploy \
 5. broker が ArgoCD の branch 切り替えと sync を実行
 6. app token を使った HTTP 動作確認を agent / operator が直接行う
 
+agent ノードでは daemon 自体を起動しない。`deploy-broker-client` と
+`deploy-broker-verify` は caller 側として使い、必要なら SSH tunnel か
+明示的な `--server` で daemon ノードへ接続する。
+
 ### agent-safe な broker フロー
 
 agent に GitHub / ArgoCD の直接権限を渡したくない場合は、`dev/deploy-broker/`
@@ -236,8 +241,9 @@ broker 側で保持し、agent は必要時に broker から受け取って `hea
 
 #### 開発時のローカル起動
 
-開発中は broker をひとまずローカルで起動してよい。ArgoCD token と app token は
-**daemon ノード側の token command** が返す JSON から取得する。
+broker daemon 自体の開発をするときだけ、daemon ノード上または権限を持つ検証環境で
+ローカル起動してよい。通常の agent ノードでは daemon を起動しない。ArgoCD token と
+app token は **daemon ノード側の token command** が返す JSON から取得する。
 
 ```bash
 mkdir -p dev/deploy-broker/state
@@ -272,10 +278,10 @@ uv run deploy-broker-client request-deploy \
 起動時に broker daemon は、現在使う `broker bearer token` を端末へ表示する。  
 また、`DEPLOY_BROKER_TOKEN_COMMAND` が未設定ならその場でエラー終了する。
 
-client は **`http://127.0.0.1:8010` をデフォルト接続先**とする。daemon が
-`127.0.0.1` bind の場合は、**broker token は不要**である。broker token
-(`broker.key` / `DEPLOY_BROKER_API_TOKEN`) は、broker を non-loopback に
-公開するときだけ使う。
+client は **`http://127.0.0.1:8010` をデフォルト接続先**とする。SSH tunnel で
+daemon ノードの localhost へ転送している場合もそのまま使える。client は
+`DEPLOY_BROKER_API_TOKEN_FILE` が無ければ `state/broker.key` を見て、さらに
+無ければ `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` を bearer token として使う。
 
 #### 別サーバーで broker daemon を動かす
 
@@ -288,7 +294,7 @@ GitHub push / GitHub Actions / ArgoCD token / app token を持たせる。
 
 | ノード | 必要な権限・設定 | 不要なもの |
 |---|---|---|
-| thin client / agent ノード | app repo の checkout、`deploy-broker-client`、daemon node の `127.0.0.1:8010` へ届く経路（通常は SSH tunnel） | `gh auth`、app repo への `git push`、Phalanx への `git push`、ArgoCD token、app token |
+| thin client / agent ノード | app repo の checkout、`make setup/agent-worktree` 済みの worktree、`deploy-broker-client`、daemon node の `127.0.0.1:8010` へ届く経路（通常は SSH tunnel）、必要なら `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` | `gh auth`、app repo への `git push`、Phalanx への `git push`、ArgoCD token、app token |
 | broker daemon ノード | `gh auth`、app repo build branch (`fov-quicklook-local-*`) への `git push`、Phalanx tracked branch (`u/michitaro/fov-quicklook-*`) への `git push`、ArgoCD token / app token を返す command、daemon 用 state dir (`tokens/*.token` cache を含む) | agent 側の作業ツリーや editor |
 
 つまり、**agent 用ノードは app repo に `git push` できなくてよい**。その代わり、

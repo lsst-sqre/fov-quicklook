@@ -1,6 +1,6 @@
 image_ref := localhost:32000/quicklook
 
-.PHONY: build push deploy dev-update restart
+.PHONY: build push deploy dev-update restart setup/agent-worktree
 
 build:
 	if [ "$(PYRIGHT_BEFORE_PUSH)" ]; then $(MAKE) -C backend pyright; fi
@@ -29,3 +29,6 @@ dev-update:
 push-to-ghcr: build
 	docker tag $(image_ref) ghcr.io/michitaro/rubin-fov-viewer
 	docker push ghcr.io/michitaro/rubin-fov-viewer
+
+setup/agent-worktree:
+	./dev/setup-agent-worktree.sh

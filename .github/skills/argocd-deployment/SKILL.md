@@ -13,9 +13,10 @@ description: >
 標準の agent-safe 経路では `dev/deploy-broker/` を使い、必要な場合だけ
 `dev/argocd.sh` を使って ArgoCD 上の fov-quicklook アプリケーションを操作する。
 
-> **デフォルト前提**: 特に指定がない限り、agent は **deploy daemon が
-> `http://127.0.0.1:8010` で動いている**前提で `deploy-broker-client` を使ってよい。
-> 必要なら SSH tunnel でこの localhost endpoint に届くようにする。
+> **デフォルト前提**: agent は **deploy broker daemon が動いていないノード**
+> で作業する。agent は caller 側として `deploy-broker-client` を使い、必要なら
+> SSH tunnel や `--server` で daemon ノードへ接続する。local endpoint に転送して
+> いる場合は `http://127.0.0.1:8010` をそのまま使ってよい。
 
 > **agent-safe 運用**: agent に GitHub / ArgoCD への直接権限を渡さない場合は、
 > `dev/deploy-broker/` の broker daemon を優先する。broker は ArgoCD token を
@@ -27,9 +28,10 @@ description: >
 ### 前提条件
 
 - `cd dev/deploy-broker`
-- broker daemon が起動していること
+- broker daemon は別ノードで起動していること
 - ArgoCD token / app token を返す command が broker daemon 側で設定済みであること
-- 標準運用では client から `http://127.0.0.1:8010` に届くこと（通常は SSH tunnel）
+- 標準運用では client から broker daemon に届くこと（通常は SSH tunnel）
+- broker bearer token は `DEPLOY_BROKER_API_TOKEN_FILE` か `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN` で渡す
 
 ### トークンの取得と設定
 
@@ -75,6 +77,10 @@ uv run deploy-broker-client argocd-logs coordinator
 # broker 全体の smoke test
 uv run deploy-broker-verify
 ```
+
+`deploy-broker-client` / `deploy-broker-verify` は、明示指定が無ければ
+`state/broker.key` を見て、さらに無ければ `$HOME/.keys/FOV_QUICKLOOK_BROKER_TOKEN`
+を bearer token として使う。
 
 ### sync / restart
 
@@ -172,6 +178,7 @@ ArgoCDのfov-quicklookアプリケーションは `lsst-sqre/phalanx` リポジ�
 
 > **注意**: `k8s/phalanx/` はプロジェクトルートとは別の独立した git リポジトリ（`https://github.com/lsst-sqre/phalanx.git`）です。
 > `.gitignore` で除外されており、サブモジュールではありません。
+> clone / worktree 作成直後に `make setup/agent-worktree` を実行して current worktree に clone する。
 
 ローカルの `k8s/phalanx` のブランチとArgoCDの参照ブランチが一致していない場合、設定のミスマッチが発生する。
 
