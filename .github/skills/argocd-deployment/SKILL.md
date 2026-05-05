@@ -18,6 +18,11 @@ description: >
 > その値を `deploy-broker-client --server ... --api-token ...` に渡す。
 > localhost (`http://127.0.0.1:8010`) は SSH tunnel などで届く場合の fallback。
 
+> **この repo の既定 client 設定**: `~/.fov-quicklook2/broker-url` と
+> `~/.fov-quicklook2/broker-token` が存在する場合、agent はその値を
+> `deploy-broker-client --server ... --api-token ...` に渡して使ってよい。
+> localhost 既定値よりこちらを優先する。
+
 > **agent-safe 運用**: agent に GitHub / ArgoCD への直接権限を渡さない場合は、
 > `dev/deploy-broker/` の broker daemon を優先する。broker は ArgoCD token を
 > daemon 側に保持し、status / branch / logs / sync / restart などの制限された操作だけを
@@ -31,6 +36,9 @@ description: >
 - broker daemon が起動していること
 - ArgoCD token / app token を返す command が broker daemon 側で設定済みであること
 - client 側では `~/.fov-quicklook2/broker-url` と `~/.fov-quicklook2/broker-token` が使えること
+- 標準運用では client から `http://127.0.0.1:8010` に届くこと（通常は SSH tunnel）
+- この repo では `~/.fov-quicklook2/broker-url` / `~/.fov-quicklook2/broker-token`
+  があれば、それを client の接続先と bearer token に使ってよい
 
 ### client 側の標準設定
 
@@ -69,6 +77,9 @@ daemon は token cache が無いとき、または認証失敗 (`401` / `403`) �
 ```bash
 cd dev/deploy-broker
 
+BROKER_URL=$(cat ~/.fov-quicklook2/broker-url)
+BROKER_TOKEN=$(cat ~/.fov-quicklook2/broker-token)
+
 uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" request-deploy \
   u/michitaro/fov-quicklook-my-topic \
   --app-repo ../.. \
@@ -79,6 +90,9 @@ uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" r
 
 ```bash
 cd dev/deploy-broker
+BROKER_URL=$(cat ~/.fov-quicklook2/broker-url)
+BROKER_TOKEN=$(cat ~/.fov-quicklook2/broker-token)
+
 uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-status
 uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-get-branch
 uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-logs coordinator
@@ -91,6 +105,8 @@ uv run deploy-broker-verify --server "$BROKER_URL" --api-token "$BROKER_TOKEN"
 
 ```bash
 cd dev/deploy-broker
+BROKER_URL=$(cat ~/.fov-quicklook2/broker-url)
+BROKER_TOKEN=$(cat ~/.fov-quicklook2/broker-token)
 
 # ArgoCD sync
 uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-sync
