@@ -1,0 +1,10 @@
+export declare const catalogDialog: string;
+export declare const dragOver: string;
+export declare const fadeExit: string;
+export declare const fadeExitActive: string;
+export declare const focused: string;
+export declare const hasFocus: string;
+export declare const navigation: string;
+export declare const objectInspector: string;
+export declare const pages: string;
+export declare const tableWrapper: string;

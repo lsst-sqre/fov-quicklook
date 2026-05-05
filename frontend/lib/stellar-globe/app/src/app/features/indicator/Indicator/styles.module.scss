@@ -1,0 +1,30 @@
+.indicator {
+  user-select: none;
+  cursor: default;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  color: rgba(greenyellow, 0.75);
+  font-family: monospace;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 4px 0 0 0;
+  padding: 4px 8px;
+}
+
+.fadeEnter {
+  opacity: 0;
+}
+
+.fadeEnterActive {
+  opacity: 1;
+  transition: opacity 100ms ease-in;
+}
+
+.fadeExit {
+  opacity: 1;
+}
+
+.fadeExitActive {
+  opacity: 0;
+  transition: opacity 500ms ease-out;
+}

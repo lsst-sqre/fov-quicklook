@@ -1,0 +1,6 @@
+{
+  "files.exclude": {
+    "**/.vite": true,
+    "**/*.scss.d.ts": true
+  }
+}

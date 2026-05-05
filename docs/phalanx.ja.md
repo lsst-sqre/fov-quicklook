@@ -193,6 +193,7 @@ ccd_data_types:
 - trusted maintainer 用の daemon ノード、またはその daemon へ到達できる thin client / agent ノードであること
 - app repo (`lsst-sqre/fov-quicklook`) への push 権限は daemon ノード側にあること
 - 現在の worktree で `make setup/agent-worktree` を実行済みであること
+- `frontend/lib/stellar-globe` は vendored snapshot として checkout 済みであること
 - `k8s/phalanx/` が `https://github.com/lsst-sqre/phalanx.git` を指していること
 - `~/.fov-quicklook2/broker-url` に broker URL があること
 - broker bearer token が `~/.fov-quicklook2/broker-key` にあるか、同等の内容を `DEPLOY_BROKER_API_TOKEN` / `DEPLOY_BROKER_API_TOKEN_FILE` で渡せること

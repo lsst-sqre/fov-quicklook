@@ -65,11 +65,11 @@
 > `.gitignore` で除外されており、サブモジュールではありません。ローカルにクローンして使用します。
 >
 > clone / worktree 作成直後に `make setup/agent-worktree` を実行し、次を current worktree に materialize してください。
-> - `frontend/lib/stellar-globe` submodule (`https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe`)
+> - vendored `frontend/lib/stellar-globe` snapshot（upstream: `https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe`）
 > - `k8s/phalanx/` clone (`https://github.com/lsst-sqre/phalanx.git`)
 > - `.githooks/post-checkout` / `.githooks/post-merge` の worktree hook
 >
-> Git に clone hook は無いので、このセットアップは clone 後に行います。
+> `stellar-globe` は GitHub Actions build 時に ADC GitLab へ接続できないため vendoring しています。Git に clone hook は無いので、このセットアップは clone 後に行います。
 
 ### エージェントの deploy broker 前提
 

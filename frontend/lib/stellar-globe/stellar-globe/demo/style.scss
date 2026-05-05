@@ -1,0 +1,26 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.control-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: #777;
+  padding: 0.25em 1em;
+  border-radius: 0 0 4px 0;
+
+  dd,
+  dt {
+    padding-left: 0;
+    margin-left: 0;
+  }
+
+  input[type="range"] {
+    width: 200px;
+  }
+}

@@ -1,0 +1,119 @@
+.dragOver {
+  background-color: white;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.objectInspector {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  color: white;
+  background-color: rgba(#333, 0.9);
+  padding: 0.5em;
+  border-radius: 0 1em 0 0;
+  font-size: small;
+  font-family: monospace;
+
+  th {
+    text-align: right;
+    color: #999;
+  }
+
+  td {
+    padding-left: 1em;
+  }
+}
+
+
+.fade {
+  &-exit {
+    opacity: 1;
+  }
+
+  &-exit-active {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+}
+
+
+.catalogDialog {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  .tableWrapper {
+    flex-grow: 1;
+    overflow-y: auto;
+    // margin: 2px;
+  }
+
+  .hasFocus {
+    outline: 2px solid #07f;
+  }
+
+  input[type="checkbox"] {
+    &:focus {
+      outline: 1px solid rgba(cyan, 0.25);
+    }
+  }
+
+  table {
+    font-size: small;
+    font-family: monospace;
+    table-layout: fixed;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border-collapse: collapse;
+
+    &:focus {
+      outline: none;
+    }
+
+    thead {
+      td {
+        position: sticky;
+        top: 0;
+        background-color: #333;
+
+        &>div {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        button {
+          margin: 0;
+          box-shadow: none;
+        }
+      }
+    }
+
+    td,
+    th {
+      padding: 0 0.5em;
+      overflow-x: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    tr.focused {
+      background-color: #037;
+    }
+  }
+
+  .navigation {
+    // border: solid 1px red;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1px 2px;
+  }
+
+  .pages {
+    display: flex;
+    align-items: center;
+  }
+}

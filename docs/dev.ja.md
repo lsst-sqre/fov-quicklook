@@ -19,7 +19,7 @@
 
 このリポジトリは clone 後に次の外部依存を materialize する必要がある。
 
-- `frontend/lib/stellar-globe` — Git submodule。取得先は `https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe`
+- `frontend/lib/stellar-globe` — `https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe` 由来の vendored snapshot
 - `k8s/phalanx` — `.gitignore` 対象の独立した Git repo。取得先は `https://github.com/lsst-sqre/phalanx.git`
 
 まず一度だけ次を実行する:
@@ -30,11 +30,13 @@ make setup/agent-worktree
 
 このセットアップは現在の worktree 向けに次を行う。
 
-1. `frontend/lib/stellar-globe` submodule の URL 同期と `git submodule update --init --recursive`
+1. vendored `frontend/lib/stellar-globe` が存在することを確認
 2. `k8s/phalanx` の clone（既存なら `fetch --prune origin`）
 3. `.githooks/post-checkout` / `.githooks/post-merge` をこの worktree に登録
 
 Git に clone hook は無いので、clone の瞬間に自動化することはできない。代わりに `make setup/agent-worktree` を clone / worktree 作成直後に必ず実行する。
+
+`stellar-globe` を submodule にすると GitHub Actions の build 中に ADC GitLab へ接続できず deploy が失敗するため、この repo では snapshot を vendoring して管理する。
 
 ## MinIO
 

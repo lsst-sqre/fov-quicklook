@@ -1,0 +1,59 @@
+.colorParamsControl {
+  padding: 2px;
+  
+  table {
+    width: 100%;
+
+    input[type="range"] {
+      min-width: 200px;
+    }
+  }
+}
+
+.scalarParamsControl {
+  td {
+    text-align: center;
+  }
+}
+
+.matrixControl {
+
+  th,
+  td {
+    text-align: center;
+  }
+
+  .colorText {
+    div {
+      display: flex;
+      flex-flow: column;
+      align-items: center;
+
+      input {
+        width: 2em;
+      }
+    }
+  }
+}
+
+.filterSelector {
+
+  th,
+  td {
+    text-align: center;
+  }
+}
+
+.filterSelector,
+.matrixControl {
+  button.filterSwitch {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    box-shadow: none;
+    border-radius: 0;
+    text-decoration: underline;
+  }
+}

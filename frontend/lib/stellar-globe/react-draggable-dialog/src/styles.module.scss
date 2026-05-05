@@ -1,0 +1,24 @@
+  .dialog {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .position {
+    display: block;
+  }
+
+  .titlebar {
+    flex-grow: 0;
+    user-select: none;
+    cursor: default;
+  }
+
+  .content {
+    flex-grow: 1;
+    overflow: auto;
+  }
+
+  .transitionWrapper {
+    display: block;
+  }

@@ -1,0 +1,79 @@
+.dialog {
+  box-shadow: 0 0 8px rgba(black, 0.75);
+  background-color: #333;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  font-family: sans-serif;
+  transition: box-shadow 0.2s;
+}
+
+.active {
+  box-shadow: 0 0 12px rgba(black, 1);
+}
+
+.titlebar {
+  background-color: #555;
+  color: white;
+  padding: 8px;
+  display: flex;
+
+  &:focus {
+    outline: none;
+    text-decoration: underline;
+  }
+}
+
+.titlebarText {
+  flex-grow: 1;
+}
+
+.titlebarCloseButton {
+  border: none 0 black;
+  border-radius: 8px;
+  background-color: transparent;
+  color: white;
+
+  &:hover {
+    background-color: #333;
+  }
+
+  &:active {
+    background-color: #777;
+  }
+}
+
+.content {
+  color: white;
+}
+
+.enter,
+.appear {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.enterActive,
+.appearActive {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.enterDone,
+.appearDone {
+  display: block;
+}
+
+.exit {
+  display: block;
+}
+
+.exitActive {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.exitDone {
+  display: block;
+}

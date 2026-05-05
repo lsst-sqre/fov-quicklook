@@ -1,0 +1,30 @@
+{
+  "name": "@stellar-globe/mockcomm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "vite build",
+    "dev": "vite"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@stellar-globe/app": "file:../../../app",
+    "@stellar-globe/stellar-globe": "file:../../../stellar-globe",
+    "@types/koa-bodyparser": "^4.3.12",
+    "koa": "^2.15.0",
+    "koa-bodyparser": "^4.4.1",
+    "koa-router": "^12.0.1",
+    "nanoid": "^5.0.6"
+  },
+  "devDependencies": {
+    "@types/koa": "^2.15.0",
+    "@types/koa-router": "^7.4.8",
+    "typescript": "^5.3.3",
+    "vite": "^4.5.2",
+    "vite-plugin-node": "^3.1.0"
+  }
+}

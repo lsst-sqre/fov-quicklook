@@ -1,0 +1,6 @@
+/_output
+/.venv
+/.cache
+/.jupyterlite.doit.db
+/pypi/*.whl
+

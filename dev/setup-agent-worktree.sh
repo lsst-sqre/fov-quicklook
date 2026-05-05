@@ -5,9 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-STELLAR_GLOBE_SUBMODULE="frontend/lib/stellar-globe"
-STELLAR_GLOBE_DIR="${REPO_ROOT}/${STELLAR_GLOBE_SUBMODULE}"
-STELLAR_GLOBE_URL="https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe"
+STELLAR_GLOBE_DIR="${REPO_ROOT}/frontend/lib/stellar-globe"
 
 PHALANX_DIR="${REPO_ROOT}/k8s/phalanx"
 PHALANX_URL="https://github.com/lsst-sqre/phalanx.git"
@@ -65,20 +63,14 @@ validate_remote_url() {
     fi
 }
 
-ensure_stellar_globe() {
-    log "syncing ${STELLAR_GLOBE_SUBMODULE}"
-    run_step git -C "$REPO_ROOT" submodule sync -- "$STELLAR_GLOBE_SUBMODULE"
+ensure_vendored_stellar_globe() {
+    local manifest="${STELLAR_GLOBE_DIR}/stellar-globe/package.json"
 
-    if "$MISSING_ONLY" && git -C "$STELLAR_GLOBE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        run_step validate_remote_url "$STELLAR_GLOBE_DIR" "$STELLAR_GLOBE_URL" "stellar-globe"
+    if [[ -f "$manifest" ]]; then
         return 0
     fi
 
-    log "initializing ${STELLAR_GLOBE_SUBMODULE}"
-    run_step git -C "$REPO_ROOT" submodule update --init --recursive "$STELLAR_GLOBE_SUBMODULE"
-    if git -C "$STELLAR_GLOBE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        run_step validate_remote_url "$STELLAR_GLOBE_DIR" "$STELLAR_GLOBE_URL" "stellar-globe"
-    fi
+    fail "vendored stellar-globe snapshot is missing: ${manifest}"
 }
 
 ensure_phalanx() {
@@ -149,7 +141,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ensure_stellar_globe
+ensure_vendored_stellar_globe
 ensure_phalanx
 
 if "$INSTALL_HOOKS"; then

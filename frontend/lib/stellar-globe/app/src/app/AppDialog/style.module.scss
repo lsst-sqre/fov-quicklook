@@ -1,0 +1,100 @@
+@use '/src/theme.scss';
+
+.dialog {
+  @include theme.background;
+  box-shadow: 0 0 8px rgba(#222, 1), 0 0 4px rgba(#777, 1);
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  font-family: sans-serif;
+  transition: box-shadow 0.2s;
+}
+
+.active {
+  box-shadow: 0 0 8px rgba(#07f, 1);
+}
+
+.titlebar {
+  @include theme.background;
+  color: white;
+  // padding: 8px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  border: solid 0 #777;
+  padding: 4px;
+
+  transition: background-color 0.2s;
+
+  &:focus {
+    outline: none;
+    background-color: #235;
+  }
+}
+
+.titlebarText {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.titlebar {
+  .buttons {
+    display: flex;
+    align-items: center;
+    margin-left: 1em;
+
+    button {
+      margin: 0;
+      box-shadow: none;
+      border-radius: 8px;
+      background-color: transparent;
+      color: white;
+      padding: 2px;
+
+      &:hover {
+        background-color: #333;
+      }
+
+      &:active {
+        background-color: #777;
+      }
+    }
+  }
+}
+
+.content {
+  color: white;
+}
+
+.enter,
+.appear {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.enterActive,
+.appearActive {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.enterDone,
+.appearDone {
+  display: block;
+}
+
+.exit {
+  display: block;
+}
+
+.exitActive {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.exitDone {
+  display: block;
+}

@@ -129,7 +129,7 @@ npm run test         # テスト実行
 |-----------|------|
 | `@reduxjs/toolkit` | 状態管理 |
 | `react-router-dom` | ルーティング |
-| `@stellar-globe/*` | 天球可視化（ローカルパッケージ） |
+| `@stellar-globe/*` | 天球可視化（`frontend/lib/stellar-globe/` に vendoring したローカルパッケージ） |
 | `@hpcc-js/wasm-zstd` | Zstd 圧縮/展開 |
 | `classnames` | 条件付きクラス名 |
 

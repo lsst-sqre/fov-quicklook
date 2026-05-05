@@ -1,0 +1,4544 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "definitions": {
+        "AddType<{Ready:{revision:number;state:any;};Closed:{};StoreChanged:Patch;QueryStateResponse:BatchPatch<unknown>;}>": {
+            "additionalProperties": false,
+            "properties": {
+                "Closed": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "Closed",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "QueryStateResponse": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "newRevision": {
+                            "type": "integer"
+                        },
+                        "patch": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "baseRevision": {
+                                    "type": "integer"
+                                },
+                                "patch": {
+                                    "items": {},
+                                    "type": "array"
+                                }
+                            },
+                            "required": [
+                                "baseRevision",
+                                "patch"
+                            ],
+                            "type": "object"
+                        },
+                        "state": {},
+                        "type": {
+                            "const": "QueryStateResponse",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "newRevision",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "Ready": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "revision": {
+                            "type": "integer"
+                        },
+                        "state": {},
+                        "type": {
+                            "const": "Ready",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "revision",
+                        "state",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "StoreChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "baseRevision": {
+                            "type": "integer"
+                        },
+                        "patch": {
+                            "items": {},
+                            "type": "array"
+                        },
+                        "type": {
+                            "const": "StoreChanged",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "baseRevision",
+                        "patch",
+                        "type"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "Closed",
+                "QueryStateResponse",
+                "Ready",
+                "StoreChanged"
+            ],
+            "type": "object"
+        },
+        "AngleUnit": {
+            "enum": [
+                "degree",
+                "radian",
+                "sexadecimal"
+            ],
+            "type": "string"
+        },
+        "AppStateWithComputed": {
+            "additionalProperties": false,
+            "properties": {
+                "appearanceLayers": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "constellation": {
+                            "$ref": "#/definitions/ConstellationLayerProps"
+                        },
+                        "esoMilkyWay": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "fadeInDuration": {
+                                    "type": "number"
+                                },
+                                "imageSize": {
+                                    "enum": [
+                                        1024,
+                                        512
+                                    ],
+                                    "type": "number"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "grid": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "hipparcosCatalog": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "nearbyGalaxiesAndNebulas": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "visible": {
+                                    "const": true,
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "tracts": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "frame": {
+                                    "type": "boolean"
+                                },
+                                "patch": {
+                                    "type": "boolean"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "frame",
+                                "patch",
+                                "visible"
+                            ],
+                            "type": "object"
+                        }
+                    },
+                    "required": [
+                        "constellation",
+                        "esoMilkyWay",
+                        "grid",
+                        "hipparcosCatalog",
+                        "nearbyGalaxiesAndNebulas",
+                        "tracts"
+                    ],
+                    "type": "object"
+                },
+                "camera": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "params": {
+                            "$ref": "#/definitions/CameraParams"
+                        },
+                        "projection": {
+                            "$ref": "#/definitions/CameraMode"
+                        },
+                        "retina": {
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "params",
+                        "projection",
+                        "retina"
+                    ],
+                    "type": "object"
+                },
+                "catalogs": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "autoColor": {
+                            "type": "boolean"
+                        },
+                        "catalogs": {
+                            "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                    "attributes": {
+                                        "items": {
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        },
+                                        "type": "array"
+                                    },
+                                    "baseColor": {
+                                        "items": [
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            }
+                                        ],
+                                        "maxItems": 4,
+                                        "minItems": 4,
+                                        "type": "array"
+                                    },
+                                    "defaultColor": {
+                                        "items": [
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            }
+                                        ],
+                                        "maxItems": 4,
+                                        "minItems": 4,
+                                        "type": "array"
+                                    },
+                                    "defaultType": {
+                                        "$ref": "#/definitions/MarkerType"
+                                    },
+                                    "dialog": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "checked": {
+                                                "additionalProperties": false,
+                                                "patternProperties": {
+                                                    "^[0-9]+$": {
+                                                        "type": "boolean"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "opened": {
+                                                "type": "boolean"
+                                            }
+                                        },
+                                        "required": [
+                                            "checked",
+                                            "opened"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    "fields": {
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "type": "array"
+                                    },
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "markers": {
+                                        "items": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "color": {
+                                                    "items": [
+                                                        {
+                                                            "type": "number"
+                                                        },
+                                                        {
+                                                            "type": "number"
+                                                        },
+                                                        {
+                                                            "type": "number"
+                                                        },
+                                                        {
+                                                            "type": "number"
+                                                        }
+                                                    ],
+                                                    "maxItems": 4,
+                                                    "minItems": 4,
+                                                    "type": "array"
+                                                },
+                                                "position": {
+                                                    "items": [
+                                                        {
+                                                            "type": "number"
+                                                        },
+                                                        {
+                                                            "type": "number"
+                                                        },
+                                                        {
+                                                            "type": "number"
+                                                        }
+                                                    ],
+                                                    "maxItems": 3,
+                                                    "minItems": 3,
+                                                    "type": "array"
+                                                },
+                                                "type": {
+                                                    "enum": [
+                                                        "asterisk",
+                                                        "circle",
+                                                        "circledHollowAsterisk",
+                                                        "circledHollowPlus",
+                                                        "circledHollowX",
+                                                        "diamond",
+                                                        "dot",
+                                                        "hollowAsterisk",
+                                                        "hollowPlus",
+                                                        "hollowX",
+                                                        "pentagon",
+                                                        "plus",
+                                                        "square",
+                                                        "triangle",
+                                                        "x"
+                                                    ],
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "position"
+                                            ],
+                                            "type": "object"
+                                        },
+                                        "type": "array"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "selectedRecords": {
+                                        "additionalProperties": false,
+                                        "patternProperties": {
+                                            "^[0-9]+$": {
+                                                "const": true,
+                                                "type": "boolean"
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    "visible": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "required": [
+                                    "attributes",
+                                    "baseColor",
+                                    "defaultColor",
+                                    "defaultType",
+                                    "dialog",
+                                    "fields",
+                                    "id",
+                                    "markers",
+                                    "name",
+                                    "selectedRecords",
+                                    "visible"
+                                ],
+                                "type": "object"
+                            },
+                            "type": "array"
+                        },
+                        "catalogsDialogVisible": {
+                            "type": "boolean"
+                        },
+                        "currentCatalogId": {
+                            "type": "string"
+                        },
+                        "focusedPosition": {
+                            "items": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "number"
+                                }
+                            ],
+                            "maxItems": 3,
+                            "minItems": 3,
+                            "type": "array"
+                        },
+                        "showAttributes": {
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "autoColor",
+                        "catalogs",
+                        "catalogsDialogVisible",
+                        "currentCatalogId",
+                        "focusedPosition",
+                        "showAttributes"
+                    ],
+                    "type": "object"
+                },
+                "common": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "active": {
+                            "type": "boolean"
+                        },
+                        "angleUnit": {
+                            "$ref": "#/definitions/AngleUnit"
+                        },
+                        "dialogPositionHint": {
+                            "$ref": "#/definitions/Partial<Record<\"top\"|\"bottom\"|\"left\"|\"right\",number>>"
+                        },
+                        "magFilter": {
+                            "enum": [
+                                "linear",
+                                "nearest"
+                            ],
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "active",
+                        "angleUnit",
+                        "dialogPositionHint"
+                    ],
+                    "type": "object"
+                },
+                "computed": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "center": {
+                            "items": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "number"
+                                }
+                            ],
+                            "maxItems": 2,
+                            "minItems": 2,
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "center"
+                    ],
+                    "type": "object"
+                },
+                "devel": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "profilerActive": {
+                            "type": "boolean"
+                        },
+                        "profilerSupported": {
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "enabled",
+                        "profilerActive",
+                        "profilerSupported"
+                    ],
+                    "type": "object"
+                },
+                "fitsImage": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "dialogVisible": {
+                            "type": "boolean"
+                        },
+                        "images": {
+                            "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                    "hduIndex": {
+                                        "type": "number"
+                                    },
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "maskConfig": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "color": {
+                                                "items": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    }
+                                                ],
+                                                "maxItems": 4,
+                                                "minItems": 4,
+                                                "type": "array"
+                                            },
+                                            "maskBit": {
+                                                "type": "number"
+                                            }
+                                        },
+                                        "required": [
+                                            "color",
+                                            "maskBit"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "url": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "hduIndex",
+                                    "id",
+                                    "maskConfig",
+                                    "name",
+                                    "url"
+                                ],
+                                "type": "object"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "dialogVisible",
+                        "images"
+                    ],
+                    "type": "object"
+                },
+                "hipsLayers": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "baseUrl": {
+                            "type": "string"
+                        },
+                        "hipsDialogVisible": {
+                            "type": "boolean"
+                        },
+                        "showHipsDialogWhenBaseUrlChanged": {
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "baseUrl",
+                        "hipsDialogVisible",
+                        "showHipsDialogWhenBaseUrlChanged"
+                    ],
+                    "type": "object"
+                },
+                "indicator": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "mouseCoord": {
+                            "items": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "number"
+                                }
+                            ],
+                            "maxItems": 2,
+                            "minItems": 2,
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "mouseCoord"
+                    ],
+                    "type": "object"
+                },
+                "initializerParams": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "hashSync": {
+                            "type": "boolean"
+                        },
+                        "storageKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "hashSync",
+                        "storageKey"
+                    ],
+                    "type": "object"
+                },
+                "regions": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "autoColor": {
+                            "type": "boolean"
+                        },
+                        "regions": {
+                            "items": {
+                                "$ref": "#/definitions/Region"
+                            },
+                            "type": "array"
+                        },
+                        "regionsDialogVisible": {
+                            "type": "boolean"
+                        },
+                        "tool": {
+                            "$ref": "#/definitions/ToolType"
+                        },
+                        "toolPinned": {
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "autoColor",
+                        "regions",
+                        "regionsDialogVisible",
+                        "tool",
+                        "toolPinned"
+                    ],
+                    "type": "object"
+                },
+                "tractTileLayers": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "colorParams": {
+                            "$ref": "#/definitions/SspTileParams"
+                        },
+                        "layers": {
+                            "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                    "baseUrl": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "visible": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "required": [
+                                    "baseUrl",
+                                    "name",
+                                    "visible"
+                                ],
+                                "type": "object"
+                            },
+                            "type": "array"
+                        },
+                        "toneDialogVisible": {
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "colorParams",
+                        "layers",
+                        "toneDialogVisible"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "appearanceLayers",
+                "camera",
+                "catalogs",
+                "common",
+                "computed",
+                "devel",
+                "fitsImage",
+                "hipsLayers",
+                "indicator",
+                "initializerParams",
+                "regions",
+                "tractTileLayers"
+            ],
+            "type": "object"
+        },
+        "CameraMode": {
+            "enum": [
+                "FLOATING_EYE",
+                "GNOMONIC",
+                "STEREOGRAPHIC"
+            ],
+            "type": "string"
+        },
+        "CameraParams": {
+            "additionalProperties": false,
+            "properties": {
+                "fovy": {
+                    "type": "number"
+                },
+                "phi": {
+                    "type": "number"
+                },
+                "roll": {
+                    "type": "number"
+                },
+                "theta": {
+                    "type": "number"
+                },
+                "za": {
+                    "type": "number"
+                },
+                "zd": {
+                    "type": "number"
+                },
+                "zp": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "fovy",
+                "phi",
+                "roll",
+                "theta",
+                "za",
+                "zd",
+                "zp"
+            ],
+            "type": "object"
+        },
+        "CircularRegion": {
+            "additionalProperties": false,
+            "properties": {
+                "center": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "dec": {
+                            "type": "number"
+                        },
+                        "ra": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "dec",
+                        "ra"
+                    ],
+                    "type": "object"
+                },
+                "color": {
+                    "items": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "type": "array"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "radius": {
+                    "type": "number"
+                },
+                "showLabel": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "const": "Circular",
+                    "type": "string"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "center",
+                "color",
+                "id",
+                "name",
+                "radius",
+                "showLabel",
+                "type",
+                "visible"
+            ],
+            "type": "object"
+        },
+        "ConstellationLayerProps": {
+            "additionalProperties": false,
+            "properties": {
+                "fadeInDuration": {
+                    "type": "number"
+                },
+                "lang": {
+                    "enum": [
+                        "English",
+                        "Hiragana",
+                        "Kanji"
+                    ],
+                    "type": "string"
+                },
+                "nameColor": {
+                    "type": "string"
+                },
+                "nameFont": {
+                    "type": "string"
+                },
+                "showLines": {
+                    "type": "boolean"
+                },
+                "showNames": {
+                    "type": "boolean"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "JOINT": {
+            "enum": [
+                "MITER",
+                "NONE"
+            ],
+            "type": "string"
+        },
+        "LinearRegion": {
+            "additionalProperties": false,
+            "properties": {
+                "color": {
+                    "items": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "type": "array"
+                },
+                "end": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "dec": {
+                            "type": "number"
+                        },
+                        "ra": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "dec",
+                        "ra"
+                    ],
+                    "type": "object"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "showLabel": {
+                    "type": "boolean"
+                },
+                "start": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "dec": {
+                            "type": "number"
+                        },
+                        "ra": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "dec",
+                        "ra"
+                    ],
+                    "type": "object"
+                },
+                "type": {
+                    "const": "Linear",
+                    "type": "string"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "color",
+                "end",
+                "id",
+                "name",
+                "showLabel",
+                "start",
+                "type",
+                "visible"
+            ],
+            "type": "object"
+        },
+        "MagFilter": {
+            "enum": [
+                "linear",
+                "nearest"
+            ],
+            "type": "string"
+        },
+        "MarkerType": {
+            "enum": [
+                "asterisk",
+                "circle",
+                "circledHollowAsterisk",
+                "circledHollowPlus",
+                "circledHollowX",
+                "diamond",
+                "dot",
+                "hollowAsterisk",
+                "hollowPlus",
+                "hollowX",
+                "pentagon",
+                "plus",
+                "square",
+                "triangle",
+                "x"
+            ],
+            "type": "string"
+        },
+        "P": {
+            "description": "The type of the action's payload.",
+            "enum": [
+                "constellation",
+                "esoMilkyWay",
+                "grid",
+                "hipparcosCatalog",
+                "nearbyGalaxiesAndNebulas",
+                "tracts"
+            ],
+            "type": "string"
+        },
+        "P_1": {
+            "description": "The type of the action's payload.",
+            "enum": [
+                "FLOATING_EYE",
+                "GNOMONIC",
+                "STEREOGRAPHIC"
+            ],
+            "type": "string"
+        },
+        "Partial<ConstellationLayerProps>": {
+            "additionalProperties": false,
+            "properties": {
+                "fadeInDuration": {
+                    "type": "number"
+                },
+                "lang": {
+                    "enum": [
+                        "English",
+                        "Hiragana",
+                        "Kanji"
+                    ],
+                    "type": "string"
+                },
+                "nameColor": {
+                    "type": "string"
+                },
+                "nameFont": {
+                    "type": "string"
+                },
+                "showLines": {
+                    "type": "boolean"
+                },
+                "showNames": {
+                    "type": "boolean"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<MaskConfig>": {
+            "additionalProperties": false,
+            "properties": {
+                "color": {
+                    "items": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "type": "array"
+                },
+                "maskBit": {
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<Pick<RegionBase,\"color\"|\"visible\"|\"showLabel\">>": {
+            "additionalProperties": false,
+            "properties": {
+                "color": {
+                    "items": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "type": "array"
+                },
+                "showLabel": {
+                    "type": "boolean"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<Record<\"top\"|\"bottom\"|\"left\"|\"right\",number>>": {
+            "additionalProperties": false,
+            "properties": {
+                "bottom": {
+                    "type": "number"
+                },
+                "left": {
+                    "type": "number"
+                },
+                "right": {
+                    "type": "number"
+                },
+                "top": {
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<{fadeInDuration?:number|undefined;imageSize?:512|1024|undefined;}&{visible?:boolean|undefined;}>": {
+            "additionalProperties": false,
+            "properties": {
+                "fadeInDuration": {
+                    "type": "number"
+                },
+                "imageSize": {
+                    "enum": [
+                        1024,
+                        512
+                    ],
+                    "type": "number"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<{visible:boolean;frame:boolean;patch:boolean;}>": {
+            "additionalProperties": false,
+            "properties": {
+                "frame": {
+                    "type": "boolean"
+                },
+                "patch": {
+                    "type": "boolean"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<{visible:boolean;}>": {
+            "additionalProperties": false,
+            "properties": {
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<{visible:boolean;}>_1": {
+            "additionalProperties": false,
+            "properties": {
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<{visible:boolean;}|({fadeInDuration?:number|undefined;imageSize?:512|1024|undefined;}&{visible?:boolean|undefined;})|ConstellationLayerProps|{visible:true;}|{visible:boolean;}|{visible:boolean;frame:boolean;patch:boolean;}>": {
+            "anyOf": [
+                {
+                    "$ref": "#/definitions/Partial<{visible:boolean;}>"
+                },
+                {
+                    "$ref": "#/definitions/Partial<{fadeInDuration?:number|undefined;imageSize?:512|1024|undefined;}&{visible?:boolean|undefined;}>"
+                },
+                {
+                    "$ref": "#/definitions/Partial<ConstellationLayerProps>"
+                },
+                {
+                    "$ref": "#/definitions/Partial<{visible:true;}>"
+                },
+                {
+                    "$ref": "#/definitions/Partial<{visible:boolean;}>_1"
+                },
+                {
+                    "$ref": "#/definitions/Partial<{visible:boolean;frame:boolean;patch:boolean;}>"
+                }
+            ]
+        },
+        "Partial<{visible:true;}>": {
+            "additionalProperties": false,
+            "properties": {
+                "visible": {
+                    "const": true,
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "PathRegion": {
+            "additionalProperties": false,
+            "properties": {
+                "color": {
+                    "items": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "type": "array"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "paths": {
+                    "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                            "close": {
+                                "type": "boolean"
+                            },
+                            "joint": {
+                                "$ref": "#/definitions/JOINT"
+                            },
+                            "points": {
+                                "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "color": {
+                                            "items": [
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                }
+                                            ],
+                                            "maxItems": 4,
+                                            "minItems": 4,
+                                            "type": "array"
+                                        },
+                                        "position": {
+                                            "items": [
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                }
+                                            ],
+                                            "maxItems": 3,
+                                            "minItems": 3,
+                                            "type": "array"
+                                        },
+                                        "size": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "required": [
+                                        "color",
+                                        "position",
+                                        "size"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            }
+                        },
+                        "required": [
+                            "close",
+                            "joint",
+                            "points"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                },
+                "showLabel": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "const": "Path",
+                    "type": "string"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "color",
+                "id",
+                "name",
+                "paths",
+                "showLabel",
+                "type",
+                "visible"
+            ],
+            "type": "object"
+        },
+        "RectangularRegion": {
+            "additionalProperties": false,
+            "properties": {
+                "color": {
+                    "items": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "type": "array"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "maxDec": {
+                    "type": "number"
+                },
+                "maxRa": {
+                    "type": "number"
+                },
+                "minDec": {
+                    "type": "number"
+                },
+                "minRa": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "showLabel": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "const": "Rectangular",
+                    "type": "string"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "color",
+                "id",
+                "maxDec",
+                "maxRa",
+                "minDec",
+                "minRa",
+                "name",
+                "showLabel",
+                "type",
+                "visible"
+            ],
+            "type": "object"
+        },
+        "Region": {
+            "anyOf": [
+                {
+                    "$ref": "#/definitions/LinearRegion"
+                },
+                {
+                    "$ref": "#/definitions/CircularRegion"
+                },
+                {
+                    "$ref": "#/definitions/RectangularRegion"
+                },
+                {
+                    "$ref": "#/definitions/TextRegion"
+                },
+                {
+                    "$ref": "#/definitions/PathRegion"
+                }
+            ]
+        },
+        "SspTileParams": {
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "filters": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "simpleRgb": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "a": {
+                                    "type": "number"
+                                },
+                                "b0": {
+                                    "type": "number"
+                                },
+                                "beta": {
+                                    "type": "number"
+                                },
+                                "bias": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "a",
+                                "b0",
+                                "beta",
+                                "bias"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "simpleRgb",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "filters",
+                        "simpleRgb",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "filters": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "simpleColorMatrix": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "a": {
+                                    "type": "number"
+                                },
+                                "b0": {
+                                    "type": "number"
+                                },
+                                "beta": {
+                                    "type": "number"
+                                },
+                                "bias": {
+                                    "type": "number"
+                                },
+                                "colors": {
+                                    "items": {
+                                        "items": [
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            }
+                                        ],
+                                        "maxItems": 3,
+                                        "minItems": 3,
+                                        "type": "array"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "required": [
+                                "a",
+                                "b0",
+                                "beta",
+                                "bias",
+                                "colors"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "simpleColorMatrix",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "filters",
+                        "simpleColorMatrix",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "filters": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "sdssTrueColor": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "a": {
+                                    "type": "number"
+                                },
+                                "b0": {
+                                    "type": "number"
+                                },
+                                "beta": {
+                                    "type": "number"
+                                },
+                                "bias": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "a",
+                                "b0",
+                                "beta",
+                                "bias"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "sdssTrueColor",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "filters",
+                        "sdssTrueColor",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "filters": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "sdssTrueColorMatrix": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "a": {
+                                    "type": "number"
+                                },
+                                "b0": {
+                                    "type": "number"
+                                },
+                                "beta": {
+                                    "type": "number"
+                                },
+                                "bias": {
+                                    "type": "number"
+                                },
+                                "colors": {
+                                    "items": {
+                                        "items": [
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "number"
+                                            }
+                                        ],
+                                        "maxItems": 3,
+                                        "minItems": 3,
+                                        "type": "array"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "required": [
+                                "a",
+                                "b0",
+                                "beta",
+                                "bias",
+                                "colors"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "sdssTrueColorMatrix",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "filters",
+                        "sdssTrueColorMatrix",
+                        "type"
+                    ],
+                    "type": "object"
+                }
+            ]
+        },
+        "TextRegion": {
+            "additionalProperties": false,
+            "properties": {
+                "color": {
+                    "items": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "maxItems": 4,
+                    "minItems": 4,
+                    "type": "array"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "position": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "dec": {
+                            "type": "number"
+                        },
+                        "ra": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "dec",
+                        "ra"
+                    ],
+                    "type": "object"
+                },
+                "showLabel": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "const": "Text",
+                    "type": "string"
+                },
+                "visible": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "color",
+                "id",
+                "name",
+                "position",
+                "showLabel",
+                "type",
+                "visible"
+            ],
+            "type": "object"
+        },
+        "ToApp": {
+            "additionalProperties": false,
+            "properties": {
+                "Close": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "Close",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "Dispatch": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "action": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "payload": {},
+                                "type": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "payload",
+                                "type"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "Dispatch",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "action",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "FrontendConsole": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "args": {
+                            "items": {},
+                            "type": "array"
+                        },
+                        "level": {
+                            "enum": [
+                                "debug",
+                                "info",
+                                "log",
+                                "warn"
+                            ],
+                            "type": "string"
+                        },
+                        "type": {
+                            "const": "FrontendConsole",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "args",
+                        "level",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "JumpTo": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "dec": {
+                            "type": "number"
+                        },
+                        "duration": {
+                            "type": "number"
+                        },
+                        "easingFunction": {
+                            "enum": [
+                                "fastStart2",
+                                "fastStart4",
+                                "linear",
+                                "slowStart2",
+                                "slowStart4",
+                                "slowStartStop2",
+                                "slowStartStop4"
+                            ],
+                            "type": "string"
+                        },
+                        "fov": {
+                            "type": "number"
+                        },
+                        "ra": {
+                            "type": "number"
+                        },
+                        "type": {
+                            "const": "JumpTo",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "dec",
+                        "duration",
+                        "ra",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "LockFrame": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "LockFrame",
+                            "type": "string"
+                        },
+                        "window_ids": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "type",
+                        "window_ids"
+                    ],
+                    "type": "object"
+                },
+                "Open": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "extraOptions": {
+                            "properties": {},
+                            "type": "object"
+                        },
+                        "id": {
+                            "type": "string"
+                        },
+                        "initialState": {},
+                        "layout": {
+                            "enum": [
+                                "merge-bottom",
+                                "merge-left",
+                                "merge-right",
+                                "merge-top",
+                                "split-bottom",
+                                "split-left",
+                                "split-right",
+                                "tab-after",
+                                "tab-before"
+                            ],
+                            "type": "string"
+                        },
+                        "queryId": {
+                            "type": "string"
+                        },
+                        "title": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "id",
+                        "queryId"
+                    ],
+                    "type": "object"
+                },
+                "QuerySnapshot": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "aspectRatio": {
+                            "type": "number"
+                        },
+                        "queryId": {
+                            "type": "string"
+                        },
+                        "type": {
+                            "const": "QuerySnapshot",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "queryId",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "QueryState": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "baseRevision": {
+                            "type": "integer"
+                        },
+                        "queryId": {
+                            "type": "string"
+                        },
+                        "type": {
+                            "const": "QueryState",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "baseRevision",
+                        "queryId",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "ShowError": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "params": {
+                            "additionalProperties": false,
+                            "properties": {
+                                "body": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "body",
+                                "title"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "ShowError",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "params",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "UnlockFrame": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "UnlockFrame",
+                            "type": "string"
+                        },
+                        "window_ids": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "type",
+                        "window_ids"
+                    ],
+                    "type": "object"
+                },
+                "UpdateWidgetState": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "title": {
+                            "type": "string"
+                        },
+                        "type": {
+                            "const": "UpdateWidgetState",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "title",
+                        "type"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "Close",
+                "Dispatch",
+                "FrontendConsole",
+                "JumpTo",
+                "LockFrame",
+                "Open",
+                "QuerySnapshot",
+                "QueryState",
+                "ShowError",
+                "UnlockFrame",
+                "UpdateWidgetState"
+            ],
+            "type": "object"
+        },
+        "ToolType": {
+            "enum": [
+                "circle",
+                "line",
+                "pan",
+                "path",
+                "rect",
+                "text"
+            ],
+            "type": "string"
+        },
+        "Which": {
+            "enum": [
+                "constellation",
+                "esoMilkyWay",
+                "grid",
+                "hipparcosCatalog",
+                "nearbyGalaxiesAndNebulas",
+                "tracts"
+            ],
+            "type": "string"
+        }
+    },
+    "properties": {
+        "Actions": {
+            "additionalProperties": false,
+            "properties": {
+                "appearanceLayers/propsUpdated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "props": {
+                                    "$ref": "#/definitions/Partial<{visible:boolean;}|({fadeInDuration?:number|undefined;imageSize?:512|1024|undefined;}&{visible?:boolean|undefined;})|ConstellationLayerProps|{visible:true;}|{visible:boolean;}|{visible:boolean;frame:boolean;patch:boolean;}>"
+                                },
+                                "which": {
+                                    "$ref": "#/definitions/Which"
+                                }
+                            },
+                            "required": [
+                                "props",
+                                "which"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "appearanceLayers/propsUpdated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "appearanceLayers/visibleToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "$ref": "#/definitions/P"
+                        },
+                        "type": {
+                            "const": "appearanceLayers/visibleToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "camera/paramsChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "$ref": "#/definitions/CameraParams"
+                        },
+                        "type": {
+                            "const": "camera/paramsChanged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "camera/projectionUpdated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "$ref": "#/definitions/P_1"
+                        },
+                        "type": {
+                            "const": "camera/projectionUpdated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "camera/retinaToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "camera/retinaToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/allRowsSelected": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "selected": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "selected"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/allRowsSelected",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/catalogAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "attributes": {
+                                    "items": {
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "type": "array"
+                                    },
+                                    "type": "array"
+                                },
+                                "baseColor": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                },
+                                "defaultType": {
+                                    "enum": [
+                                        "asterisk",
+                                        "circle",
+                                        "circledHollowAsterisk",
+                                        "circledHollowPlus",
+                                        "circledHollowX",
+                                        "diamond",
+                                        "dot",
+                                        "hollowAsterisk",
+                                        "hollowPlus",
+                                        "hollowX",
+                                        "pentagon",
+                                        "plus",
+                                        "square",
+                                        "triangle",
+                                        "x"
+                                    ],
+                                    "type": "string"
+                                },
+                                "fields": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "markers": {
+                                    "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "color": {
+                                                "items": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    }
+                                                ],
+                                                "maxItems": 4,
+                                                "minItems": 4,
+                                                "type": "array"
+                                            },
+                                            "position": {
+                                                "items": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    }
+                                                ],
+                                                "maxItems": 3,
+                                                "minItems": 3,
+                                                "type": "array"
+                                            },
+                                            "type": {
+                                                "enum": [
+                                                    "asterisk",
+                                                    "circle",
+                                                    "circledHollowAsterisk",
+                                                    "circledHollowPlus",
+                                                    "circledHollowX",
+                                                    "diamond",
+                                                    "dot",
+                                                    "hollowAsterisk",
+                                                    "hollowPlus",
+                                                    "hollowX",
+                                                    "pentagon",
+                                                    "plus",
+                                                    "square",
+                                                    "triangle",
+                                                    "x"
+                                                ],
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "position"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                },
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "attributes",
+                                "fields",
+                                "id",
+                                "markers",
+                                "name"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/catalogAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/catalogDeleted": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/catalogDeleted",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/catalogDuplicated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/catalogDuplicated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/catalogMerged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "deleteSrc": {
+                                    "type": "boolean"
+                                },
+                                "dstId": {
+                                    "type": "string"
+                                },
+                                "onlySelected": {
+                                    "type": "boolean"
+                                },
+                                "srcId": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "deleteSrc",
+                                "dstId",
+                                "onlySelected",
+                                "srcId"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/catalogMerged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/catalogReordered": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "ids": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "required": [
+                                "ids"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/catalogReordered",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/catalogSelected": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/catalogSelected",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/catalogUpdated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "attributes": {
+                                    "items": {
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "type": "array"
+                                    },
+                                    "type": "array"
+                                },
+                                "baseColor": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                },
+                                "defaultColor": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                },
+                                "defaultType": {
+                                    "enum": [
+                                        "asterisk",
+                                        "circle",
+                                        "circledHollowAsterisk",
+                                        "circledHollowPlus",
+                                        "circledHollowX",
+                                        "diamond",
+                                        "dot",
+                                        "hollowAsterisk",
+                                        "hollowPlus",
+                                        "hollowX",
+                                        "pentagon",
+                                        "plus",
+                                        "square",
+                                        "triangle",
+                                        "x"
+                                    ],
+                                    "type": "string"
+                                },
+                                "dialog": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "checked": {
+                                            "additionalProperties": false,
+                                            "patternProperties": {
+                                                "^[0-9]+$": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "opened": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "checked",
+                                        "opened"
+                                    ],
+                                    "type": "object"
+                                },
+                                "fields": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "markers": {
+                                    "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "color": {
+                                                "items": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    }
+                                                ],
+                                                "maxItems": 4,
+                                                "minItems": 4,
+                                                "type": "array"
+                                            },
+                                            "position": {
+                                                "items": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "number"
+                                                    }
+                                                ],
+                                                "maxItems": 3,
+                                                "minItems": 3,
+                                                "type": "array"
+                                            },
+                                            "type": {
+                                                "enum": [
+                                                    "asterisk",
+                                                    "circle",
+                                                    "circledHollowAsterisk",
+                                                    "circledHollowPlus",
+                                                    "circledHollowX",
+                                                    "diamond",
+                                                    "dot",
+                                                    "hollowAsterisk",
+                                                    "hollowPlus",
+                                                    "hollowX",
+                                                    "pentagon",
+                                                    "plus",
+                                                    "square",
+                                                    "triangle",
+                                                    "x"
+                                                ],
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "position"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "selectedRecords": {
+                                    "additionalProperties": false,
+                                    "patternProperties": {
+                                        "^[0-9]+$": {
+                                            "const": true,
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/catalogUpdated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/catalogsDialogToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "open": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/catalogsDialogToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/cellUpdated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "field": {
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "index": {
+                                    "type": "number"
+                                },
+                                "value": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "field",
+                                "id",
+                                "index",
+                                "value"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/cellUpdated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/dialogToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "opened": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/dialogToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/dialogsClosed": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "description": "The type of the action's payload.",
+                            "properties": {},
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/dialogsClosed",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/fieldAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "field": {
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "insertAt": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "field",
+                                "id",
+                                "insertAt"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/fieldAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/focusedPositionChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "position": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 3,
+                                    "minItems": 3,
+                                    "type": "array"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/focusedPositionChanged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/recordSelected": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "index": {
+                                    "type": "number"
+                                },
+                                "selected": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "index"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/recordSelected",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/recordsBatchSelected": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "indices": {
+                                    "items": {
+                                        "type": "number"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "indices"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/recordsBatchSelected",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/rowAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "attributes": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "insertAt": {
+                                    "type": "number"
+                                },
+                                "marker": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "color": {
+                                            "items": [
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                }
+                                            ],
+                                            "maxItems": 4,
+                                            "minItems": 4,
+                                            "type": "array"
+                                        },
+                                        "position": {
+                                            "items": [
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                }
+                                            ],
+                                            "maxItems": 3,
+                                            "minItems": 3,
+                                            "type": "array"
+                                        },
+                                        "type": {
+                                            "enum": [
+                                                "asterisk",
+                                                "circle",
+                                                "circledHollowAsterisk",
+                                                "circledHollowPlus",
+                                                "circledHollowX",
+                                                "diamond",
+                                                "dot",
+                                                "hollowAsterisk",
+                                                "hollowPlus",
+                                                "hollowX",
+                                                "pentagon",
+                                                "plus",
+                                                "square",
+                                                "triangle",
+                                                "x"
+                                            ],
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "position"
+                                    ],
+                                    "type": "object"
+                                }
+                            },
+                            "required": [
+                                "attributes",
+                                "id",
+                                "insertAt",
+                                "marker"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/rowAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/rowDeleted": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "index": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "index"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/rowDeleted",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/rowsFiltered": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "selected": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "selected"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/rowsFiltered",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/selectionInverted": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/selectionInverted",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "catalogs/showAttributesToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "show": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "show"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "catalogs/showAttributesToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "common/activeChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "description": "The type of the action's payload.",
+                            "type": "boolean"
+                        },
+                        "type": {
+                            "const": "common/activeChanged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "common/dialogPositionHintChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "$ref": "#/definitions/Partial<Record<\"top\"|\"bottom\"|\"left\"|\"right\",number>>"
+                        },
+                        "type": {
+                            "const": "common/dialogPositionHintChanged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "common/magFilterChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "magFilter": {
+                                    "$ref": "#/definitions/MagFilter"
+                                }
+                            },
+                            "required": [
+                                "magFilter"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "common/magFilterChanged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "common/unitChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "angleUnit": {
+                                    "$ref": "#/definitions/AngleUnit"
+                                }
+                            },
+                            "required": [
+                                "angleUnit"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "common/unitChanged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "common/unitToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "common/unitToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "devel/profilerToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "active": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "active"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "devel/profilerToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "fitsImage/dialogToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "fitsImage/dialogToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "fitsImage/imageAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "hduIndex": {
+                                    "type": "number"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "maskConfig": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "color": {
+                                            "items": [
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                }
+                                            ],
+                                            "maxItems": 4,
+                                            "minItems": 4,
+                                            "type": "array"
+                                        },
+                                        "maskBit": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "required": [
+                                        "color",
+                                        "maskBit"
+                                    ],
+                                    "type": "object"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "hduIndex",
+                                "id",
+                                "maskConfig",
+                                "name",
+                                "url"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "fitsImage/imageAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "fitsImage/imageMaskConfigUpdated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "maskConfig": {
+                                    "$ref": "#/definitions/Partial<MaskConfig>"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "maskConfig"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "fitsImage/imageMaskConfigUpdated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "fitsImage/imageRemoved": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "fitsImage/imageRemoved",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "hipsLayers/baseUrlChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "baseUrl": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "hipsLayers/baseUrlChanged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "hipsLayers/hipsDialogToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "open": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "hipsLayers/hipsDialogToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/autoColorToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "regions/autoColorToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/newCircularRegionAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "center": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "dec": {
+                                            "type": "number"
+                                        },
+                                        "ra": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "required": [
+                                        "dec",
+                                        "ra"
+                                    ],
+                                    "type": "object"
+                                },
+                                "color": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "radius": {
+                                    "type": "number"
+                                },
+                                "showLabel": {
+                                    "type": "boolean"
+                                },
+                                "type": {
+                                    "const": "Circular",
+                                    "type": "string"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "center",
+                                "id",
+                                "name",
+                                "radius",
+                                "showLabel",
+                                "type",
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/newCircularRegionAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/newLinearRegionAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "color": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                },
+                                "end": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "dec": {
+                                            "type": "number"
+                                        },
+                                        "ra": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "required": [
+                                        "dec",
+                                        "ra"
+                                    ],
+                                    "type": "object"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "showLabel": {
+                                    "type": "boolean"
+                                },
+                                "start": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "dec": {
+                                            "type": "number"
+                                        },
+                                        "ra": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "required": [
+                                        "dec",
+                                        "ra"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": {
+                                    "const": "Linear",
+                                    "type": "string"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "end",
+                                "id",
+                                "name",
+                                "showLabel",
+                                "start",
+                                "type",
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/newLinearRegionAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/newPathRegionAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "color": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "paths": {
+                                    "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "close": {
+                                                "type": "boolean"
+                                            },
+                                            "joint": {
+                                                "$ref": "#/definitions/JOINT"
+                                            },
+                                            "points": {
+                                                "items": {
+                                                    "additionalProperties": false,
+                                                    "properties": {
+                                                        "color": {
+                                                            "items": [
+                                                                {
+                                                                    "type": "number"
+                                                                },
+                                                                {
+                                                                    "type": "number"
+                                                                },
+                                                                {
+                                                                    "type": "number"
+                                                                },
+                                                                {
+                                                                    "type": "number"
+                                                                }
+                                                            ],
+                                                            "maxItems": 4,
+                                                            "minItems": 4,
+                                                            "type": "array"
+                                                        },
+                                                        "position": {
+                                                            "items": [
+                                                                {
+                                                                    "type": "number"
+                                                                },
+                                                                {
+                                                                    "type": "number"
+                                                                },
+                                                                {
+                                                                    "type": "number"
+                                                                }
+                                                            ],
+                                                            "maxItems": 3,
+                                                            "minItems": 3,
+                                                            "type": "array"
+                                                        },
+                                                        "size": {
+                                                            "type": "number"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "color",
+                                                        "position",
+                                                        "size"
+                                                    ],
+                                                    "type": "object"
+                                                },
+                                                "type": "array"
+                                            }
+                                        },
+                                        "required": [
+                                            "close",
+                                            "joint",
+                                            "points"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                },
+                                "showLabel": {
+                                    "type": "boolean"
+                                },
+                                "type": {
+                                    "const": "Path",
+                                    "type": "string"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "name",
+                                "paths",
+                                "showLabel",
+                                "type",
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/newPathRegionAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/newRectangularRegionAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "color": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "maxDec": {
+                                    "type": "number"
+                                },
+                                "maxRa": {
+                                    "type": "number"
+                                },
+                                "minDec": {
+                                    "type": "number"
+                                },
+                                "minRa": {
+                                    "type": "number"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "showLabel": {
+                                    "type": "boolean"
+                                },
+                                "type": {
+                                    "const": "Rectangular",
+                                    "type": "string"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "maxDec",
+                                "maxRa",
+                                "minDec",
+                                "minRa",
+                                "name",
+                                "showLabel",
+                                "type",
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/newRectangularRegionAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/newTextRegionAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "color": {
+                                    "items": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "maxItems": 4,
+                                    "minItems": 4,
+                                    "type": "array"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "position": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "dec": {
+                                            "type": "number"
+                                        },
+                                        "ra": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "required": [
+                                        "dec",
+                                        "ra"
+                                    ],
+                                    "type": "object"
+                                },
+                                "showLabel": {
+                                    "type": "boolean"
+                                },
+                                "type": {
+                                    "const": "Text",
+                                    "type": "string"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "name",
+                                "position",
+                                "showLabel",
+                                "type",
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/newTextRegionAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionDeleted": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionDeleted",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionUpdated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "regionDef": {
+                                    "$ref": "#/definitions/Region"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "regionDef"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionUpdated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionsBatchDeleted": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "nameStartsWith": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "nameStartsWith"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionsBatchDeleted",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionsBatchUpdated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "nameStartsWith": {
+                                    "type": "string"
+                                },
+                                "regionDef": {
+                                    "$ref": "#/definitions/Partial<Pick<RegionBase,\"color\"|\"visible\"|\"showLabel\">>"
+                                }
+                            },
+                            "required": [
+                                "nameStartsWith",
+                                "regionDef"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionsBatchUpdated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionsCleared": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "description": "The type of the action's payload.",
+                            "properties": {},
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionsCleared",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionsDialogToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "open": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionsDialogToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionsImported": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "regions": {
+                                    "items": {
+                                        "$ref": "#/definitions/Region"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "required": [
+                                "regions"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionsImported",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionsRenameGroup": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "nameStartsWith": {
+                                    "type": "string"
+                                },
+                                "newName": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "nameStartsWith",
+                                "newName"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionsRenameGroup",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/regionsReordered": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "ids": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "required": [
+                                "ids"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/regionsReordered",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/toolChanged": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "tool": {
+                                    "$ref": "#/definitions/ToolType"
+                                }
+                            },
+                            "required": [
+                                "tool"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "regions/toolChanged",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "regions/toolPinnedToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "regions/toolPinnedToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "tractTileLayers/colorParamsUpdated": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "params": {
+                                    "$ref": "#/definitions/SspTileParams"
+                                }
+                            },
+                            "required": [
+                                "params"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "tractTileLayers/colorParamsUpdated",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "tractTileLayers/layerAdded": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "baseUrl": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "baseUrl",
+                                "name"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "tractTileLayers/layerAdded",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "tractTileLayers/layerRemoved": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "name"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "tractTileLayers/layerRemoved",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "tractTileLayers/layerToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "visible": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "visible"
+                            ],
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "tractTileLayers/layerToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                },
+                "tractTileLayers/toneDialogToggled": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "payload": {
+                            "additionalProperties": false,
+                            "description": "The type of the action's payload.",
+                            "properties": {
+                                "open": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "type": {
+                            "const": "tractTileLayers/toneDialogToggled",
+                            "description": "the type used for the action type.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "payload",
+                        "type"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "appearanceLayers/propsUpdated",
+                "appearanceLayers/visibleToggled",
+                "camera/paramsChanged",
+                "camera/projectionUpdated",
+                "camera/retinaToggled",
+                "catalogs/allRowsSelected",
+                "catalogs/catalogAdded",
+                "catalogs/catalogDeleted",
+                "catalogs/catalogDuplicated",
+                "catalogs/catalogMerged",
+                "catalogs/catalogReordered",
+                "catalogs/catalogSelected",
+                "catalogs/catalogUpdated",
+                "catalogs/catalogsDialogToggled",
+                "catalogs/cellUpdated",
+                "catalogs/dialogToggled",
+                "catalogs/dialogsClosed",
+                "catalogs/fieldAdded",
+                "catalogs/focusedPositionChanged",
+                "catalogs/recordSelected",
+                "catalogs/recordsBatchSelected",
+                "catalogs/rowAdded",
+                "catalogs/rowDeleted",
+                "catalogs/rowsFiltered",
+                "catalogs/selectionInverted",
+                "catalogs/showAttributesToggled",
+                "common/activeChanged",
+                "common/dialogPositionHintChanged",
+                "common/magFilterChanged",
+                "common/unitChanged",
+                "common/unitToggled",
+                "devel/profilerToggled",
+                "fitsImage/dialogToggled",
+                "fitsImage/imageAdded",
+                "fitsImage/imageMaskConfigUpdated",
+                "fitsImage/imageRemoved",
+                "hipsLayers/baseUrlChanged",
+                "hipsLayers/hipsDialogToggled",
+                "regions/autoColorToggled",
+                "regions/newCircularRegionAdded",
+                "regions/newLinearRegionAdded",
+                "regions/newPathRegionAdded",
+                "regions/newRectangularRegionAdded",
+                "regions/newTextRegionAdded",
+                "regions/regionDeleted",
+                "regions/regionUpdated",
+                "regions/regionsBatchDeleted",
+                "regions/regionsBatchUpdated",
+                "regions/regionsCleared",
+                "regions/regionsDialogToggled",
+                "regions/regionsImported",
+                "regions/regionsRenameGroup",
+                "regions/regionsReordered",
+                "regions/toolChanged",
+                "regions/toolPinnedToggled",
+                "tractTileLayers/colorParamsUpdated",
+                "tractTileLayers/layerAdded",
+                "tractTileLayers/layerRemoved",
+                "tractTileLayers/layerToggled",
+                "tractTileLayers/toneDialogToggled"
+            ],
+            "type": "object"
+        },
+        "BaseAction": {
+            "additionalProperties": false,
+            "properties": {
+                "payload": {},
+                "type": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "payload",
+                "type"
+            ],
+            "type": "object"
+        },
+        "FromApp": {
+            "$ref": "#/definitions/AddType<{Ready:{revision:number;state:any;};Closed:{};StoreChanged:Patch;QueryStateResponse:BatchPatch<unknown>;}>"
+        },
+        "StoreState": {
+            "$ref": "#/definitions/AppStateWithComputed"
+        },
+        "ToApp": {
+            "$ref": "#/definitions/ToApp"
+        }
+    },
+    "required": [
+        "Actions",
+        "BaseAction",
+        "FromApp",
+        "StoreState",
+        "ToApp"
+    ],
+    "type": "object"
+}
+

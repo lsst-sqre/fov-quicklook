@@ -1,0 +1,45 @@
+@mixin active {
+  background-color: rgba(#555, 0.9);
+}
+
+@mixin background {
+  background-color: rgba(#222, 0.9);
+  color: white;
+}
+
+@mixin hoverable {
+  @include background();
+
+  &.active,
+  &:hover {
+    @include active();
+  }
+
+  &:active {
+    background-color: #777;
+  }
+
+  &:disabled {
+    color: #777;
+
+    &.active,
+    &:hover {
+      @include background();
+      color: #777;
+    }
+
+    &:active {
+      @include background();
+      color: #777;
+    }
+  }
+
+  border-style: none;
+}
+
+@mixin reset {
+  padding: 4px 6px;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}

@@ -1,0 +1,45 @@
+@use '/src/theme.scss';
+
+.menuBar {
+  display: flex;
+  align-items: stretch;
+
+  @include theme.background;
+  padding: 0 8px;
+
+  button.menuBarItem {
+    @include theme.reset;
+    background-color: transparent;
+    font-size: large;
+    padding: 8px 12px;
+
+    display: flex;
+    height: 100%;
+    align-items: center;
+
+    &.active {
+      @include theme.active;
+    }
+  }
+}
+
+.menuItemWithAnnotation {
+  display: flex;
+  align-items: center;
+  width: 100%;
+
+  &-body {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    padding-right: 1em;
+  }
+}
+
+button.hoverMenuButton {
+  font-size: x-small;
+
+  &.active {
+    @include theme.active;
+  }
+}

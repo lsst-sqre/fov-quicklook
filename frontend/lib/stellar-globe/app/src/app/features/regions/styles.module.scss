@@ -1,0 +1,16 @@
+@use '/src/theme.scss';
+
+.lineInfo {
+  @include theme.background;
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+
+  &:hover {
+    @include theme.active;
+  }
+}

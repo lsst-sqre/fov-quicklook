@@ -1,0 +1,100 @@
+{
+  "name": "@stellar-globe/app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist",
+    "types",
+    "src"
+  ],
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/lib/app.es.js",
+      "types": "./types/index.d.ts",
+      "default": "./dist/lib/app.es.js"
+    },
+    "./commTools": {
+      "import": "./dist/lib/commTools.es.js",
+      "types": "./types/commTools/index.d.ts",
+      "default": "./dist/lib/commTools.es.js"
+    }
+  },
+  "browser": {
+    "process/browser": false
+  },
+  "scripts": {
+    "dev": "vite",
+    "build-standalone": "tsc && vite build -c ./vite/vite.standalone.config.ts",
+    "build-lib": "tsc && vite build -c ./vite/vite.lib.config.ts",
+    "test": "vitest",
+    "lint": "eslint .",
+    "type-check": "tsc",
+    "typed-scss-module": "typed-scss-modules src -n camel",
+    "refresh-types": "npm run make-public-json-schema && npm run make-persistent-typevalidator && npm run make-toapp-typevalidator  && npm run make-action-typevalidator",
+    "make-toapp-typevalidator": "typescript-json-schema tsconfig.json --aliasRefs --noExtraProps --required ToAppValidatorJsonSchema -o src/commTools/toAppTypeValidation/jsonschema.json",
+    "make-action-typevalidator": "typescript-json-schema tsconfig.json --aliasRefs --noExtraProps --required ActionValidatorJsonSchema -o src/commTools/actionTypeValidation/jsonschema.json",
+    "make-persistent-typevalidator": "typescript-json-schema tsconfig.json --aliasRefs --noExtraProps --required PersistentStateJsonSchema -o src/app/store/persistentTypeValidation/jsonschema.json",
+    "make-public-json-schema": "typescript-json-schema --noExtraProps --required ./tsconfig.json PublicJsonSchema -o ./jsonschema/public.json "
+  },
+  "dependencies": {
+    "@floating-ui/react": "^0.27.0",
+    "@reduxjs/toolkit": "^2.4.0",
+    "@stellar-globe/react-draggable-dialog": "file:../react-draggable-dialog",
+    "@stellar-globe/react-stellar-globe": "file:../react-stellar-globe",
+    "@stellar-globe/stellar-globe": "file:../stellar-globe",
+    "@szhsin/react-menu": "^4.2.3",
+    "ajv": "^8.17.1",
+    "classnames": "^2.5.1",
+    "csv-stringify": "^6.5.2",
+    "material-symbols": "^0.27.2",
+    "papaparse": "^5.4.1",
+    "react": "^18.0.0",
+    "react-colorful": "^5.6.1",
+    "react-dom": "^18.0.0",
+    "react-error-boundary": "^4.1.2",
+    "react-redux": "^9.1.2",
+    "react-transition-group": "^4.4.5",
+    "use-immer": "^0.10.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@types/react-transition-group": "^4.4.11",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "@typescript-eslint/parser": "^8.17.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.16.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "fast-json-patch": "^3.1.1",
+    "jsdom": "^25.0.1",
+    "npm-check-updates": "^17.1.11",
+    "postcss": "^8.4.49",
+    "rollup-plugin-visualizer": "^5.14.0",
+    "sass": "^1.82.0",
+    "typed-scss-modules": "^8.0.1",
+    "typescript": "^5.7.2",
+    "typescript-json-schema": "^0.65.1",
+    "vite": "^6.0.3",
+    "vite-plugin-css-injected-by-js": "^3.5.2",
+    "vitest": "^2.1.8"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.28.0"
+  },
+  "typesVersions": {
+    "*": {
+      "commTools": [
+        "./types/commTools/index.d.ts"
+      ]
+    }
+  }
+}

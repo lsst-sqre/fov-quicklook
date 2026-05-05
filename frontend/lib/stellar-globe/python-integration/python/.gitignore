@@ -1,0 +1,7 @@
+__pycache__
+/.venv*
+/htmlcov
+.coverage
+*.egg-info
+/node_modules
+/dist

@@ -1,0 +1,15 @@
+export declare const active: string;
+export declare const appear: string;
+export declare const appearActive: string;
+export declare const appearDone: string;
+export declare const buttons: string;
+export declare const content: string;
+export declare const dialog: string;
+export declare const enter: string;
+export declare const enterActive: string;
+export declare const enterDone: string;
+export declare const exit: string;
+export declare const exitActive: string;
+export declare const exitDone: string;
+export declare const titlebar: string;
+export declare const titlebarText: string;

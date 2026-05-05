@@ -1,0 +1,45 @@
+@use '/src/theme.scss';
+
+.menuBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  user-select: none;
+  // ここで設定するべきかは微妙
+  // main viewerをダブルクリックすると左端のメニューが選択されてしまうので。
+  
+  border-radius: 0 0 8px 0;
+}
+
+
+.enter {
+  opacity: 0;
+  transform: translateY(-100%);
+}
+
+.enterActive {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+// .enterDone,
+// .appearDone {
+//   display: block;
+// }
+
+.exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.exitActive {
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+// .exitDone {
+//   display: block;
+// }

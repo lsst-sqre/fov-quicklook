@@ -1,0 +1,5 @@
+[run]
+omit =
+  ./src/hscmap/models/*
+  ./src/hscmap/comm/jupyterlab.py
+branch = True

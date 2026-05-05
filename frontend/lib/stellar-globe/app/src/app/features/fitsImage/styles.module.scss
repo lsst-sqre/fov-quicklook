@@ -1,0 +1,15 @@
+.name {
+  // 長いURLは...にする
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 8em;
+}
+
+.url {
+  // 長いURLは...にする
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 8em;
+}

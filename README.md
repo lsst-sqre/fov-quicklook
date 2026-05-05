@@ -152,11 +152,11 @@ make setup/agent-worktree
 
 This does three things for the current worktree:
 
-- syncs and initializes the `frontend/lib/stellar-globe` submodule from `https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe`
+- verifies that the vendored `frontend/lib/stellar-globe` snapshot is present (source upstream: `https://adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe`)
 - clones `k8s/phalanx` from `https://github.com/lsst-sqre/phalanx.git` if it is missing
 - installs best-effort `post-checkout` / `post-merge` hooks for this worktree so missing external repos are recreated automatically
 
-Git does not provide a client-side clone hook, so this step must be run after clone/worktree creation.
+`stellar-globe` is intentionally vendored into this repository because GitHub Actions cannot reach the ADC GitLab host during image builds. Git does not provide a client-side clone hook, so the `k8s/phalanx` setup step still has to run after clone/worktree creation.
 
 ### Backend Setup
 
