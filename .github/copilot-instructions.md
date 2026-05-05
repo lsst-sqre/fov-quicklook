@@ -57,6 +57,7 @@
 |------|------|------|
 | `backend/` | Python バックエンド (FastAPI) | `backend/.github/DEVELOPMENT.md` |
 | `frontend/app/` | React フロントエンド | `frontend/app/.github/DEVELOPMENT.md` |
+| `frontend/lib/stellar-globe/` | フロントエンドが参照するローカル package 群 | **Git submodule**。clone 直後は `git submodule update --init --recursive` が必要 |
 | `dev/deploy-broker/` | agent-safe deploy/sync/restart broker (Python daemon/client) | `/docs/phalanx.ja.md` |
 | `k8s/phalanx/` | Helm チャート（独立gitリポジトリ） | `/docs/phalanx.ja.md` |
 | `docs/` | 設計・開発ドキュメント | - |

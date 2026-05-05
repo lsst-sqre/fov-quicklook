@@ -2,7 +2,7 @@
 
 ## クイックスタート チェックリスト
 
-1. **クローンとセットアップ**: `git clone ...`, `cd backend && python3.13 -m venv .venv && ./.venv/bin/pip install -e .`
+1. **クローンとセットアップ**: `git clone ...`, `git submodule update --init --recursive`, `cd backend && python3.13 -m venv .venv && ./.venv/bin/pip install -e .`
 2. **ローカルで実行**: `make dev/coordinator`, `make dev/generator`, `make dev/frontend` (3ターミナル)
 3. **テスト実行**: `make test` (高速) または `make test/all` (遅いテスト含む)
 4. **コンポーネントドキュメント読み込み**: Python パターン については `backend/.github/copilot-instructions.md` を参照
@@ -68,12 +68,41 @@ make test/all          # tests/integration_tests/ の統合テストはすべて
 
 **初期セットアップ**:
 ```bash
-cd frontend/app
+git submodule update --init --recursive
+
+cd frontend/lib/stellar-globe/stellar-globe
+npm ci
+npm run build
+
+cd ../react-stellar-globe
+npm ci
+npm run build
+
+cd ../../app
+npm install
+```
+
+`frontend/app` は `frontend/lib/stellar-globe/` 配下の `@stellar-globe/*` ローカル package を参照しています。
+clone 直後や submodule 更新直後は build 成果物が無いため、先に上記 2 package を build してから
+`frontend/app` の開発・型チェック・テストを実行してください。
+
+**`@stellar-globe/*` が解決できないとき**:
+```bash
+git submodule update --init --recursive
+
+cd frontend/lib/stellar-globe/stellar-globe
+npm run build
+
+cd ../react-stellar-globe
+npm run build
+
+cd ../../app
 npm install
 ```
 
 **開発サーバー**:
 ```bash
+cd frontend/app
 npm run dev  # Vite 開発サーバー、通常 http://localhost:5173
 ```
 
