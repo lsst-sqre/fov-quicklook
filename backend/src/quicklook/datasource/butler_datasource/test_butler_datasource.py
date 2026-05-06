@@ -228,8 +228,8 @@ def test_query_visit_day_counts_uses_butler_counts_by_day():
             calls.append((dimension, kwargs))
             if dimension == 'day_obs':
                 return FakeDimensionRecordResults([
-                    SimpleNamespace(day_obs=20250301),
-                    SimpleNamespace(day_obs=20250303),
+                    SimpleNamespace(id=20250301),
+                    SimpleNamespace(id=20250303),
                 ])
             if dimension == 'exposure' and kwargs == {'datasets': 'raw', 'where': 'day_obs=20250301'}:
                 return FakeDimensionRecordResults([

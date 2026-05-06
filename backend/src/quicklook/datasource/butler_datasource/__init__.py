@@ -146,11 +146,11 @@ class DataTypeSpecificDataSource:
         )
         return [
             VisitDayCount(
-                day_obs=cast(int, getattr(record, 'day_obs')),
+                day_obs=_record_int_attr(record, 'day_obs', 'id'),
                 count=self._count_dimension_records(
                     self.data_id_dimension,
                     datasets=self.butler_data_type,
-                    where=f"day_obs={cast(int, getattr(record, 'day_obs'))}",
+                    where=f"day_obs={_record_int_attr(record, 'day_obs', 'id')}",
                 ),
             )
             for record in day_obs_records
@@ -395,6 +395,14 @@ def _record_float_attr(record: ButlerDimensionRecord, name: str, default: float 
     if value is None:
         return default
     return float(value)
+
+
+def _record_int_attr(record: ButlerDimensionRecord, *names: str, default: int = 0) -> int:
+    for name in names:
+        value = getattr(record, name, None)
+        if value is not None:
+            return int(value)
+    return default
 
 
 def _get_datasource(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:
