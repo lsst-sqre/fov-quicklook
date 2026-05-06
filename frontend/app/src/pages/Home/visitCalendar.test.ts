@@ -59,10 +59,9 @@ describe("visit calendar helpers", () => {
 
   it("counts visits by date within the visible month", () => {
     expect(buildVisitCountsByDate([
-      { day_obs: 20250519 },
-      { day_obs: 20250519 },
-      { day_obs: 20250520 },
-      { day_obs: 20250430 },
+      { day_obs: 20250519, count: 2 },
+      { day_obs: 20250520, count: 1 },
+      { day_obs: 20250430, count: 9 },
     ], "2025-05")).toEqual({
       "2025-05-19": 2,
       "2025-05-20": 1,

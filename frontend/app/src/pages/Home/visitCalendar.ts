@@ -1,7 +1,8 @@
 import { extractSearchDateFromVisitId, isValidSearchDate } from "./visitSearch"
 
-type VisitDayLike = {
+type VisitDayCountLike = {
   day_obs: number
+  count: number
 }
 
 export type CalendarDayCell = {
@@ -95,18 +96,18 @@ export function buildCalendarDayCells(month: string): CalendarDayCell[] {
   })
 }
 
-export function buildVisitCountsByDate(visits: VisitDayLike[] | undefined, month: string): Record<string, number> {
-  if (!visits?.length || !isValidCalendarMonth(month)) {
+export function buildVisitCountsByDate(visitDayCounts: VisitDayCountLike[] | undefined, month: string): Record<string, number> {
+  if (!visitDayCounts?.length || !isValidCalendarMonth(month)) {
     return {}
   }
 
   const monthPrefix = `${month}-`
-  return visits.reduce<Record<string, number>>((counts, visit) => {
-    const date = dayObsToSearchDate(visit.day_obs)
+  return visitDayCounts.reduce<Record<string, number>>((counts, visitDayCount) => {
+    const date = dayObsToSearchDate(visitDayCount.day_obs)
     if (!date.startsWith(monthPrefix)) {
       return counts
     }
-    counts[date] = (counts[date] ?? 0) + 1
+    counts[date] = visitDayCount.count
     return counts
   }, {})
 }

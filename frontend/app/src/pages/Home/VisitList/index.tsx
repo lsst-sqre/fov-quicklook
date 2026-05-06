@@ -2,7 +2,7 @@ import { Menu, MenuItem, SubMenu } from '@szhsin/react-menu'
 import classNames from 'classnames'
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MaterialSymbol } from '../../../components/MaterialSymbol'
-import { ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
+import { ListVisitsApiResponse, useListVisitDayCountsQuery, useListVisitsQuery } from "../../../store/api/openapi"
 import { homeSlice } from '../../../store/features/homeSlice'
 import { useAppDispatch, useAppSelector } from '../../../store/hooks'
 import homeStyles from '../styles.module.scss'
@@ -286,8 +286,8 @@ function SearchBox() {
   const [repositoryName, dataType] = dataSource.split(':')
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => getInitialCalendarMonth(currentQuicklook))
-  const { data: calendarVisits, isFetching: isCalendarFetching } = useListVisitsQuery(
-    { dataType, repositoryName, limit: 10000 },
+  const { data: calendarVisitDayCounts, isFetching: isCalendarFetching } = useListVisitDayCountsQuery(
+    { dataType, repositoryName, calendarMonth },
     { skip: !calendarOpen },
   )
 
@@ -300,8 +300,8 @@ function SearchBox() {
     [calendarMonth],
   )
   const visitCountsByDate = useMemo(
-    () => buildVisitCountsByDate(calendarVisits, calendarMonth),
-    [calendarMonth, calendarVisits],
+    () => buildVisitCountsByDate(calendarVisitDayCounts, calendarMonth),
+    [calendarMonth, calendarVisitDayCounts],
   )
 
   const closeCalendar = useCallback(() => {
