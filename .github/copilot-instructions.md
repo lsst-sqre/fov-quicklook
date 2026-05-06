@@ -86,6 +86,12 @@
 - プレフィックス: `QUICKLOOK_*`
 - ネスト区切り: `__` (例: `QUICKLOOK_s3_tile__access_key`)
 
+### デプロイ / 検証の標準認証情報
+
+- usdf-dev の `deploy-broker` を使うときは、まず `~/.fov-quicklook2/broker-url` と `~/.fov-quicklook2/broker-token` を確認する
+- `dev/deploy-broker/` の client には `--server "$(cat ~/.fov-quicklook2/broker-url)"` と `--api-token "$(cat ~/.fov-quicklook2/broker-token)"` を渡す
+- app 側の live 確認は、broker の `get-app-token` から得た token を優先し、`dev/.gafaelfawr-token` は fallback として扱う
+
 ---
 
 ## ドキュメントマップ

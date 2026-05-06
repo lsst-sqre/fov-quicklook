@@ -1,12 +1,15 @@
 import pickle
+from typing import cast
 
 import pytest
 from fastapi import HTTPException
 
 from quicklook.coordinator.api.types import CreateQuicklookRequest
+from quicklook.coordinator.api.types import SharedStatusMessageJobSharedLargeStatus
 from quicklook.coordinator.api.types import SharedStatusMessageJobStatusList
 from quicklook.datasource.types import ResolvedVisitInfo, VisitResolutionError
 from quicklook.frontend.api import quicklooks
+from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.job.job import Job
 from quicklook.utils.broadcast import Broadcast
 from quicklook.types import VisitName
@@ -135,3 +138,79 @@ async def test_status_relay_updates_job_status_from_binary_message(monkeypatch):
         await quicklooks._status_relay_main_loop()
 
     assert quicklooks._job_status_dict.last_value() == {job.visit: job.status}
+
+
+def test_apply_shared_status_message_moves_ready_metadata_to_short_lived_cache(monkeypatch):
+    job = Job(VisitName('repo:raw:4242'))
+    job.status.stage = 'ready'
+
+    ccd_metadata = [cast(CcdMetadata, object())]
+    job.shared_large_status.ccd_metadata_list = ccd_metadata
+
+    status_dict = Broadcast(max_queue_size=2)
+    status_dict.put({job.visit: job.status})
+
+    monkeypatch.setattr(quicklooks, '_job_status_dict', status_dict)
+    monkeypatch.setattr(quicklooks, '_job_shared_large_status_dict', {job.visit: job.shared_large_status})
+    monkeypatch.setattr(quicklooks, '_recent_ready_metadata_dict', {})
+    monkeypatch.setattr(quicklooks.time, 'monotonic', lambda: 100.0)
+
+    quicklooks._apply_shared_status_message(SharedStatusMessageJobStatusList(data={}))
+
+    assert quicklooks._job_status_dict.last_value() == {}
+    assert quicklooks._job_shared_large_status_dict == {}
+    assert quicklooks._get_ccd_metadata_list_for_shared_status(job.visit, allow_recent_ready=True) == ccd_metadata
+
+
+def test_recent_ready_metadata_expires(monkeypatch):
+    visit = VisitName('repo:raw:4242')
+    ccd_metadata = [cast(CcdMetadata, object())]
+
+    monkeypatch.setattr(quicklooks, '_job_shared_large_status_dict', {})
+    monkeypatch.setattr(
+        quicklooks,
+        '_recent_ready_metadata_dict',
+        {
+            visit: quicklooks.RecentReadyMetadata(
+                ccd_metadata_list=ccd_metadata,
+                expires_at=100.0,
+            )
+        },
+    )
+    monkeypatch.setattr(quicklooks.time, 'monotonic', lambda: 101.0)
+
+    with pytest.raises(KeyError):
+        quicklooks._get_ccd_metadata_list_for_shared_status(visit, allow_recent_ready=True)
+
+    assert quicklooks._recent_ready_metadata_dict == {}
+
+
+def test_shared_large_status_replaces_recent_ready_metadata(monkeypatch):
+    visit = VisitName('repo:raw:4242')
+    job = Job(visit)
+    active_metadata = [cast(CcdMetadata, object())]
+    job.shared_large_status.ccd_metadata_list = active_metadata
+
+    monkeypatch.setattr(quicklooks, '_job_status_dict', Broadcast(max_queue_size=2))
+    monkeypatch.setattr(quicklooks, '_job_shared_large_status_dict', {})
+    monkeypatch.setattr(
+        quicklooks,
+        '_recent_ready_metadata_dict',
+        {
+            visit: quicklooks.RecentReadyMetadata(
+                ccd_metadata_list=[cast(CcdMetadata, object())],
+                expires_at=100.0,
+            )
+        },
+    )
+    monkeypatch.setattr(quicklooks.time, 'monotonic', lambda: 50.0)
+
+    quicklooks._apply_shared_status_message(
+        SharedStatusMessageJobSharedLargeStatus(
+            visit=visit,
+            data=job.shared_large_status,
+        )
+    )
+
+    assert quicklooks._recent_ready_metadata_dict == {}
+    assert quicklooks._get_ccd_metadata_list_for_shared_status(visit) == active_metadata
