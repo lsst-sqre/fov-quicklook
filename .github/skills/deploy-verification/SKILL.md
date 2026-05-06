@@ -1,29 +1,48 @@
 ---
 name: deploy-verification
 description: >
-  fov-quicklookアプリケーションのデプロイ後の動作確認を行う。
-  gafaelfawrトークンの取得、healthzエンドポイントの確認、フロントエンドアクセスの検証、
-  ジョブ一覧・キャッシュ管理・visit一覧・quicklook再生成（WebSocket進捗監視付き）。
-  デプロイ確認、動作確認、ヘルスチェック、アプリケーション検証に関するタスクで使用する。
+  fov-quicklookアプリケーションのデプロイ後の app 動作確認を行う。
+  broker から取得した app token または gafaelfawr token を使って、
+  healthz・frontend・ジョブ一覧・キャッシュ管理・visit一覧・quicklook再生成を検証するときに使う。
 ---
 
 # デプロイ検証スキル
 
 ## 概要
 
-`dev/verify-deploy.sh` を使って、デプロイ後のfov-quicklookアプリケーションの動作を確認する。
+`dev/verify-deploy.sh` を使って、デプロイ後の fov-quicklook アプリケーションの
+HTTP / WebSocket 動作を確認する。
+
+> **役割分担**: ArgoCD sync / restart / branch 切替は `argocd-deployment` skill の担当。
+> この skill は app token を使った動作確認に集中する。
 
 > **agent-safe 運用**: deploy broker を使う構成では、app access token は broker
 > daemon が保持し、agent は `get-app-token` 相当の broker API から受け取って
-> 直接 HTTP 検証に使える。app token 自体の登録は daemon ノード側で行う。
+> 直接 HTTP 検証に使える。
 
 ## 前提条件
 
-- gafaelfawr トークンが `dev/.gafaelfawr-token` に保存されていること
-- トークンはブラウザの認証セッションに紐づくため、セッション切れの場合は再取得が必要
+- broker を使う場合は `~/.fov-quicklook2/broker-url` と `~/.fov-quicklook2/broker-token` があること
+- broker を使わない fallback では gafaelfawr トークンが `dev/.gafaelfawr-token` に保存されていること
+- ブラウザ由来のトークンは認証セッションに紐づくため、セッション切れの場合は再取得が必要
 - WebSocket進捗監視には `websockets` ライブラリが必要（`backend/.venv` 内に含まれている）
 
-## トークンの取得と設定
+## broker から app token を取る標準経路
+
+```bash
+export BROKER_URL="$(cat ~/.fov-quicklook2/broker-url)"
+export BROKER_TOKEN="$(cat ~/.fov-quicklook2/broker-token)"
+export GAFAELFAWR_TOKEN="$(
+  cd dev/deploy-broker &&
+  uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" get-app-token |
+  python -c 'import json,sys; print(json.load(sys.stdin)["token"])'
+)"
+```
+
+`verify-deploy.sh` は `GAFAELFAWR_TOKEN` 環境変数を見られるので、
+token file を作らずにそのまま実行できる。
+
+## browser token を使う fallback
 
 1. ブラウザで https://usdf-rsp-dev.slac.stanford.edu/fov-quicklook/ にアクセス（認証済み状態）
 2. 開発者ツールを開く
@@ -187,25 +206,30 @@ WebSocket で進捗を監視中...
 ## デプロイ後の典型的な検証フロー
 
 ```bash
+export BROKER_URL="$(cat ~/.fov-quicklook2/broker-url)"
+export BROKER_TOKEN="$(cat ~/.fov-quicklook2/broker-token)"
+export GAFAELFAWR_TOKEN="$(
+  cd dev/deploy-broker &&
+  uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" get-app-token |
+  python -c 'import json,sys; print(json.load(sys.stdin)["token"])'
+)"
+
 cd dev
 
-# 1. ArgoCD でデプロイ状態を確認
-./argocd.sh status
-
-# 2. 基本チェック
+# 1. 基本チェック
 ./verify-deploy.sh all
 
-# 3. visit一覧取得
+# 2. visit一覧取得
 ./verify-deploy.sh visits
 
-# 4. キャッシュ状態確認
+# 3. キャッシュ状態確認
 ./verify-deploy.sh cache
 
-# 5. 再生成テスト（キャッシュ削除 → 再生成 → 生成時間計測）
+# 4. 再生成テスト（キャッシュ削除 → 再生成 → 生成時間計測）
 ./verify-deploy.sh cache-delete embargo:raw:2026012800326
 ./verify-deploy.sh regenerate embargo:raw:2026012800326
 
-# 6. キャッシュに追加されたことを確認
+# 5. キャッシュに追加されたことを確認
 ./verify-deploy.sh cache
 ```
 
