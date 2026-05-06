@@ -1,6 +1,6 @@
 import threading
-from collections import Counter
-from datetime import date
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
 from functools import lru_cache
 from itertools import islice
 from types import EllipsisType
@@ -138,15 +138,22 @@ class DataTypeSpecificDataSource:
         return [self._visit_entry_from_record(record) for record in records]
 
     def query_visit_day_counts(self, calendar_month: str) -> list[VisitDayCount]:
-        start_day_obs, end_day_obs = _calendar_month_day_obs_range(calendar_month)
-        data_ids = self._query_data_ids(
-            ['day_obs', self.data_id_dimension],
-            datasets=self.butler_data_type,
-            where=f"day_obs>={start_day_obs} and day_obs<{end_day_obs}",
-            order_by=['day_obs'],
+        day_obs_values = _calendar_month_day_obs_values(calendar_month)
+        with ThreadPoolExecutor(max_workers=len(day_obs_values)) as executor:
+            counts = executor.map(self._query_visit_day_count, day_obs_values)
+        return [
+            VisitDayCount(day_obs=day_obs, count=count)
+            for day_obs, count in zip(day_obs_values, counts, strict=True)
+            if count > 0
+        ]
+
+    def _query_visit_day_count(self, day_obs: int) -> int:
+        datasource = _get_datasource(self.butler_data_type, self.repository_name)
+        return datasource._query_dimension_record_count(
+            datasource.data_id_dimension,
+            datasets=datasource.butler_data_type,
+            where=f'day_obs={day_obs}',
         )
-        counts_by_day_obs = Counter(int(data_id['day_obs']) for data_id in data_ids)
-        return [VisitDayCount(day_obs=day_obs, count=count) for day_obs, count in sorted(counts_by_day_obs.items())]
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
         refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit)
@@ -242,6 +249,23 @@ class DataTypeSpecificDataSource:
             records = records.limit(limit)
         return list(records)
 
+    def _query_dimension_record_count(
+        self,
+        dimension: str,
+        *,
+        datasets: str | None = None,
+        where: str | None = None,
+    ) -> int:
+        kwargs: dict[str, Any] = {}
+        if datasets is not None:
+            kwargs['datasets'] = datasets
+            if self.butler_data_type == 'difference_image':
+                kwargs['collections'] = self._query_collections()
+        if where:
+            kwargs['where'] = where
+        records = self._butler.registry.queryDimensionRecords(dimension, **kwargs)
+        return int(records.count())
+
     def _query_data_ids(
         self,
         dimensions: list[str],
@@ -323,6 +347,22 @@ def _calendar_month_day_obs_range(calendar_month: str) -> tuple[int, int]:
     start = date(year, month, 1)
     end = date(year + (1 if month == 12 else 0), 1 if month == 12 else month + 1, 1)
     return int(start.strftime('%Y%m%d')), int(end.strftime('%Y%m%d'))
+
+
+def _calendar_month_day_obs_values(calendar_month: str) -> list[int]:
+    year_text, month_text = calendar_month.split('-', maxsplit=1)
+    current = date(int(year_text), int(month_text), 1)
+    _, end_day_obs = _calendar_month_day_obs_range(calendar_month)
+    end = date(
+        int(str(end_day_obs)[:4]),
+        int(str(end_day_obs)[4:6]),
+        int(str(end_day_obs)[6:8]),
+    )
+    day_obs_values: list[int] = []
+    while current < end:
+        day_obs_values.append(int(current.strftime('%Y%m%d')))
+        current += timedelta(days=1)
+    return day_obs_values
 
 
 def _resolve_visit(visit: VisitName) -> VisitName:
