@@ -80,8 +80,15 @@ async def unvote_quicklook(visit_name: Annotated[VisitName, Depends(dep_visit_na
 
 @router.get('/api/quicklooks/*/status', response_model=JobStatusList)
 async def get_all_quicklook_jobs():
-    async for jobs in _job_status_dict.subscribe():
+    jobs = _job_status_dict.last_value()
+    if jobs is not None:
         return jobs
+    jobs = await http_request(
+        'get',
+        f'{config.coordinator_base_url}/quicklooks/*/status',
+    )
+    _job_status_dict.put(jobs)
+    return jobs
 
 
 type_adapter_JsonStatus = TypeAdapter(JobStatus | None)

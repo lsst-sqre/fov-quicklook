@@ -226,18 +226,12 @@ def test_query_visit_day_counts_uses_butler_counts_by_day():
     class FakeRegistry:
         def queryDimensionRecords(self, dimension: str, **kwargs: object):
             calls.append((dimension, kwargs))
-            if dimension == 'day_obs':
+            if dimension == 'exposure':
                 return FakeDimensionRecordResults([
-                    SimpleNamespace(id=20250301),
-                    SimpleNamespace(id=20250303),
+                    SimpleNamespace(id=101, day_obs=20250301),
+                    SimpleNamespace(id=102, day_obs=20250301),
+                    SimpleNamespace(id=103, day_obs=20250303),
                 ])
-            if dimension == 'exposure' and kwargs == {'datasets': 'raw', 'where': 'day_obs=20250301'}:
-                return FakeDimensionRecordResults([
-                    SimpleNamespace(id=101),
-                    SimpleNamespace(id=102),
-                ])
-            if dimension == 'exposure' and kwargs == {'datasets': 'raw', 'where': 'day_obs=20250303'}:
-                return FakeDimensionRecordResults([SimpleNamespace(id=103)])
             raise AssertionError((dimension, kwargs))
 
     ds = _make_datasource(
@@ -255,14 +249,12 @@ def test_query_visit_day_counts_uses_butler_counts_by_day():
     ]
     assert calls == [
         (
-            'day_obs',
+            'exposure',
             {
                 'datasets': 'raw',
                 'where': 'day_obs>=20250301 and day_obs<20250401',
             },
         ),
-        ('exposure', {'datasets': 'raw', 'where': 'day_obs=20250301'}),
-        ('exposure', {'datasets': 'raw', 'where': 'day_obs=20250303'}),
     ]
 
 

@@ -1,4 +1,5 @@
 import threading
+from collections import Counter
 from datetime import date
 from functools import lru_cache
 from itertools import islice
@@ -138,23 +139,14 @@ class DataTypeSpecificDataSource:
 
     def query_visit_day_counts(self, calendar_month: str) -> list[VisitDayCount]:
         start_day_obs, end_day_obs = _calendar_month_day_obs_range(calendar_month)
-        day_obs_records = self._query_dimension_records(
-            'day_obs',
+        records = self._query_dimension_records(
+            self.data_id_dimension,
             datasets=self.butler_data_type,
             where=f"day_obs>={start_day_obs} and day_obs<{end_day_obs}",
             order_by=['day_obs'],
         )
-        return [
-            VisitDayCount(
-                day_obs=_record_int_attr(record, 'day_obs', 'id'),
-                count=self._count_dimension_records(
-                    self.data_id_dimension,
-                    datasets=self.butler_data_type,
-                    where=f"day_obs={_record_int_attr(record, 'day_obs', 'id')}",
-                ),
-            )
-            for record in day_obs_records
-        ]
+        counts_by_day_obs = Counter(_record_int_attr(record, 'day_obs') for record in records)
+        return [VisitDayCount(day_obs=day_obs, count=count) for day_obs, count in sorted(counts_by_day_obs.items())]
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
         refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit)
@@ -249,22 +241,6 @@ class DataTypeSpecificDataSource:
         if limit is not None:
             records = records.limit(limit)
         return list(records)
-
-    def _count_dimension_records(
-        self,
-        dimension: str,
-        *,
-        datasets: str | None = None,
-        where: str | None = None,
-    ) -> int:
-        kwargs: dict[str, Any] = {}
-        if datasets is not None:
-            kwargs['datasets'] = datasets
-            if self.butler_data_type == 'difference_image':
-                kwargs['collections'] = self._query_collections()
-        if where:
-            kwargs['where'] = where
-        return cast(int, self._butler.registry.queryDimensionRecords(dimension, **kwargs).count())
 
     def _visit_entry_from_record(self, record: ButlerDimensionRecord) -> VisitEntry:
         return VisitEntry(
