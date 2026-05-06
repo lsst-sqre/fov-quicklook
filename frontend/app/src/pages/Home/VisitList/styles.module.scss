@@ -86,12 +86,6 @@
   margin-bottom: 1rem;
 }
 
-.calendarHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .calendarTitle {
   text-align: center;
 }
@@ -108,10 +102,20 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 999px;
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
 .calendarMonthButton:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+.calendarMonthButton:active {
+  transform: translateY(1px);
+}
+
+.calendarMonthButton:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.42);
 }
 
 .calendarWeekdays {
@@ -138,17 +142,36 @@
 }
 
 .calendarDay {
-  min-height: 3rem;
+  min-height: 4.2rem;
   padding: 0.45rem 0.5rem;
   color: rgba(255, 255, 255, 0.92);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
 .calendarDay:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.calendarDay:active {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(1px) scale(0.99);
+}
+
+.calendarDay:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 .calendarDay:disabled {
@@ -157,22 +180,45 @@
 
 .calendarDay:disabled:hover {
   background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
+.calendarDay:disabled:active {
+  transform: none;
 }
 
 .calendarDayLabel {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.35rem;
   width: 100%;
-  font-size: 0.9rem;
+  min-height: 100%;
+}
+
+.calendarDayNumber {
+  font-size: 0.72rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .calendarDayCount {
   min-width: 1.25rem;
-  text-align: right;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.68);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.calendarDayEmpty {
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.calendarDayCountEmpty,
+.calendarDayEmpty .calendarDayNumber {
+  color: rgba(255, 255, 255, 0.42);
 }
 
 .calendarDayOutsideMonth {
@@ -183,6 +229,12 @@
 .calendarDaySelected {
   border-color: rgba(255, 255, 255, 0.45);
   background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.calendarDaySelected .calendarDayNumber,
+.calendarDaySelected .calendarDayCount {
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .calendarLoadingOverlay {

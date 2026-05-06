@@ -1,13 +1,15 @@
 export declare const calendarBody: string;
 export declare const calendarDay: string;
 export declare const calendarDayCount: string;
+export declare const calendarDayCountEmpty: string;
+export declare const calendarDayEmpty: string;
 export declare const calendarDayLabel: string;
+export declare const calendarDayNumber: string;
 export declare const calendarDayOutsideMonth: string;
 export declare const calendarDaySelected: string;
 export declare const calendarDialog: string;
 export declare const calendarGrid: string;
 export declare const calendarHeader: string;
-export declare const calendarHeaderActions: string;
 export declare const calendarLoadingOverlay: string;
 export declare const calendarMonthButton: string;
 export declare const calendarTitle: string;

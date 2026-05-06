@@ -416,19 +416,14 @@ function SearchBox() {
               <h2 className={classNames(homeStyles.shortcutHelpTitle, styles.calendarTitle)} id="visit-calendar-title">
                 {formatCalendarMonthLabel(calendarMonth)}
               </h2>
-              <div className={styles.calendarHeaderActions}>
-                <button
-                  aria-label="Next month"
-                  className={styles.calendarMonthButton}
-                  onClick={() => setCalendarMonth(current => shiftCalendarMonth(current, 1))}
-                  type="button"
-                >
-                  <MaterialSymbol symbol="chevron_right" />
-                </button>
-                <button className={homeStyles.shortcutHelpCloseButton} onClick={closeCalendar} type="button">
-                  Close
-                </button>
-              </div>
+              <button
+                aria-label="Next month"
+                className={styles.calendarMonthButton}
+                onClick={() => setCalendarMonth(current => shiftCalendarMonth(current, 1))}
+                type="button"
+              >
+                <MaterialSymbol symbol="chevron_right" />
+              </button>
             </div>
             <div className={styles.calendarBody}>
               <div className={styles.calendarWeekdays}>
@@ -437,31 +432,38 @@ function SearchBox() {
                 ))}
               </div>
               <div className={styles.calendarGrid}>
-                {calendarDayCells.map((cell) => (
-                  <button
-                    className={classNames(
-                      styles.calendarDay,
-                      !cell.inCurrentMonth && styles.calendarDayOutsideMonth,
-                      selectedCalendarDate === cell.date && styles.calendarDaySelected,
-                    )}
-                    disabled={isCalendarFetching}
-                    key={cell.date}
-                    onClick={() => {
-                      if (!cell.inCurrentMonth) {
-                        setCalendarMonth(cell.date.slice(0, 7))
-                        return
-                      }
-                      dispatch(homeSlice.actions.setSearchString(cell.date))
-                      closeCalendar()
-                    }}
-                    type="button"
-                  >
-                    <span className={styles.calendarDayLabel}>
-                      <span>{cell.day}</span>
-                      <span className={styles.calendarDayCount}>{visitCountsByDate[cell.date] ?? 0}</span>
-                    </span>
-                  </button>
-                ))}
+                {calendarDayCells.map((cell) => {
+                  const dayCount = visitCountsByDate[cell.date] ?? 0
+
+                  return (
+                    <button
+                      className={classNames(
+                        styles.calendarDay,
+                        dayCount === 0 && styles.calendarDayEmpty,
+                        !cell.inCurrentMonth && styles.calendarDayOutsideMonth,
+                        selectedCalendarDate === cell.date && styles.calendarDaySelected,
+                      )}
+                      disabled={isCalendarFetching}
+                      key={cell.date}
+                      onClick={() => {
+                        if (!cell.inCurrentMonth) {
+                          setCalendarMonth(cell.date.slice(0, 7))
+                          return
+                        }
+                        dispatch(homeSlice.actions.setSearchString(cell.date))
+                        closeCalendar()
+                      }}
+                      type="button"
+                    >
+                      <span className={styles.calendarDayLabel}>
+                        <span className={styles.calendarDayNumber}>{cell.day}</span>
+                        <span className={classNames(styles.calendarDayCount, dayCount === 0 && styles.calendarDayCountEmpty)}>
+                          {dayCount}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
               {isCalendarFetching && (
                 <div className={styles.calendarLoadingOverlay}>
