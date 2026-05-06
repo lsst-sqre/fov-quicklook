@@ -1,6 +1,7 @@
 import asyncio
 import pickle
 import re
+import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import cached_property
@@ -222,10 +223,16 @@ async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncG
                     visit_name=visit,
                     progress=job_status.generate_single_fits_tiles,
                 )
-            case JobStatus(stage='merge_tiles' | 'upload_to_object_storage' | 'ready'):
+            case JobStatus(stage='merge_tiles' | 'upload_to_object_storage'):
                 yield QuicklookMetadataReady(
                     visit_name=visit,
-                    ccd_metadata_list=_job_shared_large_status_dict[visit].ccd_metadata_list,
+                    ccd_metadata_list=_get_ccd_metadata_list_for_shared_status(visit),
+                    wcs=focal_plane_wcs(),
+                )
+            case JobStatus(stage='ready'):
+                yield QuicklookMetadataReady(
+                    visit_name=visit,
+                    ccd_metadata_list=_get_ccd_metadata_list_for_shared_status(visit, allow_recent_ready=True),
                     wcs=focal_plane_wcs(),
                 )
             case JobStatus(stage='error'):
@@ -234,8 +241,16 @@ async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncG
                 raise ValueError(f"Unknown job status stage: {job_status.stage}")
 
 
+@dataclass
+class RecentReadyMetadata:
+    ccd_metadata_list: list[CcdMetadata]
+    expires_at: float
+
+
 _job_shared_large_status_dict: dict[VisitName, JobSharedLargeStatus] = {}
+_recent_ready_metadata_dict: dict[VisitName, RecentReadyMetadata] = {}
 _job_status_dict = Broadcast[JobStatusList](max_queue_size=2)
+_RECENT_READY_METADATA_TTL_SECONDS = 30.0
 _STATUS_RELAY_RETRY_MAX_DELAY_SECONDS = 60
 
 
@@ -309,13 +324,67 @@ def _decode_shared_status_message(msg_bytes: bytes | str) -> SharedStatusMessage
     return pickle.loads(msg_bytes)
 
 
+def _prune_recent_ready_metadata(now: float | None = None) -> None:
+    global _recent_ready_metadata_dict
+
+    if not _recent_ready_metadata_dict:
+        return
+
+    current_time = time.monotonic() if now is None else now
+    _recent_ready_metadata_dict = {
+        visit: metadata
+        for visit, metadata in _recent_ready_metadata_dict.items()
+        if metadata.expires_at > current_time
+    }
+
+
+def _get_ccd_metadata_list_for_shared_status(
+    visit: VisitName,
+    *,
+    allow_recent_ready: bool = False,
+) -> list[CcdMetadata]:
+    _prune_recent_ready_metadata()
+
+    if large_status := _job_shared_large_status_dict.get(visit):
+        return large_status.ccd_metadata_list
+
+    if allow_recent_ready and (recent_ready_metadata := _recent_ready_metadata_dict.get(visit)):
+        return recent_ready_metadata.ccd_metadata_list
+
+    raise KeyError(visit)
+
+
 def _apply_shared_status_message(msg: SharedStatusMessage) -> None:
-    global _job_shared_large_status_dict
+    global _job_shared_large_status_dict, _recent_ready_metadata_dict
 
     match msg:
         case SharedStatusMessageJobStatusList(data=data):
+            previous_jobs = _job_status_dict.last_value() or {}
+            current_time = time.monotonic()
+            _prune_recent_ready_metadata(current_time)
+
+            for visit, previous_status in previous_jobs.items():
+                if visit in data:
+                    continue
+
+                large_status = _job_shared_large_status_dict.pop(visit, None)
+                if previous_status.stage == 'ready' and large_status is not None:
+                    # Keep only the metadata briefly so the UI can bridge the
+                    # transition to object storage without retaining the full Job.
+                    _recent_ready_metadata_dict[visit] = RecentReadyMetadata(
+                        ccd_metadata_list=large_status.ccd_metadata_list,
+                        expires_at=current_time + _RECENT_READY_METADATA_TTL_SECONDS,
+                    )
+
+            _job_shared_large_status_dict = {
+                visit: large_status
+                for visit, large_status in _job_shared_large_status_dict.items()
+                if visit in data
+            }
             _job_status_dict.put(data)
         case SharedStatusMessageJobSharedLargeStatus(visit=visit, data=data):
+            _prune_recent_ready_metadata()
+            _recent_ready_metadata_dict.pop(visit, None)
             _job_shared_large_status_dict[visit] = data
             jobs = _job_status_dict.last_value()
             if jobs:
