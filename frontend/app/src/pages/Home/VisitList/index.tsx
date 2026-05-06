@@ -430,42 +430,45 @@ function SearchBox() {
                 </button>
               </div>
             </div>
-            <div className={styles.calendarWeekdays}>
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-                <span className={styles.calendarWeekday} key={day}>{day}</span>
-              ))}
-            </div>
-            <div className={styles.calendarGrid}>
-              {calendarDayCells.map((cell) => (
-                <button
-                  className={classNames(
-                    styles.calendarDay,
-                    !cell.inCurrentMonth && styles.calendarDayOutsideMonth,
-                    selectedCalendarDate === cell.date && styles.calendarDaySelected,
-                  )}
-                  key={cell.date}
-                  onClick={() => {
-                    if (!cell.inCurrentMonth) {
-                      setCalendarMonth(cell.date.slice(0, 7))
-                      return
-                    }
-                    dispatch(homeSlice.actions.setSearchString(cell.date))
-                    closeCalendar()
-                  }}
-                  type="button"
-                >
-                  <span className={styles.calendarDayLabel}>
-                    <span>{cell.day}</span>
-                    <span className={styles.calendarDayCount}>{visitCountsByDate[cell.date] ?? 0}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-            {isCalendarFetching && (
-              <div className={styles.calendarLoading}>
-                <LoadingSpinner />
+            <div className={styles.calendarBody}>
+              <div className={styles.calendarWeekdays}>
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+                  <span className={styles.calendarWeekday} key={day}>{day}</span>
+                ))}
               </div>
-            )}
+              <div className={styles.calendarGrid}>
+                {calendarDayCells.map((cell) => (
+                  <button
+                    className={classNames(
+                      styles.calendarDay,
+                      !cell.inCurrentMonth && styles.calendarDayOutsideMonth,
+                      selectedCalendarDate === cell.date && styles.calendarDaySelected,
+                    )}
+                    disabled={isCalendarFetching}
+                    key={cell.date}
+                    onClick={() => {
+                      if (!cell.inCurrentMonth) {
+                        setCalendarMonth(cell.date.slice(0, 7))
+                        return
+                      }
+                      dispatch(homeSlice.actions.setSearchString(cell.date))
+                      closeCalendar()
+                    }}
+                    type="button"
+                  >
+                    <span className={styles.calendarDayLabel}>
+                      <span>{cell.day}</span>
+                      <span className={styles.calendarDayCount}>{visitCountsByDate[cell.date] ?? 0}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {isCalendarFetching && (
+                <div className={styles.calendarLoadingOverlay}>
+                  <LoadingSpinner />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -221,18 +221,18 @@ def test_query_dimension_records_applies_order_and_limit_after_query():
 
 
 def test_query_visit_day_counts_uses_butler_counts_by_day():
-    calls: list[tuple[str, dict[str, object]]] = []
+    calls: list[tuple[list[str], dict[str, object]]] = []
 
     class FakeRegistry:
-        def queryDimensionRecords(self, dimension: str, **kwargs: object):
-            calls.append((dimension, kwargs))
-            if dimension == 'exposure':
+        def queryDataIds(self, dimensions: list[str], **kwargs: object):
+            calls.append((dimensions, kwargs))
+            if dimensions == ['day_obs', 'exposure']:
                 return FakeDimensionRecordResults([
-                    SimpleNamespace(id=101, day_obs=20250301),
-                    SimpleNamespace(id=102, day_obs=20250301),
-                    SimpleNamespace(id=103, day_obs=20250303),
+                    {'day_obs': 20250301, 'exposure': 101},
+                    {'day_obs': 20250301, 'exposure': 102},
+                    {'day_obs': 20250303, 'exposure': 103},
                 ])
-            raise AssertionError((dimension, kwargs))
+            raise AssertionError((dimensions, kwargs))
 
     ds = _make_datasource(
         data_type='raw',
@@ -249,7 +249,7 @@ def test_query_visit_day_counts_uses_butler_counts_by_day():
     ]
     assert calls == [
         (
-            'exposure',
+            ['day_obs', 'exposure'],
             {
                 'datasets': 'raw',
                 'where': 'day_obs>=20250301 and day_obs<20250401',

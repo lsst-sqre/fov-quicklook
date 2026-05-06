@@ -1,3 +1,4 @@
+export declare const calendarBody: string;
 export declare const calendarDay: string;
 export declare const calendarDayCount: string;
 export declare const calendarDayLabel: string;
@@ -7,7 +8,7 @@ export declare const calendarDialog: string;
 export declare const calendarGrid: string;
 export declare const calendarHeader: string;
 export declare const calendarHeaderActions: string;
-export declare const calendarLoading: string;
+export declare const calendarLoadingOverlay: string;
 export declare const calendarMonthButton: string;
 export declare const calendarTitle: string;
 export declare const calendarWeekday: string;
