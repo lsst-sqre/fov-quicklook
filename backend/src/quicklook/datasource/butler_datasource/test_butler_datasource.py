@@ -1,4 +1,3 @@
-from datetime import date
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -9,7 +8,6 @@ from quicklook.datasource.butler_datasource import (
     ButlerDataSource,
     DataTypeSpecificDataSource,
     Instrument,
-    _calendar_month_day_obs_values,
     _clear_resolved_visit_run_cache,
     _get_resolved_visit_run,
     _resolve_visit_cache,
@@ -222,62 +220,41 @@ def test_query_dimension_records_applies_order_and_limit_after_query():
     assert limit_calls == [7]
 
 
-def test_query_visit_day_counts_queries_each_day(monkeypatch):
-    calls: list[tuple[str, str | None, str | None]] = []
-    counts_by_day = {
-        20250301: 2,
-        20250303: 1,
-    }
+def test_query_visit_day_counts_uses_butler_counts_by_day():
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    class FakeRegistry:
+        def queryDataIds(self, dimensions: list[str], **kwargs: object):
+            calls.append((dimensions, kwargs))
+            if dimensions == ['day_obs', 'exposure']:
+                return FakeDimensionRecordResults([
+                    {'day_obs': 20250301, 'exposure': 101},
+                    {'day_obs': 20250301, 'exposure': 102},
+                    {'day_obs': 20250303, 'exposure': 103},
+                ])
+            raise AssertionError((dimensions, kwargs))
 
     ds = _make_datasource(
         data_type='raw',
         data_id_dimension='exposure',
         order_by=['-day_obs', '-exposure'],
-        registry=object(),
-    )
-
-    monkeypatch.setattr(
-        'quicklook.datasource.butler_datasource._get_datasource',
-        lambda data_type, repository_name: ds,
-    )
-
-    def fake_query_dimension_record_count(
-        self: DataTypeSpecificDataSource,
-        dimension: str,
-        *,
-        datasets: str | None = None,
-        where: str | None = None,
-    ) -> int:
-        calls.append((dimension, datasets, where))
-        assert where is not None
-        day_obs = int(where.removeprefix('day_obs='))
-        return counts_by_day.get(day_obs, 0)
-
-    monkeypatch.setattr(
-        DataTypeSpecificDataSource,
-        '_query_dimension_record_count',
-        fake_query_dimension_record_count,
+        registry=FakeRegistry(),
     )
 
     counts = ds.query_visit_day_counts('2025-03')
 
-    expected_days = [
-        int(date(2025, 3, day).strftime('%Y%m%d'))
-        for day in range(1, 32)
-    ]
     assert counts == [
         VisitDayCount(day_obs=20250301, count=2),
         VisitDayCount(day_obs=20250303, count=1),
     ]
-    assert sorted(calls) == sorted(
-        [('exposure', 'raw', f'day_obs={day_obs}') for day_obs in expected_days]
-    )
-
-
-def test_calendar_month_day_obs_values_returns_all_days():
-    assert _calendar_month_day_obs_values('2025-02') == [
-        int(date(2025, 2, day).strftime('%Y%m%d'))
-        for day in range(1, 29)
+    assert calls == [
+        (
+            ['day_obs', 'exposure'],
+            {
+                'datasets': 'raw',
+                'where': 'day_obs>=20250301 and day_obs<20250401',
+            },
+        ),
     ]
 
 
