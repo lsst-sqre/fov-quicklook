@@ -25,6 +25,13 @@ class Query:
 
 
 @dataclass
+class VisitDayCountQuery:
+    data_type: CcdDataType
+    repository_name: str
+    calendar_month: str
+
+
+@dataclass
 class VisitEntry:
     id: str
     day_obs: int
@@ -37,12 +44,24 @@ class VisitEntry:
     target_name: str
 
 
+@dataclass
+class VisitDayCount:
+    day_obs: int
+    count: int
+
+
 class DataSourceBase(abc.ABC):
     @abc.abstractmethod
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
         ...
 
     query_visits = async_wrap(query_visits_sync)
+
+    @abc.abstractmethod
+    def query_visit_day_counts_sync(self, q: VisitDayCountQuery) -> list[VisitDayCount]:  # pragma: no cover
+        ...
+
+    query_visit_day_counts = async_wrap(query_visit_day_counts_sync)
 
     @abc.abstractmethod
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:  # pragma: no cover

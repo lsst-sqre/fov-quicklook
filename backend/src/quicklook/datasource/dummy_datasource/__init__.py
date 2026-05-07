@@ -3,7 +3,7 @@ from pathlib import Path
 
 from quicklook.config import config
 from quicklook.datasource.butler_datasource.instrument import Instrument
-from quicklook.datasource.types import VisitEntry
+from quicklook.datasource.types import VisitDayCount, VisitDayCountQuery, VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import NoSuchKey, s3_download_object, s3_list_objects
@@ -18,6 +18,21 @@ class DummyDataSource(DataSourceBase):
         visits = _load_shared_dummy_visits() or _default_dummy_visits()
         visits = _filter_visits(visits, q)
         return visits[: q.limit]
+
+    def query_visit_day_counts_sync(self, q: VisitDayCountQuery) -> list[VisitDayCount]:
+        month_prefix = q.calendar_month.replace('-', '')
+        counts: dict[int, int] = {}
+        for visit in self.query_visits_sync(
+            Query(
+                data_type=q.data_type,
+                repository_name=q.repository_name,
+                limit=1000,
+            )
+        ):
+            if not str(visit.day_obs).startswith(month_prefix):
+                continue
+            counts[visit.day_obs] = counts.get(visit.day_obs, 0) + 1
+        return [VisitDayCount(day_obs=day_obs, count=count) for day_obs, count in sorted(counts.items())]
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:
         return visit

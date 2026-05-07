@@ -85,6 +85,19 @@ const injectedRtkApi = api.injectEndpoints({
         },
       }),
     }),
+    listVisitDayCounts: build.query<
+      ListVisitDayCountsApiResponse,
+      ListVisitDayCountsApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/visits/day_counts`,
+        params: {
+          calendar_month: queryArg.calendarMonth,
+          data_type: queryArg.dataType,
+          repository_name: queryArg.repositoryName,
+        },
+      }),
+    }),
     getVisitMetadata: build.query<
       GetVisitMetadataApiResponse,
       GetVisitMetadataApiArg
@@ -218,6 +231,13 @@ export type ListVisitsApiArg = {
   exposure?: number | null;
   dayObs?: number | null;
   limit?: number;
+  dataType: string;
+  repositoryName: string;
+};
+export type ListVisitDayCountsApiResponse =
+  /** status 200 Successful Response */ VisitDayCount[];
+export type ListVisitDayCountsApiArg = {
+  calendarMonth: string;
   dataType: string;
   repositoryName: string;
 };
@@ -442,6 +462,10 @@ export type VisitEntry = {
   observation_reason: string;
   target_name: string;
 };
+export type VisitDayCount = {
+  day_obs: number;
+  count: number;
+};
 export type DataSourceCcdMetadata = {
   visit_name: string;
   ccd_name: string;
@@ -485,6 +509,7 @@ export const {
   useGetQuicklookMetadataQuery,
   useGetTimeProfileQuery,
   useListVisitsQuery,
+  useListVisitDayCountsQuery,
   useGetVisitMetadataQuery,
   useGetVisitResolutionQuery,
   useGetExposureDataTypesQuery,

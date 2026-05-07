@@ -44,14 +44,14 @@ function ContextMenuAtPosition({ CcdMetadata }: { openedAt: SkyCoord, CcdMetadat
     if (CcdMetadata) {
       window.open(`${env.baseUrl}/header/${visit}/${CcdMetadata.ccd_name}`)
     }
-  }, [CcdMetadata])
+  }, [CcdMetadata, visit])
 
   const downloadThisFitsFile = useCallback(() => {
     if (CcdMetadata) {
       const fitsUrl = `${env.baseUrl}/api/quicklooks/${visit}/fits/${CcdMetadata.ccd_name}`
       download(fitsUrl, `${visit}-${CcdMetadata.ccd_name}.fits`)
     }
-  }, [CcdMetadata])
+  }, [CcdMetadata, visit])
 
   const toggleHighlight = useCallback(() => {
     if (CcdMetadata) {
@@ -120,7 +120,7 @@ function TemplateMenu({ template, CcdMetadata }: { template: CopyTemplate, CcdMe
         await copyTextToClipboard(text)
       }
     }
-  }, [metadata, template])
+  }, [metadata, template, text])
 
   return (
     <MenuItem

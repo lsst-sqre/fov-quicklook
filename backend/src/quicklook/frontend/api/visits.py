@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from quicklook.datasource import get_datasource
-from quicklook.datasource.butler_datasource import VisitEntry
-from quicklook.datasource.types import DataSourceCcdMetadata, ResolvedVisitInfo
+from quicklook.datasource.types import DataSourceCcdMetadata, ResolvedVisitInfo, VisitDayCount, VisitDayCountQuery, VisitEntry
 from quicklook.datasource.types import VisitResolutionError
 from quicklook.datasource.types import Query as DataSourceQuery
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
@@ -27,6 +26,25 @@ async def list_visits(
             limit=limit,
         )
     )
+
+
+@router.get('/api/visits/day_counts', response_model=list[VisitDayCount])
+async def list_visit_day_counts(
+    calendar_month: str = Query(..., pattern=r'^\d{4}-\d{2}$'),
+    data_type: CcdDataType = Query(...),
+    repository_name: str = Query(...),
+):
+    ds = get_datasource()
+    try:
+        return await ds.query_visit_day_counts(
+            VisitDayCountQuery(
+                data_type=data_type,
+                repository_name=repository_name,
+                calendar_month=calendar_month,
+            )
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @router.get(
