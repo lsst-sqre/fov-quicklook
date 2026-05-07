@@ -86,7 +86,7 @@ def preprocess_ccd_raw(
         hdul = pyfits.open(path, memmap=False)
         header = hdul[0].header  # type: ignore
         assert ccd_name == f'{header["RAFTBAY"]}_{header["CCDSLOT"]}'
-        amps = [RawAmp.from_hdu(j, hdu) for j, hdu in enumerate(hdul) if hdu.name.startswith('Segment')]  # type: ignore
+        amps = [RawAmp.from_hdu(j, hdu) for j, hdu in enumerate(hdul) if hdu.name.lower().startswith('segment')]  # type: ignore
         assembly = assemble_raw_amps(amps, ccd_name)
         with timeit(f'image-stat-{ccd_ref.fullname}'):
             stat = image_stat(assembly.data[:, :, 0])

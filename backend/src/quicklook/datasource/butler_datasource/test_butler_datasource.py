@@ -551,3 +551,69 @@ def test_resolve_visit_sync_raises_visit_resolution_error_for_unsupported_datase
         )
     else:  # pragma: no cover
         raise AssertionError('VisitResolutionError was not raised')
+
+
+def test_get_data_uses_virtual_review_app_raw_generator(monkeypatch):
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            assert dimension == "exposure"
+            assert kwargs == {"where": "exposure=910001"}
+            return FakeDimensionRecordResults([
+                SimpleNamespace(
+                    id=910001,
+                    day_obs=20260501,
+                    physical_filter="r",
+                    obs_id="fixture-910001",
+                )
+            ])
+
+    ds = _make_datasource(
+        data_type="raw",
+        data_id_dimension="exposure",
+        order_by=["-day_obs", "-exposure"],
+        registry=FakeRegistry(),
+    )
+    ds._config = CcdDataTypeConfig(
+        data_type="raw",
+        display_name="raw",
+        collections=["dummy"],
+        data_id_dimension="exposure",
+        order_by=["-day_obs", "-exposure"],
+        partial=False,
+        repository_name="reviewapp-ci",
+        instrument="LSSTCam",
+    )
+    ds._butler = cast(
+        Any,
+        SimpleNamespace(
+            registry=FakeRegistry(),
+            query_datasets=lambda *args, **kwargs: [SimpleNamespace(dataId={"detector": 0})],
+        ),
+    )
+
+    monkeypatch.setattr(
+        "quicklook.datasource.butler_datasource.Instrument.get",
+        lambda instrument: SimpleNamespace(ccd_2_detector={CcdName("R01_S00"): 0}),
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_render_virtual_raw_fits_bytes(**kwargs: object) -> bytes:
+        captured.update(kwargs)
+        return b"virtual-fits"
+
+    monkeypatch.setattr(
+        "quicklook.review_app.synthetic.render_virtual_raw_fits_bytes",
+        fake_render_virtual_raw_fits_bytes,
+    )
+
+    result = ds.get_data(CcdDataRef(VisitName("reviewapp-ci:raw:910001"), CcdName("R01_S00")))
+
+    assert result == b"virtual-fits"
+    assert captured == {
+        "ccd_name": CcdName("R01_S00"),
+        "exposure_id": 910001,
+        "day_obs": 20260501,
+        "physical_filter": "r",
+        "obs_id": "fixture-910001",
+    }

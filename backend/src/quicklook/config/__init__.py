@@ -32,6 +32,7 @@ class Config(BaseSettings):
         env_nested_delimiter='__',
         nested_model_default_partial_update=True,
         case_sensitive=True,
+        extra='ignore',
     )
 
     # app settings

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from quicklook.config import config
@@ -5,18 +6,18 @@ from quicklook.datasource.butler_datasource.instrument import Instrument
 from quicklook.datasource.types import VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 from quicklook.utils.fits import fits_partial_load
-from quicklook.utils.s3 import s3_download_object, s3_list_objects
+from quicklook.utils.s3 import NoSuchKey, s3_download_object, s3_list_objects
 
 from ..types import DataSourceBase, DataSourceCcdMetadata, Query, VisitName
+
+SHARED_SAMPLE_MANIFEST_KEY = "_fixtures/review-app/sample-manifest.json"
 
 
 class DummyDataSource(DataSourceBase):
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
-        return [
-            create_dummy_visit_entry("dummy:raw:broccoli", 20230101, "r", 30.0, target_name="dummy_target"),
-            create_dummy_visit_entry("dummy:calexp:192350", 20230102, "g", 15.0, target_name="dummy_target_2"),
-            *[create_dummy_visit_entry(f"dummy:raw:dummy-{i}", 20230104, "z") for i in range(50)],
-        ][: q.limit]
+        visits = _load_shared_dummy_visits() or _default_dummy_visits()
+        visits = _filter_visits(visits, q)
+        return visits[: q.limit]
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:
         return visit
@@ -49,6 +50,14 @@ class DummyDataSource(DataSourceBase):
         )
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
+        if visits := _load_shared_dummy_visits():
+            matched_types = [
+                CcdDataType(f"{VisitName(visit.id).repository_name}:{VisitName(visit.id).data_type}")
+                for visit in visits
+                if VisitName(visit.id).name == str(exposure_id)
+            ]
+            if matched_types:
+                return matched_types
         return [CcdDataType(f"{dt.repository_name}:{dt.data_type}") for dt in config.ccd_data_types]
 
 
@@ -77,6 +86,46 @@ def _s3_list_visit_ccds(visit: VisitName) -> list[CcdName]:
             ccd_names.append(ccd_name)
 
     return ccd_names
+
+
+def _default_dummy_visits() -> list[VisitEntry]:
+    return [
+        create_dummy_visit_entry("dummy:raw:broccoli", 20230101, "r", 30.0, target_name="dummy_target"),
+        create_dummy_visit_entry("dummy:calexp:192350", 20230102, "g", 15.0, target_name="dummy_target_2"),
+        *[create_dummy_visit_entry(f"dummy:raw:dummy-{i}", 20230104, "z") for i in range(50)],
+    ]
+
+
+def _load_shared_dummy_visits() -> list[VisitEntry] | None:
+    try:
+        payload = s3_download_object(config.s3_test_data, SHARED_SAMPLE_MANIFEST_KEY)
+    except NoSuchKey:
+        return None
+
+    data = json.loads(payload)
+    visits = data.get("visits")
+    if not isinstance(visits, list):
+        raise ValueError(f"Unexpected manifest format in {SHARED_SAMPLE_MANIFEST_KEY}")
+    return [
+        VisitEntry(**{key: value for key, value in visit.items() if key != "ccds"})
+        for visit in visits
+    ]
+
+
+def _filter_visits(visits: list[VisitEntry], q: Query) -> list[VisitEntry]:
+    filtered: list[VisitEntry] = []
+    for visit in visits:
+        visit_name = VisitName(visit.id)
+        if visit_name.repository_name != q.repository_name:
+            continue
+        if visit_name.data_type != q.data_type:
+            continue
+        if q.day_obs is not None and visit.day_obs != q.day_obs:
+            continue
+        if q.exposure is not None and visit_name.name != str(q.exposure):
+            continue
+        filtered.append(visit)
+    return filtered
 
 
 def create_dummy_visit_entry(

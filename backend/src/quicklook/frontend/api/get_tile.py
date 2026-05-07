@@ -53,11 +53,14 @@ async def get_tile(
 
 async def _get_tile_from_object_storage(visit: VisitName, pos: TilePos) -> Response:
     object_storage = VisitObjectStorage(visit)
+    headers = get_cache_headers()
     try:
         data_bytes = await object_storage.get_quicklook_tile_bytes(pos)
     except NoSuchKey:
         raise HTTPException(404)
-    return Response(data_bytes, media_type='application/npy+zstd')
+    if data_bytes is None:
+        return Response(blank_npy_zstd(), media_type='application/npy+zstd', headers=headers)
+    return Response(data_bytes, media_type='application/npy+zstd', headers=headers)
 
 
 async def _gather_single_fits_tiles(
