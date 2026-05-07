@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from typing import Callable, Optional, ParamSpec, TypeVar
+from typing import Callable, ParamSpec, TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -42,13 +42,11 @@ def imap_unordered_threadpool(
 
     in_flight: set[Future[R]] = set()
 
-    # 先行投入（初回は同期的に取得。パイプライン開始前なのでブロックしても問題ない）
-    for _ in range(max_in_flight):
-        try:
-            x = next(it)
-        except StopIteration:
-            break
-        in_flight.add(executor.submit(func, x))
+    try:
+        first_item = next(it)
+    except StopIteration:
+        return
+    in_flight.add(executor.submit(func, first_item))
 
     # refill を別スレッドで行うための executor（1スレッド）
     # メインの executor は download 用なので、refill で占有しないよう分離する。

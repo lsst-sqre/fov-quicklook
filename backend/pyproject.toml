@@ -23,6 +23,7 @@ dependencies = [
     "websockets",
     "alembic",
     "asyncpg",
+    "pillow>=12.2.0",
 ]
 
 [project.optional-dependencies]

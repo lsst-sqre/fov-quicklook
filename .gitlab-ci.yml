@@ -1,0 +1,187 @@
+stages:
+  - bootstrap
+  - build
+  - package
+  - deploy
+  - verify
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+default:
+  interruptible: true
+
+variables:
+  GIT_SUBMODULE_STRATEGY: none
+  REVIEW_APP_GATEWAY_NAMESPACE: "gateway-test"
+  REVIEW_APP_GATEWAY_NAME: "microk8s-envoy"
+  REVIEW_APP_GATEWAY_CLASS_NAME: "envoy"
+  REVIEW_APP_GATEWAY_LISTENER_NAME: "http"
+  REVIEW_APP_REGISTRY_PORT: "32000"
+  REVIEW_APP_REGISTRY_NAMESPACE: "container-registry"
+  REVIEW_APP_REGISTRY_SERVICE_NAME: "registry"
+  REVIEW_APP_GENERATOR_REPLICAS: "2"
+  REVIEW_APP_DATA_SOURCE: "butler"
+  STELLAR_GLOBE_REF: "main"
+
+.review_app_rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+    - when: never
+
+.review_app_stop_rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: manual
+    - when: never
+
+.with_kubectl:
+  before_script:
+    - apk add --no-cache curl kubectl
+    - |
+      if [ -n "${REVIEW_APP_KUBECONFIG_B64:-}" ]; then
+        mkdir -p "$CI_PROJECT_DIR/.kube"
+        printf '%s' "$REVIEW_APP_KUBECONFIG_B64" | base64 -d > "$CI_PROJECT_DIR/.kube/config"
+        export KUBECONFIG="$CI_PROJECT_DIR/.kube/config"
+      fi
+
+.with_stellar_globe:
+  before_script:
+    - |
+      apt-get update
+      apt-get install -y --no-install-recommends git
+      rm -rf /var/lib/apt/lists/*
+      rm -rf frontend/lib/stellar-globe
+      git clone --depth 1 --branch "$STELLAR_GLOBE_REF" \
+        "https://gitlab-ci-token:${CI_JOB_TOKEN}@adc-gitlab.mtk.nao.ac.jp/gitlab/michitaro/stellar-globe.git" \
+        frontend/lib/stellar-globe
+
+build:review:frontend:
+  stage: build
+  image: node:22-bookworm
+  extends:
+    - .review_app_rules
+    - .with_stellar_globe
+  script:
+    - cd frontend/lib/stellar-globe/stellar-globe
+    - npm ci
+    - npm run build
+    - cd "$CI_PROJECT_DIR/frontend/lib/stellar-globe/react-stellar-globe"
+    - npm ci
+    - npm run build
+    - cd "$CI_PROJECT_DIR"
+    - |
+      script_dir="$CI_PROJECT_DIR/ci/review-app"
+      . "$script_dir/common.sh"
+      export VITE_BASE_URL="$(review_app_base_path)"
+      cd frontend/app
+      npm ci
+      npx vite build
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - frontend/app/dist/
+
+bootstrap:review:app:
+  stage: bootstrap
+  image: alpine:3.20
+  extends:
+    - .review_app_rules
+    - .with_kubectl
+  resource_group: review-app-bootstrap
+  script:
+    - sh ci/review-app/bootstrap-gateway.sh
+  artifacts:
+    expire_in: 1 week
+    reports:
+      dotenv: review-app-bootstrap.env
+    paths:
+      - review-app-bootstrap.env
+
+package:review:app:
+  stage: package
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  extends:
+    - .review_app_rules
+  needs:
+    - job: build:review:frontend
+      artifacts: true
+    - job: bootstrap:review:app
+      artifacts: true
+  script:
+    - |
+      IMAGE_REF="$(sh ci/review-app/package.sh)"
+      REGISTRY_HOST="${IMAGE_REF%%/*}"
+      printf '%s\n' "$IMAGE_REF" > review-app-image.txt
+      /kaniko/executor \
+        --context "$CI_PROJECT_DIR" \
+        --dockerfile "$CI_PROJECT_DIR/ci/review-app/Dockerfile" \
+        --destination "$IMAGE_REF" \
+        --build-arg "GIT_REVISION=${CI_COMMIT_SHA:-unknown}" \
+        --insecure-registry "$REGISTRY_HOST" \
+        --skip-tls-verify-registry "$REGISTRY_HOST"
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - review-app-image.txt
+
+review:app:
+  stage: deploy
+  image: alpine:3.20
+  extends:
+    - .review_app_rules
+    - .with_kubectl
+  needs:
+    - job: bootstrap:review:app
+      artifacts: true
+    - job: package:review:app
+  resource_group: "review-app/$CI_COMMIT_REF_SLUG"
+  script:
+    - sh ci/review-app/deploy.sh
+  artifacts:
+    expire_in: 1 week
+    reports:
+      dotenv: review-app.env
+    paths:
+      - review-app.env
+  environment:
+    name: "review/$CI_COMMIT_REF_SLUG"
+    url: "$REVIEW_APP_ENVIRONMENT_URL"
+    on_stop: stop:review:app
+    auto_stop_in: 1 week
+
+smoke:review:app:
+  stage: verify
+  image: alpine:3.20
+  extends:
+    - .review_app_rules
+  needs:
+    - job: review:app
+      artifacts: true
+  before_script:
+    - apk add --no-cache curl python3
+  script:
+    - sh ci/review-app/smoke.sh
+
+stop:review:app:
+  stage: deploy
+  image: alpine:3.20
+  extends:
+    - .review_app_stop_rules
+    - .with_kubectl
+  allow_failure: true
+  resource_group: "review-app/$CI_COMMIT_REF_SLUG"
+  script:
+    - sh ci/review-app/stop.sh
+  environment:
+    name: "review/$CI_COMMIT_REF_SLUG"
+    action: stop

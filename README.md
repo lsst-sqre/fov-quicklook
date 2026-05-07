@@ -294,6 +294,8 @@ make test -- -s                 # Show print statements
 - **Development Setup**: `/docs/dev.md` - Local development environment
 - **API Reference**: `/docs/request.md` - HTTP request examples
 - **Task Definitions**: `/docs/tasks.md` - RPC task specifications
+- **Review App Planning**: `/docs/review-app-ci.ja.md` - CI review app requirements and phased approach
+- **Review App Fixtures**: `/docs/review-app-shared-fixtures.ja.md` - Shared Butler/sample fixture generation for CI
 - **Backend Details**: `/backend/.github/copilot-instructions.md` - Python patterns, testing, RPC design
 - **Frontend Details**: `/frontend/app/.github/copilot-instructions.md` - SCSS build, type generation
 

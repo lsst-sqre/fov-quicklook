@@ -152,13 +152,19 @@ class DataTypeSpecificDataSource:
         return len(refs) > 0
 
     def get_data(self, ref: CcdDataRef) -> bytes:
+        self._dataset_ref(ref)
+        if self._is_virtual_review_app_fixture(ref.visit):
+            return self._render_virtual_review_app_raw(ref)
         return retrieve_data(self._getUri(ref), partial=self.partial)
 
     def _getUri(self, ref: CcdDataRef) -> ResourcePath:
         b = self._butler
-        detector_id = Instrument.get(self.instrument).ccd_2_detector[ref.ccd]
-        butler_ref = self._refs_by_visit(ref.visit)[detector_id]
+        butler_ref = self._dataset_ref(ref)
         return b.getURI(butler_ref)  # type: ignore
+
+    def _dataset_ref(self, ref: CcdDataRef) -> ButlerDatasetRef:
+        detector_id = Instrument.get(self.instrument).ccd_2_detector[ref.ccd]
+        return self._refs_by_visit(ref.visit)[detector_id]
 
     def _refs_by_visit(self, visit: VisitName) -> dict[int, ButlerDatasetRef]:
         refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit)
@@ -242,6 +248,30 @@ class DataTypeSpecificDataSource:
     def _get_exposure_info(self, day_obs: int) -> dict[int, ButlerDimensionRecord]:
         records = self._butler.registry.queryDimensionRecords('exposure', where=f"day_obs={day_obs}")
         return {record.id: record for record in records}
+
+    def _get_exposure_record(self, exposure_id: int) -> ButlerDimensionRecord:
+        records = self._query_dimension_records("exposure", where=f"exposure={exposure_id}", limit=1)
+        if len(records) != 1:
+            raise ValueError(f"Cannot find unique exposure record for exposure {exposure_id}. found {len(records)} matches")
+        return records[0]
+
+    def _is_virtual_review_app_fixture(self, visit: VisitName) -> bool:
+        from quicklook.review_app.shared_fixtures import FIXTURE_REPOSITORY_NAME
+
+        return visit.repository_name == FIXTURE_REPOSITORY_NAME and visit.data_type == "raw"
+
+    def _render_virtual_review_app_raw(self, ref: CcdDataRef) -> bytes:
+        from quicklook.review_app.synthetic import render_virtual_raw_fits_bytes
+
+        exposure_id = int(ref.visit.name)
+        exposure = self._get_exposure_record(exposure_id)
+        return render_virtual_raw_fits_bytes(
+            ccd_name=ref.ccd,
+            exposure_id=exposure_id,
+            day_obs=cast(int, getattr(exposure, "day_obs")),
+            physical_filter=_record_string_attr(exposure, "physical_filter", "band"),
+            obs_id=_record_string_attr(exposure, "obs_id", default=str(exposure_id)),
+        )
 
     def _query_datasets(
         self,
