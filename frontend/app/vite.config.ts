@@ -1,19 +1,28 @@
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, UserConfig } from 'vite'
 
-let getGafaelfawrToken: (() => string) | null = null
-
-try {
-  // @ts-ignore
-  getGafaelfawrToken = require('./vite.proxysettings').getGafaelfawrToken
-} catch (e) {
-  // vite.proxysettings.ts が見つからない場合はスキップ（production ビルド時など）
+type ProxySettingsModule = {
+  getGafaelfawrToken: () => string
 }
 
-// https://vitejs.dev/config/
-// @ts-ignore
-export default ({ mode }) => {
-  // @ts-ignore
+async function loadProxyTokenReader(mode: string): Promise<(() => string) | null> {
+  if (mode !== 'development') {
+    return null
+  }
+
+  const proxySettingsUrl = new URL('./vite.proxysettings.ts', import.meta.url)
+  const proxySettingsPath = fileURLToPath(proxySettingsUrl)
+  if (!existsSync(proxySettingsPath)) {
+    return null
+  }
+
+  const module = await import(proxySettingsUrl.href) as ProxySettingsModule
+  return module.getGafaelfawrToken
+}
+
+export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, process.cwd())
   const base = env.VITE_BASE_URL // これは /fov-quicklook のような値が入る
 
@@ -21,20 +30,25 @@ export default ({ mode }) => {
     throw new Error('VITE_BASE_URL is not set.')
   }
 
-  const config = {
+  const getGafaelfawrToken = await loadProxyTokenReader(mode)
+
+  const config: UserConfig = {
     base: `${base}/`,
     plugins: [
       react(),
     ],
+    resolve: {
+      preserveSymlinks: true,
+    },
     css: {
       modules: {
-        localsConvention: 'camelCaseOnly' as const,
+        localsConvention: 'camelCaseOnly',
       },
     },
   }
 
   if (mode === 'development' && getGafaelfawrToken) {
-    return defineConfig({
+    return {
       ...config,
       server: {
         proxy: {
@@ -58,8 +72,8 @@ export default ({ mode }) => {
           ignored: ['**/node_modules/**'],
         },
       },
-    } as any)
+    }
   }
 
-  return defineConfig(config as any)
-}
+  return config
+})

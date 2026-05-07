@@ -1,4 +1,6 @@
 import threading
+from collections import Counter
+from datetime import date
 from functools import lru_cache
 from itertools import islice
 from types import EllipsisType
@@ -8,7 +10,7 @@ from uuid import UUID
 from lsst.resources import ResourcePath
 
 from quicklook.config import CcdDataTypeConfig, config
-from quicklook.datasource.types import VisitEntry
+from quicklook.datasource.types import VisitDayCount, VisitDayCountQuery, VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError
@@ -42,6 +44,9 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
 
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return _get_datasource(q.data_type, q.repository_name).query_visits(q)
+
+    def query_visit_day_counts_sync(self, q: VisitDayCountQuery) -> list[VisitDayCount]:
+        return _get_datasource(q.data_type, q.repository_name).query_visit_day_counts(q.calendar_month)
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:
         return self.resolve_visit_info_sync(visit).visit_name
@@ -131,6 +136,17 @@ class DataTypeSpecificDataSource:
             order_by=self.order_by,
         )
         return [self._visit_entry_from_record(record) for record in records]
+
+    def query_visit_day_counts(self, calendar_month: str) -> list[VisitDayCount]:
+        start_day_obs, end_day_obs = _calendar_month_day_obs_range(calendar_month)
+        data_ids = self._query_data_ids(
+            ['day_obs', self.data_id_dimension],
+            datasets=self.butler_data_type,
+            where=f"day_obs>={start_day_obs} and day_obs<{end_day_obs}",
+            order_by=['day_obs'],
+        )
+        counts_by_day_obs = Counter(int(data_id['day_obs']) for data_id in data_ids)
+        return [VisitDayCount(day_obs=day_obs, count=count) for day_obs, count in sorted(counts_by_day_obs.items())]
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
         refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit)
@@ -226,6 +242,29 @@ class DataTypeSpecificDataSource:
             records = records.limit(limit)
         return list(records)
 
+    def _query_data_ids(
+        self,
+        dimensions: list[str],
+        *,
+        datasets: str | None = None,
+        where: str | None = None,
+        limit: int | None = None,
+        order_by: list[str] | None = None,
+    ) -> list[Any]:
+        kwargs: dict[str, Any] = {}
+        if datasets is not None:
+            kwargs['datasets'] = datasets
+            if self.butler_data_type == 'difference_image':
+                kwargs['collections'] = self._query_collections()
+        if where:
+            kwargs['where'] = where
+        data_ids = self._butler.registry.queryDataIds(dimensions, **kwargs)
+        if order_by is not None:
+            data_ids = data_ids.order_by(*order_by)
+        if limit is not None:
+            data_ids = data_ids.limit(limit)
+        return list(data_ids)
+
     def _visit_entry_from_record(self, record: ButlerDimensionRecord) -> VisitEntry:
         return VisitEntry(
             id=f'{self.repository_name}:{self.butler_data_type}:{record.id}',
@@ -275,6 +314,15 @@ def _resolve_ref(ref: CcdDataRef, visit: VisitName) -> CcdDataRef:
     if visit == ref.visit:
         return ref
     return CcdDataRef(visit=visit, ccd=ref.ccd)
+
+
+def _calendar_month_day_obs_range(calendar_month: str) -> tuple[int, int]:
+    year_text, month_text = calendar_month.split('-', maxsplit=1)
+    year = int(year_text)
+    month = int(month_text)
+    start = date(year, month, 1)
+    end = date(year + (1 if month == 12 else 0), 1 if month == 12 else month + 1, 1)
+    return int(start.strftime('%Y%m%d')), int(end.strftime('%Y%m%d'))
 
 
 def _resolve_visit(visit: VisitName) -> VisitName:
@@ -346,6 +394,14 @@ def _record_float_attr(record: ButlerDimensionRecord, name: str, default: float 
     if value is None:
         return default
     return float(value)
+
+
+def _record_int_attr(record: ButlerDimensionRecord, *names: str, default: int = 0) -> int:
+    for name in names:
+        value = getattr(record, name, None)
+        if value is not None:
+            return int(value)
+    return default
 
 
 def _get_datasource(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:

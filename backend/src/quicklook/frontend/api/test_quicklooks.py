@@ -214,3 +214,36 @@ def test_shared_large_status_replaces_recent_ready_metadata(monkeypatch):
 
     assert quicklooks._recent_ready_metadata_dict == {}
     assert quicklooks._get_ccd_metadata_list_for_shared_status(visit) == active_metadata
+
+async def test_get_all_quicklook_jobs_returns_cached_broadcast_value(monkeypatch):
+    job = Job(VisitName('repo:raw:4242'))
+    broadcast = Broadcast(max_queue_size=2)
+    broadcast.put({job.visit: job.status})
+
+    monkeypatch.setattr(quicklooks, '_job_status_dict', broadcast)
+
+    async def fail_http_request(*args, **kwargs):
+        raise AssertionError((args, kwargs))
+
+    monkeypatch.setattr(quicklooks, 'http_request', fail_http_request)
+
+    jobs = await quicklooks.get_all_quicklook_jobs()
+
+    assert jobs == {job.visit: job.status}
+
+
+async def test_get_all_quicklook_jobs_falls_back_to_coordinator(monkeypatch):
+    monkeypatch.setattr(quicklooks, '_job_status_dict', Broadcast(max_queue_size=2))
+    received: list[tuple[str, str, dict]] = []
+
+    async def fake_http_request(method: str, url: str, **kwargs):
+        received.append((method, url, kwargs))
+        return {}
+
+    monkeypatch.setattr(quicklooks, 'http_request', fake_http_request)
+
+    jobs = await quicklooks.get_all_quicklook_jobs()
+
+    assert jobs == {}
+    assert received == [('get', f'{quicklooks.config.coordinator_base_url}/quicklooks/*/status', {})]
+    assert quicklooks._job_status_dict.last_value() == {}

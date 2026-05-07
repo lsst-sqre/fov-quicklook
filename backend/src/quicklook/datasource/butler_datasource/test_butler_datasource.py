@@ -12,7 +12,7 @@ from quicklook.datasource.butler_datasource import (
     _get_resolved_visit_run,
     _resolve_visit_cache,
 )
-from quicklook.datasource.types import VisitResolutionError
+from quicklook.datasource.types import VisitDayCount, VisitResolutionError
 from quicklook.datasource.types import Query
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
@@ -29,6 +29,10 @@ class FakeDimensionRecordResults:
 
     def __iter__(self):
         return iter(self._records)
+
+    def count(self, *, exact: bool = True, discard: bool = False):
+        del exact, discard
+        return len(self._records)
 
 
 def _make_datasource(*, data_type: str, data_id_dimension: str, order_by: list[str], registry: object):
@@ -214,6 +218,44 @@ def test_query_dimension_records_applies_order_and_limit_after_query():
     assert calls == [('exposure', {'datasets': 'raw', 'where': 'day_obs=20250303'})]
     assert order_calls == [('-day_obs', '-exposure')]
     assert limit_calls == [7]
+
+
+def test_query_visit_day_counts_uses_butler_counts_by_day():
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    class FakeRegistry:
+        def queryDataIds(self, dimensions: list[str], **kwargs: object):
+            calls.append((dimensions, kwargs))
+            if dimensions == ['day_obs', 'exposure']:
+                return FakeDimensionRecordResults([
+                    {'day_obs': 20250301, 'exposure': 101},
+                    {'day_obs': 20250301, 'exposure': 102},
+                    {'day_obs': 20250303, 'exposure': 103},
+                ])
+            raise AssertionError((dimensions, kwargs))
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+
+    counts = ds.query_visit_day_counts('2025-03')
+
+    assert counts == [
+        VisitDayCount(day_obs=20250301, count=2),
+        VisitDayCount(day_obs=20250303, count=1),
+    ]
+    assert calls == [
+        (
+            ['day_obs', 'exposure'],
+            {
+                'datasets': 'raw',
+                'where': 'day_obs>=20250301 and day_obs<20250401',
+            },
+        ),
+    ]
 
 
 def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):

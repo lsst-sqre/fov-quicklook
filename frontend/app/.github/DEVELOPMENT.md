@@ -65,6 +65,29 @@ npm run test         # Vitest でテスト実行
 
 ---
 
+## ローカル package (`@stellar-globe/*`)
+
+`@stellar-globe/stellar-globe` と `@stellar-globe/react-stellar-globe` は
+`frontend/lib/stellar-globe/` 配下の **Git submodule** から参照しています。
+
+clone 直後や submodule 更新直後は、先に次を実行してください。
+
+```bash
+git submodule update --init --recursive
+
+cd frontend/lib/stellar-globe/stellar-globe
+npm ci
+npm run build
+
+cd ../react-stellar-globe
+npm ci
+npm run build
+```
+
+これを行わないと、`frontend/app` 側で `@stellar-globe/*` の解決や型チェックが失敗します。
+
+---
+
 ## SCSS スタイル
 
 ### 型生成
@@ -137,5 +160,6 @@ npm run test         # テスト実行
 
 ## よくある落とし穴
 
+- clone 直後は `frontend/lib/stellar-globe/` submodule の初期化と build が必要
 - SCSS 編集後に `npm run scss-types` を忘れると型エラーになる
 - API スキーマ変更後は `npm run api:rtk-query` で再生成が必要
