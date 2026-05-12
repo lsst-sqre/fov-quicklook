@@ -142,8 +142,12 @@ ccd_data_types:
     partial: true
 ```
 
-`difference_image` は `ccd_data_types` に明示しなくても、アプリ側の既定値補完と
-Data Query の `by_uuid` 経路で参照できる。
+Phalanx / `system_info` に `difference_image` を明示しなくても、Data Query の
+`by_uuid` 経路から参照できる。
+
+ただし現在の実装では、UUID 解決後に backend が dataset type ごとの扱い
+（`data_id_dimension` や `difference_image` 固有の query / CCD 処理）を選ぶため、
+サポート対象の data type 自体は backend 側の既定設定に残している。
 
 ## シークレット管理
 
