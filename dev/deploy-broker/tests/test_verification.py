@@ -34,7 +34,7 @@ def test_run_basic_checks_refreshes_token_after_auth_failure(
     def handler(request: httpx.Request) -> httpx.Response:
         cookie = request.headers["Cookie"]
         if cookie == 'gafaelfawr="stale-token"':
-            return httpx.Response(401)
+            return httpx.Response(302)
         if request.url.path == "/api/healthz":
             return httpx.Response(200)
         if request.url.path == "/":
@@ -54,3 +54,32 @@ def test_run_basic_checks_refreshes_token_after_auth_failure(
     assert result["healthz_ok"] is True
     assert result["frontend_ok"] is True
     assert token_requests == [False, True]
+
+
+def test_run_basic_checks_raises_when_status_stays_non_200(
+    tmp_path: Path, monkeypatch
+) -> None:
+    settings = _settings(tmp_path)
+    token_store = TokenStore(settings)
+    client = VerificationClient(settings, token_store)
+
+    monkeypatch.setattr(token_store, "get_app_token", lambda *, refresh=False: "bad-token")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302)
+
+    transport = httpx.MockTransport(handler)
+    real_client = httpx.Client
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        lambda **kwargs: real_client(transport=transport, **kwargs),
+    )
+
+    try:
+        client.run_basic_checks("all")
+    except RuntimeError as exc:
+        assert "healthz returned 302" in str(exc)
+        assert "frontend returned 302" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError for non-200 verification")

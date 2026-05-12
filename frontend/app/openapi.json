@@ -630,6 +630,45 @@
                 }
             }
         },
+        "/api/visits/{visit_name}/representative_uuid": {
+            "get": {
+                "summary": "Get Visit Representative Uuid",
+                "operationId": "get_visit_representative_uuid",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VisitRepresentativeUuid"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/exposures/{id}/types": {
             "get": {
                 "summary": "Get Exposure Data Types",
@@ -1796,6 +1835,17 @@
                     "target_name": {
                         "type": "string",
                         "title": "Target Name"
+                    },
+                    "uuid": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Uuid"
                     }
                 },
                 "type": "object",
@@ -1811,6 +1861,19 @@
                     "target_name"
                 ],
                 "title": "VisitEntry"
+            },
+            "VisitRepresentativeUuid": {
+                "properties": {
+                    "uuid": {
+                        "type": "string",
+                        "title": "Uuid"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "uuid"
+                ],
+                "title": "VisitRepresentativeUuid"
             }
         }
     }

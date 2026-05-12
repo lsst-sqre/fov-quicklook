@@ -29,8 +29,9 @@ class BrokerClient:
         response.raise_for_status()
         return response.json()
 
-    def get_app_token(self) -> dict[str, Any]:
-        response = self._client.get("/v1/tokens/app")
+    def get_app_token(self, *, refresh: bool = False) -> dict[str, Any]:
+        params = {"refresh": "true"} if refresh else None
+        response = self._client.get("/v1/tokens/app", params=params)
         response.raise_for_status()
         return response.json()
 
@@ -162,7 +163,12 @@ def main() -> None:
     restart_parser = subparsers.add_parser("argocd-restart")
     restart_parser.add_argument("components", nargs="*")
 
-    subparsers.add_parser("get-app-token")
+    get_app_token_parser = subparsers.add_parser("get-app-token")
+    get_app_token_parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="refresh the app token via the configured token command before returning it",
+    )
     subparsers.add_parser("argocd-status")
     subparsers.add_parser("argocd-get-branch")
     subparsers.add_parser("argocd-sync")
@@ -171,7 +177,7 @@ def main() -> None:
     client = BrokerClient(args.server, args.api_token)
     try:
         if args.command == "get-app-token":
-            _print_json(client.get_app_token())
+            _print_json(client.get_app_token(refresh=args.refresh))
         elif args.command == "argocd-status":
             _print_json(client.argocd_status())
         elif args.command == "argocd-get-branch":

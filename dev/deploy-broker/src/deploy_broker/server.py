@@ -40,9 +40,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dependencies=[Depends(require_bearer_token)],
         response_model=TokenResponse,
     )
-    def get_app_token() -> TokenResponse:
+    def get_app_token(refresh: bool = False) -> TokenResponse:
         try:
-            return TokenResponse(token=service.get_app_token())
+            return TokenResponse(token=service.get_app_token(refresh=refresh))
         except Exception as exc:
             _raise_http_error(exc)
 

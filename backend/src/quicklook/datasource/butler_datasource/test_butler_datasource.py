@@ -168,6 +168,34 @@ def test_query_visits_uses_configured_dimension_for_visit_dataset():
     assert [entry.id for entry in entries] == ['repo:preliminary_visit_image:7001']
 
 
+def test_get_visit_representative_uuid_uses_single_dataset_lookup(monkeypatch):
+    captured: dict[str, object] = {}
+
+    ds = _make_datasource(
+        data_type='difference_image',
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        registry=object(),
+    )
+
+    visit = VisitName('repo:difference_image:7001')
+
+    def fake_query_datasets(where: str, *, visit: VisitName | None = None, limit: int | None = None):
+        captured['where'] = where
+        captured['visit'] = visit
+        captured['limit'] = limit
+        return [SimpleNamespace(id='019bbefe-465a-7815-a05c-13dc47a78418')]
+
+    monkeypatch.setattr(ds, '_query_datasets', fake_query_datasets)
+
+    assert ds.get_visit_representative_uuid_sync(visit) == '019bbefe-465a-7815-a05c-13dc47a78418'
+    assert captured == {
+        'where': 'visit=7001',
+        'visit': visit,
+        'limit': 1,
+    }
+
+
 def test_query_dimension_records_applies_order_and_limit_after_query():
     calls: list[tuple[str, dict[str, object]]] = []
     order_calls: list[tuple[str, ...]] = []

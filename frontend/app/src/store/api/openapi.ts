@@ -114,6 +114,14 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/visits/${queryArg.visitName}/resolution`,
       }),
     }),
+    getVisitRepresentativeUuid: build.query<
+      GetVisitRepresentativeUuidApiResponse,
+      GetVisitRepresentativeUuidApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/visits/${queryArg.visitName}/representative_uuid`,
+      }),
+    }),
     getExposureDataTypes: build.query<
       GetExposureDataTypesApiResponse,
       GetExposureDataTypesApiArg
@@ -250,6 +258,11 @@ export type GetVisitMetadataApiArg = {
 export type GetVisitResolutionApiResponse =
   /** status 200 Successful Response */ ResolvedVisitInfo;
 export type GetVisitResolutionApiArg = {
+  visitName: string;
+};
+export type GetVisitRepresentativeUuidApiResponse =
+  /** status 200 Successful Response */ VisitRepresentativeUuid;
+export type GetVisitRepresentativeUuidApiArg = {
   visitName: string;
 };
 export type GetExposureDataTypesApiResponse =
@@ -461,6 +474,7 @@ export type VisitEntry = {
   observation_type: string;
   observation_reason: string;
   target_name: string;
+  uuid?: string | null;
 };
 export type VisitDayCount = {
   day_obs: number;
@@ -477,6 +491,9 @@ export type DataSourceCcdMetadata = {
 export type ResolvedVisitInfo = {
   visit_name: string;
   detector?: number | null;
+};
+export type VisitRepresentativeUuid = {
+  uuid: string;
 };
 export type ShutdownResponse = {
   status: string;
@@ -512,6 +529,7 @@ export const {
   useListVisitDayCountsQuery,
   useGetVisitMetadataQuery,
   useGetVisitResolutionQuery,
+  useGetVisitRepresentativeUuidQuery,
   useGetExposureDataTypesQuery,
   useGetFitsFileQuery,
   useKillCoordinatorMutation,

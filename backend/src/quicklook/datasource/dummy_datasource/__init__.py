@@ -1,9 +1,11 @@
+import base64
+import binascii
 import json
 from pathlib import Path
 
 from quicklook.config import config
 from quicklook.datasource.butler_datasource.instrument import Instrument
-from quicklook.datasource.types import VisitDayCount, VisitDayCountQuery, VisitEntry
+from quicklook.datasource.types import VisitDayCount, VisitDayCountQuery, VisitEntry, VisitResolutionError
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import NoSuchKey, s3_download_object, s3_list_objects
@@ -35,9 +37,15 @@ class DummyDataSource(DataSourceBase):
         return [VisitDayCount(day_obs=day_obs, count=count) for day_obs, count in sorted(counts.items())]
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:
+        if visit.data_type == "by_uuid":
+            resolved_visit = _decode_dummy_visit_uuid(visit.name)
+            if resolved_visit.repository_name != visit.repository_name:
+                raise VisitResolutionError(f"Unknown dataset UUID: {visit.name}")
+            return resolved_visit
         return visit
 
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
+        visit = self.resolve_visit_sync(visit)
         ccds = [*_s3_list_visit_ccds(visit)]
         match config.environment:
             case 'test':
@@ -48,12 +56,14 @@ class DummyDataSource(DataSourceBase):
         return ccds
 
     def get_data_sync(self, ref: CcdDataRef) -> bytes:
+        ref = CcdDataRef(visit=self.resolve_visit_sync(ref.visit), ccd=ref.ccd)
         if ref.visit.data_type == "calexp":
             return _s3_get_visit_ccd_fits_calexp(ref)
         else:
             return _s3_get_visit_ccd_fits_raw(ref)
 
     def get_metadata_sync(self, ref: CcdDataRef) -> DataSourceCcdMetadata:
+        ref = CcdDataRef(visit=self.resolve_visit_sync(ref.visit), ccd=ref.ccd)
         i = Instrument.get("LSSTCam")
         return DataSourceCcdMetadata(
             detector=i.ccd_2_detector[ref.ccd],
@@ -63,6 +73,9 @@ class DummyDataSource(DataSourceBase):
             visit_name=ref.visit,
             uuid=f"dummy-uuid-{ref.visit.name}-{ref.ccd}",
         )
+
+    def get_visit_representative_uuid_sync(self, visit: VisitName) -> str:
+        return _encode_dummy_visit_uuid(self.resolve_visit_sync(visit))
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         if visits := _load_shared_dummy_visits():
@@ -101,6 +114,20 @@ def _s3_list_visit_ccds(visit: VisitName) -> list[CcdName]:
             ccd_names.append(ccd_name)
 
     return ccd_names
+
+
+def _encode_dummy_visit_uuid(visit: VisitName) -> str:
+    encoded = base64.urlsafe_b64encode(str(visit).encode("utf-8")).decode("ascii")
+    return encoded.rstrip("=")
+
+
+def _decode_dummy_visit_uuid(uuid_text: str) -> VisitName:
+    padding = "=" * (-len(uuid_text) % 4)
+    try:
+        visit_name = base64.urlsafe_b64decode(f"{uuid_text}{padding}").decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError) as e:  # pragma: no cover - malformed test input only
+        raise VisitResolutionError(f"Unknown dataset UUID: {uuid_text}") from e
+    return VisitName(visit_name)
 
 
 def _default_dummy_visits() -> list[VisitEntry]:
@@ -170,4 +197,5 @@ def create_dummy_visit_entry(
         observation_type=observation_type,
         observation_reason=observation_reason,
         target_name=target_name,
+        uuid=_encode_dummy_visit_uuid(VisitName(visit_id)),
     )

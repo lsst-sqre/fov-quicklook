@@ -41,8 +41,8 @@ class DeployBrokerService:
     def store_app_token_from_curl(self, curl_command: str) -> None:
         self._token_store.set_app_token(extract_app_token(curl_command))
 
-    def get_app_token(self) -> str:
-        return self._token_store.get_app_token()
+    def get_app_token(self, *, refresh: bool = False) -> str:
+        return self._token_store.get_app_token(refresh=refresh)
 
     def argocd_status(self):
         return self._argocd.status()

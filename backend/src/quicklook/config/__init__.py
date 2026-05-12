@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from quicklook.utils.s3 import S3Config
@@ -24,6 +24,57 @@ class CcdDataTypeConfig(BaseModel):
     partial: bool = False  # 部分読み込みを使用するか
     repository_name: str = "embargo"  # Butler リポジトリ名
     instrument: str = "LSSTCam"  # Butler instrument名
+
+
+DEFAULT_CCD_DATA_TYPES = [
+    CcdDataTypeConfig(
+        data_type='raw',
+        display_name='Raw',
+        collections=['LSSTCam/raw/all'],
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        partial=False,
+        repository_name='embargo',
+        instrument='LSSTCam',
+    ),
+    CcdDataTypeConfig(
+        data_type='post_isr_image',
+        display_name='Post-ISR',
+        collections=['LSSTCam/runs/nightlyValidation'],
+        data_id_dimension='exposure',
+        order_by=['-exposure'],
+        partial=True,
+        repository_name='embargo',
+        instrument='LSSTCam',
+    ),
+    CcdDataTypeConfig(
+        data_type='difference_image',
+        display_name='Difference Image',
+        collections=['LSSTCam/runs/nightlyValidation'],
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        partial=True,
+        repository_name='embargo',
+        instrument='LSSTCam',
+    ),
+    CcdDataTypeConfig(
+        data_type='preliminary_visit_image',
+        display_name='Preliminary',
+        collections=['LSSTCam/runs/nightlyValidation'],
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        partial=True,
+        repository_name='embargo',
+        instrument='LSSTCam',
+    ),
+]
+DEFAULT_CCD_DATA_TYPE_REPOSITORIES = {
+    data_type.repository_name for data_type in DEFAULT_CCD_DATA_TYPES
+}
+
+
+def _copy_default_ccd_data_types() -> list[CcdDataTypeConfig]:
+    return [data_type.model_copy(deep=True) for data_type in DEFAULT_CCD_DATA_TYPES]
 
 
 class Config(BaseSettings):
@@ -132,48 +183,32 @@ class Config(BaseSettings):
     pipeline_stage_timeout: int = 600  # 10 minutes; merge_tiles can be slow with concurrent jobs
 
     # CCD Data Types configuration
-    ccd_data_types: list[CcdDataTypeConfig] = [
-        CcdDataTypeConfig(
-            data_type='raw',
-            display_name='Raw',
-            collections=['LSSTCam/raw/all'],
-            data_id_dimension='exposure',
-            order_by=['-day_obs', '-exposure'],
-            partial=False,
-            repository_name='embargo',
-            instrument='LSSTCam',
-        ),
-        CcdDataTypeConfig(
-            data_type='post_isr_image',
-            display_name='Post-ISR',
-            collections=['LSSTCam/runs/nightlyValidation'],
-            data_id_dimension='exposure',
-            order_by=['-exposure'],
-            partial=True,
-            repository_name='embargo',
-            instrument='LSSTCam',
-        ),
-        CcdDataTypeConfig(
-            data_type='difference_image',
-            display_name='Difference Image',
-            collections=['LSSTCam/runs/nightlyValidation'],
-            data_id_dimension='visit',
-            order_by=['-visit'],
-            partial=True,
-            repository_name='embargo',
-            instrument='LSSTCam',
-        ),
-        CcdDataTypeConfig(
-            data_type='preliminary_visit_image',
-            display_name='Preliminary',
-            collections=['LSSTCam/runs/nightlyValidation'],
-            data_id_dimension='visit',
-            order_by=['-visit'],
-            partial=True,
-            repository_name='embargo',
-            instrument='LSSTCam',
-        ),
-    ]
+    ccd_data_types: list[CcdDataTypeConfig] = Field(default_factory=_copy_default_ccd_data_types)
+
+    @model_validator(mode='after')
+    def merge_missing_default_ccd_data_types(self):
+        configured_by_key = {
+            (data_type.repository_name, data_type.data_type): data_type
+            for data_type in self.ccd_data_types
+        }
+        configured_default_repositories = {
+            data_type.repository_name
+            for data_type in self.ccd_data_types
+            if data_type.repository_name in DEFAULT_CCD_DATA_TYPE_REPOSITORIES
+        }
+
+        if not configured_default_repositories:
+            return self
+
+        merged = []
+        for default in DEFAULT_CCD_DATA_TYPES:
+            if default.repository_name not in configured_default_repositories:
+                continue
+            key = (default.repository_name, default.data_type)
+            merged.append(configured_by_key.pop(key, default.model_copy(deep=True)))
+        merged.extend(configured_by_key.values())
+        self.ccd_data_types = merged
+        return self
 
 
 config = Config(
