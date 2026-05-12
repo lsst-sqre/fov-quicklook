@@ -184,6 +184,33 @@ class Config(BaseSettings):
 
     # CCD Data Types configuration
     ccd_data_types: list[CcdDataTypeConfig] = Field(default_factory=_copy_default_ccd_data_types)
+    configured_ccd_data_type_keys: set[tuple[str, str]] = Field(default_factory=set, exclude=True)
+
+    @model_validator(mode='before')
+    @classmethod
+    def capture_configured_ccd_data_type_keys(cls, data):
+        if not isinstance(data, dict):
+            return data
+
+        configured = data.get('ccd_data_types')
+        if not isinstance(configured, list):
+            return data
+
+        configured_keys = set()
+        for item in configured:
+            if not isinstance(item, dict):
+                continue
+            data_type = item.get('data_type')
+            if not isinstance(data_type, str) or not data_type:
+                continue
+            repository_name = item.get('repository_name', 'embargo')
+            if not isinstance(repository_name, str) or not repository_name:
+                repository_name = 'embargo'
+            configured_keys.add((repository_name, data_type))
+
+        merged = dict(data)
+        merged['configured_ccd_data_type_keys'] = configured_keys
+        return merged
 
     @model_validator(mode='after')
     def merge_missing_default_ccd_data_types(self):
@@ -209,6 +236,16 @@ class Config(BaseSettings):
         merged.extend(configured_by_key.values())
         self.ccd_data_types = merged
         return self
+
+    @property
+    def system_info_ccd_data_types(self) -> list[CcdDataTypeConfig]:
+        if not self.configured_ccd_data_type_keys:
+            return self.ccd_data_types
+        return [
+            data_type
+            for data_type in self.ccd_data_types
+            if (data_type.repository_name, data_type.data_type) in self.configured_ccd_data_type_keys
+        ]
 
 
 config = Config(
