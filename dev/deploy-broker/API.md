@@ -72,6 +72,8 @@ broker 自身が GitHub / Phalanx / ArgoCD / app access token を保持し、age
 {"token": "<gafaelfawr token>"}
 ```
 
+- query parameter: `refresh=true` を付けると、broker は `DEPLOY_BROKER_TOKEN_COMMAND` を再実行して token cache を更新してから返す
+
 ### `GET /v1/argocd/status`
 
 ```json
