@@ -42,12 +42,18 @@ class VisitEntry:
     observation_type: str
     observation_reason: str
     target_name: str
+    uuid: str | None = None
 
 
 @dataclass
 class VisitDayCount:
     day_obs: int
     count: int
+
+
+@dataclass
+class VisitRepresentativeUuid:
+    uuid: str
 
 
 class DataSourceBase(abc.ABC):
@@ -73,6 +79,12 @@ class DataSourceBase(abc.ABC):
         return ResolvedVisitInfo(visit_name=self.resolve_visit_sync(visit))
 
     resolve_visit_info = async_wrap(resolve_visit_info_sync)
+
+    @abc.abstractmethod
+    def get_visit_representative_uuid_sync(self, visit: VisitName) -> str:  # pragma: no cover
+        ...
+
+    get_visit_representative_uuid = async_wrap(get_visit_representative_uuid_sync)
 
     @abc.abstractmethod
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:  # pragma: no cover

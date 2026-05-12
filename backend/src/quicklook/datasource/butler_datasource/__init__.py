@@ -54,6 +54,10 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
     def resolve_visit_info_sync(self, visit: VisitName) -> ResolvedVisitInfo:
         return _resolve_visit_info(visit)
 
+    def get_visit_representative_uuid_sync(self, visit: VisitName) -> str:
+        visit = self.resolve_visit_sync(visit)
+        return _get_datasource(visit.data_type, visit.repository_name).get_visit_representative_uuid_sync(visit)
+
     def list_ccds_sync(self, visit: VisitName) -> list[CcdName]:
         visit = self.resolve_visit_sync(visit)
         return _get_datasource(visit.data_type, visit.repository_name).list_ccds(visit)
@@ -293,6 +297,12 @@ class DataTypeSpecificDataSource:
         if len(records) != 1:
             raise ValueError(f"Cannot find unique exposure record for exposure {exposure_id}. found {len(records)} matches")
         return records[0]
+
+    def get_visit_representative_uuid_sync(self, visit: VisitName) -> str:
+        refs = self._query_datasets(f"{self.data_id_dimension}={visit.name}", visit=visit, limit=1)
+        if len(refs) == 0:
+            raise VisitResolutionError(f"Cannot find dataset UUID for visit {visit}")
+        return str(refs[0].id)
 
     def _is_virtual_review_app_fixture(self, visit: VisitName) -> bool:
         from quicklook.review_app.shared_fixtures import FIXTURE_REPOSITORY_NAME

@@ -72,3 +72,11 @@ def test_get_exposure_data_types_uses_shared_manifest(monkeypatch):
 
     ds = DummyDataSource()
     assert ds.get_exposure_data_types_sync(910001) == [CcdDataType("dummy:raw")]
+
+
+def test_representative_uuid_round_trips_to_visit():
+    ds = DummyDataSource()
+
+    representative_uuid = ds.get_visit_representative_uuid_sync(VisitName("dummy:raw:910001"))
+
+    assert ds.resolve_visit_sync(VisitName(f"dummy:by_uuid:{representative_uuid}")) == VisitName("dummy:raw:910001")

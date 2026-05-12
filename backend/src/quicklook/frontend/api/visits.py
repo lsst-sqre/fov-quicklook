@@ -1,6 +1,13 @@
 from fastapi import APIRouter, HTTPException, Query
 from quicklook.datasource import get_datasource
-from quicklook.datasource.types import DataSourceCcdMetadata, ResolvedVisitInfo, VisitDayCount, VisitDayCountQuery, VisitEntry
+from quicklook.datasource.types import (
+    DataSourceCcdMetadata,
+    ResolvedVisitInfo,
+    VisitDayCount,
+    VisitDayCountQuery,
+    VisitEntry,
+    VisitRepresentativeUuid,
+)
 from quicklook.datasource.types import VisitResolutionError
 from quicklook.datasource.types import Query as DataSourceQuery
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
@@ -72,6 +79,17 @@ async def get_visit_resolution(visit_name: str) -> ResolvedVisitInfo:
     ds = get_datasource()
     try:
         return await ds.resolve_visit_info(VisitName(visit_name))
+    except VisitResolutionError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.get('/api/visits/{visit_name}/representative_uuid', response_model=VisitRepresentativeUuid)
+async def get_visit_representative_uuid(visit_name: str) -> VisitRepresentativeUuid:
+    ds = get_datasource()
+    try:
+        return VisitRepresentativeUuid(
+            uuid=await ds.get_visit_representative_uuid(VisitName(visit_name))
+        )
     except VisitResolutionError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 

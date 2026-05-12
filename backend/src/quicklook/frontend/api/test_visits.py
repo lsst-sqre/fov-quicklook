@@ -2,8 +2,9 @@ from types import SimpleNamespace
 
 from fastapi import HTTPException
 
-from quicklook.datasource.types import ResolvedVisitInfo, VisitDayCount, VisitResolutionError
+from quicklook.datasource.types import ResolvedVisitInfo, VisitDayCount, VisitRepresentativeUuid, VisitResolutionError
 from quicklook.frontend.api import visits
+from quicklook.types import CcdDataType
 from quicklook.types import VisitName
 
 
@@ -43,6 +44,19 @@ async def test_get_visit_resolution_returns_detector(monkeypatch):
     )
 
 
+async def test_get_visit_representative_uuid_returns_uuid(monkeypatch):
+    class FakeDataSource:
+        async def get_visit_representative_uuid(self, visit: VisitName) -> str:
+            assert visit == VisitName('repo:raw:4242')
+            return 'uuid-4242'
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    representative = await visits.get_visit_representative_uuid('repo:raw:4242')
+
+    assert representative == VisitRepresentativeUuid(uuid='uuid-4242')
+
+
 async def test_list_visit_day_counts_returns_backend_counts(monkeypatch):
     class FakeDataSource:
         async def query_visit_day_counts(self, q):
@@ -58,7 +72,7 @@ async def test_list_visit_day_counts_returns_backend_counts(monkeypatch):
 
     counts = await visits.list_visit_day_counts(
         calendar_month='2025-03',
-        data_type='raw',
+        data_type=CcdDataType('raw'),
         repository_name='repo',
     )
 
