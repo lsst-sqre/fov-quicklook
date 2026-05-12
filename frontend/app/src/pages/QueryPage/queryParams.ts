@@ -19,6 +19,26 @@ export function normalizeQueryInput(input: string): string {
   return input.trim().replace(/^\/query\?/, "").replace(/^\?/, "")
 }
 
+export function buildDefaultQueryInput(dataSource: string | null | undefined, limit = 2): string {
+  if (!dataSource) {
+    return ""
+  }
+
+  const separatorIndex = dataSource.indexOf(":")
+  if (separatorIndex <= 0 || separatorIndex >= dataSource.length - 1) {
+    return ""
+  }
+
+  const repositoryName = dataSource.slice(0, separatorIndex)
+  const dataType = dataSource.slice(separatorIndex + 1)
+  const params = new URLSearchParams({
+    data_type: dataType,
+    repository_name: repositoryName,
+    limit: String(limit),
+  })
+  return params.toString()
+}
+
 export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildResult {
   const dataType = searchParams.get("data_type")
   const repositoryName = searchParams.get("repository_name")

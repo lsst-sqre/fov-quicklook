@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildByUuidVisitName, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { buildByUuidVisitName, buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 
 describe("query params helpers", () => {
   it("normalizes an optional /query prefix", () => {
@@ -30,5 +30,10 @@ describe("query params helpers", () => {
 
   it("builds a by_uuid visit name", () => {
     expect(buildByUuidVisitName("embargo:difference_image:7001", "uuid-1")).toBe("embargo:by_uuid:uuid-1")
+  })
+
+  it("builds a default query string from the current datasource", () => {
+    expect(buildDefaultQueryInput("main:raw")).toBe("data_type=raw&repository_name=main&limit=2")
+    expect(buildDefaultQueryInput("embargo:difference_image", 5)).toBe("data_type=difference_image&repository_name=embargo&limit=5")
   })
 })

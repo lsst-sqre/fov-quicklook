@@ -2,21 +2,32 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { env } from "../../env"
 import { useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
-import { buildByUuidVisitName, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { useAppSelector } from "../../store/hooks"
+import { buildByUuidVisitName, buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 
 export function QueryPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const currentQuery = searchParams.toString()
-  const [queryInput, setQueryInput] = useState(currentQuery)
+  const currentDataSource = useAppSelector((state) => state.home.dataSource)
+  const defaultQuery = useMemo(() => buildDefaultQueryInput(currentDataSource), [currentDataSource])
+  const effectiveQuery = currentQuery || defaultQuery
+  const effectiveSearchParams = useMemo(() => new URLSearchParams(effectiveQuery), [effectiveQuery])
+  const [queryInput, setQueryInput] = useState(effectiveQuery)
   const [openError, setOpenError] = useState<string | null>(null)
   const [openingVisit, setOpeningVisit] = useState<string | null>(null)
 
   useEffect(() => {
-    setQueryInput(currentQuery)
-  }, [currentQuery])
+    setQueryInput(effectiveQuery)
+  }, [effectiveQuery])
 
-  const parsedQuery = useMemo(() => buildVisitListArgs(searchParams), [searchParams])
+  useEffect(() => {
+    if (!currentQuery && defaultQuery) {
+      navigate(`/query?${defaultQuery}`, { replace: true })
+    }
+  }, [currentQuery, defaultQuery, navigate])
+
+  const parsedQuery = useMemo(() => buildVisitListArgs(effectiveSearchParams), [effectiveSearchParams])
   const { data, error, isFetching, isLoading } = useListVisitsQuery(parsedQuery.args!, {
     skip: parsedQuery.args === null || parsedQuery.error !== null,
     refetchOnMountOrArgChange: true,
@@ -88,7 +99,7 @@ export function QueryPage() {
                 <thead>
                   <tr>
                     <th>Open</th>
-                    <th>Visit</th>
+                    <th>Visit / Exposure</th>
                     <th>Day Obs</th>
                     <th>Filter</th>
                     <th>Exposure Time</th>
