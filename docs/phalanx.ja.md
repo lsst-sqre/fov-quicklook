@@ -115,7 +115,7 @@ butler_settings:
 
 ```yaml
 ccd_data_types:
-  - name: raw
+  - data_type: raw
     display_name: Raw
     collections:
       - LSSTCam/raw/all
@@ -124,7 +124,7 @@ ccd_data_types:
       - -day_obs
       - -exposure
     partial: false
-  - name: post_isr_image
+  - data_type: post_isr_image
     display_name: Post-ISR
     collections:
       - LSSTCam/runs/nightlyValidation
@@ -132,15 +132,7 @@ ccd_data_types:
     order_by:
       - -exposure
     partial: true
-  - name: difference_image
-    display_name: Difference Image
-    collections:
-      - LSSTCam/runs/nightlyValidation
-    data_id_dimension: visit
-    order_by:
-      - -visit
-    partial: true
-  - name: preliminary_visit_image
+  - data_type: preliminary_visit_image
     display_name: Preliminary
     collections:
       - LSSTCam/runs/nightlyValidation
@@ -149,6 +141,13 @@ ccd_data_types:
       - -visit
     partial: true
 ```
+
+Phalanx / `system_info` に `difference_image` を明示しなくても、Data Query の
+`by_uuid` 経路から参照できる。
+
+ただし現在の実装では、UUID 解決後に backend が dataset type ごとの扱い
+（`data_id_dimension` や `difference_image` 固有の query / CCD 処理）を選ぶため、
+サポート対象の data type 自体は backend 側の既定設定に残している。
 
 ## シークレット管理
 

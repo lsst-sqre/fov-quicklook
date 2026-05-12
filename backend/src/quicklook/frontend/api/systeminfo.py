@@ -19,5 +19,5 @@ def get_system_info():
         admin_page=config.admin_page,
         context_menu_templates=config.context_menu_templates,
         max_object_storage_usage=config.max_object_storage_usage,
-        ccd_data_types=config.ccd_data_types,
+        ccd_data_types=config.system_info_ccd_data_types,
     )
