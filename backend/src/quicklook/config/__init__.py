@@ -68,6 +68,9 @@ DEFAULT_CCD_DATA_TYPES = [
         instrument='LSSTCam',
     ),
 ]
+DEFAULT_CCD_DATA_TYPE_REPOSITORIES = {
+    data_type.repository_name for data_type in DEFAULT_CCD_DATA_TYPES
+}
 
 
 def _copy_default_ccd_data_types() -> list[CcdDataTypeConfig]:
@@ -188,9 +191,19 @@ class Config(BaseSettings):
             (data_type.repository_name, data_type.data_type): data_type
             for data_type in self.ccd_data_types
         }
+        configured_default_repositories = {
+            data_type.repository_name
+            for data_type in self.ccd_data_types
+            if data_type.repository_name in DEFAULT_CCD_DATA_TYPE_REPOSITORIES
+        }
+
+        if not configured_default_repositories:
+            return self
 
         merged = []
         for default in DEFAULT_CCD_DATA_TYPES:
+            if default.repository_name not in configured_default_repositories:
+                continue
             key = (default.repository_name, default.data_type)
             merged.append(configured_by_key.pop(key, default.model_copy(deep=True)))
         merged.extend(configured_by_key.values())

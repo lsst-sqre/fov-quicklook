@@ -52,3 +52,22 @@ def test_config_adds_missing_default_ccd_data_types_from_env_file(tmp_path, monk
 
     assert difference_image.data_id_dimension == 'visit'
     assert difference_image.partial is True
+
+
+def test_config_does_not_inject_default_repositories_into_custom_fixture_env(tmp_path, monkeypatch):
+    env_file = tmp_path / "review-app.env"
+    env_file.write_text(
+        "\n".join(
+            [
+                'QUICKLOOK_ccd_data_types=[{"data_type":"raw","display_name":"Raw (CI fixture)","collections":["LSSTCam/raw/all"],"data_id_dimension":"exposure","order_by":["-day_obs","-exposure"],"partial":false,"repository_name":"reviewapp-ci","instrument":"LSSTCam"}]',
+                "",
+            ]
+        )
+    )
+
+    monkeypatch.delenv("QUICKLOOK_ccd_data_types", raising=False)
+    loaded = Config(_env_file=env_file)
+
+    assert [(dt.repository_name, dt.data_type) for dt in loaded.ccd_data_types] == [
+        ("reviewapp-ci", "raw")
+    ]
