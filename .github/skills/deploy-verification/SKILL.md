@@ -42,6 +42,23 @@ export GAFAELFAWR_TOKEN="$(
 `verify-deploy.sh` は `GAFAELFAWR_TOKEN` 環境変数を見られるので、
 token file を作らずにそのまま実行できる。
 
+### token の意味と refresh
+
+- この skill でいう **app token** は、app へ送る `gafaelfawr` cookie の値そのものを指す
+- ブラウザの "Copy as cURL" では `Cookie: gafaelfawr="..."` のように cookie header 側に `"` が入るが、broker API の `token` field は **cookie value** として使う文字列であり、`verify-deploy.sh` 側が header へ載せる
+- token の期限切れや stale cache が疑わしいときは、broker を更新・再起動したうえで `get-app-token --refresh` を優先する
+
+```bash
+export GAFAELFAWR_TOKEN="$(
+  cd dev/deploy-broker &&
+  uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" \
+    get-app-token --refresh |
+  python -c 'import json,sys; print(json.load(sys.stdin)["token"])'
+)"
+```
+
+- `get-app-token` と `get-app-token --refresh` が同じ token を返し、app 側が `302` を返し続ける場合は、remote broker daemon がまだ新しい refresh 実装を拾っていないか、token command 側が同じ stale token を返している可能性が高い
+
 ## browser token を使う fallback
 
 1. ブラウザで https://usdf-rsp-dev.slac.stanford.edu/fov-quicklook/ にアクセス（認証済み状態）
@@ -89,6 +106,9 @@ gafaelfawr cookieを含む任意のページのリクエストで構わない。
 ```bash
 ./verify-deploy.sh all
 ```
+
+`302` になったら ingress auth に戻されているので、まず token freshness を疑う。
+broker 経由なら `get-app-token --refresh` を取り直してから再試行する。
 
 ## API操作
 
@@ -221,6 +241,15 @@ cd dev
 
 # 2. visit一覧取得
 ./verify-deploy.sh visits
+
+# token の期限切れが疑わしいときは refresh 付きで取得し直す
+export GAFAELFAWR_TOKEN="$(
+  cd ../dev/deploy-broker &&
+  uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" \
+    get-app-token --refresh |
+  python -c 'import json,sys; print(json.load(sys.stdin)["token"])'
+)"
+./verify-deploy.sh all
 
 # 3. キャッシュ状態確認
 ./verify-deploy.sh cache
