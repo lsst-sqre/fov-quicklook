@@ -31,14 +31,32 @@ PYTHON=python3
 
 # --- トークン管理 ---
 
+normalize_token() {
+    printf '%s' "$1" | $PYTHON -c '
+import json
+import sys
+
+token = sys.stdin.read().strip()
+if len(token) >= 2 and token[0] == token[-1] == "\"":
+    try:
+        decoded = json.loads(token)
+    except json.JSONDecodeError:
+        pass
+    else:
+        if isinstance(decoded, str) and decoded.strip():
+            token = decoded.strip()
+print(token, end="")
+'
+}
+
 get_token() {
     if [[ -n "${GAFAELFAWR_TOKEN:-}" ]]; then
-        echo "$GAFAELFAWR_TOKEN"
+        normalize_token "$GAFAELFAWR_TOKEN"
         return
     fi
 
     if [[ -f "$TOKEN_FILE" ]]; then
-        cat "$TOKEN_FILE"
+        normalize_token "$(cat "$TOKEN_FILE")"
         return
     fi
 

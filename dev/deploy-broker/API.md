@@ -24,7 +24,8 @@ broker 自身が GitHub / Phalanx / ArgoCD / app access token を保持し、age
 - 取得した token は state dir 配下の `tokens/argocd.token` と `tokens/app.token` にキャッシュする
 - token file は別プロセスからも再利用され、cache miss / refresh 時は lock file で排他して token command の多重実行を避ける
 - token cache が無いときに初回取得する
-- ArgoCD API または app verification で `401` / `403` を受けた場合、token command を再実行して cache を更新し、同じ操作を 1 回だけ再試行する
+- ArgoCD API または app verification で `401` / `403`、および ingress auth redirect の `302` を受けた場合、token command を再実行して cache を更新し、同じ操作を 1 回だけ再試行する
+- deploy verify の app check は `/api/healthz` と `/` の両方が `200` を返したときだけ成功とみなす
 
 ## Phalanx change policy
 

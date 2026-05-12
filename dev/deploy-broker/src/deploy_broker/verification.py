@@ -5,7 +5,7 @@ import httpx
 from .config import Settings
 from .storage import TokenStore
 
-AUTH_FAILURE_STATUS_CODES = {401, 403}
+AUTH_FAILURE_STATUS_CODES = {302, 401, 403}
 
 
 class VerificationClient:
@@ -25,6 +25,13 @@ class VerificationClient:
             if mode == "auto":
                 return {"skipped": True, "reason": "app token unavailable"}
             raise
+
+        if healthz.status_code != 200 or frontend.status_code != 200:
+            raise RuntimeError(
+                "app verification failed: "
+                f"healthz returned {healthz.status_code}, "
+                f"frontend returned {frontend.status_code}"
+            )
 
         return {
             "healthz_ok": healthz.status_code == 200,

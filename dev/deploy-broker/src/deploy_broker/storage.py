@@ -14,6 +14,18 @@ from .config import Settings
 from .models import DeployRequestRecord, JobLogEntry
 
 
+def _normalize_token_value(token: str) -> str:
+    normalized = token.strip()
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] == '"':
+        try:
+            decoded = json.loads(normalized)
+        except json.JSONDecodeError:
+            return normalized
+        if isinstance(decoded, str) and decoded.strip():
+            return decoded.strip()
+    return normalized
+
+
 class TokenStore:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -23,7 +35,9 @@ class TokenStore:
         if not path.exists():
             return None
         content = path.read_text(encoding="utf-8").strip()
-        return content or None
+        if not content:
+            return None
+        return _normalize_token_value(content)
 
     def _write_secret(self, path: Path, token: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -69,12 +83,15 @@ class TokenStore:
             raise RuntimeError(
                 "token command JSON must contain non-empty string argocd_token"
             )
+        argocd_token = _normalize_token_value(argocd_token)
+
         app_token = payload.get("gafaelfawr_token")
         if not isinstance(app_token, str) or not app_token.strip():
             raise RuntimeError(
                 "token command JSON must contain non-empty string gafaelfawr_token"
             )
-        return argocd_token.strip(), app_token.strip()
+        app_token = _normalize_token_value(app_token)
+        return argocd_token, app_token
 
     def _refresh_tokens_locked(self) -> list[str]:
         argv = self._token_command_argv()
