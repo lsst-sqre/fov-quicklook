@@ -115,7 +115,7 @@ butler_settings:
 
 ```yaml
 ccd_data_types:
-  - name: raw
+  - data_type: raw
     display_name: Raw
     collections:
       - LSSTCam/raw/all
@@ -124,7 +124,7 @@ ccd_data_types:
       - -day_obs
       - -exposure
     partial: false
-  - name: post_isr_image
+  - data_type: post_isr_image
     display_name: Post-ISR
     collections:
       - LSSTCam/runs/nightlyValidation
@@ -132,15 +132,7 @@ ccd_data_types:
     order_by:
       - -exposure
     partial: true
-  - name: difference_image
-    display_name: Difference Image
-    collections:
-      - LSSTCam/runs/nightlyValidation
-    data_id_dimension: visit
-    order_by:
-      - -visit
-    partial: true
-  - name: preliminary_visit_image
+  - data_type: preliminary_visit_image
     display_name: Preliminary
     collections:
       - LSSTCam/runs/nightlyValidation
@@ -149,6 +141,9 @@ ccd_data_types:
       - -visit
     partial: true
 ```
+
+`difference_image` は `ccd_data_types` に明示しなくても、アプリ側の既定値補完と
+Data Query の `by_uuid` 経路で参照できる。
 
 ## シークレット管理
 
