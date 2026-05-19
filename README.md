@@ -293,6 +293,7 @@ make test -- -s                 # Show print statements
 - **System Design**: `/docs/concept.md` - Architecture, components, pipeline phases
 - **Development Setup**: `/docs/dev.md` - Local development environment
 - **API Reference**: `/docs/request.md` - HTTP request examples
+- **Butler/Data Query Guide**: `/docs/butler-data-query.ja.md` - How Data Query maps onto Butler queries, dimensions, and datasets
 - **Task Definitions**: `/docs/tasks.md` - RPC task specifications
 - **Review App Planning**: `/docs/review-app-ci.ja.md` - CI review app requirements and phased approach
 - **Review App Fixtures**: `/docs/review-app-shared-fixtures.ja.md` - Shared Butler/sample fixture generation for CI
