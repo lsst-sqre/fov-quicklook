@@ -100,6 +100,7 @@
 ### システム設計
 - `/docs/concept.ja.md` — アーキテクチャ、パイプラインフェーズ
 - `/docs/architecture-decisions.ja.md` — 重要な設計決定
+- `/docs/butler-data-query.ja.md` — Data Query と Butler registry/dataset の関係
 
 ### 開発
 - `/docs/dev.ja.md` — ローカル開発環境、ワークフロー
