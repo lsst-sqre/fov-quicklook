@@ -12,6 +12,14 @@ def test_difference_image_uses_visit_dimension():
     assert difference_image.partial is True
 
 
+def test_generate_single_fits_tiles_timeout_default_is_300_seconds(monkeypatch):
+    monkeypatch.delenv("QUICKLOOK_generate_single_fits_tiles_timeout_seconds", raising=False)
+
+    loaded = Config()
+
+    assert loaded.generate_single_fits_tiles_timeout_seconds == 300.0
+
+
 def test_config_ignores_non_quicklook_entries_in_env_file(tmp_path, monkeypatch):
     env_file = tmp_path / "review-app.env"
     env_file.write_text(
