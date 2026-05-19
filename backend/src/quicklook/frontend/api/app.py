@@ -1,7 +1,9 @@
-import quicklook.mylogging
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+
+import quicklook.mylogging
 
 from quicklook.config import config
 from quicklook.frontend.api.compression import setup_compression
@@ -9,6 +11,7 @@ from quicklook.frontend.api.staticassets import setup_static_assets
 from quicklook.frontend.api.use_route_names_as_operation_ids import use_route_names_as_operation_ids
 from quicklook.frontend.comm import lifespan as comm_lifespan
 from quicklook.utils.http_client import managed_session
+from quicklook.utils.system_status import get_memory_current
 
 from .admin import router as admin_router
 from .get_fits_file import router as get_fits_file_router
@@ -26,6 +29,23 @@ from .cache_entries import router as cache_entries_router
 logger = quicklook.mylogging.getLogger(__name__)
 
 
+def _should_log_frontend_request(path: str) -> bool:
+    prefix = config.frontend_app_prefix
+    return (
+        path.startswith(f"{prefix}/assets/")
+        or path.startswith(f"{prefix}/visits/")
+        or path == f"{prefix}/api/status"
+        or (
+            path.startswith(f"{prefix}/api/quicklooks/")
+            and (
+                "quicklook_metadata" in path
+                or path.endswith("/vote")
+                or path.endswith("/unvote")
+            )
+        )
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from quicklook.revision import GIT_REVISION
@@ -38,6 +58,30 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.middleware("http")
+async def log_frontend_memory(request: Request, call_next):
+    path = request.url.path
+    if not _should_log_frontend_request(path):
+        return await call_next(request)
+
+    rss_before = get_memory_current()
+    started_at = time.monotonic()
+    response = await call_next(request)
+    rss_after = get_memory_current()
+    logger.info(
+        "Frontend request path=%s method=%s status=%s rss_before=%d rss_after=%d rss_delta=%d duration_ms=%d content_length=%s",
+        path,
+        request.method,
+        response.status_code,
+        rss_before,
+        rss_after,
+        rss_after - rss_before,
+        int((time.monotonic() - started_at) * 1000),
+        response.headers.get("content-length", "-"),
+    )
+    return response
 
 app.include_router(systeminfo_router, prefix=config.frontend_app_prefix)
 app.include_router(status_router, prefix=config.frontend_app_prefix)
