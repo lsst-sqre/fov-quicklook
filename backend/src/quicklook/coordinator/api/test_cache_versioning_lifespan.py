@@ -2,10 +2,18 @@ from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import quicklook.coordinator.api.app as coordinator_app
+from quicklook.coordinator.housekeeping import StaleCacheCleanupPlan
 
 
-async def test_lifespan_runs_startup_cleanup_before_services(monkeypatch):
+async def test_lifespan_prepares_cleanup_before_startup_cleanup(monkeypatch):
     events: list[str] = []
+
+    async def fake_prepare_stale_cache_cleanup():
+        events.append('prepare')
+        return StaleCacheCleanupPlan(stale_versions=frozenset({2}), deleted_quicklook_count=1)
+
+    async def fake_delete_stale_cache_versions(versions):
+        events.append(f'delete:{sorted(versions)}')
 
     async def fake_cleanup_at_startup():
         events.append('cleanup')
@@ -35,19 +43,24 @@ async def test_lifespan_runs_startup_cleanup_before_services(monkeypatch):
         finally:
             events.append('pipeline_exit')
 
+    monkeypatch.setattr(coordinator_app, 'prepare_stale_cache_cleanup', fake_prepare_stale_cache_cleanup)
+    monkeypatch.setattr(coordinator_app, 'delete_stale_cache_versions', fake_delete_stale_cache_versions)
     monkeypatch.setattr(coordinator_app, 'cleanup_at_startup', fake_cleanup_at_startup)
     monkeypatch.setattr(coordinator_app, 'managed_session', fake_managed_session)
     monkeypatch.setattr(coordinator_app, 'coordinator_lifespan', fake_coordinator_lifespan)
     monkeypatch.setattr(coordinator_app, 'run_quicklook_pipeline', fake_run_quicklook_pipeline)
 
     async with coordinator_app.lifespan(coordinator_app.app):
+        await coordinator_app.asyncio.sleep(0)
         events.append('lifespan_body')
 
     assert events == [
+        'prepare',
         'cleanup',
         'managed_session_enter',
         'coordinator_enter',
         'pipeline_enter',
+        'delete:[2]',
         'lifespan_body',
         'pipeline_exit',
         'coordinator_exit',

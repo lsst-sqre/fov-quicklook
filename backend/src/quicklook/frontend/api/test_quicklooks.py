@@ -271,4 +271,4 @@ async def test_get_quicklook_metadata_from_db_filters_current_cache_version(monk
     assert await quicklooks._get_quicklook_metadata_from_db(VisitName('repo:raw:4242')) is None
     assert len(statements) == 1
     assert 'quicklooks.ready = true' in statements[0].lower()
-    assert 'quicklooks.cache_version =' in statements[0]
+    assert 'quicklooks.cache_version =' not in statements[0]

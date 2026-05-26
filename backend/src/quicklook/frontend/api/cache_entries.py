@@ -5,7 +5,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 
-from quicklook.config import config
 from quicklook.coordinator.housekeeping import delete_one_quicklook, select_quicklook_to_delete
 from quicklook.db import Quicklook
 from quicklook.db.session import get_db_session
@@ -29,9 +28,7 @@ class CacheEntry(BaseModel):
 @router.get('/api/cache_entries')
 async def list_cache_entries() -> list[CacheEntry]:
     async with get_db_session() as db:
-        result = await db.execute(
-            select(Quicklook).where(Quicklook.cache_version == config.tile_cache_schema_version)
-        )
+        result = await db.execute(select(Quicklook))
         rows = result.scalars().all()
 
     return [CacheEntry.model_validate(r) for r in rows]

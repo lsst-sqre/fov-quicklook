@@ -1,4 +1,7 @@
+import asyncio
+import json
 import pickle
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Iterable, Literal
@@ -20,6 +23,19 @@ from quicklook.utils.s3 import (
     s3_upload_object,
 )
 
+TILE_CACHE_METADATA_KEY = 'meta.json'
+_CACHE_VERSION_DIRECTORY_PATTERN = re.compile(r'^v(?P<version>\d+)$')
+
+
+class TileCacheMetadataError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class TileCacheMetadata:
+    schema_version: int
+
+
 def current_cache_version() -> int:
     return config.tile_cache_schema_version
 
@@ -33,6 +49,10 @@ def _normalized_root_prefix() -> str:
 
 def cache_version_prefix(cache_version: int) -> str:
     return f'{_normalized_root_prefix()}v{cache_version}/'
+
+
+def _root_key(key: str) -> str:
+    return f'{_normalized_root_prefix()}{key}'
 
 
 def _versioned_key(key: str, cache_version: int | None = None) -> str:
@@ -53,6 +73,52 @@ def put_object(
 
 def get_object(key: str, *, cache_version: int | None = None) -> bytes:
     return s3_download_object(config.s3_tile, _versioned_key(key, cache_version))
+
+
+def put_tile_cache_metadata_sync(metadata: TileCacheMetadata) -> int:
+    payload = json.dumps(
+        {'tile_cache_schema_version': metadata.schema_version},
+        separators=(',', ':'),
+        sort_keys=True,
+    ).encode('utf-8')
+    s3_upload_object(config.s3_tile, _root_key(TILE_CACHE_METADATA_KEY), payload, 'application/json')
+    return len(payload)
+
+
+def get_tile_cache_metadata_sync() -> TileCacheMetadata | None:
+    try:
+        payload = s3_download_object(config.s3_tile, _root_key(TILE_CACHE_METADATA_KEY))
+    except NoSuchKey:
+        return None
+
+    try:
+        parsed = json.loads(payload.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise TileCacheMetadataError('tile cache metadata is not valid UTF-8 JSON') from e
+
+    if not isinstance(parsed, dict):
+        raise TileCacheMetadataError('tile cache metadata must be a JSON object')
+
+    schema_version = parsed.get('tile_cache_schema_version')
+    if type(schema_version) is not int:
+        raise TileCacheMetadataError('tile cache metadata must include integer tile_cache_schema_version')
+
+    return TileCacheMetadata(schema_version=schema_version)
+
+
+def list_cache_versions() -> set[int]:
+    root_prefix = _normalized_root_prefix()
+    versions: set[int] = set()
+    for obj in s3_list_objects(config.s3_tile, prefix=root_prefix, delimiter='/'):
+        if obj.type != 'directory':
+            continue
+
+        relative = obj.key.removeprefix(root_prefix).rstrip('/')
+        match = _CACHE_VERSION_DIRECTORY_PATTERN.fullmatch(relative)
+        if match is None:
+            continue
+        versions.add(int(match.group('version')))
+    return versions
 
 
 @dataclass
@@ -79,7 +145,11 @@ def delete_objects_by_prefix(prefix: str, *, cache_version: int | None = None) -
 
 
 def delete_root_objects_by_prefix(prefix: str = '') -> None:
-    s3_delete_objects_with_prefix(config.s3_tile, f'{_normalized_root_prefix()}{prefix}')
+    s3_delete_objects_with_prefix(config.s3_tile, _root_key(prefix))
+
+
+def delete_cache_version(cache_version: int) -> None:
+    delete_root_objects_by_prefix(f'v{cache_version}/')
 
 
 @dataclass(frozen=True)
@@ -161,3 +231,11 @@ class VisitObjectStorage:
     get_ccd_metadata_list = async_wrap(get_ccd_metadata_list_sync)
     put_time_profile = async_wrap(put_time_profile_sync)
     get_time_profile = async_wrap(get_time_profile_sync)
+
+
+async def put_tile_cache_metadata(metadata: TileCacheMetadata) -> int:
+    return await asyncio.to_thread(put_tile_cache_metadata_sync, metadata)
+
+
+async def get_tile_cache_metadata() -> TileCacheMetadata | None:
+    return await asyncio.to_thread(get_tile_cache_metadata_sync)

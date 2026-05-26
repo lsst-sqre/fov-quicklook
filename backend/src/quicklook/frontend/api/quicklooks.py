@@ -249,7 +249,6 @@ async def _get_quicklook_metadata_from_db(visit: VisitName) -> QuicklookMetadata
             select(Quicklook).where(
                 Quicklook.visit_name == visit,
                 Quicklook.ready == True,
-                Quicklook.cache_version == config.tile_cache_schema_version,
             )
         )
         quicklook: Quicklook | None = result.scalar_one_or_none()
