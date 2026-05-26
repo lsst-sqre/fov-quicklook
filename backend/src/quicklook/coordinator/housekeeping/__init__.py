@@ -2,68 +2,16 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 
 from quicklook.config import config
 from quicklook.db import Access, Quicklook, get_db_session
-from quicklook.object_storage import VisitObjectStorage, delete_cache_version, list_cache_versions
+from quicklook.object_storage import VisitObjectStorage
 from quicklook.types import VisitName
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class StaleCacheCleanupPlan:
-    stale_versions: frozenset[int]
-    deleted_quicklook_count: int
-
-
-async def prepare_stale_cache_cleanup() -> StaleCacheCleanupPlan:
-    """Delete stale DB cache entries and return stale object-storage versions to clean in background."""
-    current_version = config.tile_cache_schema_version
-
-    async with get_db_session() as session:
-        stale_rows = (
-            await session.execute(
-                select(Quicklook.visit_name, Quicklook.cache_version).where(Quicklook.cache_version != current_version)
-            )
-        ).all()
-        stale_visits = [row[0] for row in stale_rows]
-        stale_versions = {row[1] for row in stale_rows}
-
-        if stale_visits:
-            await session.execute(delete(Access).where(Access.visit_name.in_(stale_visits)))
-            await session.execute(delete(Quicklook).where(Quicklook.visit_name.in_(stale_visits)))
-            await session.commit()
-
-    stale_versions |= list_cache_versions() - {current_version}
-    if stale_versions or stale_visits:
-        logger.info(
-            "Prepared stale cache cleanup current_version=%d stale_versions=%s deleted_quicklooks=%d",
-            current_version,
-            sorted(stale_versions),
-            len(stale_visits),
-        )
-    else:
-        logger.info("No stale cache versions found at startup")
-
-    return StaleCacheCleanupPlan(
-        stale_versions=frozenset(stale_versions),
-        deleted_quicklook_count=len(stale_visits),
-    )
-
-
-async def delete_stale_cache_versions(stale_versions: set[int] | frozenset[int]) -> None:
-    if not stale_versions:
-        return
-
-    for cache_version in sorted(stale_versions):
-        logger.info("Deleting stale cache version prefix version=%d", cache_version)
-        delete_cache_version(cache_version)
-    logger.info("Finished deleting stale cache versions: %s", sorted(stale_versions))
 
 
 async def select_quicklook_to_delete() -> str | None:
@@ -77,10 +25,14 @@ async def select_quicklook_to_delete() -> str | None:
     これにより、アクセス頻度が高いものだけが残った場合でも新しいデータを追加できる。
     """
     async with get_db_session() as session:
+        current_version = config.tile_cache_schema_version
         one_week_ago = datetime.now() - timedelta(days=7)
 
         # ready=trueのquicklook総数を取得
-        total_count_stmt = select(func.count()).select_from(Quicklook).where(Quicklook.ready == True)
+        total_count_stmt = select(func.count()).select_from(Quicklook).where(
+            Quicklook.ready == True,
+            Quicklook.cache_version == current_version,
+        )
         total_count_result = await session.execute(total_count_stmt)
         total_count = total_count_result.scalar() or 0
         
@@ -91,7 +43,10 @@ async def select_quicklook_to_delete() -> str | None:
         # 最新のN個のvisit_nameを取得（これらは削除候補から除外）
         recent_visits_stmt = (
             select(Quicklook.visit_name)
-            .where(Quicklook.ready == True)
+            .where(
+                Quicklook.ready == True,
+                Quicklook.cache_version == current_version,
+            )
             .order_by(Quicklook.created_at.desc())
             .limit(config.housekeeping_keep_recent_count)
         )
@@ -110,7 +65,10 @@ async def select_quicklook_to_delete() -> str | None:
         stmt = (
             select(Quicklook.visit_name)
             .outerjoin(recent_access_count, Quicklook.visit_name == recent_access_count.c.visit_name)
-            .where(Quicklook.ready == True)
+            .where(
+                Quicklook.ready == True,
+                Quicklook.cache_version == current_version,
+            )
         )
         
         if protected_visits:
@@ -171,7 +129,10 @@ async def delete_one_quicklook(visit_name: str) -> int:
 async def get_total_disk_usage() -> int:
     """現在のobject storageの総使用量を取得（bytes）"""
     async with get_db_session() as session:
-        stmt = select(func.sum(Quicklook.disk_usage)).where(Quicklook.ready == True)
+        stmt = select(func.sum(Quicklook.disk_usage)).where(
+            Quicklook.ready == True,
+            Quicklook.cache_version == config.tile_cache_schema_version,
+        )
         result = await session.execute(stmt)
         total = result.scalar()
         return total if total is not None else 0
@@ -227,8 +188,12 @@ async def cleanup_at_startup() -> None:
     起動時のクリーンアップ。
     ready=falseのquicklookエントリーを見つけて、関連データを削除する。
     """
+    current_version = config.tile_cache_schema_version
     async with get_db_session() as session:
-        stmt = select(Quicklook.visit_name).where(Quicklook.ready == False)
+        stmt = select(Quicklook.visit_name).where(
+            Quicklook.ready == False,
+            Quicklook.cache_version == current_version,
+        )
         result = await session.execute(stmt)
         unready_visits = [row[0] for row in result.all()]
 

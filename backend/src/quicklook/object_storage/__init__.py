@@ -1,6 +1,4 @@
-import asyncio
 import pickle
-import re
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Iterable, Literal
@@ -21,9 +19,6 @@ from quicklook.utils.s3 import (
     s3_list_objects,
     s3_upload_object,
 )
-
-_CACHE_VERSION_DIRECTORY_PATTERN = re.compile(r'^v(?P<version>\d+)$')
-
 
 def current_cache_version() -> int:
     return config.tile_cache_schema_version
@@ -60,21 +55,6 @@ def get_object(key: str, *, cache_version: int | None = None) -> bytes:
     return s3_download_object(config.s3_tile, _versioned_key(key, cache_version))
 
 
-def list_cache_versions() -> set[int]:
-    root_prefix = _normalized_root_prefix()
-    versions: set[int] = set()
-    for obj in s3_list_objects(config.s3_tile, prefix=root_prefix, delimiter='/'):
-        if obj.type != 'directory':
-            continue
-
-        relative = obj.key.removeprefix(root_prefix).rstrip('/')
-        match = _CACHE_VERSION_DIRECTORY_PATTERN.fullmatch(relative)
-        if match is None:
-            continue
-        versions.add(int(match.group('version')))
-    return versions
-
-
 @dataclass
 class Entry:
     name: str
@@ -100,10 +80,6 @@ def delete_objects_by_prefix(prefix: str, *, cache_version: int | None = None) -
 
 def delete_root_objects_by_prefix(prefix: str = '') -> None:
     s3_delete_objects_with_prefix(config.s3_tile, f'{_normalized_root_prefix()}{prefix}')
-
-
-def delete_cache_version(cache_version: int) -> None:
-    delete_root_objects_by_prefix(f'v{cache_version}/')
 
 
 @dataclass(frozen=True)
@@ -185,7 +161,3 @@ class VisitObjectStorage:
     get_ccd_metadata_list = async_wrap(get_ccd_metadata_list_sync)
     put_time_profile = async_wrap(put_time_profile_sync)
     get_time_profile = async_wrap(get_time_profile_sync)
-
-
-async def list_cache_versions_async() -> set[int]:
-    return await asyncio.to_thread(list_cache_versions)

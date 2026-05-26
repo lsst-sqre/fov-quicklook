@@ -183,7 +183,7 @@ async def get_quicklook_metadata(
 async def get_time_profile(
     visit: Annotated[VisitName, Depends(dep_visit_name)],
 ):
-    object_storage = VisitObjectStorage(visit)
+    object_storage = VisitObjectStorage.from_visit(visit)
     try:
         return await object_storage.get_time_profile()
     except (NoSuchKey, Exception):
@@ -249,11 +249,12 @@ async def _get_quicklook_metadata_from_db(visit: VisitName) -> QuicklookMetadata
             select(Quicklook).where(
                 Quicklook.visit_name == visit,
                 Quicklook.ready == True,
+                Quicklook.cache_version == config.tile_cache_schema_version,
             )
         )
         quicklook: Quicklook | None = result.scalar_one_or_none()
         if quicklook:
-            ccd_metadata_list = await VisitObjectStorage(visit).get_ccd_metadata_list()
+            ccd_metadata_list = await VisitObjectStorage.from_visit(visit).get_ccd_metadata_list()
             return QuicklookMetadataReady(
                 visit_name=visit,
                 ccd_metadata_list=ccd_metadata_list,

@@ -42,7 +42,7 @@ async def get_fits_header(
 
 
 async def _get_fits_header_from_object_storage(visit: VisitName, ccd: CcdName) -> list[HeaderType]:
-    return await storage.VisitObjectStorage(visit).get_fits_headers(ccd)
+    return await storage.VisitObjectStorage.from_visit(visit).get_fits_headers(ccd)
 
 
 async def _get_fits_header_from_generator(

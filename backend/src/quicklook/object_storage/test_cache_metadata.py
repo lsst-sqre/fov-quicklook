@@ -1,5 +1,4 @@
 import quicklook.object_storage as object_storage
-from quicklook.utils.s3 import S3Object
 
 
 def test_put_object_writes_to_versioned_prefix(monkeypatch):
@@ -33,23 +32,6 @@ def test_get_object_reads_from_current_version_prefix(monkeypatch):
     data = object_storage.get_object('quicklooks/repo:raw:4242/data.pickle')
 
     assert data == b'data'
-
-
-def test_list_cache_versions_parses_version_directories(monkeypatch):
-    monkeypatch.setattr(object_storage.config, 's3_tile_key_prefix', 'cache-root/')
-    monkeypatch.setattr(
-        object_storage,
-        's3_list_objects',
-        lambda *_args, **_kwargs: [
-            S3Object(key='cache-root/v1/', type='directory', size=None),
-            S3Object(key='cache-root/v9/', type='directory', size=None),
-            S3Object(key='cache-root/not-a-version/', type='directory', size=None),
-        ],
-    )
-
-    versions = object_storage.list_cache_versions()
-
-    assert versions == {1, 9}
 
 
 def test_delete_root_objects_by_prefix_uses_unversioned_root(monkeypatch):
