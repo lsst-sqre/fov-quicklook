@@ -54,6 +54,10 @@ export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildRes
   if (exposure.error) {
     return { args: null, error: exposure.error }
   }
+  const offset = parseOptionalInteger(searchParams.get("offset"), "offset")
+  if (offset.error) {
+    return { args: null, error: offset.error }
+  }
   const dayObs = parseOptionalInteger(searchParams.get("day_obs"), "day_obs")
   if (dayObs.error) {
     return { args: null, error: dayObs.error }
@@ -65,6 +69,7 @@ export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildRes
       repositoryName,
       ...(limit.value !== undefined ? { limit: limit.value } : {}),
       ...(exposure.value !== undefined ? { exposure: exposure.value } : {}),
+      ...(offset.value !== undefined ? { offset: offset.value } : {}),
       ...(dayObs.value !== undefined ? { dayObs: dayObs.value } : {}),
     },
     error: null,

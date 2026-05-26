@@ -1,11 +1,37 @@
-from types import SimpleNamespace
-
 from fastapi import HTTPException
 
 from quicklook.datasource.types import ResolvedVisitInfo, VisitDayCount, VisitRepresentativeUuid, VisitResolutionError
 from quicklook.frontend.api import visits
 from quicklook.types import CcdDataType
 from quicklook.types import VisitName
+
+
+async def test_list_visits_forwards_limit_and_offset(monkeypatch):
+    captured = {}
+
+    class FakeDataSource:
+        async def query_visits(self, q):
+            captured["query"] = q
+            return []
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    result = await visits.list_visits(
+        exposure=None,
+        day_obs=None,
+        data_type=CcdDataType('raw'),
+        repository_name='repo',
+        limit=1000,
+        offset=1000,
+    )
+
+    assert result == []
+    assert captured["query"].data_type == CcdDataType('raw')
+    assert captured["query"].repository_name == 'repo'
+    assert captured["query"].limit == 1000
+    assert captured["query"].offset == 1000
+    assert captured["query"].exposure is None
+    assert captured["query"].day_obs is None
 
 
 async def test_get_visit_metadata_returns_404_for_unknown_uuid(monkeypatch):

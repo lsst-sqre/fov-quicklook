@@ -20,6 +20,7 @@ async def list_visits(
     exposure: int | None = Query(None),
     day_obs: int | None = Query(None),
     limit: int = Query(default=1000, le=10000),
+    offset: int = Query(default=0, ge=0),
     data_type: CcdDataType = Query(...),
     repository_name: str = Query(...),
 ):
@@ -31,6 +32,7 @@ async def list_visits(
             exposure=exposure,
             day_obs=day_obs,
             limit=limit,
+            offset=offset,
         )
     )
 

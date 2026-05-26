@@ -18,7 +18,7 @@ from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 
 class FakeDimensionRecordResults:
-    def __init__(self, records: list[SimpleNamespace]):
+    def __init__(self, records: list[Any]):
         self._records = records
 
     def order_by(self, *args: str):
@@ -117,6 +117,70 @@ def test_query_visits_uses_exposure_dimension_records(monkeypatch):
         )
     ]
     assert [entry.id for entry in entries] == ['repo:raw:101', 'repo:raw:102']
+
+
+def test_query_visits_applies_offset_after_ordering(monkeypatch):
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            assert dimension == 'exposure'
+            assert kwargs == {
+                'datasets': 'raw',
+                'where': 'day_obs=20250301',
+            }
+            return FakeDimensionRecordResults([
+                SimpleNamespace(
+                    id=101,
+                    obs_id='obs-101',
+                    day_obs=20250301,
+                    physical_filter='r',
+                    exposure_time=30.0,
+                    science_program='program-1',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-101',
+                ),
+                SimpleNamespace(
+                    id=102,
+                    obs_id='obs-102',
+                    day_obs=20250301,
+                    physical_filter='i',
+                    exposure_time=31.0,
+                    science_program='program-2',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-102',
+                ),
+                SimpleNamespace(
+                    id=103,
+                    obs_id='obs-103',
+                    day_obs=20250301,
+                    physical_filter='z',
+                    exposure_time=32.0,
+                    science_program='program-3',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-103',
+                ),
+            ])
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
+
+    entries = ds.query_visits(
+        Query(
+            data_type=CcdDataType('raw'),
+            repository_name='repo',
+            limit=1,
+            offset=1,
+        )
+    )
+
+    assert [entry.id for entry in entries] == ['repo:raw:102']
 
 
 def test_query_visits_uses_configured_dimension_for_visit_dataset():

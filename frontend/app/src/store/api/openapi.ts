@@ -80,6 +80,7 @@ const injectedRtkApi = api.injectEndpoints({
           exposure: queryArg.exposure,
           day_obs: queryArg.dayObs,
           limit: queryArg.limit,
+          offset: queryArg.offset,
           data_type: queryArg.dataType,
           repository_name: queryArg.repositoryName,
         },
@@ -239,6 +240,7 @@ export type ListVisitsApiArg = {
   exposure?: number | null;
   dayObs?: number | null;
   limit?: number;
+  offset?: number;
   dataType: string;
   repositoryName: string;
 };
