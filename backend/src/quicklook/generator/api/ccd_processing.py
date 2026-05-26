@@ -16,6 +16,7 @@ import quicklook.mylogging
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
+from quicklook.config import config
 from quicklook.generator.generate_single_fits_tiles import (
     CcdMetadata,
     GenerateSingleFitsTilesProgress,
@@ -34,6 +35,14 @@ from .ccd_processing_protocol import (
 )
 
 logger = quicklook.mylogging.getLogger(__name__)
+
+
+def validate_job_cache_version(job: Job) -> None:
+    expected_version = config.tile_cache_schema_version
+    if job.cache_version != expected_version:
+        raise RuntimeError(
+            f"Cache version mismatch: controller={job.cache_version}, generator={expected_version}"
+        )
 
 
 async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
@@ -63,9 +72,12 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
             await websocket.close(code=1002, reason="Expected InitJobMessage")
             return
         job = init_msg.job
+        validate_job_cache_version(job)
         logger.info(f"WebSocket initialized for job {job.id}")
     except Exception as e:
         logger.error(f"Error receiving InitJobMessage: {e}")
+        if websocket.client_state == WebSocketState.CONNECTED:
+            await websocket.send_bytes(pickle.dumps(ErrorMessage(ccd_name=None, error=str(e))))
         await websocket.close(code=1002, reason="Failed to receive job")
         return
 

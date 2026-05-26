@@ -11,6 +11,7 @@ from sqlalchemy import select
 import quicklook.mylogging
 from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
+from quicklook.config import config
 from quicklook.utils.http_client import managed_session
 from quicklook.coordinator.api.deps import dep_visit_name
 from quicklook.coordinator.api.status import router as status_router
@@ -22,7 +23,7 @@ from quicklook.coordinator.api.types import (
     SharedStatusMessageJobStatusList,
 )
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
-from quicklook.coordinator.housekeeping import cleanup_at_startup, ensure_tile_cache_schema_version
+from quicklook.coordinator.housekeeping import cleanup_at_startup, delete_stale_cache_versions, prepare_stale_cache_cleanup
 from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.job.job import Job
 from quicklook.types import VisitName
@@ -39,13 +40,26 @@ async def lifespan(app: FastAPI):
     from quicklook.revision import GIT_REVISION
     logger.info("Coordinator starting, revision=%s", GIT_REVISION)
 
-    await ensure_tile_cache_schema_version()
+    stale_cache_cleanup_plan = await prepare_stale_cache_cleanup()
+    stale_cache_cleanup_task = None
+    if stale_cache_cleanup_plan.stale_versions:
+        stale_cache_cleanup_task = asyncio.create_task(
+            delete_stale_cache_versions(stale_cache_cleanup_plan.stale_versions)
+        )
     await cleanup_at_startup()
 
-    async with managed_session():
-        async with coordinator_lifespan(app):
-            async with run_quicklook_pipeline() as running_pipeline:
-                yield
+    try:
+        async with managed_session():
+            async with coordinator_lifespan(app):
+                async with run_quicklook_pipeline() as running_pipeline:
+                    yield
+    finally:
+        if stale_cache_cleanup_task is not None and not stale_cache_cleanup_task.done():
+            stale_cache_cleanup_task.cancel()
+            try:
+                await stale_cache_cleanup_task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(lifespan=lifespan)
@@ -69,8 +83,16 @@ async def route_create_quicklook(params: CreateQuicklookRequest):
         quicklook = result.scalar_one_or_none()
 
         if quicklook is not None:
-            logger.info(f'Quicklook for visit {visit} already exists in DB')
-            return
+            if quicklook.cache_version == config.tile_cache_schema_version:
+                logger.info(f'Quicklook for visit {visit} already exists in DB')
+                return
+            await session.delete(quicklook)
+            await session.commit()
+            logger.info(
+                'Deleted stale quicklook record for visit %s (cache_version=%d)',
+                visit,
+                quicklook.cache_version,
+            )
 
     await running_pipeline.push(visit)
 

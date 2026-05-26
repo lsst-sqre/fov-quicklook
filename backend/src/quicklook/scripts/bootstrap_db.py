@@ -17,7 +17,7 @@ from sqlalchemy import text
 
 from quicklook.config import config
 from quicklook.db import Base, get_engine
-from quicklook.object_storage import delete_objects_by_prefix
+from quicklook.object_storage import delete_root_objects_by_prefix
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ async def drop_all_tables():
 def delete_all_object_storage():
     """Delete all objects from object storage with the configured prefix."""
     logger.info(f"Deleting all objects with prefix: {repr(config.s3_tile_key_prefix)}")
-    delete_objects_by_prefix("")
+    delete_root_objects_by_prefix("")
     logger.info("All objects deleted from object storage")
 
 

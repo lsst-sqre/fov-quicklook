@@ -2,63 +2,68 @@
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, func, select
 
 from quicklook.config import config
 from quicklook.db import Access, Quicklook, get_db_session
-from quicklook.object_storage import (
-    TileCacheMetadata,
-    TileCacheMetadataError,
-    VisitObjectStorage,
-    delete_objects_by_prefix,
-    get_tile_cache_metadata,
-    put_tile_cache_metadata,
-)
+from quicklook.object_storage import VisitObjectStorage, delete_cache_version, list_cache_versions
 from quicklook.types import VisitName
 
 logger = logging.getLogger(__name__)
 
 
-async def reset_tile_cache_state() -> None:
-    """Clear DB state and object storage when the shared tile cache schema changes."""
+@dataclass(frozen=True)
+class StaleCacheCleanupPlan:
+    stale_versions: frozenset[int]
+    deleted_quicklook_count: int
+
+
+async def prepare_stale_cache_cleanup() -> StaleCacheCleanupPlan:
+    """Delete stale DB cache entries and return stale object-storage versions to clean in background."""
+    current_version = config.tile_cache_schema_version
+
     async with get_db_session() as session:
-        await session.execute(delete(Access))
-        await session.execute(delete(Quicklook))
-        await session.commit()
+        stale_rows = (
+            await session.execute(
+                select(Quicklook.visit_name, Quicklook.cache_version).where(Quicklook.cache_version != current_version)
+            )
+        ).all()
+        stale_visits = [row[0] for row in stale_rows]
+        stale_versions = {row[1] for row in stale_rows}
 
-    logger.info("Deleted all quicklook/access DB entries for tile cache reset")
-    delete_objects_by_prefix("")
-    logger.info("Deleted all object storage data under prefix %r", config.s3_tile_key_prefix)
-    await put_tile_cache_metadata(TileCacheMetadata(schema_version=config.tile_cache_schema_version))
-    logger.info("Wrote tile cache metadata schema_version=%d", config.tile_cache_schema_version)
+        if stale_visits:
+            await session.execute(delete(Access).where(Access.visit_name.in_(stale_visits)))
+            await session.execute(delete(Quicklook).where(Quicklook.visit_name.in_(stale_visits)))
+            await session.commit()
 
-
-async def ensure_tile_cache_schema_version() -> None:
-    """Ensure the shared tile cache matches the application schema version."""
-    expected_version = config.tile_cache_schema_version
-
-    try:
-        metadata = await get_tile_cache_metadata()
-    except TileCacheMetadataError as e:
-        logger.warning("Tile cache metadata is invalid (%s); resetting cache", e)
-        await reset_tile_cache_state()
-        return
-
-    if metadata is not None and metadata.schema_version == expected_version:
-        logger.info("Tile cache metadata schema_version=%d matches expected version", expected_version)
-        return
-
-    if metadata is None:
-        logger.info("Tile cache metadata is missing; resetting cache for schema_version=%d", expected_version)
-    else:
+    stale_versions |= list_cache_versions() - {current_version}
+    if stale_versions or stale_visits:
         logger.info(
-            "Tile cache schema version mismatch stored=%d expected=%d; resetting cache",
-            metadata.schema_version,
-            expected_version,
+            "Prepared stale cache cleanup current_version=%d stale_versions=%s deleted_quicklooks=%d",
+            current_version,
+            sorted(stale_versions),
+            len(stale_visits),
         )
-    await reset_tile_cache_state()
+    else:
+        logger.info("No stale cache versions found at startup")
+
+    return StaleCacheCleanupPlan(
+        stale_versions=frozenset(stale_versions),
+        deleted_quicklook_count=len(stale_visits),
+    )
+
+
+async def delete_stale_cache_versions(stale_versions: set[int] | frozenset[int]) -> None:
+    if not stale_versions:
+        return
+
+    for cache_version in sorted(stale_versions):
+        logger.info("Deleting stale cache version prefix version=%d", cache_version)
+        delete_cache_version(cache_version)
+    logger.info("Finished deleting stale cache versions: %s", sorted(stale_versions))
 
 
 async def select_quicklook_to_delete() -> str | None:
@@ -139,12 +144,13 @@ async def delete_one_quicklook(visit_name: str) -> int:
             return 0
 
         disk_usage = quicklook.disk_usage
+        cache_version = quicklook.cache_version
         quicklook.ready = False
         await session.commit()
         logger.info(f"Marked quicklook {visit_name} as not ready")
 
     # object storageのデータを削除
-    storage = VisitObjectStorage(visit=VisitName(visit_name))
+    storage = VisitObjectStorage.from_visit(VisitName(visit_name), cache_version=cache_version)
     await storage.delete_all()
     logger.info(f"Deleted object storage data for {visit_name}")
 

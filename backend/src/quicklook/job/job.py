@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 from functools import cached_property
 
+from quicklook.config import config
 from quicklook.types import VisitName
 from quicklook.utils.exclude_cached_properties_from_pickle import exclude_cached_properties_from_pickle
 
@@ -11,6 +12,7 @@ from quicklook.utils.exclude_cached_properties_from_pickle import exclude_cached
 class Job:
     visit: VisitName
     id: str = field(default_factory=lambda: f'j-{uuid.uuid4().hex}')
+    cache_version: int = field(default_factory=lambda: config.tile_cache_schema_version)
 
     @classmethod
     def from_id(cls, id: str):
@@ -28,7 +30,7 @@ class Job:
     def object_storage(self):
         from quicklook.object_storage import VisitObjectStorage
 
-        return VisitObjectStorage.from_visit(self.visit)
+        return VisitObjectStorage.from_visit(self.visit, cache_version=self.cache_version)
 
     @cached_property
     def status(self):

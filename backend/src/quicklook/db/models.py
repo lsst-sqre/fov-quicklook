@@ -4,6 +4,8 @@ from datetime import datetime
 from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, BigInteger
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from quicklook.config import config
+
 
 class Base(DeclarativeBase):
     pass
@@ -14,6 +16,7 @@ class Quicklook(Base):
 
     visit_name: Mapped[str] = mapped_column(String, primary_key=True)
     job_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    cache_version: Mapped[int] = mapped_column(Integer, nullable=False, default=lambda: config.tile_cache_schema_version)
     # disk_usage can exceed 32-bit integer range, use BigInteger to be safe
     disk_usage: Mapped[int] = mapped_column(BigInteger, nullable=False)
     ready: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

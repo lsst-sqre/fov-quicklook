@@ -223,6 +223,7 @@ async def _create_quicklook_record(job: Job):
         quicklook = Quicklook(
             visit_name=str(job.visit),
             job_id=job.id,
+            cache_version=job.cache_version,
             disk_usage=0,
             ready=False,
             created_at=datetime.now(),
