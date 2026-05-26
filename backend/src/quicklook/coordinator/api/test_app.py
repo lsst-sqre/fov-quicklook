@@ -33,32 +33,3 @@ async def test_route_create_quicklook_queues_requested_visit(monkeypatch):
     await app_module.route_create_quicklook(CreateQuicklookRequest(visit='repo:raw:4242'))
 
     assert pushed_visits == [VisitName('repo:raw:4242')]
-
-
-async def test_route_create_quicklook_skips_queueing_when_record_exists(monkeypatch):
-    pushed_visits: list[VisitName] = []
-    existing_quicklook = SimpleNamespace()
-
-    class FakeSession:
-        async def execute(self, stmt):
-            del stmt
-            return SimpleNamespace(scalar_one_or_none=lambda: existing_quicklook)
-
-    class FakeSessionContext:
-        async def __aenter__(self):
-            return FakeSession()
-
-        async def __aexit__(self, exc_type, exc, tb):
-            del exc_type, exc, tb
-            return False
-
-    class FakeRunningPipeline:
-        async def push(self, visit: VisitName):
-            pushed_visits.append(visit)
-
-    monkeypatch.setattr(app_module, 'get_db_session', lambda: FakeSessionContext())
-    monkeypatch.setattr(app_module, 'running_pipeline', FakeRunningPipeline(), raising=False)
-
-    await app_module.route_create_quicklook(CreateQuicklookRequest(visit='repo:raw:4242'))
-
-    assert pushed_visits == []

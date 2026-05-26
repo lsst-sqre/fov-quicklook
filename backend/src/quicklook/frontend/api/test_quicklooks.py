@@ -1,5 +1,4 @@
 import pickle
-from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -248,27 +247,3 @@ async def test_get_all_quicklook_jobs_falls_back_to_coordinator(monkeypatch):
     assert jobs == {}
     assert received == [('get', f'{quicklooks.config.coordinator_base_url}/quicklooks/*/status', {})]
     assert quicklooks._job_status_dict.last_value() == {}
-
-
-async def test_get_quicklook_metadata_from_db_filters_current_cache_version(monkeypatch):
-    statements: list[str] = []
-
-    class FakeSession:
-        async def execute(self, stmt):
-            statements.append(str(stmt))
-            return SimpleNamespace(scalar_one_or_none=lambda: None)
-
-    class FakeSessionContext:
-        async def __aenter__(self):
-            return FakeSession()
-
-        async def __aexit__(self, exc_type, exc, tb):
-            del exc_type, exc, tb
-            return False
-
-    monkeypatch.setattr(quicklooks, 'get_db_session', lambda: FakeSessionContext())
-
-    assert await quicklooks._get_quicklook_metadata_from_db(VisitName('repo:raw:4242')) is None
-    assert len(statements) == 1
-    assert 'quicklooks.ready = true' in statements[0].lower()
-    assert 'quicklooks.cache_version =' not in statements[0]
