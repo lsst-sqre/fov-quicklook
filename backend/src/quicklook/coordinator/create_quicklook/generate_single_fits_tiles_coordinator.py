@@ -407,6 +407,7 @@ async def _handle_generator_message(
 
         case ErrorMessage(ccd_name=ccd_name, error=error):
             logger.error(f"Generator {generator.id} error for CCD {ccd_name}: {error}")
+            raise RuntimeError(f"Generator {generator.id} error for CCD {ccd_name}: {error}")
 
 
 async def _wait_for_next_ccd(dispatcher: CcdDispatcher, generator_id: GeneratorId) -> CcdDataRef | None:
