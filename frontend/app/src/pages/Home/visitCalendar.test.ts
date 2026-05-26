@@ -4,9 +4,11 @@ import {
   buildVisitCountsByDate,
   dayObsToSearchDate,
   formatCalendarMonthLabel,
+  getCalendarDayCountDisplay,
   getInitialCalendarMonth,
   getSelectedCalendarDate,
   getTodaySearchDate,
+  isValidCalendarMonth,
   shiftCalendarMonth,
 } from "./visitCalendar"
 
@@ -41,6 +43,11 @@ describe("visit calendar helpers", () => {
     expect(shiftCalendarMonth("2025-12", 1)).toBe("2026-01")
   })
 
+  it("validates calendar month strings", () => {
+    expect(isValidCalendarMonth("2025-05")).toBe(true)
+    expect(isValidCalendarMonth("2025-5")).toBe(false)
+  })
+
   it("creates a six-week calendar grid", () => {
     const cells = buildCalendarDayCells("2025-05")
 
@@ -65,6 +72,42 @@ describe("visit calendar helpers", () => {
     ], "2025-05")).toEqual({
       "2025-05-19": 2,
       "2025-05-20": 1,
+    })
+  })
+
+  it("shows a dash for days outside the selected month", () => {
+    expect(getCalendarDayCountDisplay({
+      date: "2025-04-30",
+      day: 30,
+      inCurrentMonth: false,
+    }, {
+      "2025-05-19": 2,
+    })).toEqual({
+      value: "-",
+      isEmpty: true,
+    })
+  })
+
+  it("shows visit counts for days in the selected month", () => {
+    expect(getCalendarDayCountDisplay({
+      date: "2025-05-19",
+      day: 19,
+      inCurrentMonth: true,
+    }, {
+      "2025-05-19": 2,
+    })).toEqual({
+      value: "2",
+      isEmpty: false,
+    })
+    expect(getCalendarDayCountDisplay({
+      date: "2025-05-20",
+      day: 20,
+      inCurrentMonth: true,
+    }, {
+      "2025-05-19": 2,
+    })).toEqual({
+      value: "0",
+      isEmpty: true,
     })
   })
 

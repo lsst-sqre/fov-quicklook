@@ -10,8 +10,10 @@ import {
   buildCalendarDayCells,
   buildVisitCountsByDate,
   formatCalendarMonthLabel,
+  getCalendarDayCountDisplay,
   getInitialCalendarMonth,
   getSelectedCalendarDate,
+  isValidCalendarMonth,
   shiftCalendarMonth,
 } from '../visitCalendar'
 import { buildVisitListQuery } from '../visitSearch'
@@ -413,9 +415,22 @@ function SearchBox() {
               >
                 <MaterialSymbol symbol="chevron_left" />
               </button>
-              <h2 className={classNames(homeStyles.shortcutHelpTitle, styles.calendarTitle)} id="visit-calendar-title">
-                {formatCalendarMonthLabel(calendarMonth)}
-              </h2>
+              <div className={styles.calendarTitle}>
+                <h2 className={homeStyles.shortcutHelpTitle} id="visit-calendar-title">
+                  {formatCalendarMonthLabel(calendarMonth)}
+                </h2>
+                <input
+                  aria-label="Select month"
+                  className={styles.calendarMonthInput}
+                  onChange={(event) => {
+                    if (isValidCalendarMonth(event.target.value)) {
+                      setCalendarMonth(event.target.value)
+                    }
+                  }}
+                  type="month"
+                  value={calendarMonth}
+                />
+              </div>
               <button
                 aria-label="Next month"
                 className={styles.calendarMonthButton}
@@ -433,13 +448,13 @@ function SearchBox() {
               </div>
               <div className={styles.calendarGrid}>
                 {calendarDayCells.map((cell) => {
-                  const dayCount = visitCountsByDate[cell.date] ?? 0
+                  const dayCountDisplay = getCalendarDayCountDisplay(cell, visitCountsByDate)
 
                   return (
                     <button
                       className={classNames(
                         styles.calendarDay,
-                        dayCount === 0 && styles.calendarDayEmpty,
+                        dayCountDisplay.isEmpty && cell.inCurrentMonth && styles.calendarDayEmpty,
                         !cell.inCurrentMonth && styles.calendarDayOutsideMonth,
                         selectedCalendarDate === cell.date && styles.calendarDaySelected,
                       )}
@@ -457,8 +472,8 @@ function SearchBox() {
                     >
                       <span className={styles.calendarDayLabel}>
                         <span className={styles.calendarDayNumber}>{cell.day}</span>
-                        <span className={classNames(styles.calendarDayCount, dayCount === 0 && styles.calendarDayCountEmpty)}>
-                          {dayCount}
+                        <span className={classNames(styles.calendarDayCount, dayCountDisplay.isEmpty && styles.calendarDayCountEmpty)}>
+                          {dayCountDisplay.value}
                         </span>
                       </span>
                     </button>

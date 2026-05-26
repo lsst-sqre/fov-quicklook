@@ -12,6 +12,7 @@ export declare const calendarGrid: string;
 export declare const calendarHeader: string;
 export declare const calendarLoadingOverlay: string;
 export declare const calendarMonthButton: string;
+export declare const calendarMonthInput: string;
 export declare const calendarTitle: string;
 export declare const calendarWeekday: string;
 export declare const calendarWeekdays: string;
