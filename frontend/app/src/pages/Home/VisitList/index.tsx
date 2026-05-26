@@ -16,6 +16,12 @@ import {
   isValidCalendarMonth,
   shiftCalendarMonth,
 } from '../visitCalendar'
+import {
+  buildVisitListPageQuery,
+  getVisibleVisitEntries,
+  hasNextVisitPage,
+  shouldShowVisitPagination,
+} from './pagination'
 import { buildVisitListQuery } from '../visitSearch'
 import styles from './styles.module.scss'
 import { LoadingSpinner } from '../../../components/Loading'
@@ -42,13 +48,17 @@ function formatExposureTime(exposureTime: number, digits: number): string {
   return `${isRounded ? '~' : ''}${rounded}`
 }
 
-function useVisitList() {
+function useVisitList(page: number) {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
   const [repositoryName, dataType] = dataSource.split(':')
-  const query = useMemo(
+  const baseQuery = useMemo(
     () => buildVisitListQuery(searchString, dataType, repositoryName),
     [dataType, repositoryName, searchString],
+  )
+  const query = useMemo(
+    () => buildVisitListPageQuery(baseQuery, page),
+    [baseQuery, page],
   )
   const { data: list, refetch, isFetching } = useListVisitsQuery(query)
   return { list, refetch, isFetching }
@@ -95,24 +105,49 @@ function groupVisitList(list: VisitListEntryType[] | undefined, timeToleranceDig
 const ListScrollContainerContext = React.createContext<React.RefObject<HTMLDivElement> | null>(null)
 
 export const VisitList = memo(({ style }: VisitListProps) => {
-  const { list, isFetching } = useVisitList()
+  const searchString = useAppSelector(state => state.home.searchString)
+  const dataSource = useAppSelector(state => state.home.dataSource)
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
   const listContainerRef = useRef<HTMLDivElement>(null)
+  const [page, setPage] = useState(0)
+  const { list, refetch, isFetching } = useVisitList(page)
+  const visibleEntries = useMemo(() => getVisibleVisitEntries(list), [list])
+  const hasNextPage = useMemo(() => hasNextVisitPage(list), [list])
+  const showPagination = shouldShowVisitPagination(page, hasNextPage)
 
   // リストをグループ化
-  const groupedList = useMemo(() => groupVisitList(list, listGroupingTimeToleranceDigits), [list, listGroupingTimeToleranceDigits])
+  const groupedList = useMemo(
+    () => groupVisitList(visibleEntries, listGroupingTimeToleranceDigits),
+    [listGroupingTimeToleranceDigits, visibleEntries],
+  )
 
   useEffect(() => {
-    if (currentQuicklook === undefined && list?.length) {
-      changeCurrentQuicklook(list[0].id)
+    setPage(0)
+  }, [dataSource, searchString])
+
+  useEffect(() => {
+    listContainerRef.current?.scrollTo({ top: 0 })
+  }, [page])
+
+  useEffect(() => {
+    if (currentQuicklook === undefined && visibleEntries.length) {
+      changeCurrentQuicklook(visibleEntries[0].id)
     }
-  }, [changeCurrentQuicklook, currentQuicklook, list])
+  }, [changeCurrentQuicklook, currentQuicklook, visibleEntries])
 
   return (
     <div className={styles.listWrapper}>
-      <SearchBox />
+      <SearchBox onRefresh={refetch} />
+      {showPagination && (
+        <VisitListPagination
+          hasNextPage={hasNextPage}
+          onNext={() => setPage(current => current + 1)}
+          onPrevious={() => setPage(current => Math.max(current - 1, 0))}
+          page={page}
+        />
+      )}
       <div className={styles.listContainer}>
         <ListScrollContainerContext.Provider value={listContainerRef}>
           <div className={styles.list} style={style} ref={listContainerRef}>
@@ -123,9 +158,48 @@ export const VisitList = memo(({ style }: VisitListProps) => {
         </ListScrollContainerContext.Provider>
         {isFetching && <div className={styles.loadingOverlay}><LoadingSpinner /></div>}
       </div>
+      {showPagination && (
+        <VisitListPagination
+          hasNextPage={hasNextPage}
+          onNext={() => setPage(current => current + 1)}
+          onPrevious={() => setPage(current => Math.max(current - 1, 0))}
+          page={page}
+        />
+      )}
     </div>
   )
 })
+
+type VisitListPaginationProps = {
+  hasNextPage: boolean
+  onNext: () => void
+  onPrevious: () => void
+  page: number
+}
+
+function VisitListPagination({ hasNextPage, onNext, onPrevious, page }: VisitListPaginationProps) {
+  return (
+    <div className={styles.pagination}>
+      <button
+        className={styles.paginationButton}
+        disabled={page === 0}
+        onClick={onPrevious}
+        type="button"
+      >
+        Previous
+      </button>
+      <span className={styles.paginationLabel}>Page {page + 1}</span>
+      <button
+        className={styles.paginationButton}
+        disabled={!hasNextPage}
+        onClick={onNext}
+        type="button"
+      >
+        Next
+      </button>
+    </div>
+  )
+}
 
 // グループを表示するコンポーネント
 function VisitGroup({ group }: { group: VisitListEntryType[] }) {
@@ -277,14 +351,13 @@ function scrollToElementBelowSticky(
   }
 }
 
-function SearchBox() {
+function SearchBox({ onRefresh }: { onRefresh: () => void }) {
   const dispatch = useAppDispatch()
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
   const ccdDataTypes = useAppSelector(state => state.copyTemplate.ccdDataTypes)
-  const { refetch } = useVisitList()
   const [repositoryName, dataType] = dataSource.split(':')
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => getInitialCalendarMonth(currentQuicklook))
@@ -375,7 +448,7 @@ function SearchBox() {
               ))}
             </SubMenu>
           </Menu>
-          <button onClick={refetch}>
+          <button onClick={onRefresh}>
             <MaterialSymbol symbol='refresh' />
           </button>
         </div>

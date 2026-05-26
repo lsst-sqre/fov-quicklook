@@ -137,6 +137,7 @@ class DataTypeSpecificDataSource:
             datasets=self.butler_data_type,
             where=where,
             limit=q.limit,
+            offset=q.offset,
             order_by=self.order_by,
         )
         return [self._visit_entry_from_record(record) for record in records]
@@ -236,6 +237,7 @@ class DataTypeSpecificDataSource:
         datasets: str | None = None,
         where: str | None = None,
         limit: int | None = None,
+        offset: int = 0,
         order_by: list[str] | None = None,
     ) -> list[ButlerDimensionRecord]:
         kwargs: dict[str, Any] = {}
@@ -248,6 +250,9 @@ class DataTypeSpecificDataSource:
         records = self._butler.registry.queryDimensionRecords(dimension, **kwargs)
         if order_by is not None:
             records = records.order_by(*order_by)
+        if offset > 0:
+            stop = None if limit is None else offset + limit
+            return list(islice(records, offset, stop))
         if limit is not None:
             records = records.limit(limit)
         return list(records)

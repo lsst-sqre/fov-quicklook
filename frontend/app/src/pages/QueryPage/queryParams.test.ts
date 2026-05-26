@@ -8,13 +8,14 @@ describe("query params helpers", () => {
   })
 
   it("builds list visit arguments from the URL search params", () => {
-    const result = buildVisitListArgs(new URLSearchParams("data_type=raw&repository_name=embargo&limit=2&day_obs=20260128"))
+    const result = buildVisitListArgs(new URLSearchParams("data_type=raw&repository_name=embargo&limit=2&offset=1000&day_obs=20260128"))
 
     expect(result).toEqual({
       args: {
         dataType: "raw",
         repositoryName: "embargo",
         limit: 2,
+        offset: 1000,
         dayObs: 20260128,
       },
       error: null,

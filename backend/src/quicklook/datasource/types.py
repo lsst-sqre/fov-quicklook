@@ -20,6 +20,7 @@ class Query:
     data_type: CcdDataType
     repository_name: str
     limit: int
+    offset: int = 0
     exposure: int | None = None
     day_obs: int | None = None
 

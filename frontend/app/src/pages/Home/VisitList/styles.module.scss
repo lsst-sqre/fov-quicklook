@@ -4,6 +4,39 @@
   height: 100%;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.paginationButton {
+  min-width: 5.5rem;
+  padding: 0.35rem 0.75rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover:enabled {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+}
+
+.paginationLabel {
+  flex: 1;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.85rem;
+}
+
 .list {
   cursor: default;
   user-select: none;

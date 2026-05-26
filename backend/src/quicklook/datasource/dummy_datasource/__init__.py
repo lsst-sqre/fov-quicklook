@@ -19,7 +19,7 @@ class DummyDataSource(DataSourceBase):
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         visits = _load_shared_dummy_visits() or _default_dummy_visits()
         visits = _filter_visits(visits, q)
-        return visits[: q.limit]
+        return visits[q.offset : q.offset + q.limit]
 
     def query_visit_day_counts_sync(self, q: VisitDayCountQuery) -> list[VisitDayCount]:
         month_prefix = q.calendar_month.replace('-', '')

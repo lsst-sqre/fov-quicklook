@@ -45,6 +45,38 @@ def test_query_visits_uses_shared_manifest(monkeypatch):
     assert [visit.id for visit in visits] == ["dummy:raw:910001"]
 
 
+def test_query_visits_respects_offset(monkeypatch):
+    payload = json.dumps(
+        {
+            "version": "fixture",
+            "visits": [
+                {
+                    "id": f"dummy:raw:{index}",
+                    "day_obs": 20260501,
+                    "physical_filter": "r",
+                    "obs_id": f"fixture-{index}",
+                    "exposure_time": 15.0,
+                    "science_program": "review-app-fixtures",
+                    "observation_type": "science",
+                    "observation_reason": "review-app",
+                    "target_name": f"fixture-target-{index}",
+                    "ccds": ["R01_S00"],
+                }
+                for index in range(3)
+            ],
+        }
+    ).encode("utf-8")
+    monkeypatch.setattr(
+        "quicklook.datasource.dummy_datasource.s3_download_object",
+        lambda *_args, **_kwargs: payload,
+    )
+
+    ds = DummyDataSource()
+    visits = ds.query_visits_sync(Query(data_type=CcdDataType("raw"), repository_name="dummy", limit=1, offset=1))
+
+    assert [visit.id for visit in visits] == ["dummy:raw:1"]
+
+
 def test_get_exposure_data_types_uses_shared_manifest(monkeypatch):
     payload = json.dumps(
         {
