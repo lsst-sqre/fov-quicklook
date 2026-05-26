@@ -1,3 +1,5 @@
+import asyncio
+import json
 import pickle
 from dataclasses import dataclass
 from functools import lru_cache
@@ -11,16 +13,64 @@ if TYPE_CHECKING:
     from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 
 from quicklook.utils.fitsheader import HeaderType
-from quicklook.utils.s3 import s3_delete_object, s3_delete_objects_with_prefix, s3_download_object, s3_list_objects, s3_upload_object
+from quicklook.utils.s3 import (
+    NoSuchKey,
+    s3_delete_object,
+    s3_delete_objects_with_prefix,
+    s3_download_object,
+    s3_list_objects,
+    s3_upload_object,
+)
+
+TILE_CACHE_METADATA_KEY = 'meta.json'
 
 
-def put_object(key: str, value: bytes) -> int:
-    s3_upload_object(config.s3_tile, f'{config.s3_tile_key_prefix}{key}', value, 'application/octet-stream')
+class TileCacheMetadataError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class TileCacheMetadata:
+    schema_version: int
+
+
+def put_object(key: str, value: bytes, content_type: str = 'application/octet-stream') -> int:
+    s3_upload_object(config.s3_tile, f'{config.s3_tile_key_prefix}{key}', value, content_type)
     return len(value)
 
 
 def get_object(key: str) -> bytes:
     return s3_download_object(config.s3_tile, f'{config.s3_tile_key_prefix}{key}')
+
+
+def put_tile_cache_metadata_sync(metadata: TileCacheMetadata) -> int:
+    payload = json.dumps(
+        {'tile_cache_schema_version': metadata.schema_version},
+        separators=(',', ':'),
+        sort_keys=True,
+    ).encode('utf-8')
+    return put_object(TILE_CACHE_METADATA_KEY, payload, 'application/json')
+
+
+def get_tile_cache_metadata_sync() -> TileCacheMetadata | None:
+    try:
+        payload = get_object(TILE_CACHE_METADATA_KEY)
+    except NoSuchKey:
+        return None
+
+    try:
+        parsed = json.loads(payload.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise TileCacheMetadataError('tile cache metadata is not valid UTF-8 JSON') from e
+
+    if not isinstance(parsed, dict):
+        raise TileCacheMetadataError('tile cache metadata must be a JSON object')
+
+    schema_version = parsed.get('tile_cache_schema_version')
+    if type(schema_version) is not int:
+        raise TileCacheMetadataError('tile cache metadata must include integer tile_cache_schema_version')
+
+    return TileCacheMetadata(schema_version=schema_version)
 
 
 @dataclass
@@ -124,3 +174,11 @@ class VisitObjectStorage:
     get_ccd_metadata_list = async_wrap(get_ccd_metadata_list_sync)
     put_time_profile = async_wrap(put_time_profile_sync)
     get_time_profile = async_wrap(get_time_profile_sync)
+
+
+async def put_tile_cache_metadata(metadata: TileCacheMetadata) -> int:
+    return await asyncio.to_thread(put_tile_cache_metadata_sync, metadata)
+
+
+async def get_tile_cache_metadata() -> TileCacheMetadata | None:
+    return await asyncio.to_thread(get_tile_cache_metadata_sync)

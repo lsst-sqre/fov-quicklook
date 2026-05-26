@@ -4,14 +4,61 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from quicklook.config import config
 from quicklook.db import Access, Quicklook, get_db_session
-from quicklook.object_storage import VisitObjectStorage
+from quicklook.object_storage import (
+    TileCacheMetadata,
+    TileCacheMetadataError,
+    VisitObjectStorage,
+    delete_objects_by_prefix,
+    get_tile_cache_metadata,
+    put_tile_cache_metadata,
+)
 from quicklook.types import VisitName
 
 logger = logging.getLogger(__name__)
+
+
+async def reset_tile_cache_state() -> None:
+    """Clear DB state and object storage when the shared tile cache schema changes."""
+    async with get_db_session() as session:
+        await session.execute(delete(Access))
+        await session.execute(delete(Quicklook))
+        await session.commit()
+
+    logger.info("Deleted all quicklook/access DB entries for tile cache reset")
+    delete_objects_by_prefix("")
+    logger.info("Deleted all object storage data under prefix %r", config.s3_tile_key_prefix)
+    await put_tile_cache_metadata(TileCacheMetadata(schema_version=config.tile_cache_schema_version))
+    logger.info("Wrote tile cache metadata schema_version=%d", config.tile_cache_schema_version)
+
+
+async def ensure_tile_cache_schema_version() -> None:
+    """Ensure the shared tile cache matches the application schema version."""
+    expected_version = config.tile_cache_schema_version
+
+    try:
+        metadata = await get_tile_cache_metadata()
+    except TileCacheMetadataError as e:
+        logger.warning("Tile cache metadata is invalid (%s); resetting cache", e)
+        await reset_tile_cache_state()
+        return
+
+    if metadata is not None and metadata.schema_version == expected_version:
+        logger.info("Tile cache metadata schema_version=%d matches expected version", expected_version)
+        return
+
+    if metadata is None:
+        logger.info("Tile cache metadata is missing; resetting cache for schema_version=%d", expected_version)
+    else:
+        logger.info(
+            "Tile cache schema version mismatch stored=%d expected=%d; resetting cache",
+            metadata.schema_version,
+            expected_version,
+        )
+    await reset_tile_cache_state()
 
 
 async def select_quicklook_to_delete() -> str | None:

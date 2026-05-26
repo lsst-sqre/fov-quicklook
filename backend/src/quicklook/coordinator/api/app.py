@@ -22,7 +22,7 @@ from quicklook.coordinator.api.types import (
     SharedStatusMessageJobStatusList,
 )
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
-from quicklook.coordinator.housekeeping import cleanup_at_startup
+from quicklook.coordinator.housekeeping import cleanup_at_startup, ensure_tile_cache_schema_version
 from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.job.job import Job
 from quicklook.types import VisitName
@@ -39,6 +39,7 @@ async def lifespan(app: FastAPI):
     from quicklook.revision import GIT_REVISION
     logger.info("Coordinator starting, revision=%s", GIT_REVISION)
 
+    await ensure_tile_cache_schema_version()
     await cleanup_at_startup()
 
     async with managed_session():
