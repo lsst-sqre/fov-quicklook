@@ -5,6 +5,11 @@ type VisitDayCountLike = {
   count: number
 }
 
+export type CalendarDayCountDisplay = {
+  value: string
+  isEmpty: boolean
+}
+
 export type CalendarDayCell = {
   date: string
   day: number
@@ -15,7 +20,7 @@ function zeroPad(value: number): string {
   return `${value}`.padStart(2, "0")
 }
 
-function isValidCalendarMonth(value: string): boolean {
+export function isValidCalendarMonth(value: string): boolean {
   return /^\d{4}-\d{2}$/.test(value)
 }
 
@@ -110,4 +115,22 @@ export function buildVisitCountsByDate(visitDayCounts: VisitDayCountLike[] | und
     counts[date] = visitDayCount.count
     return counts
   }, {})
+}
+
+export function getCalendarDayCountDisplay(
+  cell: CalendarDayCell,
+  visitCountsByDate: Record<string, number>,
+): CalendarDayCountDisplay {
+  if (!cell.inCurrentMonth) {
+    return {
+      value: "-",
+      isEmpty: true,
+    }
+  }
+
+  const count = visitCountsByDate[cell.date] ?? 0
+  return {
+    value: `${count}`,
+    isEmpty: count === 0,
+  }
 }
