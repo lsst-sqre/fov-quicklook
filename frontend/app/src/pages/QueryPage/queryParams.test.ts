@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildByUuidVisitName, buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 
 describe("query params helpers", () => {
   it("normalizes an optional /query prefix", () => {
@@ -8,7 +8,9 @@ describe("query params helpers", () => {
   })
 
   it("builds list visit arguments from the URL search params", () => {
-    const result = buildVisitListArgs(new URLSearchParams("data_type=raw&repository_name=embargo&limit=2&offset=1000&day_obs=20260128"))
+    const result = buildVisitListArgs(
+      new URLSearchParams("data_type=raw&repository_name=embargo&limit=2&offset=1000&day_obs=20260128&order=-day_obs,-exposure&ra_deg=53.6&dec_deg=-32.7&radius_deg=1.5"),
+    )
 
     expect(result).toEqual({
       args: {
@@ -17,6 +19,10 @@ describe("query params helpers", () => {
         limit: 2,
         offset: 1000,
         dayObs: 20260128,
+        order: "-day_obs,-exposure",
+        raDeg: 53.6,
+        decDeg: -32.7,
+        radiusDeg: 1.5,
       },
       error: null,
     })
@@ -29,12 +35,15 @@ describe("query params helpers", () => {
     })
   })
 
-  it("builds a by_uuid visit name", () => {
-    expect(buildByUuidVisitName("embargo:difference_image:7001", "uuid-1")).toBe("embargo:by_uuid:uuid-1")
+  it("reports incomplete spatial parameters", () => {
+    expect(buildVisitListArgs(new URLSearchParams("data_type=raw&repository_name=embargo&ra_deg=53.6&radius_deg=1.5"))).toEqual({
+      args: null,
+      error: "ra_deg, dec_deg, and radius_deg must be specified together.",
+    })
   })
 
   it("builds a default query string from the current datasource", () => {
-    expect(buildDefaultQueryInput("main:raw")).toBe("data_type=raw&repository_name=main&limit=2")
+    expect(buildDefaultQueryInput("main:raw")).toBe("data_type=raw&repository_name=main&limit=100")
     expect(buildDefaultQueryInput("embargo:difference_image", 5)).toBe("data_type=difference_image&repository_name=embargo&limit=5")
   })
 })

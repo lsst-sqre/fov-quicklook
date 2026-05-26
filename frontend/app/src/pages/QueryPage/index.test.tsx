@@ -1,18 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { Provider } from "react-redux"
-import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom"
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { QueryPage } from "."
 import { makeStore } from "../../store"
 
 const { useListVisitsQuery } = vi.hoisted(() => ({
   useListVisitsQuery: vi.fn(),
-}))
-
-vi.mock("../../env", () => ({
-  env: {
-    baseUrl: "http://example.test",
-  },
 }))
 
 vi.mock("../../store/api/openapi", () => ({
@@ -27,11 +21,6 @@ function QueryRoute() {
       <div data-testid="location-search">{location.search}</div>
     </>
   )
-}
-
-function VisitRoute() {
-  const { visitId } = useParams()
-  return <div>{visitId}</div>
 }
 
 const systemInfo = {
@@ -58,7 +47,6 @@ function renderQueryPage(initialEntries: string[]) {
       <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route element={<QueryRoute />} path="/query" />
-          <Route element={<VisitRoute />} path="/visits/:visitId" />
         </Routes>
       </MemoryRouter>
     </Provider>,
@@ -105,9 +93,9 @@ describe("QueryPage", () => {
     renderQueryPage(["/query"])
 
     await waitFor(() => {
-      expect(screen.getByTestId("location-search").textContent).toBe("?data_type=main_raw&repository_name=main&limit=2")
+      expect(screen.getByTestId("location-search").textContent).toBe("?data_type=main_raw&repository_name=main&limit=100")
     })
-    expect(screen.getByDisplayValue("data_type=main_raw&repository_name=main&limit=2")).toBeTruthy()
+    expect(screen.getByDisplayValue("data_type=main_raw&repository_name=main&limit=100")).toBeTruthy()
   })
 
   it("re-runs the query when the input loses focus", async () => {
@@ -120,18 +108,5 @@ describe("QueryPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("location-search").textContent).toBe("?data_type=raw&repository_name=main&limit=2")
     })
-  })
-
-  it("opens the selected visit via by_uuid", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({ uuid: "uuid-1" }),
-    } as Response)
-
-    renderQueryPage(["/query?data_type=raw&repository_name=embargo&limit=2"])
-
-    fireEvent.click(screen.getByRole("button", { name: "Open embargo:raw:2026012800342 by UUID" }))
-
-    expect(await screen.findByText("embargo:by_uuid:uuid-1")).toBeTruthy()
   })
 })

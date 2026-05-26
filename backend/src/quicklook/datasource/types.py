@@ -23,6 +23,15 @@ class Query:
     offset: int = 0
     exposure: int | None = None
     day_obs: int | None = None
+    order: tuple[str, ...] | None = None
+    spatial: 'SpatialQuery | None' = None
+
+
+@dataclass(frozen=True)
+class SpatialQuery:
+    ra_deg: float
+    dec_deg: float
+    radius_deg: float
 
 
 @dataclass

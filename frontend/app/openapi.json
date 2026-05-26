@@ -430,8 +430,84 @@
                         "schema": {
                             "type": "integer",
                             "maximum": 10000,
-                            "default": 1000,
+                            "exclusiveMinimum": 0,
+                            "default": 100,
                             "title": "Limit"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0,
+                            "title": "Offset"
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Order"
+                        }
+                    },
+                    {
+                        "name": "ra_deg",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Ra Deg"
+                        }
+                    },
+                    {
+                        "name": "dec_deg",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Dec Deg"
+                        }
+                    },
+                    {
+                        "name": "radius_deg",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Radius Deg"
                         }
                     },
                     {
@@ -1337,6 +1413,10 @@
                     "id": {
                         "type": "string",
                         "title": "Id"
+                    },
+                    "cache_version": {
+                        "type": "integer",
+                        "title": "Cache Version"
                     }
                 },
                 "type": "object",

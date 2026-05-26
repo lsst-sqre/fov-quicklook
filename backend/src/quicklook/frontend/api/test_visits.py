@@ -1,12 +1,19 @@
 from fastapi import HTTPException
 
-from quicklook.datasource.types import ResolvedVisitInfo, VisitDayCount, VisitRepresentativeUuid, VisitResolutionError
+from quicklook.datasource.types import (
+    Query,
+    ResolvedVisitInfo,
+    SpatialQuery,
+    VisitDayCount,
+    VisitRepresentativeUuid,
+    VisitResolutionError,
+)
 from quicklook.frontend.api import visits
 from quicklook.types import CcdDataType
 from quicklook.types import VisitName
 
 
-async def test_list_visits_forwards_limit_and_offset(monkeypatch):
+async def test_list_visits_forwards_limit_offset_order_and_spatial(monkeypatch):
     captured = {}
 
     class FakeDataSource:
@@ -21,17 +28,51 @@ async def test_list_visits_forwards_limit_and_offset(monkeypatch):
         day_obs=None,
         data_type=CcdDataType('raw'),
         repository_name='repo',
-        limit=1000,
+        limit=100,
         offset=1000,
+        order='-day_obs,-exposure',
+        ra_deg=53.6,
+        dec_deg=-32.7,
+        radius_deg=1.5,
     )
 
     assert result == []
-    assert captured["query"].data_type == CcdDataType('raw')
-    assert captured["query"].repository_name == 'repo'
-    assert captured["query"].limit == 1000
-    assert captured["query"].offset == 1000
-    assert captured["query"].exposure is None
-    assert captured["query"].day_obs is None
+    assert captured["query"] == Query(
+        data_type=CcdDataType('raw'),
+        repository_name='repo',
+        limit=100,
+        offset=1000,
+        order=('-day_obs', '-exposure'),
+        spatial=SpatialQuery(ra_deg=53.6, dec_deg=-32.7, radius_deg=1.5),
+    )
+
+
+async def test_list_visits_returns_422_for_partial_spatial_query(monkeypatch):
+    class FakeDataSource:
+        async def query_visits(self, q):
+            del q
+            return []
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    try:
+        await visits.list_visits(
+            exposure=None,
+            day_obs=None,
+            limit=100,
+            offset=0,
+            order=None,
+            ra_deg=53.6,
+            dec_deg=None,
+            radius_deg=1.5,
+            data_type=CcdDataType('raw'),
+            repository_name='repo',
+        )
+    except HTTPException as e:
+        assert e.status_code == 422
+        assert e.detail == 'ra_deg, dec_deg, and radius_deg must be specified together.'
+    else:  # pragma: no cover
+        raise AssertionError('HTTPException was not raised')
 
 
 async def test_get_visit_metadata_returns_404_for_unknown_uuid(monkeypatch):

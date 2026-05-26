@@ -19,7 +19,8 @@
 - ただし月次 API は「月内のすべての `day_obs + data_id_dimension`」を 1 回で取得してから、日別件数に集計しています。
 - `by_uuid` は **repository + UUID** があれば Butler 上の dataset を特定でき、その `datasetType.name` から `data_type` も引けます。
 - ただし `by_uuid` をそのまま画面表示やデータ取得につなげるには、**解決後の dataset type に対応する `ccd_data_types` 設定**が必要です。
-- 一覧検索の query string でユーザーが指定できるのは現状 `limit` までで、`order` は設定固定、`offset` は未対応です。
+- 一覧検索の query string では `limit` / `offset` / `order` に加えて、`ra_deg` / `dec_deg` / `radius_deg` による spatial search も指定できます。
+- `limit` を省略した場合の既定値は `100` です。
 
 ## Data Query のリクエストの流れ
 
@@ -32,7 +33,7 @@ data_type=raw&repository_name=embargo&day_obs=20260128&limit=20
 流れは次のとおりです。
 
 1. フロントエンドの `frontend/app/src/pages/QueryPage/index.tsx` が URL の query string を読む
-2. `frontend/app/src/pages/QueryPage/queryParams.ts` が `data_type` / `repository_name` / `day_obs` / `exposure` / `limit` をパースする
+2. `frontend/app/src/pages/QueryPage/queryParams.ts` が `data_type` / `repository_name` / `day_obs` / `exposure` / `limit` / `offset` / `order` / spatial search 用パラメータをパースする
 3. `frontend/app/src/store/api/openapi.ts` の `listVisits` が `GET /api/visits` を呼ぶ
 4. `backend/src/quicklook/frontend/api/visits.py` が `Query` オブジェクトを作り、data source に渡す
 5. Butler 使用時は `backend/src/quicklook/datasource/butler_datasource/__init__.py` の `ButlerDataSource.query_visits_sync` が処理する
@@ -189,6 +190,11 @@ CcdDataTypeConfig(
 - `day_obs`
 - `exposure`
 - `limit`
+- `offset`
+- `order`
+- `ra_deg`
+- `dec_deg`
+- `radius_deg`
 
 だけで、`detector` や `ccd_name` をクエリ条件として渡す口はありません。
 
@@ -211,31 +217,36 @@ data_type=raw&repository_name=embargo&exposure=2026012800342
 - `day_obs` を省略した場合、バックエンドは最新の `day_obs` を自動補完します
 - Home 画面の通常検索は日付入力中心ですが、`Data Query` 画面では query string を直接書けるので exposure 指定が可能です
 
-## ページネーションできるか
+## ページネーションと並び順
 
-**現状は「件数制限つきの先頭 N 件取得」で、一般的なページネーション API にはなっていません。**
+**現在は `limit + offset` ベースの単純なページネーションが使えます。**
 
 ### `limit`
 
-`limit` は指定できます。
+`limit` は指定できます。省略時は `100` です。
 
 - `frontend/app/src/pages/QueryPage/queryParams.ts` が `limit` を受け取る
 - `backend/src/quicklook/frontend/api/visits.py` が `/api/visits?limit=...` を受け取る
 - backend の `Query` dataclass にも `limit` フィールドがある
-- Butler query では `records.limit(limit)` を使って反映している
+- Butler query では `records.limit(limit)` または `islice(...)` を使って反映している
 
-したがって、**「最大何件返すか」** は今でも指定可能です。
+したがって、**「最大何件返すか」** を指定できます。
 
 ### `order`
 
-**ユーザーから自由には指定できません。**
+**ユーザーから指定できます。**
 
-現在の並び順は `ccd_data_types` 設定の `order_by` に固定されています。例:
+`order` query param に Butler の `order_by` 形式をカンマ区切りで渡します。例:
+
+- `order=-day_obs,-exposure`
+- `order=-visit`
+
+`order` を省略した場合は、従来どおり `ccd_data_types` 設定の `order_by` を使います。例:
 
 - `raw`: `['-day_obs', '-exposure']`
 - `difference_image`: `['-visit']`
 
-実装では `self.order_by` をそのまま Butler query result に適用しています。
+実装では、query param から渡された `order` があればそれを優先し、なければ `self.order_by` を Butler query result に適用しています。
 
 ```python
 records = self._butler.registry.queryDimensionRecords(dimension, **kwargs)
@@ -243,43 +254,36 @@ records = records.order_by(*order_by)
 records = records.limit(limit)
 ```
 
-そのため、**「limit は可変、order は data type ごとの設定固定」** という状態です。
+そのため、**limit / offset は可変、order も query string で上書き可能** という状態です。
 
 ### `offset`
 
-**現状の FOV-Quicklook API/UI では指定できません。**
+**指定できます。**
 
-少なくとも今の実装には:
+`/api/visits` の `offset`、backend の `Query.offset`、frontend の query string パーサ、Butler 呼び出し側の適用がすべて実装されています。
 
-- `/api/visits` の `offset` パラメータ
-- `Query` dataclass の `offset`
-- frontend の query string パーサでの `offset`
-- Butler 呼び出し側での `offset` 適用
-
-のどれもありません。
-
-また、このコードパスで使っている Butler query interface でも、現状コード上は `order_by(...).limit(...)` までしか使っていません。
+Butler 自体は `offset` を直接サポートしないため、FOV-Quicklook 側で `islice(...)` を使って順序づけ後の record 列から `offset` 分を読み飛ばしています。
 
 ### つまり何ができて、何ができないか
 
 | 項目 | 現状 |
 | --- | --- |
 | `limit` | できる |
-| `order` を query string で指定 | できない |
-| `offset` を query string で指定 | できない |
-| 典型的な `limit + offset` ページネーション | 未実装 |
+| `limit` 省略時の既定値 | `100` |
+| `order` を query string で指定 | できる |
+| `offset` を query string で指定 | できる |
+| 典型的な `limit + offset` ページネーション | できる |
+| `ra_deg` / `dec_deg` / `radius_deg` による spatial search | できる |
 
-### 実装するとしたら
+### spatial search
 
-将来的にページネーションを入れるなら、少なくとも:
+spatial search には次の query string を使います。
 
-1. `/api/visits` に `offset` あるいは cursor を足す
-2. frontend の `QueryPage` にも対応する
-3. data type ごとに安定した sort order を保証する
+```text
+data_type=raw&repository_name=embargo&ra_deg=53.6&dec_deg=-32.7&radius_deg=1.5
+```
 
-が必要です。
-
-特に `offset` 方式にするなら、**並び順が固定で安定していること** が前提になります。今の実装は order 自体は固定ですが、API 契約として pagination を保証しているわけではないので、その整理が必要です。
+これは **視野中心が指定座標から `radius_deg` 度以内** の record を返します。実装では Butler record から取得できる sky-center 座標を使って角距離判定し、その後に `offset` / `limit` を適用しています。
 
 ## Butler の関連テーブルをどう理解するとよいか
 

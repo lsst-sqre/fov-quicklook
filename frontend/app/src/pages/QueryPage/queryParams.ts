@@ -15,11 +15,22 @@ function parseOptionalInteger(value: string | null, name: string): { value?: num
   return { value: Number(value) }
 }
 
+function parseOptionalNumber(value: string | null, name: string): { value?: number, error?: string } {
+  if (!value) {
+    return {}
+  }
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) {
+    return { error: `${name} must be a number.` }
+  }
+  return { value: parsed }
+}
+
 export function normalizeQueryInput(input: string): string {
   return input.trim().replace(/^\/query\?/, "").replace(/^\?/, "")
 }
 
-export function buildDefaultQueryInput(dataSource: string | null | undefined, limit = 2): string {
+export function buildDefaultQueryInput(dataSource: string | null | undefined, limit = 100): string {
   if (!dataSource) {
     return ""
   }
@@ -62,6 +73,37 @@ export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildRes
   if (dayObs.error) {
     return { args: null, error: dayObs.error }
   }
+  const raDeg = parseOptionalNumber(searchParams.get("ra_deg"), "ra_deg")
+  if (raDeg.error) {
+    return { args: null, error: raDeg.error }
+  }
+  const decDeg = parseOptionalNumber(searchParams.get("dec_deg"), "dec_deg")
+  if (decDeg.error) {
+    return { args: null, error: decDeg.error }
+  }
+  const radiusDeg = parseOptionalNumber(searchParams.get("radius_deg"), "radius_deg")
+  if (radiusDeg.error) {
+    return { args: null, error: radiusDeg.error }
+  }
+  const order = searchParams.get("order")?.trim()
+  if (order === "") {
+    return { args: null, error: "order must not be empty." }
+  }
+
+  const spatialValues = [raDeg.value, decDeg.value, radiusDeg.value]
+  const spatialCount = spatialValues.filter((value) => value !== undefined).length
+  if (spatialCount !== 0 && spatialCount !== 3) {
+    return { args: null, error: "ra_deg, dec_deg, and radius_deg must be specified together." }
+  }
+  if (raDeg.value !== undefined && (raDeg.value < 0 || raDeg.value >= 360)) {
+    return { args: null, error: "ra_deg must be in [0, 360)." }
+  }
+  if (decDeg.value !== undefined && (decDeg.value < -90 || decDeg.value > 90)) {
+    return { args: null, error: "dec_deg must be in [-90, 90]." }
+  }
+  if (radiusDeg.value !== undefined && radiusDeg.value < 0) {
+    return { args: null, error: "radius_deg must be >= 0." }
+  }
 
   return {
     args: {
@@ -71,12 +113,11 @@ export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildRes
       ...(exposure.value !== undefined ? { exposure: exposure.value } : {}),
       ...(offset.value !== undefined ? { offset: offset.value } : {}),
       ...(dayObs.value !== undefined ? { dayObs: dayObs.value } : {}),
+      ...(order ? { order } : {}),
+      ...(raDeg.value !== undefined ? { raDeg: raDeg.value } : {}),
+      ...(decDeg.value !== undefined ? { decDeg: decDeg.value } : {}),
+      ...(radiusDeg.value !== undefined ? { radiusDeg: radiusDeg.value } : {}),
     },
     error: null,
   }
-}
-
-export function buildByUuidVisitName(visitName: string, uuid: string): string {
-  const repositoryName = visitName.split(":", 1)[0]
-  return `${repositoryName}:by_uuid:${uuid}`
 }

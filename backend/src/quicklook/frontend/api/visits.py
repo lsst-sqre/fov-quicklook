@@ -1,7 +1,10 @@
+import re
+
 from fastapi import APIRouter, HTTPException, Query
 from quicklook.datasource import get_datasource
 from quicklook.datasource.types import (
     DataSourceCcdMetadata,
+    SpatialQuery,
     ResolvedVisitInfo,
     VisitDayCount,
     VisitDayCountQuery,
@@ -13,28 +16,42 @@ from quicklook.datasource.types import Query as DataSourceQuery
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 router = APIRouter()
+ORDER_FIELD_PATTERN = re.compile(r'^-?[A-Za-z_][A-Za-z0-9_.]*$')
 
 
 @router.get('/api/visits', response_model=list[VisitEntry])
 async def list_visits(
     exposure: int | None = Query(None),
     day_obs: int | None = Query(None),
-    limit: int = Query(default=1000, le=10000),
+    limit: int = Query(default=100, gt=0, le=10000),
     offset: int = Query(default=0, ge=0),
+    order: str | None = Query(None),
+    ra_deg: float | None = Query(None),
+    dec_deg: float | None = Query(None),
+    radius_deg: float | None = Query(None),
     data_type: CcdDataType = Query(...),
     repository_name: str = Query(...),
 ):
     ds = get_datasource()
-    return await ds.query_visits(
-        DataSourceQuery(
-            data_type=data_type,
-            repository_name=repository_name,
-            exposure=exposure,
-            day_obs=day_obs,
-            limit=limit,
-            offset=offset,
+    try:
+        return await ds.query_visits(
+            DataSourceQuery(
+                data_type=data_type,
+                repository_name=repository_name,
+                exposure=exposure,
+                day_obs=day_obs,
+                limit=limit,
+                offset=offset,
+                order=_parse_order(order),
+                spatial=_parse_spatial_query(
+                    ra_deg=ra_deg,
+                    dec_deg=dec_deg,
+                    radius_deg=radius_deg,
+                ),
+            )
         )
-    )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @router.get('/api/visits/day_counts', response_model=list[VisitDayCount])
@@ -100,3 +117,39 @@ async def get_visit_representative_uuid(visit_name: str) -> VisitRepresentativeU
 async def get_exposure_data_types(id: int):
     ds = get_datasource()
     return await ds.get_exposure_data_types(id)
+
+
+def _parse_order(order: str | None) -> tuple[str, ...] | None:
+    if order is None:
+        return None
+
+    fields = [field.strip() for field in order.split(',')]
+    if any(not field for field in fields):
+        raise ValueError('order must be a comma-separated list of field names.')
+    for field in fields:
+        if not ORDER_FIELD_PATTERN.fullmatch(field):
+            raise ValueError(f'Invalid order field: {field}')
+    return tuple(fields)
+
+
+def _parse_spatial_query(
+    *,
+    ra_deg: float | None,
+    dec_deg: float | None,
+    radius_deg: float | None,
+) -> SpatialQuery | None:
+    supplied = [ra_deg is not None, dec_deg is not None, radius_deg is not None]
+    if not any(supplied):
+        return None
+    if not all(supplied):
+        raise ValueError('ra_deg, dec_deg, and radius_deg must be specified together.')
+    assert ra_deg is not None
+    assert dec_deg is not None
+    assert radius_deg is not None
+    if not 0 <= ra_deg < 360:
+        raise ValueError('ra_deg must be in [0, 360).')
+    if not -90 <= dec_deg <= 90:
+        raise ValueError('dec_deg must be in [-90, 90].')
+    if radius_deg < 0:
+        raise ValueError('radius_deg must be >= 0.')
+    return SpatialQuery(ra_deg=ra_deg, dec_deg=dec_deg, radius_deg=radius_deg)

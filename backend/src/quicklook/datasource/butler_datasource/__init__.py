@@ -7,10 +7,11 @@ from types import EllipsisType
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
+from astropy.coordinates import SkyCoord
 from lsst.resources import ResourcePath
 
 from quicklook.config import CcdDataTypeConfig, config
-from quicklook.datasource.types import VisitDayCount, VisitDayCountQuery, VisitEntry
+from quicklook.datasource.types import SpatialQuery, VisitDayCount, VisitDayCountQuery, VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError
@@ -132,14 +133,21 @@ class DataTypeSpecificDataSource:
             conds.append(f"day_obs={q.day_obs}")
         where = " and ".join(conds)
 
+        order_by = list(q.order) if q.order is not None else self.order_by
         records = self._query_dimension_records(
             self.data_id_dimension,
             datasets=self.butler_data_type,
             where=where,
-            limit=q.limit,
-            offset=q.offset,
-            order_by=self.order_by,
+            limit=None if q.spatial is not None else q.limit,
+            offset=0 if q.spatial is not None else q.offset,
+            order_by=order_by,
         )
+        if q.spatial is not None:
+            records = list(islice(
+                (record for record in records if _record_matches_spatial(record, q.spatial)),
+                q.offset,
+                q.offset + q.limit,
+            ))
         return [self._visit_entry_from_record(record) for record in records]
 
     def query_visit_day_counts(self, calendar_month: str) -> list[VisitDayCount]:
@@ -447,6 +455,73 @@ def _record_int_attr(record: ButlerDimensionRecord, *names: str, default: int = 
         if value is not None:
             return int(value)
     return default
+
+
+def _record_matches_spatial(record: ButlerDimensionRecord, spatial: SpatialQuery) -> bool:
+    center = _record_sky_center(record)
+    if center is None:
+        raise ValueError('Spatial search requires sky-center coordinates, but Butler did not provide them for this record.')
+    target = SkyCoord(ra=spatial.ra_deg, dec=spatial.dec_deg, unit='deg')
+    return float(cast(Any, target.separation(center).degree)) <= spatial.radius_deg
+
+
+def _record_sky_center(record: ButlerDimensionRecord) -> SkyCoord | None:
+    for ra_name, dec_name in (
+        ('tracking_ra', 'tracking_dec'),
+        ('boresight_ra', 'boresight_dec'),
+        ('sky_center_ra', 'sky_center_dec'),
+        ('center_ra', 'center_dec'),
+        ('s_ra', 's_dec'),
+        ('ra', 'dec'),
+    ):
+        ra = getattr(record, ra_name, None)
+        dec = getattr(record, dec_name, None)
+        if ra is None or dec is None:
+            continue
+        return SkyCoord(ra=_angle_like_to_deg(ra), dec=_angle_like_to_deg(dec), unit='deg')
+
+    for coord_name in ('skycoord', 'coord', 'boresight', 'pointing', 'radec'):
+        coord = getattr(record, coord_name, None)
+        if coord is None or not hasattr(coord, 'ra') or not hasattr(coord, 'dec'):
+            continue
+        return SkyCoord(ra=_angle_like_to_deg(coord.ra), dec=_angle_like_to_deg(coord.dec), unit='deg')
+
+    region = getattr(record, 'region', None)
+    if region is not None and hasattr(region, 'getBoundingCircle'):
+        try:
+            center = region.getBoundingCircle().getCenter()
+            lon = _extract_sphgeom_coord_deg(center, 'getLon', 'getRa', 'getLongitude')
+            lat = _extract_sphgeom_coord_deg(center, 'getLat', 'getDec', 'getLatitude')
+            if lon is not None and lat is not None:
+                return SkyCoord(ra=lon, dec=lat, unit='deg')
+        except Exception:
+            return None
+
+    return None
+
+
+def _extract_sphgeom_coord_deg(center: object, *method_names: str) -> float | None:
+    for method_name in method_names:
+        method = getattr(center, method_name, None)
+        if callable(method):
+            return _angle_like_to_deg(method())
+    return None
+
+
+def _angle_like_to_deg(value: object) -> float:
+    if isinstance(value, (int, float, str)):
+        return float(value)
+    to_value = getattr(value, 'to_value', None)
+    if callable(to_value):
+        return float(cast(Any, to_value('deg')))
+    for attr in ('degree', 'deg'):
+        angle = getattr(value, attr, None)
+        if angle is not None:
+            return float(cast(Any, angle))
+    as_degrees = getattr(value, 'asDegrees', None)
+    if callable(as_degrees):
+        return float(cast(Any, as_degrees()))
+    return float(cast(Any, value))
 
 
 def _get_datasource(data_type: str, repository_name: str) -> DataTypeSpecificDataSource:

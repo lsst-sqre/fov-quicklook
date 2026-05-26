@@ -12,7 +12,7 @@ from quicklook.datasource.butler_datasource import (
     _get_resolved_visit_run,
     _resolve_visit_cache,
 )
-from quicklook.datasource.types import VisitDayCount, VisitResolutionError
+from quicklook.datasource.types import SpatialQuery, VisitDayCount, VisitResolutionError
 from quicklook.datasource.types import Query
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
@@ -181,6 +181,177 @@ def test_query_visits_applies_offset_after_ordering(monkeypatch):
     )
 
     assert [entry.id for entry in entries] == ['repo:raw:102']
+
+
+def test_query_visits_uses_custom_order(monkeypatch):
+    calls: list[tuple[str, dict[str, object]]] = []
+    order_calls: list[tuple[str, ...]] = []
+
+    class TrackingResults(FakeDimensionRecordResults):
+        def order_by(self, *args: str):
+            order_calls.append(args)
+            return self
+
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            calls.append((dimension, kwargs))
+            return TrackingResults([
+                SimpleNamespace(
+                    id=101,
+                    obs_id='obs-101',
+                    day_obs=20250301,
+                    physical_filter='r',
+                    exposure_time=30.0,
+                    science_program='program-1',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-101',
+                )
+            ])
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
+
+    ds.query_visits(
+        Query(
+            data_type=CcdDataType('raw'),
+            repository_name='repo',
+            limit=5,
+            order=('visit.timespan.begin', '-exposure'),
+        )
+    )
+
+    assert calls == [
+        (
+            'exposure',
+            {
+                'datasets': 'raw',
+                'where': 'day_obs=20250301',
+            },
+        )
+    ]
+    assert order_calls == [('visit.timespan.begin', '-exposure')]
+
+
+def test_query_visits_applies_spatial_filter_before_offset(monkeypatch):
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            assert dimension == 'exposure'
+            assert kwargs == {
+                'datasets': 'raw',
+                'where': 'day_obs=20250301',
+            }
+            return FakeDimensionRecordResults([
+                SimpleNamespace(
+                    id=101,
+                    obs_id='obs-101',
+                    day_obs=20250301,
+                    physical_filter='r',
+                    exposure_time=30.0,
+                    science_program='program-1',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-101',
+                    tracking_ra=10.0,
+                    tracking_dec=0.0,
+                ),
+                SimpleNamespace(
+                    id=102,
+                    obs_id='obs-102',
+                    day_obs=20250301,
+                    physical_filter='i',
+                    exposure_time=31.0,
+                    science_program='program-2',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-102',
+                    tracking_ra=11.5,
+                    tracking_dec=0.0,
+                ),
+                SimpleNamespace(
+                    id=103,
+                    obs_id='obs-103',
+                    day_obs=20250301,
+                    physical_filter='z',
+                    exposure_time=32.0,
+                    science_program='program-3',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-103',
+                    tracking_ra=10.3,
+                    tracking_dec=0.0,
+                ),
+            ])
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
+
+    entries = ds.query_visits(
+        Query(
+            data_type=CcdDataType('raw'),
+            repository_name='repo',
+            limit=1,
+            offset=1,
+            spatial=SpatialQuery(ra_deg=10.0, dec_deg=0.0, radius_deg=0.4),
+        )
+    )
+
+    assert [entry.id for entry in entries] == ['repo:raw:103']
+
+
+def test_query_visits_raises_when_spatial_center_is_missing(monkeypatch):
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            assert dimension == 'exposure'
+            assert kwargs == {
+                'datasets': 'raw',
+                'where': 'day_obs=20250301',
+            }
+            return FakeDimensionRecordResults([
+                SimpleNamespace(
+                    id=101,
+                    obs_id='obs-101',
+                    day_obs=20250301,
+                    physical_filter='r',
+                    exposure_time=30.0,
+                    science_program='program-1',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-101',
+                )
+            ])
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
+
+    try:
+        ds.query_visits(
+            Query(
+                data_type=CcdDataType('raw'),
+                repository_name='repo',
+                limit=1,
+                spatial=SpatialQuery(ra_deg=10.0, dec_deg=0.0, radius_deg=0.4),
+            )
+        )
+    except ValueError as e:
+        assert str(e) == 'Spatial search requires sky-center coordinates, but Butler did not provide them for this record.'
+    else:  # pragma: no cover
+        raise AssertionError('ValueError was not raised')
 
 
 def test_query_visits_uses_configured_dimension_for_visit_dataset():

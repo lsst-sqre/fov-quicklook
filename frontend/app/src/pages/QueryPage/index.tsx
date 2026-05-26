@@ -1,9 +1,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { env } from "../../env"
 import { useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
 import { useAppSelector } from "../../store/hooks"
-import { buildByUuidVisitName, buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 
 export function QueryPage() {
   const navigate = useNavigate()
@@ -14,8 +13,6 @@ export function QueryPage() {
   const effectiveQuery = currentQuery || defaultQuery
   const effectiveSearchParams = useMemo(() => new URLSearchParams(effectiveQuery), [effectiveQuery])
   const [queryInput, setQueryInput] = useState(effectiveQuery)
-  const [openError, setOpenError] = useState<string | null>(null)
-  const [openingVisit, setOpeningVisit] = useState<string | null>(null)
 
   useEffect(() => {
     setQueryInput(effectiveQuery)
@@ -46,25 +43,14 @@ export function QueryPage() {
     commitQuery()
   }, [commitQuery])
 
-  const openByUuid = useCallback(async (visitName: string) => {
-    setOpenError(null)
-    setOpeningVisit(visitName)
-    try {
-      const representativeUuid = await fetchRepresentativeUuid(visitName)
-      navigate(`/visits/${encodeURIComponent(buildByUuidVisitName(visitName, representativeUuid))}`)
-    } catch (e) {
-      setOpenError(e instanceof Error ? e.message : "Failed to open the selected dataset.")
-    } finally {
-      setOpeningVisit((current) => current === visitName ? null : current)
-    }
-  }, [navigate])
-
   return (
     <div style={pageStyle}>
       <div style={sectionStyle}>
         <h1 style={{ margin: 0, fontSize: "1.25rem" }}>Data Query</h1>
         <p style={hintStyle}>
           Enter the query string after <code>/query?</code>. The query runs when the field loses focus or when you press Enter.
+          Supported parameters include <code>exposure</code>, <code>day_obs</code>, <code>limit</code>, <code>offset</code>, <code>order</code>,
+          <code>ra_deg</code>, <code>dec_deg</code>, and <code>radius_deg</code>.
         </p>
         <form onSubmit={handleSubmit} style={formStyle}>
           <input
@@ -81,7 +67,6 @@ export function QueryPage() {
       </div>
 
       {parsedQuery.error && <p role="alert">{parsedQuery.error}</p>}
-      {openError && <p role="alert">{openError}</p>}
       {parsedQuery.args === null && parsedQuery.error === null && (
         <p>Set <code>data_type</code> and <code>repository_name</code> to run a query.</p>
       )}
@@ -98,7 +83,6 @@ export function QueryPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th>Open</th>
                     <th>Visit / Exposure</th>
                     <th>Day Obs</th>
                     <th>Filter</th>
@@ -114,9 +98,7 @@ export function QueryPage() {
                   {data.map((entry) => (
                     <VisitRow
                       entry={entry}
-                      isOpening={openingVisit === entry.id}
                       key={entry.id}
-                      onOpenByUuid={openByUuid}
                     />
                   ))}
                 </tbody>
@@ -129,17 +111,9 @@ export function QueryPage() {
   )
 }
 
-function VisitRow(
-  { entry, isOpening, onOpenByUuid }:
-  { entry: VisitEntry, isOpening: boolean, onOpenByUuid: (visitName: string) => Promise<void> }
-) {
+function VisitRow({ entry }: { entry: VisitEntry }) {
   return (
     <tr>
-      <td>
-        <button aria-label={`Open ${entry.id} by UUID`} disabled={isOpening} onClick={() => void onOpenByUuid(entry.id)}>
-          {isOpening ? "Opening..." : "Open by UUID"}
-        </button>
-      </td>
       <td>
         <Link to={`/visits/${encodeURIComponent(entry.id)}`}>{entry.id}</Link>
       </td>
@@ -153,39 +127,6 @@ function VisitRow(
       <td>{entry.obs_id}</td>
     </tr>
   )
-}
-
-async function fetchRepresentativeUuid(visitName: string): Promise<string> {
-  const response = await fetch(
-    `${env.baseUrl}/api/visits/${encodeURIComponent(visitName)}/representative_uuid`,
-  )
-  if (!response.ok) {
-    const detail = await readErrorDetail(response)
-    throw new Error(detail ?? `Failed to resolve a dataset UUID for ${visitName}.`)
-  }
-  const payload: unknown = await response.json()
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !("uuid" in payload) ||
-    typeof payload.uuid !== "string"
-  ) {
-    throw new Error(`Failed to resolve a dataset UUID for ${visitName}.`)
-  }
-  return payload.uuid
-}
-
-async function readErrorDetail(response: Response): Promise<string | null> {
-  const payload: unknown = await response.json().catch(() => null)
-  if (
-    typeof payload === "object" &&
-    payload !== null &&
-    "detail" in payload &&
-    typeof payload.detail === "string"
-  ) {
-    return payload.detail
-  }
-  return null
 }
 
 function formatQueryError(error: unknown): string {

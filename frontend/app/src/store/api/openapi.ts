@@ -81,6 +81,10 @@ const injectedRtkApi = api.injectEndpoints({
           day_obs: queryArg.dayObs,
           limit: queryArg.limit,
           offset: queryArg.offset,
+          order: queryArg.order,
+          ra_deg: queryArg.raDeg,
+          dec_deg: queryArg.decDeg,
+          radius_deg: queryArg.radiusDeg,
           data_type: queryArg.dataType,
           repository_name: queryArg.repositoryName,
         },
@@ -241,6 +245,10 @@ export type ListVisitsApiArg = {
   dayObs?: number | null;
   limit?: number;
   offset?: number;
+  order?: string | null;
+  raDeg?: number | null;
+  decDeg?: number | null;
+  radiusDeg?: number | null;
   dataType: string;
   repositoryName: string;
 };
@@ -389,6 +397,7 @@ export type CreateQuicklookRequest = {
 export type Job = {
   visit: string;
   id?: string;
+  cache_version?: number;
 };
 export type Progress = {
   total: number;
