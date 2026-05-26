@@ -9,7 +9,6 @@ from quicklook.coordinator.housekeeping import (
     select_quicklook_to_delete,
 )
 from quicklook.db import Access, Quicklook, get_db_session
-from quicklook.types import VisitName
 
 pytestmark = pytest.mark.slow
 

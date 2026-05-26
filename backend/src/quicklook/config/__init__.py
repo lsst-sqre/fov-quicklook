@@ -97,6 +97,7 @@ class Config(BaseSettings):
     tile_max_level: int = 8
     tile_pack: int = 2  # (1<<tile_pack) ** 2 個のタイルがまとめてオブジェクトストレージにアップロードされる。
     # 例えばtile_pack==2のときは、16個のタイルがまとめてアップロードされる。
+    tile_cache_schema_version: int = 1
     fitsio_decompress_parallel: int = 4
     fitsio_tmpdir: Path = Path('/tmp/quicklook/fitsio')
     fitsio_memory_saving_mode: bool = True

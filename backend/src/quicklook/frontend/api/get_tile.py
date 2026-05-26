@@ -52,7 +52,7 @@ async def get_tile(
 
 
 async def _get_tile_from_object_storage(visit: VisitName, pos: TilePos) -> Response:
-    object_storage = VisitObjectStorage(visit)
+    object_storage = VisitObjectStorage.from_visit(visit)
     headers = get_cache_headers()
     try:
         data_bytes = await object_storage.get_quicklook_tile_bytes(pos)
