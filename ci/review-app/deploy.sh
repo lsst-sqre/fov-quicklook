@@ -608,6 +608,37 @@ spec:
       port: 9500
 EOF
 
+for _ in $(seq 1 30); do
+  accepted=$(
+    kubectl -n "$gateway_namespace" get httproute "$route_name" \
+      -o jsonpath='{.status.parents[?(@.parentRef.name=="'"$gateway_name"'")].conditions[?(@.type=="Accepted")].status}' \
+      2>/dev/null || true
+  )
+  resolved_refs=$(
+    kubectl -n "$gateway_namespace" get httproute "$route_name" \
+      -o jsonpath='{.status.parents[?(@.parentRef.name=="'"$gateway_name"'")].conditions[?(@.type=="ResolvedRefs")].status}' \
+      2>/dev/null || true
+  )
+  if [ "$accepted" = "True" ] && [ "$resolved_refs" = "True" ]; then
+    break
+  fi
+  sleep 2
+done
+
+if [ "${accepted:-}" != "True" ] || [ "${resolved_refs:-}" != "True" ]; then
+  echo "review app HTTPRoute was not accepted/resolved by gateway ${gateway_namespace}/${gateway_name}" >&2
+  kubectl -n "$gateway_namespace" get httproute "$route_name" -o yaml >&2
+  kubectl -n "$namespace" get referencegrant "$route_name" -o yaml >&2
+  exit 1
+fi
+
+curl --fail --silent --show-error \
+  --retry 10 \
+  --retry-all-errors \
+  --retry-delay 2 \
+  --max-time 20 \
+  "$environment_url" >/dev/null
+
 cat > "$env_file" <<EOF
 REVIEW_APP_GATEWAY_ADDRESS=${gateway_address}
 REVIEW_APP_BASE_URL=${base_url}

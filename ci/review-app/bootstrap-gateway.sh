@@ -7,114 +7,69 @@ script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 
 gateway_namespace=$(review_app_gateway_namespace)
 gateway_name=$(review_app_gateway_name)
-gateway_class_name=$(review_app_gateway_class_name)
 listener_name=$(review_app_gateway_listener_name)
-registry_namespace=$(review_app_registry_namespace)
-registry_service_name=$(review_app_registry_service_name)
-image_registry=$(review_app_image_registry)
 gateway_address=$(review_app_gateway_address)
 base_url=$(review_app_base_url)
-env_file=$(review_app_bootstrap_env_file)
+image_registry=$(review_app_image_registry)
+env_file=$(review_app_gitlab_env_file)
+registry_namespace=$(review_app_registry_namespace)
+registry_service_name=$(review_app_registry_service_name)
 
 can_manage_microk8s_host() {
-  command -v microk8s >/dev/null 2>&1 &&
-    command -v sudo >/dev/null 2>&1 &&
-    sudo -n true >/dev/null 2>&1
+  [ "${REVIEW_APP_CONFIGURE_LOCAL_REGISTRY:-0}" = "1" ] || return 1
+  [ -n "${REVIEW_APP_GATEWAY_ADDRESS:-}" ] || return 1
+  [ -n "${REVIEW_APP_REGISTRY_HOST:-}" ] || return 1
+  [ -n "${REVIEW_APP_REGISTRY_IP:-}" ] || return 1
+  [ -n "${REVIEW_APP_MICROK8S_USER:-}" ] || return 1
 }
 
 ensure_microk8s_registry_host() {
   if ! can_manage_microk8s_host; then
-    return
+    return 0
   fi
 
-  config_dir="/var/snap/microk8s/current/args/certs.d/${image_registry}"
-  tmp=$(mktemp)
-  cat > "$tmp" <<EOF
-server = "http://${image_registry}"
+  host_line="${REVIEW_APP_REGISTRY_IP} ${REVIEW_APP_REGISTRY_HOST}"
+  remote_cmd=$(cat <<REMOTE
+set -eu
+if ! grep -q -F '${host_line}' /etc/hosts; then
+  printf '%s\n' '${host_line}' | sudo tee -a /etc/hosts >/dev/null
+fi
+REMOTE
+)
+  ssh -o StrictHostKeyChecking=no "${REVIEW_APP_MICROK8S_USER}@${REVIEW_APP_GATEWAY_ADDRESS}" "$remote_cmd"
+}
 
-[host."http://${image_registry}"]
-  capabilities = ["pull", "resolve"]
-EOF
+wait_for_gateway_programmed() {
+  for _ in $(seq 1 30); do
+    programmed=$(kubectl -n "$gateway_namespace" get gateway "$gateway_name" \
+      -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' 2>/dev/null || true)
+    if [ "$programmed" = "True" ]; then
+      return 0
+    fi
+    sleep 2
+  done
 
-  sudo microk8s enable registry >/dev/null
-  sudo install -d "$config_dir"
-
-  changed=0
-  if ! sudo test -f "$config_dir/hosts.toml"; then
-    changed=1
-  elif ! sudo cmp -s "$tmp" "$config_dir/hosts.toml"; then
-    changed=1
-  fi
-
-  if [ "$changed" -eq 1 ]; then
-    sudo cp "$tmp" "$config_dir/hosts.toml"
-    sudo snap restart microk8s.daemon-containerd >/dev/null
-  fi
-
-  rm -f "$tmp"
-  sudo microk8s status --wait-ready >/dev/null
+  echo "shared Gateway ${gateway_namespace}/${gateway_name} is not Programmed" >&2
+  kubectl -n "$gateway_namespace" get gateway "$gateway_name" -o yaml >&2 || true
+  return 1
 }
 
 ensure_microk8s_registry_host
+kubectl wait -n "$registry_namespace" --for=condition=Available "deployment/${registry_service_name}" --timeout=180s
+kubectl get namespace "$gateway_namespace" >/dev/null
+kubectl -n "$gateway_namespace" get gateway "$gateway_name" >/dev/null
+wait_for_gateway_programmed
 
-kubectl wait --for=condition=Available "deployment/${registry_service_name}" -n "$registry_namespace" --timeout=180s
-
-cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ${gateway_namespace}
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: ${gateway_name}
-  namespace: ${gateway_namespace}
-spec:
-  gatewayClassName: ${gateway_class_name}
-  addresses:
-  - type: IPAddress
-    value: ${gateway_address}
-  listeners:
-  - name: ${listener_name}
-    protocol: HTTP
-    port: 80
-    allowedRoutes:
-      namespaces:
-        from: All
-EOF
-
-service_ref=""
-for _ in $(seq 1 30); do
-  service_ref=$(
-    kubectl get svc -A \
-      -l "gateway.envoyproxy.io/owning-gateway-name=${gateway_name},gateway.envoyproxy.io/owning-gateway-namespace=${gateway_namespace}" \
-      -o jsonpath='{.items[0].metadata.namespace} {.items[0].metadata.name}' 2>/dev/null || true
-  )
-  if [ -n "$service_ref" ]; then
-    break
-  fi
-  sleep 2
-done
-
-if [ -z "$service_ref" ]; then
-  echo "failed to find Envoy service for gateway ${gateway_namespace}/${gateway_name}" >&2
+listener=$(kubectl -n "$gateway_namespace" get gateway "$gateway_name" \
+  -o jsonpath="{.spec.listeners[?(@.name==\"${listener_name}\")].name}" 2>/dev/null || true)
+if [ "$listener" != "$listener_name" ]; then
+  echo "shared Gateway ${gateway_namespace}/${gateway_name} does not expose listener ${listener_name}" >&2
+  kubectl -n "$gateway_namespace" get gateway "$gateway_name" -o yaml >&2 || true
   exit 1
 fi
 
-service_namespace=${service_ref% *}
-service_name=${service_ref#* }
-kubectl patch svc -n "$service_namespace" "$service_name" --type=merge -p "{\"spec\":{\"externalIPs\":[\"${gateway_address}\"]}}"
-
 cat > "$env_file" <<EOF
-BOOTSTRAP_GATEWAY_ADDRESS=${gateway_address}
-BOOTSTRAP_BASE_URL=${base_url}
-BOOTSTRAP_IMAGE_REGISTRY=${image_registry}
 REVIEW_APP_GATEWAY_ADDRESS=${gateway_address}
 REVIEW_APP_BASE_URL=${base_url}
 REVIEW_APP_IMAGE_REGISTRY=${image_registry}
 EOF
-
-printf 'Gateway address: %s\n' "$gateway_address"
-printf 'Image registry: %s\n' "$image_registry"
-printf 'Bootstrap env file: %s\n' "$env_file"
