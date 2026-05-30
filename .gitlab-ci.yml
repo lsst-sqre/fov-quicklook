@@ -32,14 +32,32 @@ variables:
 .review_app_rules:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
     - when: never
 
-.review_app_stop_rules:
+.review_app_feature_rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+    - when: never
+
+.review_app_default_branch_rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - when: never
+
+.review_app_feature_stop_rules:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: manual
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: manual
+    - when: never
+
+.review_app_default_stop_rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
     - when: never
 
@@ -139,7 +157,7 @@ review:app:
   stage: deploy
   image: alpine:3.20
   extends:
-    - .review_app_rules
+    - .review_app_feature_rules
     - .with_kubectl
   needs:
     - job: bootstrap:review:app
@@ -160,13 +178,50 @@ review:app:
     on_stop: stop:review:app
     auto_stop_in: 1 week
 
+review:main:app:
+  stage: deploy
+  image: alpine:3.20
+  extends:
+    - .review_app_default_branch_rules
+    - .with_kubectl
+  needs:
+    - job: bootstrap:review:app
+      artifacts: true
+    - job: package:review:app
+  resource_group: "review-app/$CI_COMMIT_REF_SLUG"
+  script:
+    - sh ci/review-app/deploy.sh
+  artifacts:
+    expire_in: 1 week
+    reports:
+      dotenv: review-app.env
+    paths:
+      - review-app.env
+  environment:
+    name: "review/$CI_COMMIT_REF_SLUG"
+    url: "$REVIEW_APP_ENVIRONMENT_URL"
+    on_stop: stop:main:review:app
+
 smoke:review:app:
   stage: verify
   image: alpine:3.20
   extends:
-    - .review_app_rules
+    - .review_app_feature_rules
   needs:
     - job: review:app
+      artifacts: true
+  before_script:
+    - apk add --no-cache curl python3
+  script:
+    - sh ci/review-app/smoke.sh
+
+smoke:main:review:app:
+  stage: verify
+  image: alpine:3.20
+  extends:
+    - .review_app_default_branch_rules
+  needs:
+    - job: review:main:app
       artifacts: true
   before_script:
     - apk add --no-cache curl python3
@@ -177,7 +232,21 @@ stop:review:app:
   stage: deploy
   image: alpine:3.20
   extends:
-    - .review_app_stop_rules
+    - .review_app_feature_stop_rules
+    - .with_kubectl
+  allow_failure: true
+  resource_group: "review-app/$CI_COMMIT_REF_SLUG"
+  script:
+    - sh ci/review-app/stop.sh
+  environment:
+    name: "review/$CI_COMMIT_REF_SLUG"
+    action: stop
+
+stop:main:review:app:
+  stage: deploy
+  image: alpine:3.20
+  extends:
+    - .review_app_default_stop_rules
     - .with_kubectl
   allow_failure: true
   resource_group: "review-app/$CI_COMMIT_REF_SLUG"
