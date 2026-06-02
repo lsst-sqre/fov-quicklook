@@ -536,8 +536,12 @@ const wideFieldStyle = {
 } as const
 
 const fullWidthFieldStyle = {
-  ...fieldStyle,
+  display: "flex",
+  flexDirection: "column",
+  gap: "4px",
   width: "100%",
+  minWidth: 0,
+  flex: "0 0 auto",
 } as const
 
 const checkboxStyle = {

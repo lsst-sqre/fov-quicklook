@@ -91,19 +91,14 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             if dataset_type and _dataset_type_exists_for_repository(selected_repository, dataset_type)
             else None
         )
-        where_examples: list[QueryWhereExample] = []
-        if selected_collection is not None and selected_dataset_type is not None:
-            where_examples = _get_scope_datasource(
-                repository_name=selected_repository,
-                collection=selected_collection,
-                dataset_type=selected_dataset_type,
-            ).query_where_examples()
-
         return QueryBuilderOptions(
             repositories=repositories,
             collections=collections,
             dataset_types=dataset_types,
-            where_examples=where_examples,
+            # Keep this endpoint limited to registry metadata. Probing dataset
+            # contents here made exact matches for large collections unstable
+            # enough to flap the deployed frontend.
+            where_examples=[],
         )
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:

@@ -33,7 +33,10 @@ export function MainMenu() {
     window.open(url, "_blank")
   }, [currentQuicklook])
   const openDataQuery = useCallback(() => {
-    navigate("/query")
+    navigate({
+      pathname: "/query",
+      search: "",
+    })
   }, [navigate])
 
   return (
