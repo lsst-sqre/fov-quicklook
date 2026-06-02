@@ -11,7 +11,7 @@ from lsst.resources import ResourcePath
 
 from quicklook.config import ButlerScopeConfig, config
 from quicklook.datasets import Dataset, get_dataset
-from quicklook.datasource.types import VisitDayCount, VisitDayCountQuery, VisitEntry
+from quicklook.datasource.types import QueryBuilderOptions, QueryWhereExample, VisitDayCount, VisitDayCountQuery, VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName, build_scope_id
 
 from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError
@@ -54,6 +54,42 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             collection=q.collection,
             dataset_type=q.dataset_type,
         ).query_visit_day_counts(q.calendar_month)
+
+    def get_query_builder_options_sync(
+        self,
+        *,
+        repository_name: str | None = None,
+        collection: str | None = None,
+        dataset_type: str | None = None,
+    ) -> QueryBuilderOptions:
+        repositories = _query_repository_names()
+        selected_repository = repository_name if repository_name in repositories else (repositories[0] if repositories else None)
+        if selected_repository is None:
+            return QueryBuilderOptions(
+                repositories=[],
+                collections=[],
+                dataset_types=[],
+                where_examples=[],
+            )
+
+        collections = _query_collections_for_repository(selected_repository, dataset_type=dataset_type)
+        selected_collection = collection if collection in collections else None
+        dataset_types = _query_dataset_types_for_repository(selected_repository, collection=selected_collection)
+        selected_dataset_type = dataset_type if dataset_type in dataset_types else None
+        where_examples: list[QueryWhereExample] = []
+        if selected_collection is not None and selected_dataset_type is not None:
+            where_examples = _get_scope_datasource(
+                repository_name=selected_repository,
+                collection=selected_collection,
+                dataset_type=selected_dataset_type,
+            ).query_where_examples()
+
+        return QueryBuilderOptions(
+            repositories=repositories,
+            collections=collections,
+            dataset_types=dataset_types,
+            where_examples=where_examples,
+        )
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:
         return self.resolve_visit_info_sync(visit).visit_name
@@ -164,6 +200,51 @@ class ScopedButlerDataSource:
         )
         counts_by_day_obs = Counter(int(data_id['day_obs']) for data_id in data_ids)
         return [VisitDayCount(day_obs=day_obs, count=count) for day_obs, count in sorted(counts_by_day_obs.items())]
+
+    def query_where_examples(self) -> list[QueryWhereExample]:
+        records = self._query_dimension_records(
+            self.data_id_dimension,
+            datasets=self.dataset_type,
+            limit=1,
+            order_by=self._normalize_order_by(None, None),
+        )
+        if len(records) == 0:
+            return []
+
+        record = records[0]
+        examples: list[QueryWhereExample] = []
+        day_obs = getattr(record, 'day_obs', None)
+        if day_obs is not None:
+            day_obs_value = int(day_obs)
+            month_start, month_end = _day_obs_month_range(day_obs_value)
+            examples.extend([
+                QueryWhereExample(
+                    label=f'Latest day_obs ({day_obs_value})',
+                    where=f'day_obs={day_obs_value}',
+                ),
+                QueryWhereExample(
+                    label=f'Month of latest day_obs ({day_obs_value // 100})',
+                    where=f'day_obs>={month_start} and day_obs<{month_end}',
+                ),
+            ])
+
+        record_id = getattr(record, 'id', None)
+        if record_id is not None:
+            examples.append(
+                QueryWhereExample(
+                    label=f'Latest {self.data_id_dimension} ({record_id})',
+                    where=f'{self.data_id_dimension}={record_id}',
+                )
+            )
+
+        deduped: list[QueryWhereExample] = []
+        seen = set()
+        for example in examples:
+            if example.where in seen:
+                continue
+            seen.add(example.where)
+            deduped.append(example)
+        return deduped
 
     def list_ccds(self, visit: VisitName) -> list[CcdName]:
         refs = self._query_datasets(self._visit_where(visit), visit=visit)
@@ -410,6 +491,11 @@ def _calendar_month_day_obs_range(calendar_month: str) -> tuple[int, int]:
     return int(start.strftime('%Y%m%d')), int(end.strftime('%Y%m%d'))
 
 
+def _day_obs_month_range(day_obs: int) -> tuple[int, int]:
+    day_obs_text = str(day_obs)
+    return _calendar_month_day_obs_range(f'{day_obs_text[:4]}-{day_obs_text[4:6]}')
+
+
 def _resolve_visit_info(visit: VisitName) -> ResolvedVisitInfo:
     if visit.data_type != BY_UUID_DATA_TYPE:
         return ResolvedVisitInfo(visit_name=visit)
@@ -555,3 +641,91 @@ def _get_repository_butler_cache(repository_name: str, thread_id: int) -> Butler
     from lsst.daf.butler import Butler
 
     return Butler(repository_name)  # type: ignore
+
+
+def _query_repository_names() -> list[str]:
+    return sorted({scope.repository_name for scope in config.butler_scopes})
+
+
+def _repository_instrument(repository_name: str) -> str:
+    for scope in config.butler_scopes:
+        if scope.repository_name == repository_name:
+            return scope.instrument
+    return 'LSSTCam'
+
+
+def _get_query_repository_butler(repository_name: str, instrument: str) -> ButlerType:
+    thread_id = threading.get_ident()
+    return _get_query_repository_butler_cache(repository_name, instrument, thread_id=thread_id)
+
+
+@lru_cache(32)
+def _get_query_repository_butler_cache(repository_name: str, instrument: str, thread_id: int) -> ButlerType:
+    del thread_id
+    from lsst.daf.butler import Butler
+
+    return Butler(repository_name, instrument=instrument, without_datastore=True)  # type: ignore
+
+
+def _dataset_required_dimension_names(dataset_type: Any) -> tuple[str, ...]:
+    required = getattr(dataset_type.dimensions, 'required', ())
+    return tuple(sorted(cast(str, getattr(dimension, 'name', str(dimension))) for dimension in required))
+
+
+def _query_collections_for_repository(repository_name: str, *, dataset_type: str | None = None) -> list[str]:
+    instrument = _repository_instrument(repository_name)
+    thread_id = threading.get_ident()
+    return list(_query_collections_for_repository_cache(repository_name, instrument, dataset_type, thread_id=thread_id))
+
+
+@lru_cache(128)
+def _query_collections_for_repository_cache(
+    repository_name: str,
+    instrument: str,
+    dataset_type: str | None,
+    thread_id: int,
+) -> tuple[str, ...]:
+    del thread_id
+    butler = _get_query_repository_butler(repository_name, instrument)
+    kwargs: dict[str, Any] = {
+        'flattenChains': False,
+    }
+    if dataset_type:
+        kwargs['datasetType'] = dataset_type
+    return tuple(sorted(cast(str, collection) for collection in butler.registry.queryCollections(**kwargs)))
+
+
+def _query_dataset_types_for_repository(repository_name: str, *, collection: str | None = None) -> list[str]:
+    instrument = _repository_instrument(repository_name)
+    thread_id = threading.get_ident()
+    return list(_query_dataset_types_for_repository_cache(repository_name, instrument, collection, thread_id=thread_id))
+
+
+@lru_cache(128)
+def _query_dataset_types_for_repository_cache(
+    repository_name: str,
+    instrument: str,
+    collection: str | None,
+    thread_id: int,
+) -> tuple[str, ...]:
+    cache_thread_id = thread_id
+    del thread_id
+    butler = _get_query_repository_butler(repository_name, instrument)
+    dataset_types: list[str] = []
+    for dataset_type in butler.registry.queryDatasetTypes():
+        dataset_type_name = cast(str, dataset_type.name)
+        try:
+            get_dataset(dataset_type_name).quicklook_dimensions(_dataset_required_dimension_names(dataset_type))
+        except ValueError:
+            continue
+        if collection is not None:
+            collections = _query_collections_for_repository_cache(
+                repository_name,
+                instrument,
+                dataset_type_name,
+                cache_thread_id,
+            )
+            if collection not in collections:
+                continue
+        dataset_types.append(dataset_type_name)
+    return tuple(sorted(set(dataset_types)))

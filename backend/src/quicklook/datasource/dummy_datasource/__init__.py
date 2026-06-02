@@ -5,7 +5,14 @@ from pathlib import Path
 
 from quicklook.config import config
 from quicklook.datasource.butler_datasource.instrument import Instrument
-from quicklook.datasource.types import VisitDayCount, VisitDayCountQuery, VisitEntry, VisitResolutionError
+from quicklook.datasource.types import (
+    QueryBuilderOptions,
+    QueryWhereExample,
+    VisitDayCount,
+    VisitDayCountQuery,
+    VisitEntry,
+    VisitResolutionError,
+)
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import NoSuchKey, s3_download_object, s3_list_objects
@@ -36,6 +43,41 @@ class DummyDataSource(DataSourceBase):
                 continue
             counts[visit.day_obs] = counts.get(visit.day_obs, 0) + 1
         return [VisitDayCount(day_obs=day_obs, count=count) for day_obs, count in sorted(counts.items())]
+
+    def get_query_builder_options_sync(
+        self,
+        *,
+        repository_name: str | None = None,
+        collection: str | None = None,
+        dataset_type: str | None = None,
+    ) -> QueryBuilderOptions:
+        visits = _load_shared_dummy_visits() or _default_dummy_visits()
+        repositories = sorted({VisitName(visit.id).repository_name for visit in visits} | {scope.repository_name for scope in config.butler_scopes})
+        selected_repository = repository_name if repository_name in repositories else (repositories[0] if repositories else None)
+        scoped_visits = [
+            visit
+            for visit in visits
+            if selected_repository is None or VisitName(visit.id).repository_name == selected_repository
+        ]
+        collections = sorted({VisitName(visit.id).collection for visit in scoped_visits})
+        selected_collection = collection if collection in collections else None
+        dataset_types = sorted({
+            VisitName(visit.id).dataset_type
+            for visit in scoped_visits
+            if selected_collection is None or VisitName(visit.id).collection == selected_collection
+        })
+        selected_dataset_type = dataset_type if dataset_type in dataset_types else None
+        where_examples = _build_dummy_where_examples(
+            scoped_visits,
+            collection=selected_collection,
+            dataset_type=selected_dataset_type,
+        )
+        return QueryBuilderOptions(
+            repositories=repositories,
+            collections=collections,
+            dataset_types=dataset_types,
+            where_examples=where_examples,
+        )
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:
         if visit.data_type == "by_uuid":
@@ -239,3 +281,40 @@ def create_dummy_visit_entry(
         target_name=target_name,
         uuid=_encode_dummy_visit_uuid(visit_name),
     )
+
+
+def _build_dummy_where_examples(
+    visits: list[VisitEntry],
+    *,
+    collection: str | None,
+    dataset_type: str | None,
+) -> list[QueryWhereExample]:
+    if collection is None or dataset_type is None:
+        return []
+
+    matching_visits = [
+        visit
+        for visit in visits
+        if VisitName(visit.id).collection == collection and VisitName(visit.id).dataset_type == dataset_type
+    ]
+    if not matching_visits:
+        return []
+
+    latest_visit = max(matching_visits, key=lambda visit: (visit.day_obs, visit.display_id))
+    visit_name = VisitName(latest_visit.id)
+    examples = [
+        QueryWhereExample(
+            label=f"Latest day_obs ({latest_visit.day_obs})",
+            where=f"day_obs={latest_visit.day_obs}",
+        ),
+    ]
+    if visit_name.dimensions:
+        key = sorted(visit_name.dimensions)[0]
+        value = visit_name.dimensions[key]
+        examples.append(
+            QueryWhereExample(
+                label=f"Latest {key} ({value})",
+                where=f"{key}={value}",
+            )
+        )
+    return examples

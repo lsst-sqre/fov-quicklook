@@ -73,6 +73,19 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/quicklooks/${queryArg.visitName}/time_profile`,
       }),
     }),
+    getQueryBuilderOptions: build.query<
+      GetQueryBuilderOptionsApiResponse,
+      GetQueryBuilderOptionsApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/visits/query_builder_options`,
+        params: {
+          repository_name: queryArg.repositoryName,
+          collection: queryArg.collection,
+          dataset_type: queryArg.datasetType,
+        },
+      }),
+    }),
     listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
       query: (queryArg) => ({
         url: `/api/visits`,
@@ -236,6 +249,13 @@ export type GetTimeProfileApiResponse =
   /** status 200 Successful Response */ any;
 export type GetTimeProfileApiArg = {
   visitName: string;
+};
+export type GetQueryBuilderOptionsApiResponse =
+  /** status 200 Successful Response */ QueryBuilderOptions;
+export type GetQueryBuilderOptionsApiArg = {
+  repositoryName?: string | null;
+  collection?: string | null;
+  datasetType?: string | null;
 };
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitEntry[];
@@ -474,6 +494,16 @@ export type QuicklookMetadata =
   | QuicklookMetadataProgress
   | QuicklookMetadataPending
   | QuicklookMetadataError;
+export type QueryWhereExample = {
+  label: string;
+  where: string;
+};
+export type QueryBuilderOptions = {
+  repositories: string[];
+  collections: string[];
+  dataset_types: string[];
+  where_examples: QueryWhereExample[];
+};
 export type VisitEntry = {
   id: string;
   display_id: string;
@@ -537,6 +567,7 @@ export const {
   useGetAllQuicklookJobsQuery,
   useGetQuicklookMetadataQuery,
   useGetTimeProfileQuery,
+  useGetQueryBuilderOptionsQuery,
   useListVisitsQuery,
   useListVisitDayCountsQuery,
   useGetVisitMetadataQuery,

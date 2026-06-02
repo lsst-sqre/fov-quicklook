@@ -5,7 +5,6 @@ import { MaterialSymbol } from "../../../components/MaterialSymbol"
 import { env } from "../../../env"
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
-import { buildDefaultQueryInput } from "../../QueryPage/queryParams"
 import { useHomeActions } from "../useHomeActions"
 
 export function MainMenu() {
@@ -28,16 +27,14 @@ export function MainMenu() {
   }, [dispatch, showMemoryUsageInCompactStatus])
 
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-  const currentDataSource = useAppSelector(state => state.home.dataSource)
   const downloadTimeProfile = useCallback(() => {
     if (!currentQuicklook) return
     const url = `${env.baseUrl}/api/quicklooks/${encodeURIComponent(currentQuicklook)}/time_profile`
     window.open(url, "_blank")
   }, [currentQuicklook])
   const openDataQuery = useCallback(() => {
-    const query = buildDefaultQueryInput(currentDataSource)
-    navigate(query ? `/query?${query}` : "/query")
-  }, [currentDataSource, navigate])
+    navigate("/query")
+  }, [navigate])
 
   return (
     <div>
