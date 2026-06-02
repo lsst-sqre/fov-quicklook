@@ -49,22 +49,30 @@ def test_get_query_builder_options_keeps_exact_selection_metadata_only(monkeypat
     monkeypatch.setattr(
         butler_datasource_module,
         '_query_collections_for_repository',
-        lambda repository_name, *, search_text=None: ['LSSTCam/raw/all'] if repository_name == 'main' and search_text == 'LSSTCam/raw/all' else [],
+        lambda repository_name, *, search_text=None: (_ for _ in ()).throw(
+            AssertionError(f'_query_collections_for_repository should not be called: {repository_name}, {search_text}')
+        ),
     )
     monkeypatch.setattr(
         butler_datasource_module,
         '_query_dataset_types_for_repository',
-        lambda repository_name, *, search_text=None: ['raw'] if repository_name == 'main' and search_text == 'raw' else [],
+        lambda repository_name, *, search_text=None: (_ for _ in ()).throw(
+            AssertionError(f'_query_dataset_types_for_repository should not be called: {repository_name}, {search_text}')
+        ),
     )
     monkeypatch.setattr(
         butler_datasource_module,
         '_collection_exists_for_repository',
-        lambda repository_name, collection: repository_name == 'main' and collection == 'LSSTCam/raw/all',
+        lambda repository_name, collection: (_ for _ in ()).throw(
+            AssertionError(f'_collection_exists_for_repository should not be called: {repository_name}, {collection}')
+        ),
     )
     monkeypatch.setattr(
         butler_datasource_module,
         '_dataset_type_exists_for_repository',
-        lambda repository_name, dataset_type: repository_name == 'main' and dataset_type == 'raw',
+        lambda repository_name, dataset_type: (_ for _ in ()).throw(
+            AssertionError(f'_dataset_type_exists_for_repository should not be called: {repository_name}, {dataset_type}')
+        ),
     )
     monkeypatch.setattr(
         butler_datasource_module,
