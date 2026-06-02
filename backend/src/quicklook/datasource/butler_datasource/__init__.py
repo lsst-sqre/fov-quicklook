@@ -72,9 +72,9 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
                 where_examples=[],
             )
 
-        collections = _query_collections_for_repository(selected_repository, dataset_type=dataset_type)
+        collections = _query_collections_for_repository(selected_repository)
         selected_collection = collection if collection in collections else None
-        dataset_types = _query_dataset_types_for_repository(selected_repository, collection=selected_collection)
+        dataset_types = _query_dataset_types_for_repository(selected_repository)
         selected_dataset_type = dataset_type if dataset_type in dataset_types else None
         where_examples: list[QueryWhereExample] = []
         if selected_collection is not None and selected_dataset_type is not None:
@@ -202,9 +202,11 @@ class ScopedButlerDataSource:
         return [VisitDayCount(day_obs=day_obs, count=count) for day_obs, count in sorted(counts_by_day_obs.items())]
 
     def query_where_examples(self) -> list[QueryWhereExample]:
+        latest_day_where = self._build_latest_day_where()
         records = self._query_dimension_records(
             self.data_id_dimension,
             datasets=self.dataset_type,
+            where=latest_day_where,
             limit=1,
             order_by=self._normalize_order_by(None, None),
         )
