@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+from lsst.daf.butler._exceptions import MissingCollectionError, MissingDatasetTypeError
+
 from quicklook.datasource import butler_datasource as butler_datasource_module
 from quicklook.datasource.butler_datasource import ButlerDataSource
 from quicklook.datasource.types import QueryWhereExample
@@ -84,3 +86,44 @@ def test_get_query_builder_options_uses_exact_selection_for_where_examples(monke
     assert result.collections == ['LSSTCam/raw/all']
     assert result.dataset_types == ['raw']
     assert result.where_examples == [QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')]
+
+
+def test_collection_exists_for_repository_returns_false_for_partial_match(monkeypatch):
+    class FakeRegistry:
+        def queryCollections(self, expression, *, flattenChains=False):
+            assert expression == 'nightly'
+            assert flattenChains is False
+            raise MissingCollectionError('nightly')
+
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_get_query_repository_butler',
+        lambda repository_name, instrument: SimpleNamespace(registry=FakeRegistry()),
+    )
+
+    assert butler_datasource_module._collection_exists_for_repository_cache(
+        'embargo',
+        'LSSTCam',
+        'nightly',
+        thread_id=1001,
+    ) is False
+
+
+def test_dataset_type_exists_for_repository_returns_false_for_partial_match(monkeypatch):
+    class FakeRegistry:
+        def queryDatasetTypes(self, expression):
+            assert expression == 'raw'
+            raise MissingDatasetTypeError('raw')
+
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_get_query_repository_butler',
+        lambda repository_name, instrument: SimpleNamespace(registry=FakeRegistry()),
+    )
+
+    assert butler_datasource_module._dataset_type_exists_for_repository_cache(
+        'embargo',
+        'LSSTCam',
+        'raw',
+        thread_id=1002,
+    ) is False
