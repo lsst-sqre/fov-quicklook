@@ -4,7 +4,7 @@ from datetime import date
 from functools import lru_cache
 from itertools import islice
 from types import EllipsisType
-from typing import TYPE_CHECKING, Any, Iterable, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, cast
 from uuid import UUID
 
 from lsst.resources import ResourcePath
@@ -802,13 +802,18 @@ def _query_collections_for_repository(repository_name: str, *, search_text: str 
         _prime_query_builder_metadata_async(repository_name)
         instrument = _repository_instrument(repository_name)
         thread_id = threading.get_ident()
-        return list(
-            _query_collections_for_repository_cache(
-                repository_name,
-                instrument,
-                search,
-                thread_id=thread_id,
-            )
+        return _run_query_builder_fallback(
+            repository_name=repository_name,
+            action='collection suggestions',
+            default=[],
+            func=lambda: list(
+                _query_collections_for_repository_cache(
+                    repository_name,
+                    instrument,
+                    search,
+                    thread_id=thread_id,
+                )
+            ),
         )
     return _filter_query_builder_options(metadata.collections, search)
 
@@ -837,13 +842,18 @@ def _query_dataset_types_for_repository(repository_name: str, *, search_text: st
         _prime_query_builder_metadata_async(repository_name)
         instrument = _repository_instrument(repository_name)
         thread_id = threading.get_ident()
-        return list(
-            _query_dataset_types_for_repository_cache(
-                repository_name,
-                instrument,
-                search,
-                thread_id=thread_id,
-            )
+        return _run_query_builder_fallback(
+            repository_name=repository_name,
+            action='dataset type suggestions',
+            default=[],
+            func=lambda: list(
+                _query_dataset_types_for_repository_cache(
+                    repository_name,
+                    instrument,
+                    search,
+                    thread_id=thread_id,
+                )
+            ),
         )
     return _filter_query_builder_options(metadata.dataset_types, search)
 
@@ -876,11 +886,16 @@ def _collection_exists_for_repository(repository_name: str, collection: str) -> 
         _prime_query_builder_metadata_async(repository_name)
         instrument = _repository_instrument(repository_name)
         thread_id = threading.get_ident()
-        return _collection_exists_for_repository_cache(
-            repository_name,
-            instrument,
-            collection,
-            thread_id=thread_id,
+        return _run_query_builder_fallback(
+            repository_name=repository_name,
+            action='collection existence check',
+            default=False,
+            func=lambda: _collection_exists_for_repository_cache(
+                repository_name,
+                instrument,
+                collection,
+                thread_id=thread_id,
+            ),
         )
     return collection in metadata.collections
 
@@ -908,11 +923,16 @@ def _dataset_type_exists_for_repository(repository_name: str, dataset_type: str)
         _prime_query_builder_metadata_async(repository_name)
         instrument = _repository_instrument(repository_name)
         thread_id = threading.get_ident()
-        return _dataset_type_exists_for_repository_cache(
-            repository_name,
-            instrument,
-            dataset_type,
-            thread_id=thread_id,
+        return _run_query_builder_fallback(
+            repository_name=repository_name,
+            action='dataset type existence check',
+            default=False,
+            func=lambda: _dataset_type_exists_for_repository_cache(
+                repository_name,
+                instrument,
+                dataset_type,
+                thread_id=thread_id,
+            ),
         )
     return dataset_type in metadata.dataset_types
 
@@ -952,3 +972,21 @@ def _normalize_option_search_text(text: str | None) -> str | None:
 
 def _build_contains_glob(search_text: str) -> str:
     return f'*{search_text}*'
+
+
+def _run_query_builder_fallback(
+    *,
+    repository_name: str,
+    action: str,
+    default: Any,
+    func: Callable[[], Any],
+) -> Any:
+    try:
+        return func()
+    except Exception:
+        logger.exception(
+            "Falling back to default after Data Query %s failed for repository=%s",
+            action,
+            repository_name,
+        )
+        return default

@@ -301,3 +301,53 @@ def test_dataset_type_exists_for_repository_filters_non_quicklook_dataset_types(
         'not_quicklook',
         thread_id=1003,
     ) is False
+
+
+def test_get_query_builder_options_returns_empty_options_when_direct_fallback_raises(monkeypatch):
+    monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_prime_query_builder_metadata_async',
+        lambda repository_name: None,
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_get_query_repository_metadata_if_available',
+        lambda repository_name, wait_for_prefetch=False: None,
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_repository_instrument',
+        lambda repository_name: 'LSSTCam',
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_collection_exists_for_repository_cache',
+        lambda repository_name, instrument, collection, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_dataset_type_exists_for_repository_cache',
+        lambda repository_name, instrument, dataset_type, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_collections_for_repository_cache',
+        lambda repository_name, instrument, search_text, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_dataset_types_for_repository_cache',
+        lambda repository_name, instrument, search_text, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    result = ds.get_query_builder_options_sync(
+        repository_name='main',
+        collection='LSSTCam/raw/all',
+        dataset_type='difference_image',
+    )
+
+    assert result.collections == []
+    assert result.dataset_types == []
+    assert result.where_examples == []
