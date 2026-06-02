@@ -154,7 +154,8 @@ describe("QueryPage", () => {
     })
     expect((screen.getByLabelText("Query string") as HTMLInputElement).value).toBe("")
     expect(screen.getByTestId("location-search").textContent).toBe("")
-    expect(useListVisitsQuery.mock.calls.at(-1)?.[1]?.skip).toBe(true)
+    const lastCall = useListVisitsQuery.mock.calls[useListVisitsQuery.mock.calls.length - 1]
+    expect(lastCall?.[1]?.skip).toBe(true)
   })
 
   it("lets the helper controls build the query string and where example", async () => {
