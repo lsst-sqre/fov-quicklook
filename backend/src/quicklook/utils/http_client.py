@@ -36,12 +36,14 @@ async def managed_session() -> AsyncIterator[None]:
         yield
         return
 
-    connector = aiohttp.TCPConnector(
-        family=socket.AF_INET,
+    connector_kwargs = dict(
         limit=config.http_client_connection_limit,
         ttl_dns_cache=config.http_client_dns_cache_ttl,
         keepalive_timeout=config.http_client_keepalive_timeout,
     )
+    if config.comm_force_ipv4_internal:
+        connector_kwargs["family"] = socket.AF_INET
+    connector = aiohttp.TCPConnector(**connector_kwargs)
     _session = aiohttp.ClientSession(connector=connector)
     try:
         yield
