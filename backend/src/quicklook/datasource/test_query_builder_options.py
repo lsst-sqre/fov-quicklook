@@ -1,3 +1,4 @@
+import sys
 from types import SimpleNamespace
 
 from lsst.daf.butler._exceptions import MissingCollectionError, MissingDatasetTypeError
@@ -8,6 +9,24 @@ from quicklook.datasource.butler_datasource import ButlerDataSource
 
 def test_build_contains_glob():
     assert butler_datasource_module._build_contains_glob('nightly') == '*nightly*'
+
+
+def test_butler_datasource_init_does_not_prime_query_builder_metadata(monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setitem(
+        sys.modules,
+        'quicklook.datasource.butler_datasource.butlerutils',
+        SimpleNamespace(chown_pgpassfile=lambda: calls.append('chown')),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_prime_query_builder_metadata_async',
+        lambda repository_name: calls.append(repository_name),
+    )
+
+    ButlerDataSource()
+
+    assert calls == ['chown']
 
 
 def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatch):

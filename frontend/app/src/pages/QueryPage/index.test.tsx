@@ -8,6 +8,9 @@ import { makeStore } from "../../store"
 const { useListVisitsQuery } = vi.hoisted(() => ({
   useListVisitsQuery: vi.fn(),
 }))
+const { copyTextToClipboard } = vi.hoisted(() => ({
+  copyTextToClipboard: vi.fn(),
+}))
 
 vi.mock("../../env", () => ({
   env: {
@@ -22,6 +25,10 @@ vi.mock("../../store/api/openapi", async () => {
     useListVisitsQuery,
   }
 })
+
+vi.mock("../../utils/copyTextToClipboard", () => ({
+  copyTextToClipboard,
+}))
 
 function jsonResponse(payload: unknown): Response {
   return {
@@ -113,6 +120,7 @@ function renderQueryPage(initialEntries: string[]) {
 describe("QueryPage", () => {
   beforeEach(() => {
     useListVisitsQuery.mockReset()
+    copyTextToClipboard.mockReset()
     useListVisitsQuery.mockReturnValue({
       data: [
         {
@@ -220,5 +228,37 @@ describe("QueryPage", () => {
       limit: 100,
       reverse: undefined,
     })
+  })
+
+  it("copies runnable python code for the current query string", async () => {
+    renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100")).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy Python" }))
+
+    expect(copyTextToClipboard).toHaveBeenCalledTimes(1)
+    expect(copyTextToClipboard).toHaveBeenCalledWith(
+      "import requests\n\n"
+      + "BASE_URL = 'http://example.test'\n"
+      + "GAFAELFAWR_TOKEN = '<set gafaelfawr token here>'\n\n"
+      + "params = {\n"
+      + "    'repository_name': 'embargo',\n"
+      + "    'collection': 'LSSTCam/raw/all',\n"
+      + "    'dataset_type': 'raw',\n"
+      + "    'limit': '100',\n"
+      + "}\n\n"
+      + "response = requests.get(\n"
+      + "    f\"{BASE_URL}/api/visits\",\n"
+      + "    params=params,\n"
+      + "    cookies={'gafaelfawr': GAFAELFAWR_TOKEN},\n"
+      + "    timeout=30,\n"
+      + ")\n"
+      + "response.raise_for_status()\n\n"
+      + "for visit in response.json():\n"
+      + "    print(visit['display_id'])",
+    )
   })
 })
