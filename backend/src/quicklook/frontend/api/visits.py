@@ -1,6 +1,7 @@
 import re
 
 from fastapi import APIRouter, HTTPException, Query
+from lsst.daf.butler._exceptions import ButlerUserError
 from quicklook.datasets import get_dataset
 from quicklook.datasource import get_datasource
 from quicklook.datasource.types import (
@@ -75,18 +76,21 @@ async def list_visits(
     offset: int = Query(default=0, ge=0),
 ):
     ds = get_datasource()
-    return await ds.query_visits(
-        DataSourceQuery(
-            repository_name=repository_name,
-            collection=collection,
-            dataset_type=dataset_type,
-            where=_normalize_where(where),
-            order_by=_normalize_order_by(dataset_type, order_by),
-            reverse=reverse,
-            limit=limit,
-            offset=offset,
+    try:
+        return await ds.query_visits(
+            DataSourceQuery(
+                repository_name=repository_name,
+                collection=collection,
+                dataset_type=dataset_type,
+                where=_normalize_where(where),
+                order_by=_normalize_order_by(dataset_type, order_by),
+                reverse=reverse,
+                limit=limit,
+                offset=offset,
+            )
         )
-    )
+    except ButlerUserError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @router.get('/api/visits/day_counts', response_model=list[VisitDayCount])
@@ -106,7 +110,7 @@ async def list_visit_day_counts(
                 calendar_month=calendar_month,
             )
         )
-    except ValueError as e:
+    except (ButlerUserError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
