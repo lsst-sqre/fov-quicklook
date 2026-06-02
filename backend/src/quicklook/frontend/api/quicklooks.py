@@ -405,7 +405,10 @@ async def _status_relay_main_loop():
 
     while True:
         try:
-            async with websockets.connect(ws_url, max_size=None, family=socket.AF_INET) as ws:
+            connect_kwargs = {"max_size": None}
+            if config.comm_force_ipv4_internal:
+                connect_kwargs["family"] = socket.AF_INET
+            async with websockets.connect(ws_url, **connect_kwargs) as ws:
                 if retry_count:
                     logger.info(f"Reconnected to {ws_url} after {retry_count} retries")
                     retry_count = 0

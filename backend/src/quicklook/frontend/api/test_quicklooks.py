@@ -103,6 +103,33 @@ async def test_status_relay_keeps_retrying_without_shutdown(monkeypatch):
     assert len(connect_calls) == 7
     assert sleep_calls == [1, 2, 4, 8, 16, 32]
     assert {kwargs['max_size'] for _, kwargs in connect_calls} == {None}
+    assert all('family' not in kwargs for _, kwargs in connect_calls)
+
+
+async def test_status_relay_uses_ipv4_when_enabled(monkeypatch):
+    connect_calls: list[tuple[str, dict]] = []
+
+    class StopLoop(BaseException):
+        pass
+
+    class FakeConnect:
+        async def __aenter__(self):
+            raise StopLoop()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+    def fake_connect(url: str, **kwargs):
+        connect_calls.append((url, kwargs))
+        return FakeConnect()
+
+    monkeypatch.setattr(quicklooks.config, "comm_force_ipv4_internal", True)
+    monkeypatch.setattr(quicklooks.websockets, 'connect', fake_connect)
+
+    with pytest.raises(StopLoop):
+        await quicklooks._status_relay_main_loop()
+
     assert {kwargs['family'] for _, kwargs in connect_calls} == {socket.AF_INET}
 
 

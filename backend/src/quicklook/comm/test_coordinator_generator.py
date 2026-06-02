@@ -1,6 +1,7 @@
 """coordinator-generator間の通信のテスト"""
 
 import asyncio
+import errno
 from contextlib import asynccontextmanager
 
 import pytest
@@ -155,6 +156,41 @@ async def test_registration_loop_shuts_down_on_coordinator_restart(monkeypatch):
     await generator._registration_loop()
 
     assert shutdown_called is True
+
+
+async def test_registration_loop_shuts_down_immediately_on_permission_error(monkeypatch):
+    immediate_shutdown_called = False
+    sleep_called = False
+
+    monkeypatch.setattr(generator, "_generator_id", GeneratorId("test-gen"))
+    monkeypatch.setattr(generator, "_coordinator_id", None)
+    monkeypatch.setattr(generator, "_shutdown_requested", False)
+
+    class ConnectorError(Exception):
+        def __init__(self):
+            super().__init__("Cannot connect [Operation not permitted]")
+            self.os_error = PermissionError(errno.EPERM, "Operation not permitted")
+
+    async def fake_register():
+        raise ConnectorError()
+
+    async def fake_immediate_shutdown():
+        nonlocal immediate_shutdown_called
+        immediate_shutdown_called = True
+        generator._shutdown_requested = True
+
+    async def fake_sleep(_delay: float):
+        nonlocal sleep_called
+        sleep_called = True
+
+    monkeypatch.setattr(generator, "_register_to_coordinator", fake_register)
+    monkeypatch.setattr(generator, "_immediate_shutdown", fake_immediate_shutdown)
+    monkeypatch.setattr(generator.asyncio, "sleep", fake_sleep)
+
+    await generator._registration_loop()
+
+    assert immediate_shutdown_called is True
+    assert sleep_called is False
 
 
 async def test_generator_lifespan_starts_before_registration_succeeds(monkeypatch):

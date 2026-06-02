@@ -56,14 +56,15 @@ class Rpc(Generic[P, R]):
         self.kwargs = kwargs
 
     async def run(self) -> R:
-        ws = await websockets.connect(
-            self.endpoint_url,
-            family=socket.AF_INET,
+        connect_kwargs = dict(
             open_timeout=config.rpc_open_timeout,
             close_timeout=config.rpc_close_timeout,
             ping_interval=config.rpc_ping_interval,
             ping_timeout=config.rpc_ping_timeout,
         )
+        if config.comm_force_ipv4_internal:
+            connect_kwargs["family"] = socket.AF_INET
+        ws = await websockets.connect(self.endpoint_url, **connect_kwargs)
 
         try:
             async with _handle_rpc_arguments(self.args, self.kwargs, ws):
@@ -95,14 +96,15 @@ class Rpc(Generic[P, R]):
             await self._close(ws)
 
     async def iterate(self) -> AsyncIterator[R]:
-        ws = await websockets.connect(
-            self.endpoint_url,
-            family=socket.AF_INET,
+        connect_kwargs = dict(
             open_timeout=config.rpc_open_timeout,
             close_timeout=config.rpc_close_timeout,
             ping_interval=config.rpc_ping_interval,
             ping_timeout=config.rpc_ping_timeout,
         )
+        if config.comm_force_ipv4_internal:
+            connect_kwargs["family"] = socket.AF_INET
+        ws = await websockets.connect(self.endpoint_url, **connect_kwargs)
 
         try:
             async with _handle_rpc_arguments(self.args, self.kwargs, ws):

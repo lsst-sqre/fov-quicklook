@@ -6,6 +6,7 @@ Coordinatorとの疎通を定期的に確認し、失敗した場合は自プロ
 """
 
 import asyncio
+import errno
 import quicklook.mylogging
 import os
 import uuid
@@ -35,6 +36,23 @@ _REGISTRATION_RETRY_MAX_DELAY_SECONDS = 60
 
 class CoordinatorRestartedError(RuntimeError):
     pass
+
+
+def _is_fatal_registration_error(exc: BaseException) -> bool:
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, PermissionError):
+            return True
+        if isinstance(current, OSError) and current.errno == errno.EPERM:
+            return True
+        os_error = getattr(current, "os_error", None)
+        if isinstance(os_error, BaseException) and id(os_error) not in seen:
+            current = os_error
+            continue
+        current = current.__cause__ or current.__context__
+    return False
 
 
 @router.get("/comm/healthz")
@@ -143,6 +161,12 @@ async def _registration_loop():
             await _shutdown()
             break
         except Exception as e:  # pragma: no cover
+            if _is_fatal_registration_error(e):
+                logger.exception(
+                    "Fatal error while registering generator to coordinator; shutting down immediately"
+                )
+                await _immediate_shutdown()
+                break
             retry_count += 1
             delay_seconds = min(2 ** (retry_count - 1), _REGISTRATION_RETRY_MAX_DELAY_SECONDS)
             logger.warning(
