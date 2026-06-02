@@ -37,7 +37,7 @@ describe("query params helpers", () => {
   })
 
   it("builds a default query string from the current datasource", () => {
-    expect(buildDefaultQueryInput("main:LSSTCam!-raw!-all:raw")).toBe("repository_name=main&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=2")
+    expect(buildDefaultQueryInput("main:LSSTCam!-raw!-all:raw")).toBe("repository_name=main&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100")
     expect(buildDefaultQueryInput("embargo:LSSTCam!-runs!-nightlyValidation:difference_image", 5)).toBe("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&limit=5")
   })
 })

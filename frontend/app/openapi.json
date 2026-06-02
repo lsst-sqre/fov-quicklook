@@ -386,6 +386,84 @@
                 }
             }
         },
+        "/api/visits/query_builder_options": {
+            "get": {
+                "summary": "Get Query Builder Options",
+                "operationId": "get_query_builder_options",
+                "parameters": [
+                    {
+                        "name": "repository_name",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Repository Name"
+                        }
+                    },
+                    {
+                        "name": "collection",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Collection"
+                        }
+                    },
+                    {
+                        "name": "dataset_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Dataset Type"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QueryBuilderOptions"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/visits": {
             "get": {
                 "summary": "List Visits",
@@ -473,7 +551,7 @@
                         "schema": {
                             "type": "integer",
                             "maximum": 10000,
-                            "default": 1000,
+                            "default": 100,
                             "title": "Limit"
                         }
                     },
@@ -1573,6 +1651,64 @@
                     "total"
                 ],
                 "title": "Progress"
+            },
+            "QueryBuilderOptions": {
+                "properties": {
+                    "repositories": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Repositories"
+                    },
+                    "collections": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Collections"
+                    },
+                    "dataset_types": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Dataset Types"
+                    },
+                    "where_examples": {
+                        "items": {
+                            "$ref": "#/components/schemas/QueryWhereExample"
+                        },
+                        "type": "array",
+                        "title": "Where Examples"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "repositories",
+                    "collections",
+                    "dataset_types",
+                    "where_examples"
+                ],
+                "title": "QueryBuilderOptions"
+            },
+            "QueryWhereExample": {
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "title": "Label"
+                    },
+                    "where": {
+                        "type": "string",
+                        "title": "Where"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "label",
+                    "where"
+                ],
+                "title": "QueryWhereExample"
             },
             "QuicklookMetadata": {
                 "anyOf": [

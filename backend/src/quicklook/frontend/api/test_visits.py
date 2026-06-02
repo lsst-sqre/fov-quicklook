@@ -1,6 +1,13 @@
 from fastapi import HTTPException
 
-from quicklook.datasource.types import ResolvedVisitInfo, VisitDayCount, VisitRepresentativeUuid, VisitResolutionError
+from quicklook.datasource.types import (
+    QueryBuilderOptions,
+    QueryWhereExample,
+    ResolvedVisitInfo,
+    VisitDayCount,
+    VisitRepresentativeUuid,
+    VisitResolutionError,
+)
 from quicklook.frontend.api import visits
 from quicklook.types import VisitName
 
@@ -35,6 +42,89 @@ async def test_list_visits_forwards_limit_and_offset(monkeypatch):
     assert captured["query"].where == 'day_obs=20250301'
     assert captured["query"].order_by == 'day_obs'
     assert captured["query"].reverse is True
+
+
+async def test_get_query_builder_options_forwards_filters(monkeypatch):
+    class FakeDataSource:
+        async def get_query_builder_options(self, **kwargs):
+            assert kwargs == {
+                'repository_name': 'repo',
+                'collection': 'LSSTCam/raw/all',
+                'dataset_type': 'raw',
+            }
+            return QueryBuilderOptions(
+                repositories=['repo'],
+                collections=['LSSTCam/raw/all'],
+                dataset_types=['raw'],
+                where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+            )
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    result = await visits.get_query_builder_options(
+        repository_name='repo',
+        collection='LSSTCam/raw/all',
+        dataset_type='raw',
+    )
+
+    assert result == QueryBuilderOptions(
+        repositories=['repo'],
+        collections=['LSSTCam/raw/all'],
+        dataset_types=['raw'],
+        where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+    )
+
+
+async def test_list_visits_rejects_unsafe_where(monkeypatch):
+    class FakeDataSource:
+        async def query_visits(self, q):  # pragma: no cover
+            del q
+            raise AssertionError('query_visits should not be called')
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    try:
+        await visits.list_visits(
+            repository_name='repo',
+            collection='LSSTCam/raw/all',
+            dataset_type='raw',
+            where='day_obs=20250301;\nselect * from visits',
+            order_by=None,
+            reverse=None,
+            limit=100,
+            offset=0,
+        )
+    except HTTPException as e:
+        assert e.status_code == 422
+        assert e.detail == "where must not contain control characters or ';'."
+    else:  # pragma: no cover
+        raise AssertionError('HTTPException was not raised')
+
+
+async def test_list_visits_rejects_unknown_order_by(monkeypatch):
+    class FakeDataSource:
+        async def query_visits(self, q):  # pragma: no cover
+            del q
+            raise AssertionError('query_visits should not be called')
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    try:
+        await visits.list_visits(
+            repository_name='repo',
+            collection='LSSTCam/raw/all',
+            dataset_type='raw',
+            where=None,
+            order_by='drop_table',
+            reverse=None,
+            limit=100,
+            offset=0,
+        )
+    except HTTPException as e:
+        assert e.status_code == 422
+        assert 'order_by must be one of:' in e.detail
+    else:  # pragma: no cover
+        raise AssertionError('HTTPException was not raised')
 
 
 async def test_get_visit_metadata_returns_404_for_unknown_uuid(monkeypatch):

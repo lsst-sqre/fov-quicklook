@@ -20,7 +20,7 @@ export function normalizeQueryInput(input: string): string {
   return input.trim().replace(/^\/query\?/, "").replace(/^\?/, "")
 }
 
-export function buildDefaultQueryInput(dataSource: string | null | undefined, limit = 2): string {
+export function buildDefaultQueryInput(dataSource: string | null | undefined, limit = 100): string {
   if (!dataSource) {
     return ""
   }

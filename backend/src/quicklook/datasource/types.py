@@ -62,6 +62,20 @@ class VisitRepresentativeUuid:
     uuid: str
 
 
+@dataclass
+class QueryWhereExample:
+    label: str
+    where: str
+
+
+@dataclass
+class QueryBuilderOptions:
+    repositories: list[str]
+    collections: list[str]
+    dataset_types: list[str]
+    where_examples: list[QueryWhereExample]
+
+
 class DataSourceBase(abc.ABC):
     @abc.abstractmethod
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
@@ -74,6 +88,18 @@ class DataSourceBase(abc.ABC):
         ...
 
     query_visit_day_counts = async_wrap(query_visit_day_counts_sync)
+
+    @abc.abstractmethod
+    def get_query_builder_options_sync(
+        self,
+        *,
+        repository_name: str | None = None,
+        collection: str | None = None,
+        dataset_type: str | None = None,
+    ) -> QueryBuilderOptions:  # pragma: no cover
+        ...
+
+    get_query_builder_options = async_wrap(get_query_builder_options_sync)
 
     @abc.abstractmethod
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:  # pragma: no cover
