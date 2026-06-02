@@ -1,6 +1,7 @@
 import asyncio
 import pickle
 import re
+import socket
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -403,7 +404,7 @@ async def _status_relay_main_loop():
 
     while True:
         try:
-            async with websockets.connect(ws_url, max_size=None) as ws:
+            async with websockets.connect(ws_url, max_size=None, family=socket.AF_INET) as ws:
                 if retry_count:
                     logger.info(f"Reconnected to {ws_url} after {retry_count} retries")
                     retry_count = 0
