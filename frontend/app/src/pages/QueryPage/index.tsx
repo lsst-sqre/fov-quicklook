@@ -43,6 +43,7 @@ export function QueryPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const butlerScopes = useSelector((state: AppState) => state.copyTemplate.butlerScopes)
+  const queryBuilderInputMode = useSelector((state: AppState) => state.copyTemplate.queryBuilderInputMode)
   const currentQuery = searchParams.toString()
   const effectiveSearchParams = useMemo(() => new URLSearchParams(currentQuery), [currentQuery])
   const [queryInput, setQueryInput] = useState(() => normalizeQueryInput(currentQuery))
@@ -57,6 +58,17 @@ export function QueryPage() {
     refetchOnMountOrArgChange: true,
   })
   const orderByOptions = useMemo(() => getDatasetOrderFields(form.datasetType), [form.datasetType])
+  const repositoryOptions = useMemo(() => getConfiguredRepositories(butlerScopes), [butlerScopes])
+  const configuredCollections = useMemo(
+    () => getConfiguredCollections(butlerScopes, form.repositoryName),
+    [butlerScopes, form.repositoryName],
+  )
+  const configuredDatasetTypes = useMemo(
+    () => getConfiguredDatasetTypes(butlerScopes, form.repositoryName, form.collection),
+    [butlerScopes, form.collection, form.repositoryName],
+  )
+  const collectionOptions = queryBuilderInputMode === "select" ? configuredCollections : options.collections
+  const datasetTypeOptions = queryBuilderInputMode === "select" ? configuredDatasetTypes : options.dataset_types
 
   useEffect(() => {
     const normalizedQuery = normalizeQueryInput(currentQuery)
@@ -79,6 +91,12 @@ export function QueryPage() {
   }, [butlerScopes, currentQuery, form])
 
   useEffect(() => {
+    if (queryBuilderInputMode !== "combobox") {
+      setOptions(EMPTY_OPTIONS)
+      setOptionsError(null)
+      setLoadingOptions(false)
+      return
+    }
     if (!form.repositoryName) {
       setOptions(EMPTY_OPTIONS)
       setOptionsError(null)
@@ -97,7 +115,7 @@ export function QueryPage() {
       controller.signal,
     ).then((nextOptions) => {
         setOptions(nextOptions)
-        setForm((current) => normalizeFormState(current, nextOptions))
+        setForm((current) => normalizeComboboxFormState(current, repositoryOptions))
       }).catch((fetchError) => {
         if (controller.signal.aborted) {
           return
@@ -110,17 +128,34 @@ export function QueryPage() {
       }
     })
     return () => controller.abort()
-  }, [form.collection, form.datasetType, form.repositoryName])
+  }, [form.collection, form.datasetType, form.repositoryName, queryBuilderInputMode, repositoryOptions])
 
   const applyForm = useCallback((nextForm: QueryFormState) => {
     setForm(nextForm)
     setQueryInput(buildQueryInput(nextForm))
   }, [])
 
+  useEffect(() => {
+    if (queryBuilderInputMode !== "select") {
+      return
+    }
+    if (currentQuery && !hasQueryBuilderSelection(form)) {
+      return
+    }
+    const nextForm = normalizeSelectFormState(form, butlerScopes)
+    if (!areFormsEqual(form, nextForm)) {
+      applyForm(nextForm)
+    }
+  }, [applyForm, butlerScopes, currentQuery, form, queryBuilderInputMode])
+
   const updateRepository = useCallback((repositoryName: string) => {
     const defaultScope = findDefaultScope(butlerScopes, repositoryName)
-    const datasetType = defaultScope?.dataset_type ?? ""
-    const collection = defaultScope?.collection ?? ""
+    const collection = defaultScope?.collection ?? (queryBuilderInputMode === "select"
+      ? (getConfiguredCollections(butlerScopes, repositoryName)[0] ?? "")
+      : "")
+    const datasetType = defaultScope?.dataset_type ?? (queryBuilderInputMode === "select"
+      ? (getConfiguredDatasetTypes(butlerScopes, repositoryName, collection)[0] ?? "")
+      : "")
     const orderBy = getDatasetOrderFields(datasetType)[0] ?? "day_obs"
     applyForm({
       ...form,
@@ -130,17 +165,20 @@ export function QueryPage() {
       orderBy,
       where: "",
     })
-  }, [applyForm, butlerScopes, form])
+  }, [applyForm, butlerScopes, form, queryBuilderInputMode])
 
   const updateCollection = useCallback((collection: string) => {
+    const datasetType = queryBuilderInputMode === "select"
+      ? (getConfiguredDatasetTypes(butlerScopes, form.repositoryName, collection)[0] ?? "")
+      : ""
     applyForm({
       ...form,
       collection,
-      datasetType: "",
-      orderBy: "day_obs",
+      datasetType,
+      orderBy: getDatasetOrderFields(datasetType)[0] ?? "day_obs",
       where: "",
     })
-  }, [applyForm, form])
+  }, [applyForm, butlerScopes, form, queryBuilderInputMode])
 
   const updateDatasetType = useCallback((datasetType: string) => {
     const nextOrderBy = getDatasetOrderFields(datasetType)[0] ?? "day_obs"
@@ -184,7 +222,9 @@ export function QueryPage() {
       <div style={sectionStyle}>
         <h1 style={{ margin: 0, fontSize: "1.25rem" }}>Data Query</h1>
         <p style={hintStyle}>
-          Build a query string for arbitrary `repository` / `collection` / `dataset_type`, or edit the query string directly. Type in the comboboxes to narrow large option lists.
+          Build a query string for arbitrary `repository` / `collection` / `dataset_type`, or edit the query string directly. {queryBuilderInputMode === "combobox"
+            ? "Type in the comboboxes to narrow large option lists."
+            : "Use the configured select menus, or switch to combobox mode in config when you need dynamic narrowing."}
         </p>
         <form onSubmit={handleSubmit} style={formStyle}>
           <label style={fullWidthFieldStyle}>
@@ -202,36 +242,54 @@ export function QueryPage() {
               <span>Repository</span>
               <select value={form.repositoryName} onChange={(event) => updateRepository(event.target.value)}>
                 <option value="">Select repository</option>
-                {options.repositories.map((option) => <option key={option} value={option}>{option}</option>)}
+                {repositoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             </label>
             <label style={fieldStyle}>
               <span>Collection</span>
-              <input
-                list="query-page-collections"
-                spellCheck={false}
-                type="text"
-                value={form.collection}
-                onChange={(event) => updateCollection(event.target.value)}
-                placeholder="Type to filter collections"
-              />
-              <datalist id="query-page-collections">
-                {options.collections.map((option) => <option key={option} value={option} />)}
-              </datalist>
+              {queryBuilderInputMode === "combobox" ? (
+                <>
+                  <input
+                    list="query-page-collections"
+                    spellCheck={false}
+                    type="text"
+                    value={form.collection}
+                    onChange={(event) => updateCollection(event.target.value)}
+                    placeholder="Type to filter collections"
+                  />
+                  <datalist id="query-page-collections">
+                    {collectionOptions.map((option) => <option key={option} value={option} />)}
+                  </datalist>
+                </>
+              ) : (
+                <select value={form.collection} onChange={(event) => updateCollection(event.target.value)}>
+                  <option value="">Select collection</option>
+                  {collectionOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              )}
             </label>
             <label style={fieldStyle}>
               <span>Dataset Type</span>
-              <input
-                list="query-page-dataset-types"
-                spellCheck={false}
-                type="text"
-                value={form.datasetType}
-                onChange={(event) => updateDatasetType(event.target.value)}
-                placeholder="Type to filter dataset types"
-              />
-              <datalist id="query-page-dataset-types">
-                {options.dataset_types.map((option) => <option key={option} value={option} />)}
-              </datalist>
+              {queryBuilderInputMode === "combobox" ? (
+                <>
+                  <input
+                    list="query-page-dataset-types"
+                    spellCheck={false}
+                    type="text"
+                    value={form.datasetType}
+                    onChange={(event) => updateDatasetType(event.target.value)}
+                    placeholder="Type to filter dataset types"
+                  />
+                  <datalist id="query-page-dataset-types">
+                    {datasetTypeOptions.map((option) => <option key={option} value={option} />)}
+                  </datalist>
+                </>
+              ) : (
+                <select value={form.datasetType} onChange={(event) => updateDatasetType(event.target.value)}>
+                  <option value="">Select dataset type</option>
+                  {datasetTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              )}
             </label>
             <label style={fieldStyle}>
               <span>Order By</span>
@@ -278,12 +336,12 @@ export function QueryPage() {
           <div style={buttonRowStyle}>
             <button type="submit">Search</button>
             <button type="button" onClick={() => void handleCopyPython()}>Copy Python</button>
-            {loadingOptions && <span>Loading query options...</span>}
+            {queryBuilderInputMode === "combobox" && loadingOptions && <span>Loading query options...</span>}
           </div>
         </form>
       </div>
 
-      {optionsError && <p role="alert">{optionsError}</p>}
+      {queryBuilderInputMode === "combobox" && optionsError && <p role="alert">{optionsError}</p>}
       {parsedQuery.error && <p role="alert">{parsedQuery.error}</p>}
       {parsedQuery.args !== null && (
         <>
@@ -387,10 +445,13 @@ function mergeFormWithSearchParams(form: QueryFormState, searchParams: URLSearch
   }
 }
 
-function normalizeFormState(form: QueryFormState, options: QueryBuilderOptions): QueryFormState {
-  const repositoryName = options.repositories.includes(form.repositoryName)
+function normalizeComboboxFormState(
+  form: QueryFormState,
+  repositoryOptions: string[],
+): QueryFormState {
+  const repositoryName = repositoryOptions.includes(form.repositoryName)
     ? form.repositoryName
-    : (options.repositories[0] ?? "")
+    : (repositoryOptions[0] ?? "")
   const orderByFields = getDatasetOrderFields(form.datasetType)
   const orderBy = orderByFields.includes(form.orderBy) ? form.orderBy : (orderByFields[0] ?? "day_obs")
   return {
@@ -399,6 +460,68 @@ function normalizeFormState(form: QueryFormState, options: QueryBuilderOptions):
     orderBy,
     limit: form.limit || DEFAULT_LIMIT,
   }
+}
+
+function normalizeSelectFormState(form: QueryFormState, scopes: ButlerScopeConfig[]): QueryFormState {
+  const repositoryOptions = getConfiguredRepositories(scopes)
+  const repositoryName = repositoryOptions.includes(form.repositoryName)
+    ? form.repositoryName
+    : (repositoryOptions[0] ?? "")
+  const collections = getConfiguredCollections(scopes, repositoryName)
+  const collection = collections.includes(form.collection) ? form.collection : (collections[0] ?? "")
+  const datasetTypes = getConfiguredDatasetTypes(scopes, repositoryName, collection)
+  const datasetType = datasetTypes.includes(form.datasetType) ? form.datasetType : (datasetTypes[0] ?? "")
+  const orderByFields = getDatasetOrderFields(datasetType)
+  const orderBy = orderByFields.includes(form.orderBy) ? form.orderBy : (orderByFields[0] ?? "day_obs")
+  return {
+    ...form,
+    repositoryName,
+    collection,
+    datasetType,
+    orderBy,
+    limit: form.limit || DEFAULT_LIMIT,
+  }
+}
+
+function areFormsEqual(left: QueryFormState, right: QueryFormState): boolean {
+  return (
+    left.repositoryName === right.repositoryName
+    && left.collection === right.collection
+    && left.datasetType === right.datasetType
+    && left.orderBy === right.orderBy
+    && left.reverse === right.reverse
+    && left.limit === right.limit
+    && left.where === right.where
+  )
+}
+
+function getConfiguredRepositories(scopes: ButlerScopeConfig[]): string[] {
+  return uniqueValues(scopes.map((scope) => scope.repository_name ?? ""))
+}
+
+function getConfiguredCollections(scopes: ButlerScopeConfig[], repositoryName: string): string[] {
+  return uniqueValues(
+    scopes
+      .filter((scope) => (scope.repository_name ?? "") === repositoryName)
+      .map((scope) => scope.collection),
+  )
+}
+
+function getConfiguredDatasetTypes(
+  scopes: ButlerScopeConfig[],
+  repositoryName: string,
+  collection: string,
+): string[] {
+  return uniqueValues(
+    scopes
+      .filter((scope) => (scope.repository_name ?? "") === repositoryName)
+      .filter((scope) => !collection || scope.collection === collection)
+      .map((scope) => scope.dataset_type),
+  )
+}
+
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)))
 }
 
 function getDatasetOrderFields(datasetType: string): string[] {

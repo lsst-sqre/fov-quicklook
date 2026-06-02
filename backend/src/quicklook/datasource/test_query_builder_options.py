@@ -11,17 +11,12 @@ def test_build_contains_glob():
     assert butler_datasource_module._build_contains_glob('nightly') == '*nightly*'
 
 
-def test_butler_datasource_init_does_not_prime_query_builder_metadata(monkeypatch):
+def test_butler_datasource_init_only_chowns_pgpass(monkeypatch):
     calls: list[str] = []
     monkeypatch.setitem(
         sys.modules,
         'quicklook.datasource.butler_datasource.butlerutils',
         SimpleNamespace(chown_pgpassfile=lambda: calls.append('chown')),
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_prime_query_builder_metadata_async',
-        lambda repository_name: calls.append(repository_name),
     )
 
     ButlerDataSource()
@@ -29,9 +24,19 @@ def test_butler_datasource_init_does_not_prime_query_builder_metadata(monkeypatc
     assert calls == ['chown']
 
 
-def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatch):
+def test_warm_query_builder_options_metadata_sync_is_noop(monkeypatch):
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_repository_names',
+        lambda: (_ for _ in ()).throw(AssertionError('_query_repository_names should not be called')),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    ds.warm_query_builder_options_metadata_sync()
+
+
+def test_get_query_builder_options_skips_unbounded_queries_without_search(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['embargo', 'main'])
-    monkeypatch.setattr(butler_datasource_module, '_prime_query_builder_metadata_async', lambda repository_name: None)
 
     collections_called = False
     dataset_types_called = False
@@ -64,9 +69,8 @@ def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatc
     assert dataset_types_called is True
 
 
-def test_get_query_builder_options_keeps_exact_selection_metadata_only(monkeypatch):
+def test_get_query_builder_options_keeps_exact_selection_without_suggestions(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    monkeypatch.setattr(butler_datasource_module, '_prime_query_builder_metadata_async', lambda repository_name: None)
     monkeypatch.setattr(
         butler_datasource_module,
         '_query_collections_for_repository',
@@ -91,11 +95,6 @@ def test_get_query_builder_options_keeps_exact_selection_metadata_only(monkeypat
         '_dataset_type_exists_for_repository',
         lambda repository_name, dataset_type: repository_name == 'main' and dataset_type == 'raw',
     )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_get_scope_datasource',
-        lambda **kwargs: (_ for _ in ()).throw(AssertionError(f'_get_scope_datasource should not be called: {kwargs}')),
-    )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
     result = ds.get_query_builder_options_sync(
@@ -109,16 +108,13 @@ def test_get_query_builder_options_keeps_exact_selection_metadata_only(monkeypat
     assert result.where_examples == []
 
 
-def test_get_query_builder_options_filters_partial_collection_from_cached_metadata(monkeypatch):
+def test_get_query_builder_options_filters_partial_collection_via_direct_lookup(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    monkeypatch.setattr(butler_datasource_module, '_prime_query_builder_metadata_async', lambda repository_name: None)
+    monkeypatch.setattr(butler_datasource_module, '_repository_instrument', lambda repository_name: 'LSSTCam')
     monkeypatch.setattr(
         butler_datasource_module,
-        '_get_query_repository_metadata_if_available',
-        lambda repository_name, wait_for_prefetch=False: butler_datasource_module._QueryRepositoryMetadata(
-            collections=('LSSTCam/raw/all', 'LSSTCam/runs/nightlyValidation/10'),
-            dataset_types=('preliminary_visit_image', 'raw'),
-        ),
+        '_query_collections_for_repository_cache',
+        lambda repository_name, instrument, search_text, thread_id: ('LSSTCam/runs/nightlyValidation/10',),
     )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
@@ -131,14 +127,26 @@ def test_get_query_builder_options_filters_partial_collection_from_cached_metada
 
 def test_get_query_builder_options_does_not_short_circuit_partial_dataset_type(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    monkeypatch.setattr(butler_datasource_module, '_prime_query_builder_metadata_async', lambda repository_name: None)
+    monkeypatch.setattr(butler_datasource_module, '_repository_instrument', lambda repository_name: 'LSSTCam')
     monkeypatch.setattr(
         butler_datasource_module,
-        '_get_query_repository_metadata_if_available',
-        lambda repository_name, wait_for_prefetch=False: butler_datasource_module._QueryRepositoryMetadata(
-            collections=('LSSTCam/raw/all', 'LSSTCam/runs/nightlyValidation/10'),
-            dataset_types=('preliminary_visit_image', 'raw'),
-        ),
+        '_collection_exists_for_repository_cache',
+        lambda repository_name, instrument, collection, thread_id: collection == 'LSSTCam/runs/nightlyValidation/10',
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_dataset_type_exists_for_repository_cache',
+        lambda repository_name, instrument, dataset_type, thread_id: False,
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_collections_for_repository_cache',
+        lambda repository_name, instrument, search_text, thread_id: ('LSSTCam/runs/nightlyValidation/10',),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_dataset_types_for_repository_cache',
+        lambda repository_name, instrument, search_text, thread_id: ('preliminary_visit_image',),
     )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
@@ -150,84 +158,6 @@ def test_get_query_builder_options_does_not_short_circuit_partial_dataset_type(m
 
     assert result.collections == ['LSSTCam/runs/nightlyValidation/10']
     assert result.dataset_types == ['preliminary_visit_image']
-    assert result.where_examples == []
-
-
-def test_get_query_builder_options_falls_back_to_direct_collection_search_while_prefetch_runs(monkeypatch):
-    monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    prefetch_calls: list[str] = []
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_prime_query_builder_metadata_async',
-        lambda repository_name: prefetch_calls.append(repository_name),
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_get_query_repository_metadata_if_available',
-        lambda repository_name, wait_for_prefetch=False: None,
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_repository_instrument',
-        lambda repository_name: 'LSSTCam',
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_query_collections_for_repository_cache',
-        lambda repository_name, instrument, search_text, thread_id: ('LSSTCam/runs/nightlyValidation/10',),
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_collection_exists_for_repository_cache',
-        lambda repository_name, instrument, collection, thread_id: False,
-    )
-
-    ds = ButlerDataSource.__new__(ButlerDataSource)
-    result = ds.get_query_builder_options_sync(repository_name='main', collection='nightly')
-
-    assert result.collections == ['LSSTCam/runs/nightlyValidation/10']
-    assert result.dataset_types == []
-    assert result.where_examples == []
-    assert prefetch_calls == ['main', 'main', 'main']
-
-
-def test_get_query_builder_options_keeps_exact_selection_while_prefetch_runs(monkeypatch):
-    monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_prime_query_builder_metadata_async',
-        lambda repository_name: None,
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_get_query_repository_metadata_if_available',
-        lambda repository_name, wait_for_prefetch=False: None,
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_repository_instrument',
-        lambda repository_name: 'LSSTCam',
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_collection_exists_for_repository_cache',
-        lambda repository_name, instrument, collection, thread_id: collection == 'LSSTCam/raw/all',
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_dataset_type_exists_for_repository_cache',
-        lambda repository_name, instrument, dataset_type, thread_id: dataset_type == 'raw',
-    )
-
-    ds = ButlerDataSource.__new__(ButlerDataSource)
-    result = ds.get_query_builder_options_sync(
-        repository_name='main',
-        collection='LSSTCam/raw/all',
-        dataset_type='raw',
-    )
-
-    assert result.collections == ['LSSTCam/raw/all']
-    assert result.dataset_types == ['raw']
     assert result.where_examples == []
 
 
@@ -305,21 +235,7 @@ def test_dataset_type_exists_for_repository_filters_non_quicklook_dataset_types(
 
 def test_get_query_builder_options_returns_empty_options_when_direct_fallback_raises(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_prime_query_builder_metadata_async',
-        lambda repository_name: None,
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_get_query_repository_metadata_if_available',
-        lambda repository_name, wait_for_prefetch=False: None,
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_repository_instrument',
-        lambda repository_name: 'LSSTCam',
-    )
+    monkeypatch.setattr(butler_datasource_module, '_repository_instrument', lambda repository_name: 'LSSTCam')
     monkeypatch.setattr(
         butler_datasource_module,
         '_collection_exists_for_repository_cache',
