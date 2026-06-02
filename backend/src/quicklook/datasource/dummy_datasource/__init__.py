@@ -59,14 +59,20 @@ class DummyDataSource(DataSourceBase):
             for visit in visits
             if selected_repository is None or VisitName(visit.id).repository_name == selected_repository
         ]
-        collections = sorted({VisitName(visit.id).collection for visit in scoped_visits})
-        selected_collection = collection if collection in collections else None
+        collection_search = collection.strip() if collection else ''
+        collections = sorted({
+            VisitName(visit.id).collection
+            for visit in scoped_visits
+            if collection_search and collection_search.casefold() in VisitName(visit.id).collection.casefold()
+        })
+        selected_collection = collection if collection and any(candidate == collection for candidate in collections) else None
+        dataset_type_search = dataset_type.strip() if dataset_type else ''
         dataset_types = sorted({
             VisitName(visit.id).dataset_type
             for visit in scoped_visits
-            if selected_collection is None or VisitName(visit.id).collection == selected_collection
+            if dataset_type_search and dataset_type_search.casefold() in VisitName(visit.id).dataset_type.casefold()
         })
-        selected_dataset_type = dataset_type if dataset_type in dataset_types else None
+        selected_dataset_type = dataset_type if dataset_type and any(candidate == dataset_type for candidate in dataset_types) else None
         where_examples = _build_dummy_where_examples(
             scoped_visits,
             collection=selected_collection,
