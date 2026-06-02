@@ -84,16 +84,12 @@ def test_get_query_builder_options_keeps_exact_selection_metadata_only(monkeypat
     monkeypatch.setattr(
         butler_datasource_module,
         '_collection_exists_for_repository',
-        lambda repository_name, collection: (_ for _ in ()).throw(
-            AssertionError(f'_collection_exists_for_repository should not be called: {repository_name}, {collection}')
-        ),
+        lambda repository_name, collection: repository_name == 'main' and collection == 'LSSTCam/raw/all',
     )
     monkeypatch.setattr(
         butler_datasource_module,
         '_dataset_type_exists_for_repository',
-        lambda repository_name, dataset_type: (_ for _ in ()).throw(
-            AssertionError(f'_dataset_type_exists_for_repository should not be called: {repository_name}, {dataset_type}')
-        ),
+        lambda repository_name, dataset_type: repository_name == 'main' and dataset_type == 'raw',
     )
     monkeypatch.setattr(
         butler_datasource_module,
@@ -130,6 +126,30 @@ def test_get_query_builder_options_filters_partial_collection_from_cached_metada
 
     assert result.collections == ['LSSTCam/runs/nightlyValidation/10']
     assert result.dataset_types == []
+    assert result.where_examples == []
+
+
+def test_get_query_builder_options_does_not_short_circuit_partial_dataset_type(monkeypatch):
+    monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
+    monkeypatch.setattr(butler_datasource_module, '_prime_query_builder_metadata_async', lambda repository_name: None)
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_get_query_repository_metadata_if_available',
+        lambda repository_name, wait_for_prefetch=False: butler_datasource_module._QueryRepositoryMetadata(
+            collections=('LSSTCam/raw/all', 'LSSTCam/runs/nightlyValidation/10'),
+            dataset_types=('preliminary_visit_image', 'raw'),
+        ),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    result = ds.get_query_builder_options_sync(
+        repository_name='main',
+        collection='LSSTCam/runs/nightlyValidation/10',
+        dataset_type='prelim',
+    )
+
+    assert result.collections == ['LSSTCam/runs/nightlyValidation/10']
+    assert result.dataset_types == ['preliminary_visit_image']
     assert result.where_examples == []
 
 

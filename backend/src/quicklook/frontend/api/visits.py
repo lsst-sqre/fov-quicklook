@@ -1,7 +1,9 @@
 import re
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query
 from lsst.daf.butler._exceptions import ButlerUserError
+from quicklook.config import config
 from quicklook.datasets import get_dataset
 from quicklook.datasource import get_datasource
 from quicklook.datasource.types import (
@@ -16,6 +18,7 @@ from quicklook.datasource.types import (
 from quicklook.datasource.types import VisitResolutionError
 from quicklook.datasource.types import Query as DataSourceQuery
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
+from quicklook.utils.http_request import http_request
 
 router = APIRouter()
 _INVALID_WHERE_PATTERN = re.compile(r'[\x00-\x1f\x7f;]')
@@ -60,11 +63,19 @@ async def get_query_builder_options(
     collection: str | None = Query(None),
     dataset_type: str | None = Query(None),
 ):
-    ds = get_datasource()
-    return await ds.get_query_builder_options(
-        repository_name=repository_name,
-        collection=collection,
-        dataset_type=dataset_type,
+    params = {
+        key: value
+        for key, value in {
+            'repository_name': repository_name,
+            'collection': collection,
+            'dataset_type': dataset_type,
+        }.items()
+        if value is not None
+    }
+    query = urlencode(params)
+    return await http_request(
+        'get',
+        f"{config.coordinator_base_url}/query_builder_options{f'?{query}' if query else ''}",
     )
 
 

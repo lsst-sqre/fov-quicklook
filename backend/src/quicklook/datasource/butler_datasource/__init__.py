@@ -54,6 +54,10 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
 
         chown_pgpassfile()
 
+    def warm_query_builder_options_metadata_sync(self) -> None:
+        for repository_name in _query_repository_names():
+            _prime_query_builder_metadata_async(repository_name)
+
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return _get_scope_datasource(
             repository_name=q.repository_name,
@@ -88,7 +92,12 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         _prime_query_builder_metadata_async(selected_repository)
         selected_collection = _normalize_option_search_text(collection)
         selected_dataset_type = _normalize_option_search_text(dataset_type)
-        if selected_collection is not None and selected_dataset_type is not None:
+        if (
+            selected_collection is not None
+            and selected_dataset_type is not None
+            and _collection_exists_for_repository(selected_repository, selected_collection)
+            and _dataset_type_exists_for_repository(selected_repository, selected_dataset_type)
+        ):
             return QueryBuilderOptions(
                 repositories=repositories,
                 collections=[selected_collection],

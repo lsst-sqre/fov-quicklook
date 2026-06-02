@@ -13,6 +13,7 @@ from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
 from quicklook.utils.http_client import managed_session
 from quicklook.coordinator.api.deps import dep_visit_name
+from quicklook.coordinator.api.query_builder_options import router as query_builder_options_router
 from quicklook.coordinator.api.status import router as status_router
 from quicklook.coordinator.api.types import (
     CreateQuicklookRequest,
@@ -23,6 +24,7 @@ from quicklook.coordinator.api.types import (
 )
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
 from quicklook.coordinator.housekeeping import cleanup_at_startup, delete_stale_cache_versions, prepare_stale_cache_cleanup
+from quicklook.datasource import get_datasource
 from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.job.job import Job
 from quicklook.types import VisitName
@@ -50,6 +52,7 @@ async def lifespan(app: FastAPI):
     try:
         async with managed_session():
             async with coordinator_lifespan(app):
+                await get_datasource().warm_query_builder_options_metadata()
                 async with run_quicklook_pipeline() as running_pipeline:
                     yield
     finally:
@@ -63,6 +66,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(comm_coordinator_router)
+app.include_router(query_builder_options_router)
 app.include_router(status_router)
 
 
