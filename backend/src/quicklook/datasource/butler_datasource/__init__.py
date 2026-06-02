@@ -800,7 +800,16 @@ def _query_collections_for_repository(repository_name: str, *, search_text: str 
     metadata = _get_query_repository_metadata_if_available(repository_name, wait_for_prefetch=True)
     if metadata is None:
         _prime_query_builder_metadata_async(repository_name)
-        return []
+        instrument = _repository_instrument(repository_name)
+        thread_id = threading.get_ident()
+        return list(
+            _query_collections_for_repository_cache(
+                repository_name,
+                instrument,
+                search,
+                thread_id=thread_id,
+            )
+        )
     return _filter_query_builder_options(metadata.collections, search)
 
 
@@ -826,7 +835,16 @@ def _query_dataset_types_for_repository(repository_name: str, *, search_text: st
     metadata = _get_query_repository_metadata_if_available(repository_name, wait_for_prefetch=True)
     if metadata is None:
         _prime_query_builder_metadata_async(repository_name)
-        return []
+        instrument = _repository_instrument(repository_name)
+        thread_id = threading.get_ident()
+        return list(
+            _query_dataset_types_for_repository_cache(
+                repository_name,
+                instrument,
+                search,
+                thread_id=thread_id,
+            )
+        )
     return _filter_query_builder_options(metadata.dataset_types, search)
 
 
@@ -856,7 +874,14 @@ def _collection_exists_for_repository(repository_name: str, collection: str) -> 
     metadata = _get_query_repository_metadata_if_available(repository_name, wait_for_prefetch=True)
     if metadata is None:
         _prime_query_builder_metadata_async(repository_name)
-        return False
+        instrument = _repository_instrument(repository_name)
+        thread_id = threading.get_ident()
+        return _collection_exists_for_repository_cache(
+            repository_name,
+            instrument,
+            collection,
+            thread_id=thread_id,
+        )
     return collection in metadata.collections
 
 
@@ -881,7 +906,14 @@ def _dataset_type_exists_for_repository(repository_name: str, dataset_type: str)
     metadata = _get_query_repository_metadata_if_available(repository_name, wait_for_prefetch=True)
     if metadata is None:
         _prime_query_builder_metadata_async(repository_name)
-        return False
+        instrument = _repository_instrument(repository_name)
+        thread_id = threading.get_ident()
+        return _dataset_type_exists_for_repository_cache(
+            repository_name,
+            instrument,
+            dataset_type,
+            thread_id=thread_id,
+        )
     return dataset_type in metadata.dataset_types
 
 
@@ -897,7 +929,16 @@ def _dataset_type_exists_for_repository_cache(
 
     butler = _get_query_repository_butler(repository_name, instrument)
     try:
-        return any(cast(str, candidate.name) == dataset_type for candidate in butler.registry.queryDatasetTypes(dataset_type))
+        for candidate in butler.registry.queryDatasetTypes(dataset_type):
+            dataset_type_name = cast(str, candidate.name)
+            if dataset_type_name != dataset_type:
+                continue
+            try:
+                get_dataset(dataset_type_name).quicklook_dimensions(_dataset_required_dimension_names(candidate))
+            except ValueError:
+                continue
+            return True
+        return False
     except MissingDatasetTypeError:
         return False
 
