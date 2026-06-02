@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 
 from quicklook.comm.types import CoordinatorId, GeneratorId
 from quicklook.config import config
+from quicklook.utils.coordinator_url import get_coordinator_base_url
 from quicklook.utils.http_client import get_session, managed_session
 
 from .types import GeneratorId, GeneratorRegistrationRequest, GeneratorRegistrationResponse
@@ -105,7 +106,7 @@ async def _register_to_coordinator():
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
     session = get_session()
     async with session.post(
-        f"{config.coordinator_base_url}/comm/register",
+        f"{get_coordinator_base_url()}/comm/register",
         json=registration_data.model_dump(),
         timeout=timeout,
     ) as response:

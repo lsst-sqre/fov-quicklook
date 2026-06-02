@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 import quicklook.mylogging
-from quicklook.config import config
+from quicklook.utils.coordinator_url import get_coordinator_base_url
 from quicklook.utils.http_client import get_session
 
 logger = quicklook.mylogging.getLogger(__name__)
@@ -32,7 +32,7 @@ async def kill_coordinator() -> ShutdownResponse:
     timeout = aiohttp.ClientTimeout(total=10)
     session = get_session()
     async with session.post(
-        f"{config.coordinator_base_url}/comm/shutdown",
+        f"{get_coordinator_base_url()}/comm/shutdown",
         timeout=timeout,
     ) as response:
         response.raise_for_status()
@@ -55,7 +55,7 @@ async def kill_random_generator() -> KillGeneratorResponse:
     timeout = aiohttp.ClientTimeout(total=10)
     session = get_session()
     async with session.post(
-        f"{config.coordinator_base_url}/comm/kill-random-generator",
+        f"{get_coordinator_base_url()}/comm/kill-random-generator",
         timeout=timeout,
     ) as response:
         response.raise_for_status()
