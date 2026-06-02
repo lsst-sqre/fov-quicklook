@@ -18,6 +18,7 @@ from quicklook.datasource.types import (
 from quicklook.datasource.types import VisitResolutionError
 from quicklook.datasource.types import Query as DataSourceQuery
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
+from quicklook.utils.coordinator_url import get_coordinator_base_url
 from quicklook.utils.http_request import http_request
 
 router = APIRouter()
@@ -75,7 +76,7 @@ async def get_query_builder_options(
     query = urlencode(params)
     return await http_request(
         'get',
-        f"{config.coordinator_base_url}/query_builder_options{f'?{query}' if query else ''}",
+        f"{get_coordinator_base_url()}/query_builder_options{f'?{query}' if query else ''}",
     )
 
 

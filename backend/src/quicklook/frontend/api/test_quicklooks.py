@@ -142,6 +142,13 @@ async def test_status_relay_updates_job_status_from_binary_message(monkeypatch):
     assert quicklooks._job_status_dict.last_value() == {job.visit: job.status}
 
 
+def test_get_coordinator_base_url_prefers_service_host(monkeypatch):
+    monkeypatch.setattr(quicklooks.config, "coordinator_base_url", "http://fov-quicklook-coordinator:9501")
+    monkeypatch.setenv("FOV_QUICKLOOK_COORDINATOR_SERVICE_HOST", "10.96.123.45")
+
+    assert quicklooks.get_coordinator_base_url() == "http://10.96.123.45:9501"
+
+
 def test_apply_shared_status_message_moves_ready_metadata_to_short_lived_cache(monkeypatch):
     job = Job(VisitName('repo:raw:4242'))
     job.status.stage = 'ready'

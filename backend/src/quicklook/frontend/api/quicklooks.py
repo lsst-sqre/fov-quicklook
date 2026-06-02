@@ -33,6 +33,7 @@ from quicklook.object_storage import VisitObjectStorage
 from quicklook.tileinfo import focal_plane_wcs
 from quicklook.types import CcdName, Progress, VisitName
 from quicklook.utils.broadcast import Broadcast
+from quicklook.utils.coordinator_url import get_coordinator_base_url
 from quicklook.utils.hash_utils import json_digest
 from quicklook.utils.http_request import http_request
 from quicklook.utils.s3 import NoSuchKey
@@ -61,7 +62,7 @@ async def create_quicklook(params: CreateQuicklookRequest):
         raise HTTPException(status_code=404, detail=str(e)) from e
     return await http_request(
         'post',
-        f'{config.coordinator_base_url}/quicklooks',
+        f'{get_coordinator_base_url()}/quicklooks',
         json=CreateQuicklookRequest(visit=str(visit)).model_dump(),
     )
 
@@ -70,7 +71,7 @@ async def create_quicklook(params: CreateQuicklookRequest):
 async def vote_quicklook(visit_name: Annotated[VisitName, Depends(dep_visit_name)]):
     return await http_request(
         'post',
-        f'{config.coordinator_base_url}/quicklooks/{visit_name}/vote',
+        f'{get_coordinator_base_url()}/quicklooks/{visit_name}/vote',
     )
 
 
@@ -78,7 +79,7 @@ async def vote_quicklook(visit_name: Annotated[VisitName, Depends(dep_visit_name
 async def unvote_quicklook(visit_name: Annotated[VisitName, Depends(dep_visit_name)]):
     return await http_request(
         'post',
-        f'{config.coordinator_base_url}/quicklooks/{visit_name}/unvote',
+        f'{get_coordinator_base_url()}/quicklooks/{visit_name}/unvote',
     )
 
 
@@ -89,7 +90,7 @@ async def get_all_quicklook_jobs():
         return jobs
     jobs = await http_request(
         'get',
-        f'{config.coordinator_base_url}/quicklooks/*/status',
+        f'{get_coordinator_base_url()}/quicklooks/*/status',
     )
     _job_status_dict.put(jobs)
     return jobs
@@ -399,7 +400,7 @@ async def _quicklook_status_relay():
 
 async def _status_relay_main_loop():
     global _job_shared_large_status_dict
-    ws_url = f"{re.sub(r'^http://', 'ws://', config.coordinator_base_url)}/quicklooks/*/shared_status.ws"
+    ws_url = f"{re.sub(r'^http://', 'ws://', get_coordinator_base_url())}/quicklooks/*/shared_status.ws"
     retry_count = 0
 
     while True:
