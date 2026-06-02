@@ -141,6 +141,7 @@ class Config(BaseSettings):
     comm_heartbeat_interval: int = 5
     comm_heartbeat_timeout: int = 2
     comm_registration_interval: int = 10
+    comm_use_coordinator_service_host: bool = False
     rpc_timeout_total: float = 600
     rpc_open_timeout: float = 10
     rpc_close_timeout: float = 5
