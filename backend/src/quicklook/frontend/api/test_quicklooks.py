@@ -1,4 +1,5 @@
 import pickle
+import socket
 from typing import cast
 
 import pytest
@@ -102,6 +103,7 @@ async def test_status_relay_keeps_retrying_without_shutdown(monkeypatch):
     assert len(connect_calls) == 7
     assert sleep_calls == [1, 2, 4, 8, 16, 32]
     assert {kwargs['max_size'] for _, kwargs in connect_calls} == {None}
+    assert {kwargs['family'] for _, kwargs in connect_calls} == {socket.AF_INET}
 
 
 async def test_status_relay_updates_job_status_from_binary_message(monkeypatch):

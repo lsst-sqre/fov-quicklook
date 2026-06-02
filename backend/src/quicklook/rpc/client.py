@@ -1,5 +1,6 @@
 import asyncio
 import pickle
+import socket
 from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar
@@ -57,6 +58,7 @@ class Rpc(Generic[P, R]):
     async def run(self) -> R:
         ws = await websockets.connect(
             self.endpoint_url,
+            family=socket.AF_INET,
             open_timeout=config.rpc_open_timeout,
             close_timeout=config.rpc_close_timeout,
             ping_interval=config.rpc_ping_interval,
@@ -95,6 +97,7 @@ class Rpc(Generic[P, R]):
     async def iterate(self) -> AsyncIterator[R]:
         ws = await websockets.connect(
             self.endpoint_url,
+            family=socket.AF_INET,
             open_timeout=config.rpc_open_timeout,
             close_timeout=config.rpc_close_timeout,
             ping_interval=config.rpc_ping_interval,

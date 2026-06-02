@@ -5,9 +5,11 @@ aiohttp ClientSession の再利用ユーティリティ。
 lifespan で初期化・後始末し、利用側は get_session() で取得する。
 """
 
-import aiohttp
+import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+
+import aiohttp
 
 from quicklook.config import config
 
@@ -35,6 +37,7 @@ async def managed_session() -> AsyncIterator[None]:
         return
 
     connector = aiohttp.TCPConnector(
+        family=socket.AF_INET,
         limit=config.http_client_connection_limit,
         ttl_dns_cache=config.http_client_dns_cache_ttl,
         keepalive_timeout=config.http_client_keepalive_timeout,
