@@ -1,5 +1,8 @@
 """coordinator-generator間の通信のテスト"""
 
+import asyncio
+from contextlib import asynccontextmanager
+
 import pytest
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
@@ -96,3 +99,94 @@ def test_generator_registration_with_mismatched_coordinator_id():
         response = client.post("/comm/register", json=registration_request.model_dump())
         assert response.status_code == 409
         assert "Coordinator ID mismatch" in response.json()["detail"]
+
+
+async def test_registration_loop_retries_transient_errors_without_shutdown(monkeypatch):
+    attempts = 0
+    shutdown_called = False
+    original_sleep = asyncio.sleep
+
+    monkeypatch.setattr(generator, "_generator_id", GeneratorId("test-gen"))
+    monkeypatch.setattr(generator, "_coordinator_id", None)
+    monkeypatch.setattr(generator, "_shutdown_requested", False)
+
+    async def fake_register():
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("temporary network error")
+        generator._shutdown_requested = True
+
+    async def fake_shutdown():
+        nonlocal shutdown_called
+        shutdown_called = True
+
+    async def fake_sleep(_delay: float):
+        await original_sleep(0)
+
+    monkeypatch.setattr(generator, "_register_to_coordinator", fake_register)
+    monkeypatch.setattr(generator, "_shutdown", fake_shutdown)
+    monkeypatch.setattr(generator.asyncio, "sleep", fake_sleep)
+
+    await generator._registration_loop()
+
+    assert attempts == 2
+    assert shutdown_called is False
+
+
+async def test_registration_loop_shuts_down_on_coordinator_restart(monkeypatch):
+    shutdown_called = False
+
+    monkeypatch.setattr(generator, "_generator_id", GeneratorId("test-gen"))
+    monkeypatch.setattr(generator, "_coordinator_id", CoordinatorId("c-old"))
+    monkeypatch.setattr(generator, "_shutdown_requested", False)
+
+    async def fake_register():
+        raise generator.CoordinatorRestartedError("Coordinator ID mismatch")
+
+    async def fake_shutdown():
+        nonlocal shutdown_called
+        shutdown_called = True
+        generator._shutdown_requested = True
+
+    monkeypatch.setattr(generator, "_register_to_coordinator", fake_register)
+    monkeypatch.setattr(generator, "_shutdown", fake_shutdown)
+
+    await generator._registration_loop()
+
+    assert shutdown_called is True
+
+
+async def test_generator_lifespan_starts_before_registration_succeeds(monkeypatch):
+    attempts = 0
+    original_sleep = asyncio.sleep
+
+    monkeypatch.setattr(generator, "_coordinator_id", None)
+    monkeypatch.setattr(generator, "_shutdown_requested", False)
+
+    @asynccontextmanager
+    async def fake_managed_session():
+        yield
+
+    async def fake_register():
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("temporary network error")
+        generator._shutdown_requested = True
+
+    async def fake_sleep(_delay: float):
+        await original_sleep(0)
+
+    async def fake_shutdown():
+        raise AssertionError("shutdown should not be requested for transient startup errors")
+
+    monkeypatch.setattr(generator, "managed_session", fake_managed_session)
+    monkeypatch.setattr(generator, "_register_to_coordinator", fake_register)
+    monkeypatch.setattr(generator, "_shutdown", fake_shutdown)
+    monkeypatch.setattr(generator.asyncio, "sleep", fake_sleep)
+
+    async with generator.lifespan(object()):
+        await original_sleep(0)
+        assert generator.self_generator_id().startswith("g-")
+        assert attempts >= 1
