@@ -12,6 +12,7 @@ def test_build_contains_glob():
 
 def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['embargo', 'main'])
+    monkeypatch.setattr(butler_datasource_module, '_prime_query_builder_metadata_async', lambda repository_name: None)
 
     collections_called = False
     dataset_types_called = False
@@ -46,6 +47,7 @@ def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatc
 
 def test_get_query_builder_options_keeps_exact_selection_metadata_only(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
+    monkeypatch.setattr(butler_datasource_module, '_prime_query_builder_metadata_async', lambda repository_name: None)
     monkeypatch.setattr(
         butler_datasource_module,
         '_query_collections_for_repository',
@@ -90,6 +92,49 @@ def test_get_query_builder_options_keeps_exact_selection_metadata_only(monkeypat
     assert result.collections == ['LSSTCam/raw/all']
     assert result.dataset_types == ['raw']
     assert result.where_examples == []
+
+
+def test_get_query_builder_options_filters_partial_collection_from_cached_metadata(monkeypatch):
+    monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
+    monkeypatch.setattr(butler_datasource_module, '_prime_query_builder_metadata_async', lambda repository_name: None)
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_get_query_repository_metadata_if_available',
+        lambda repository_name, wait_for_prefetch=False: butler_datasource_module._QueryRepositoryMetadata(
+            collections=('LSSTCam/raw/all', 'LSSTCam/runs/nightlyValidation/10'),
+            dataset_types=('preliminary_visit_image', 'raw'),
+        ),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    result = ds.get_query_builder_options_sync(repository_name='main', collection='nightly')
+
+    assert result.collections == ['LSSTCam/runs/nightlyValidation/10']
+    assert result.dataset_types == []
+    assert result.where_examples == []
+
+
+def test_get_query_builder_options_returns_empty_options_while_prefetch_runs(monkeypatch):
+    monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
+    prefetch_calls: list[str] = []
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_prime_query_builder_metadata_async',
+        lambda repository_name: prefetch_calls.append(repository_name),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_get_query_repository_metadata_if_available',
+        lambda repository_name, wait_for_prefetch=False: None,
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    result = ds.get_query_builder_options_sync(repository_name='main', collection='nightly')
+
+    assert result.collections == []
+    assert result.dataset_types == []
+    assert result.where_examples == []
+    assert prefetch_calls == ['main', 'main', 'main']
 
 
 def test_collection_exists_for_repository_returns_false_for_partial_match(monkeypatch):
