@@ -57,9 +57,6 @@ export function QueryPage() {
     refetchOnMountOrArgChange: true,
   })
   const orderByOptions = useMemo(() => getDatasetOrderFields(form.datasetType), [form.datasetType])
-  const queryApiBaseUrl = useMemo(() => (
-    /^https?:\/\//.test(env.baseUrl) ? env.baseUrl : `${window.location.origin}${env.baseUrl}`
-  ), [])
 
   useEffect(() => {
     const normalizedQuery = normalizeQueryInput(currentQuery)
@@ -179,8 +176,8 @@ export function QueryPage() {
   }, [commitQuery])
 
   const handleCopyPython = useCallback(async () => {
-    await copyTextToClipboard(buildQueryPythonSnippet(queryInput, queryApiBaseUrl))
-  }, [queryApiBaseUrl, queryInput])
+    await copyTextToClipboard(buildQueryPythonSnippet(queryInput))
+  }, [queryInput])
 
   return (
     <div style={pageStyle}>
