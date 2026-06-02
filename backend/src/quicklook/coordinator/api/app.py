@@ -24,7 +24,6 @@ from quicklook.coordinator.api.types import (
 )
 from quicklook.coordinator.create_quicklook import quicklook_pipeline
 from quicklook.coordinator.housekeeping import cleanup_at_startup, delete_stale_cache_versions, prepare_stale_cache_cleanup
-from quicklook.datasource import get_datasource
 from quicklook.db import Access, Quicklook, get_db_session
 from quicklook.job.job import Job
 from quicklook.types import VisitName
@@ -41,19 +40,23 @@ async def lifespan(app: FastAPI):
     from quicklook.revision import GIT_REVISION
     logger.info("Coordinator starting, revision=%s", GIT_REVISION)
 
+    logger.info("Coordinator startup step=prepare_stale_cache_cleanup")
     stale_cache_cleanup_plan = await prepare_stale_cache_cleanup()
     stale_cache_cleanup_task = None
     if stale_cache_cleanup_plan.stale_versions:
         stale_cache_cleanup_task = asyncio.create_task(
             delete_stale_cache_versions(stale_cache_cleanup_plan.stale_versions)
         )
+    logger.info("Coordinator startup step=cleanup_at_startup")
     await cleanup_at_startup()
 
     try:
         async with managed_session():
+            logger.info("Coordinator startup step=coordinator_lifespan_enter")
             async with coordinator_lifespan(app):
-                await get_datasource().warm_query_builder_options_metadata()
+                logger.info("Coordinator startup step=run_quicklook_pipeline_enter")
                 async with run_quicklook_pipeline() as running_pipeline:
+                    logger.info("Coordinator startup step=ready")
                     yield
     finally:
         if stale_cache_cleanup_task is not None and not stale_cache_cleanup_task.done():
