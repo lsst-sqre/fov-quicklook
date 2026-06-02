@@ -757,8 +757,13 @@ def _collection_exists_for_repository_cache(
     thread_id: int,
 ) -> bool:
     del thread_id
+    from lsst.daf.butler._exceptions import MissingCollectionError
+
     butler = _get_query_repository_butler(repository_name, instrument)
-    return collection in butler.registry.queryCollections(collection, flattenChains=False)
+    try:
+        return collection in butler.registry.queryCollections(collection, flattenChains=False)
+    except MissingCollectionError:
+        return False
 
 
 def _dataset_type_exists_for_repository(repository_name: str, dataset_type: str) -> bool:
@@ -775,8 +780,13 @@ def _dataset_type_exists_for_repository_cache(
     thread_id: int,
 ) -> bool:
     del thread_id
+    from lsst.daf.butler._exceptions import MissingDatasetTypeError
+
     butler = _get_query_repository_butler(repository_name, instrument)
-    return any(cast(str, candidate.name) == dataset_type for candidate in butler.registry.queryDatasetTypes(dataset_type))
+    try:
+        return any(cast(str, candidate.name) == dataset_type for candidate in butler.registry.queryDatasetTypes(dataset_type))
+    except MissingDatasetTypeError:
+        return False
 
 
 def _normalize_option_search_text(text: str | None) -> str | None:
