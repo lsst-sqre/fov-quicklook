@@ -342,6 +342,7 @@ export type SystemInfo = {
   admin_page: boolean;
   context_menu_templates: ContextMenuTemplate[];
   max_object_storage_usage: number;
+  query_builder_input_mode: string;
   butler_scopes: ButlerScopeConfig[];
   datasets: {
     [key: string]: any;

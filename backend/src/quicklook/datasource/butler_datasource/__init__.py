@@ -33,19 +33,9 @@ else:
 
 BY_UUID_DATA_TYPE = CcdDataType('by_uuid')
 _QUERY_BUILDER_SUGGESTION_LIMIT = 100
-_QUERY_BUILDER_PREFETCH_WAIT_SECONDS = 1.0
 _resolved_visit_runs: dict[str, str] = {}
 _resolved_visit_runs_lock = threading.Lock()
-_query_builder_metadata_cache: dict[tuple[str, str], '_QueryRepositoryMetadata'] = {}
-_query_builder_metadata_loading: dict[tuple[str, str], threading.Event] = {}
-_query_builder_metadata_lock = threading.Lock()
 logger = quicklook.mylogging.getLogger(__name__)
-
-
-class _QueryRepositoryMetadata:
-    def __init__(self, *, collections: tuple[str, ...], dataset_types: tuple[str, ...]):
-        self.collections = collections
-        self.dataset_types = dataset_types
 
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
@@ -55,8 +45,7 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         chown_pgpassfile()
 
     def warm_query_builder_options_metadata_sync(self) -> None:
-        for repository_name in _query_repository_names():
-            _prime_query_builder_metadata_async(repository_name)
+        logger.info("Skipping Data Query metadata warmup to avoid unbounded Butler registry scans")
 
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return _get_scope_datasource(
@@ -89,7 +78,12 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
                 where_examples=[],
             )
 
-        _prime_query_builder_metadata_async(selected_repository)
+        logger.info(
+            "Data Query options request repository=%s collection=%r dataset_type=%r",
+            selected_repository,
+            collection,
+            dataset_type,
+        )
         selected_collection = _normalize_option_search_text(collection)
         selected_dataset_type = _normalize_option_search_text(dataset_type)
         if (
@@ -98,6 +92,12 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             and _collection_exists_for_repository(selected_repository, selected_collection)
             and _dataset_type_exists_for_repository(selected_repository, selected_dataset_type)
         ):
+            logger.info(
+                "Data Query options exact selection repository=%s collection=%s dataset_type=%s",
+                selected_repository,
+                selected_collection,
+                selected_dataset_type,
+            )
             return QueryBuilderOptions(
                 repositories=repositories,
                 collections=[selected_collection],
@@ -122,6 +122,14 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             dataset_type
             if dataset_type and _dataset_type_exists_for_repository(selected_repository, dataset_type)
             else None
+        )
+        logger.info(
+            "Data Query options direct lookup repository=%s collection_search=%r dataset_type_search=%r collections=%d dataset_types=%d",
+            selected_repository,
+            collection,
+            dataset_type,
+            len(collections),
+            len(dataset_types),
         )
         return QueryBuilderOptions(
             repositories=repositories,
@@ -716,106 +724,24 @@ def _dataset_required_dimension_names(dataset_type: Any) -> tuple[str, ...]:
     return tuple(sorted(cast(str, getattr(dimension, 'name', str(dimension))) for dimension in required))
 
 
-def _prime_query_builder_metadata_async(repository_name: str) -> None:
-    instrument = _repository_instrument(repository_name)
-    key = (repository_name, instrument)
-    with _query_builder_metadata_lock:
-        if key in _query_builder_metadata_cache or key in _query_builder_metadata_loading:
-            return
-        event = threading.Event()
-        _query_builder_metadata_loading[key] = event
-
-    def worker() -> None:
-        try:
-            metadata = _load_query_repository_metadata(repository_name, instrument)
-        except Exception:
-            with _query_builder_metadata_lock:
-                _query_builder_metadata_loading.pop(key, None)
-                event.set()
-            logger.exception(
-                "Failed to preload Data Query metadata for repository=%s instrument=%s",
-                repository_name,
-                instrument,
-            )
-        else:
-            with _query_builder_metadata_lock:
-                _query_builder_metadata_cache[key] = metadata
-                _query_builder_metadata_loading.pop(key, None)
-                event.set()
-
-    threading.Thread(
-        target=worker,
-        name=f'query-builder-metadata-{repository_name}',
-        daemon=True,
-    ).start()
-
-
-def _get_query_repository_metadata_if_available(
-    repository_name: str,
-    *,
-    wait_for_prefetch: bool = False,
-) -> _QueryRepositoryMetadata | None:
-    instrument = _repository_instrument(repository_name)
-    key = (repository_name, instrument)
-    with _query_builder_metadata_lock:
-        metadata = _query_builder_metadata_cache.get(key)
-        event = _query_builder_metadata_loading.get(key)
-    if metadata is not None:
-        return metadata
-    if wait_for_prefetch and event is not None:
-        event.wait(timeout=_QUERY_BUILDER_PREFETCH_WAIT_SECONDS)
-        with _query_builder_metadata_lock:
-            return _query_builder_metadata_cache.get(key)
-    return None
-
-
-def _load_query_repository_metadata(repository_name: str, instrument: str) -> _QueryRepositoryMetadata:
-    butler = _get_query_repository_butler(repository_name, instrument)
-    collections = tuple(sorted(cast(str, collection) for collection in butler.registry.queryCollections('*', flattenChains=False)))
-    dataset_types: set[str] = set()
-    for dataset_type in butler.registry.queryDatasetTypes('*'):
-        dataset_type_name = cast(str, dataset_type.name)
-        try:
-            get_dataset(dataset_type_name).quicklook_dimensions(_dataset_required_dimension_names(dataset_type))
-        except ValueError:
-            continue
-        dataset_types.add(dataset_type_name)
-    return _QueryRepositoryMetadata(
-        collections=collections,
-        dataset_types=tuple(sorted(dataset_types)),
-    )
-
-
-def _filter_query_builder_options(options: tuple[str, ...], search_text: str) -> list[str]:
-    normalized_search_text = search_text.casefold()
-    return [
-        option for option in options
-        if normalized_search_text in option.casefold()
-    ][: _QUERY_BUILDER_SUGGESTION_LIMIT]
-
-
 def _query_collections_for_repository(repository_name: str, *, search_text: str | None = None) -> list[str]:
     if not (search := _normalize_option_search_text(search_text)):
         return []
-    metadata = _get_query_repository_metadata_if_available(repository_name, wait_for_prefetch=True)
-    if metadata is None:
-        _prime_query_builder_metadata_async(repository_name)
-        instrument = _repository_instrument(repository_name)
-        thread_id = threading.get_ident()
-        return _run_query_builder_fallback(
-            repository_name=repository_name,
-            action='collection suggestions',
-            default=[],
-            func=lambda: list(
-                _query_collections_for_repository_cache(
-                    repository_name,
-                    instrument,
-                    search,
-                    thread_id=thread_id,
-                )
-            ),
-        )
-    return _filter_query_builder_options(metadata.collections, search)
+    instrument = _repository_instrument(repository_name)
+    thread_id = threading.get_ident()
+    return _run_query_builder_fallback(
+        repository_name=repository_name,
+        action='collection suggestions',
+        default=[],
+        func=lambda: list(
+            _query_collections_for_repository_cache(
+                repository_name,
+                instrument,
+                search,
+                thread_id=thread_id,
+            )
+        ),
+    )
 
 
 @lru_cache(128)
@@ -837,25 +763,21 @@ def _query_collections_for_repository_cache(
 def _query_dataset_types_for_repository(repository_name: str, *, search_text: str | None = None) -> list[str]:
     if not (search := _normalize_option_search_text(search_text)):
         return []
-    metadata = _get_query_repository_metadata_if_available(repository_name, wait_for_prefetch=True)
-    if metadata is None:
-        _prime_query_builder_metadata_async(repository_name)
-        instrument = _repository_instrument(repository_name)
-        thread_id = threading.get_ident()
-        return _run_query_builder_fallback(
-            repository_name=repository_name,
-            action='dataset type suggestions',
-            default=[],
-            func=lambda: list(
-                _query_dataset_types_for_repository_cache(
-                    repository_name,
-                    instrument,
-                    search,
-                    thread_id=thread_id,
-                )
-            ),
-        )
-    return _filter_query_builder_options(metadata.dataset_types, search)
+    instrument = _repository_instrument(repository_name)
+    thread_id = threading.get_ident()
+    return _run_query_builder_fallback(
+        repository_name=repository_name,
+        action='dataset type suggestions',
+        default=[],
+        func=lambda: list(
+            _query_dataset_types_for_repository_cache(
+                repository_name,
+                instrument,
+                search,
+                thread_id=thread_id,
+            )
+        ),
+    )
 
 
 @lru_cache(128)
@@ -881,23 +803,19 @@ def _query_dataset_types_for_repository_cache(
 
 
 def _collection_exists_for_repository(repository_name: str, collection: str) -> bool:
-    metadata = _get_query_repository_metadata_if_available(repository_name, wait_for_prefetch=True)
-    if metadata is None:
-        _prime_query_builder_metadata_async(repository_name)
-        instrument = _repository_instrument(repository_name)
-        thread_id = threading.get_ident()
-        return _run_query_builder_fallback(
-            repository_name=repository_name,
-            action='collection existence check',
-            default=False,
-            func=lambda: _collection_exists_for_repository_cache(
-                repository_name,
-                instrument,
-                collection,
-                thread_id=thread_id,
-            ),
-        )
-    return collection in metadata.collections
+    instrument = _repository_instrument(repository_name)
+    thread_id = threading.get_ident()
+    return _run_query_builder_fallback(
+        repository_name=repository_name,
+        action='collection existence check',
+        default=False,
+        func=lambda: _collection_exists_for_repository_cache(
+            repository_name,
+            instrument,
+            collection,
+            thread_id=thread_id,
+        ),
+    )
 
 
 @lru_cache(256)
@@ -918,23 +836,19 @@ def _collection_exists_for_repository_cache(
 
 
 def _dataset_type_exists_for_repository(repository_name: str, dataset_type: str) -> bool:
-    metadata = _get_query_repository_metadata_if_available(repository_name, wait_for_prefetch=True)
-    if metadata is None:
-        _prime_query_builder_metadata_async(repository_name)
-        instrument = _repository_instrument(repository_name)
-        thread_id = threading.get_ident()
-        return _run_query_builder_fallback(
-            repository_name=repository_name,
-            action='dataset type existence check',
-            default=False,
-            func=lambda: _dataset_type_exists_for_repository_cache(
-                repository_name,
-                instrument,
-                dataset_type,
-                thread_id=thread_id,
-            ),
-        )
-    return dataset_type in metadata.dataset_types
+    instrument = _repository_instrument(repository_name)
+    thread_id = threading.get_ident()
+    return _run_query_builder_fallback(
+        repository_name=repository_name,
+        action='dataset type existence check',
+        default=False,
+        func=lambda: _dataset_type_exists_for_repository_cache(
+            repository_name,
+            instrument,
+            dataset_type,
+            thread_id=thread_id,
+        ),
+    )
 
 
 @lru_cache(256)

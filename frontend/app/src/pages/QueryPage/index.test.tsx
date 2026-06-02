@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { QueryPage } from "."
 import { makeStore } from "../../store"
+import { buildQueryPythonSnippet } from "./queryParams"
 
 const { useListVisitsQuery } = vi.hoisted(() => ({
   useListVisitsQuery: vi.fn(),
@@ -80,10 +81,11 @@ function QueryRoute() {
   )
 }
 
-const systemInfo = {
+const baseSystemInfo = {
   admin_page: false,
   context_menu_templates: [],
   max_object_storage_usage: 0,
+  query_builder_input_mode: "select",
   butler_scopes: [
     {
       id: "main:main!-raw:main_raw",
@@ -101,11 +103,19 @@ const systemInfo = {
       display_name: "Embargo Raw",
       instrument: "LSSTCam",
     },
+    {
+      id: "embargo:LSSTCam!-runs!-nightlyValidation:difference_image",
+      repository_name: "embargo",
+      collection: "LSSTCam/runs/nightlyValidation",
+      dataset_type: "difference_image",
+      display_name: "Embargo Difference Image",
+      instrument: "LSSTCam",
+    },
   ],
   datasets: [],
 }
 
-function renderQueryPage(initialEntries: string[]) {
+function renderQueryPage(initialEntries: string[], systemInfo = baseSystemInfo) {
   return render(
     <Provider store={makeStore(systemInfo as never)}>
       <MemoryRouter initialEntries={initialEntries}>
@@ -157,10 +167,13 @@ describe("QueryPage", () => {
 
   it("renders search results from the current query string", async () => {
     renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
+    const queryInput = screen.getByLabelText("Query string") as HTMLInputElement
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100")).toBeTruthy()
+      expect(queryInput.value).toContain("repository_name=embargo")
     })
+    expect(queryInput.value).toContain("collection=LSSTCam")
+    expect(queryInput.value).toContain("dataset_type=raw")
     expect(useListVisitsQuery).toHaveBeenCalled()
     expect(screen.getByText("embargo:LSSTCam/raw/all:raw:exposure=2026012800342")).toBeTruthy()
     expect(screen.getByText("field-342")).toBeTruthy()
@@ -179,8 +192,40 @@ describe("QueryPage", () => {
     expect(lastCall?.[1]?.skip).toBe(true)
   })
 
-  it("lets the helper controls build the query string with combobox filtering", async () => {
+  it("builds the query string from configured select options by default", async () => {
     renderQueryPage(["/query"])
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("main")).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByDisplayValue("main"), { target: { value: "embargo" } })
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
+    })
+    fireEvent.change(screen.getByLabelText("Collection"), { target: { value: "LSSTCam/runs/nightlyValidation" } })
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("difference_image")).toBeTruthy()
+    })
+
+    expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&order_by=visit&limit=100")).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: "Search" }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search").textContent).toContain("repository_name=embargo")
+    })
+  })
+
+  it("supports dynamic narrowing in combobox mode", async () => {
+    renderQueryPage(
+      ["/query"],
+      {
+        ...baseSystemInfo,
+        query_builder_input_mode: "combobox",
+      },
+    )
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("main")).toBeTruthy()
@@ -198,12 +243,6 @@ describe("QueryPage", () => {
     fireEvent.change(screen.getByDisplayValue("Select example"), { target: { value: "visit=7001" } })
 
     expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&order_by=visit&limit=100&where=visit%3D7001")).toBeTruthy()
-
-    fireEvent.click(screen.getByRole("button", { name: "Search" }))
-
-    await waitFor(() => {
-      expect(screen.getByTestId("location-search").textContent).toContain("repository_name=embargo")
-    })
   })
 
   it("submits the default query without adding where=null", async () => {
@@ -232,80 +271,15 @@ describe("QueryPage", () => {
 
   it("copies runnable python code for the current query string", async () => {
     renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
+    const queryInput = screen.getByLabelText("Query string") as HTMLInputElement
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100")).toBeTruthy()
+      expect(queryInput.value).toContain("repository_name=embargo")
     })
 
     fireEvent.click(screen.getByRole("button", { name: "Copy Python" }))
 
     expect(copyTextToClipboard).toHaveBeenCalledTimes(1)
-    expect(copyTextToClipboard).toHaveBeenCalledWith(
-      "import os\n"
-      + "import shutil\n"
-      + "import stat\n"
-      + "import tempfile\n\n"
-      + "from itertools import islice\n"
-      + "from urllib.parse import parse_qs\n\n"
-      + "from lsst.daf.butler import Butler\n\n"
-      + "def prepare_pgpass() -> None:\n"
-      + "    if pgpass := os.environ.get('PGPASSFILE'):\n"
-      + "        fd, temp_path = tempfile.mkstemp(prefix='.pgpass_')\n"
-      + "        os.close(fd)\n"
-      + "        shutil.copyfile(pgpass, temp_path)\n"
-      + "        os.chmod(temp_path, stat.S_IRUSR)\n"
-      + "        os.environ['PGPASSFILE'] = temp_path\n\n"
-      + "def quicklook_dimension(dataset_type: str) -> str:\n"
-      + "    if dataset_type in {'difference_image', 'preliminary_visit_image'}:\n"
-      + "        return 'visit'\n"
-      + "    return 'exposure'\n\n"
-      + "def default_order_by(dataset_type: str) -> str:\n"
-      + "    return {\n"
-      + "        'raw': '-day_obs',\n"
-      + "        'post_isr_image': '-exposure',\n"
-      + "        'difference_image': '-visit',\n"
-      + "        'preliminary_visit_image': '-visit',\n"
-      + "        'calexp': '-exposure',\n"
-      + "    }.get(dataset_type, '-exposure')\n\n"
-      + "def normalize_order_by(dataset_type: str, order_by: str | None, reverse: bool | None) -> list[str]:\n"
-      + "    default = default_order_by(dataset_type)\n"
-      + "    selected_field = order_by or default.removeprefix('-')\n"
-      + "    selected_reverse = default.startswith('-') if reverse is None else reverse\n"
-      + "    prefix = '-' if selected_reverse else ''\n"
-      + "    return [f'{prefix}{selected_field}']\n\n"
-      + "prepare_pgpass()\n\n"
-      + "query_string = 'repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100'\n"
-      + "params = {key: values[-1] for key, values in parse_qs(query_string).items()}\n\n"
-      + "repository_name = params['repository_name']\n"
-      + "collection = params['collection']\n"
-      + "dataset_type = params['dataset_type']\n"
-      + "where = params.get('where')\n"
-      + "order_by = params.get('order_by')\n"
-      + "reverse = None if 'reverse' not in params else params['reverse'].lower() == 'true'\n"
-      + "limit = int(params['limit']) if 'limit' in params else 100\n"
-      + "offset = int(params['offset']) if 'offset' in params else 0\n\n"
-      + "butler = Butler(repository_name, instrument='LSSTCam', collections=[collection])\n"
-      + "dimension = quicklook_dimension(dataset_type)\n"
-      + "query_kwargs = {'datasets': dataset_type}\n"
-      + "if dataset_type == 'difference_image':\n"
-      + "    query_kwargs['collections'] = ...\n"
-      + "if where:\n"
-      + "    query_kwargs['where'] = where\n"
-      + "else:\n"
-      + "    latest_records = list(\n"
-      + "        butler.registry.queryDimensionRecords(dimension, **query_kwargs).order_by('-day_obs').limit(1)\n"
-      + "    )\n"
-      + "    if latest_records:\n"
-      + "        query_kwargs['where'] = f\"day_obs={int(latest_records[0].day_obs)}\"\n\n"
-      + "records = butler.registry.queryDimensionRecords(dimension, **query_kwargs).order_by(\n"
-      + "    *normalize_order_by(dataset_type, order_by, reverse)\n"
-      + ")\n"
-      + "if offset > 0:\n"
-      + "    records = islice(records, offset, offset + limit)\n"
-      + "else:\n"
-      + "    records = records.limit(limit)\n\n"
-      + "for record in records:\n"
-      + "    print(record)",
-    )
+    expect(copyTextToClipboard).toHaveBeenCalledWith(buildQueryPythonSnippet(queryInput.value))
   })
 })

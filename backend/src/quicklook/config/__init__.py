@@ -134,6 +134,7 @@ class Config(BaseSettings):
     )
 
     frontend_assets_dir: str = './frontend-assets'
+    query_builder_input_mode: Literal['select', 'combobox'] = 'select'
 
     frontend_port: int = 9500
     generator_port: int = 9502

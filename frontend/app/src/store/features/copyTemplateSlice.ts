@@ -6,6 +6,7 @@ import { getSystemInfoSync } from "../../systemInfo"
 type State = {
   templates: CopyTemplate[]
   butlerScopes: ButlerScopeConfig[]
+  queryBuilderInputMode: "select" | "combobox"
 }
 
 const copyTemplateLocalStorage = makeLocalStorageAccessor<CopyTemplate[]>('copyTemplates', [])
@@ -35,11 +36,16 @@ function initialState(systemInfo?: SystemInfo): State {
   ]
   return { 
     templates, 
-    butlerScopes: systemInfo?.butler_scopes ?? [] 
+    butlerScopes: systemInfo?.butler_scopes ?? [],
+    queryBuilderInputMode: normalizeQueryBuilderInputMode(systemInfo?.query_builder_input_mode),
   }
 }
 
 export { initialState as copyTemplateInitialState }
+
+function normalizeQueryBuilderInputMode(value: string | undefined): "select" | "combobox" {
+  return value === "combobox" ? "combobox" : "select"
+}
 
 
 export const copyTemplateSlice = createSlice({

@@ -1878,6 +1878,10 @@
                         "type": "integer",
                         "title": "Max Object Storage Usage"
                     },
+                    "query_builder_input_mode": {
+                        "type": "string",
+                        "title": "Query Builder Input Mode"
+                    },
                     "butler_scopes": {
                         "items": {
                             "$ref": "#/components/schemas/ButlerScopeConfig"
@@ -1899,6 +1903,7 @@
                     "admin_page",
                     "context_menu_templates",
                     "max_object_storage_usage",
+                    "query_builder_input_mode",
                     "butler_scopes",
                     "datasets"
                 ],
