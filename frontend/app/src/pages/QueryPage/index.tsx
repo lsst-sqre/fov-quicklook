@@ -5,7 +5,8 @@ import { env } from "../../env"
 import { buildScopeId } from "../../quicklookId"
 import { AppState } from "../../store"
 import { ButlerScopeConfig, useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
-import { buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { copyTextToClipboard } from "../../utils/copyTextToClipboard"
+import { buildDefaultQueryInput, buildQueryPythonSnippet, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 
 const DEFAULT_LIMIT = "100"
 
@@ -56,6 +57,9 @@ export function QueryPage() {
     refetchOnMountOrArgChange: true,
   })
   const orderByOptions = useMemo(() => getDatasetOrderFields(form.datasetType), [form.datasetType])
+  const queryApiBaseUrl = useMemo(() => (
+    /^https?:\/\//.test(env.baseUrl) ? env.baseUrl : `${window.location.origin}${env.baseUrl}`
+  ), [])
 
   useEffect(() => {
     const normalizedQuery = normalizeQueryInput(currentQuery)
@@ -174,6 +178,10 @@ export function QueryPage() {
     commitQuery()
   }, [commitQuery])
 
+  const handleCopyPython = useCallback(async () => {
+    await copyTextToClipboard(buildQueryPythonSnippet(queryInput, queryApiBaseUrl))
+  }, [queryApiBaseUrl, queryInput])
+
   return (
     <div style={pageStyle}>
       <div style={sectionStyle}>
@@ -272,6 +280,7 @@ export function QueryPage() {
           </div>
           <div style={buttonRowStyle}>
             <button type="submit">Search</button>
+            <button type="button" onClick={() => void handleCopyPython()}>Copy Python</button>
             {loadingOptions && <span>Loading query options...</span>}
           </div>
         </form>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildByUuidVisitName, buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { buildByUuidVisitName, buildDefaultQueryInput, buildQueryPythonSnippet, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 
 describe("query params helpers", () => {
   it("normalizes an optional /query prefix", () => {
@@ -53,5 +53,33 @@ describe("query params helpers", () => {
   it("builds a default query string from the current datasource", () => {
     expect(buildDefaultQueryInput("main:LSSTCam!-raw!-all:raw")).toBe("repository_name=main&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100")
     expect(buildDefaultQueryInput("embargo:LSSTCam!-runs!-nightlyValidation:difference_image", 5)).toBe("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&limit=5")
+  })
+
+  it("builds runnable python code from the current query string", () => {
+    expect(
+      buildQueryPythonSnippet(
+        "repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100",
+        "https://example.test/fov-quicklook",
+      ),
+    ).toBe(
+      "import requests\n\n"
+      + "BASE_URL = 'https://example.test/fov-quicklook'\n"
+      + "GAFAELFAWR_TOKEN = '<set gafaelfawr token here>'\n\n"
+      + "params = {\n"
+      + "    'repository_name': 'embargo',\n"
+      + "    'collection': 'LSSTCam/raw/all',\n"
+      + "    'dataset_type': 'raw',\n"
+      + "    'limit': '100',\n"
+      + "}\n\n"
+      + "response = requests.get(\n"
+      + "    f\"{BASE_URL}/api/visits\",\n"
+      + "    params=params,\n"
+      + "    cookies={'gafaelfawr': GAFAELFAWR_TOKEN},\n"
+      + "    timeout=30,\n"
+      + ")\n"
+      + "response.raise_for_status()\n\n"
+      + "for visit in response.json():\n"
+      + "    print(visit['display_id'])",
+    )
   })
 })

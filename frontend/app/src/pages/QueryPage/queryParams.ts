@@ -20,6 +20,13 @@ export function normalizeQueryInput(input: string): string {
   return input.trim().replace(/^\/query\?/, "").replace(/^\?/, "")
 }
 
+function pythonStringLiteral(value: string): string {
+  return `'${value
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n")}'`
+}
+
 export function buildDefaultQueryInput(dataSource: string | null | undefined, limit = 100): string {
   if (!dataSource) {
     return ""
@@ -37,6 +44,34 @@ export function buildDefaultQueryInput(dataSource: string | null | undefined, li
     limit: String(limit),
   })
   return params.toString()
+}
+
+export function buildQueryPythonSnippet(queryInput: string, baseUrl: string): string {
+  const searchParams = new URLSearchParams(normalizeQueryInput(queryInput))
+  const paramsEntries = Array.from(searchParams.entries())
+  const paramsLiteral = paramsEntries.length === 0
+    ? "{}"
+    : `{\n${paramsEntries.map(([key, value]) => `    ${pythonStringLiteral(key)}: ${pythonStringLiteral(value)},`).join("\n")}\n}`
+
+  return [
+    "import requests",
+    "",
+    `BASE_URL = ${pythonStringLiteral(baseUrl)}`,
+    "GAFAELFAWR_TOKEN = '<set gafaelfawr token here>'",
+    "",
+    `params = ${paramsLiteral}`,
+    "",
+    "response = requests.get(",
+    "    f\"{BASE_URL}/api/visits\",",
+    "    params=params,",
+    "    cookies={'gafaelfawr': GAFAELFAWR_TOKEN},",
+    "    timeout=30,",
+    ")",
+    "response.raise_for_status()",
+    "",
+    "for visit in response.json():",
+    "    print(visit['display_id'])",
+  ].join("\n")
 }
 
 export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildResult {

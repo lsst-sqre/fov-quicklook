@@ -9,6 +9,7 @@ from uuid import UUID
 
 from lsst.resources import ResourcePath
 
+import quicklook.mylogging
 from quicklook.config import ButlerScopeConfig, config
 from quicklook.datasets import Dataset, get_dataset
 from quicklook.datasource.types import QueryBuilderOptions, QueryWhereExample, VisitDayCount, VisitDayCountQuery, VisitEntry
@@ -38,6 +39,7 @@ _resolved_visit_runs_lock = threading.Lock()
 _query_builder_metadata_cache: dict[tuple[str, str], '_QueryRepositoryMetadata'] = {}
 _query_builder_metadata_loading: dict[tuple[str, str], threading.Event] = {}
 _query_builder_metadata_lock = threading.Lock()
+logger = quicklook.mylogging.getLogger(__name__)
 
 
 class _QueryRepositoryMetadata:
@@ -51,8 +53,6 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         from .butlerutils import chown_pgpassfile
 
         chown_pgpassfile()
-        for repository_name in _query_repository_names():
-            _prime_query_builder_metadata_async(repository_name)
 
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         return _get_scope_datasource(
@@ -723,7 +723,11 @@ def _prime_query_builder_metadata_async(repository_name: str) -> None:
             with _query_builder_metadata_lock:
                 _query_builder_metadata_loading.pop(key, None)
                 event.set()
-            raise
+            logger.exception(
+                "Failed to preload Data Query metadata for repository=%s instrument=%s",
+                repository_name,
+                instrument,
+            )
         else:
             with _query_builder_metadata_lock:
                 _query_builder_metadata_cache[key] = metadata
