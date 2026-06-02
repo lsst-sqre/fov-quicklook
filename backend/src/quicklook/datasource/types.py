@@ -17,24 +17,29 @@ class ResolvedVisitInfo:
 
 @dataclass
 class Query:
-    data_type: CcdDataType
     repository_name: str
+    collection: str
+    dataset_type: str
     limit: int
     offset: int = 0
-    exposure: int | None = None
-    day_obs: int | None = None
+    where: str | None = None
+    order_by: str | None = None
+    reverse: bool | None = None
 
 
 @dataclass
 class VisitDayCountQuery:
-    data_type: CcdDataType
     repository_name: str
+    collection: str
+    dataset_type: str
     calendar_month: str
 
 
 @dataclass
 class VisitEntry:
     id: str
+    display_id: str
+    scope_id: str
     day_obs: int
     physical_filter: str
     obs_id: str

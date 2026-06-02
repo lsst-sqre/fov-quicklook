@@ -22,7 +22,7 @@ async def test_create_quicklook_resolves_visit_before_forwarding(monkeypatch):
     class FakeDataSource:
         async def resolve_visit_info(self, visit: VisitName) -> ResolvedVisitInfo:
             received_visits.append(visit)
-            return ResolvedVisitInfo(visit_name=VisitName('repo:raw:4242'))
+            return ResolvedVisitInfo(visit_name=VisitName('repo:LSSTCam!-raw!-all:raw:exposure=4242'))
 
     async def fake_http_request(method: str, url: str, **kwargs):
         forwarded_requests.append((method, url, kwargs))
@@ -39,7 +39,7 @@ async def test_create_quicklook_resolves_visit_before_forwarding(monkeypatch):
         (
             'post',
             f'{quicklooks.config.coordinator_base_url}/quicklooks',
-            {'json': {'visit': 'repo:raw:4242'}},
+            {'json': {'visit': 'repo:LSSTCam!-raw!-all:raw:exposure=4242'}},
         )
     ]
 

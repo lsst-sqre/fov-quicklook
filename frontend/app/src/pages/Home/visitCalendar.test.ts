@@ -23,7 +23,7 @@ describe("visit calendar helpers", () => {
   })
 
   it("uses the selected visit month when opening the calendar", () => {
-    expect(getInitialCalendarMonth("embargo:raw:2025051900437", new Date(2024, 0, 1))).toBe("2025-05")
+    expect(getInitialCalendarMonth("embargo:LSSTCam!-raw!-all:raw:exposure=2025051900437", new Date(2024, 0, 1))).toBe("2025-05")
   })
 
   it("falls back to today when there is no selected visit", () => {
@@ -31,11 +31,11 @@ describe("visit calendar helpers", () => {
   })
 
   it("prefers the manual search date for the selected day", () => {
-    expect(getSelectedCalendarDate("2025-05-18", "embargo:raw:2025051900437")).toBe("2025-05-18")
+    expect(getSelectedCalendarDate("2025-05-18", "embargo:LSSTCam!-raw!-all:raw:exposure=2025051900437")).toBe("2025-05-18")
   })
 
   it("falls back to the selected visit date for the selected day", () => {
-    expect(getSelectedCalendarDate("", "embargo:raw:2025051900437")).toBe("2025-05-19")
+    expect(getSelectedCalendarDate("", "embargo:LSSTCam!-raw!-all:raw:exposure=2025051900437")).toBe("2025-05-19")
   })
 
   it("can move across month boundaries", () => {

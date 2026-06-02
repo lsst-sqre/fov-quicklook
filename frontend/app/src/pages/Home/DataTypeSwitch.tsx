@@ -1,6 +1,7 @@
 import styles from './styles.module.scss'
 import { useCallback } from "react"
 import { useGetExposureDataTypesQuery } from "../../store/api/openapi"
+import { buildVisitId, extractScopeIdFromVisitId, getSingleDimensionName, getSingleDimensionValue, parseScopeId } from "../../quicklookId"
 import { homeSlice } from "../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../store/hooks"
 import { useHomeContext } from "./context"
@@ -8,38 +9,48 @@ import classNames from 'classnames'
 import { useChangeCurrentQuicklook } from '../../hooks/useChangeCurrentQuicklook'
 
 export function DataTypeSwitch() {
-  type DataType = typeof types[number]
   const { currentQuicklook } = useHomeContext()
-  const parts = currentQuicklook.id?.split(':') ?? []
-  const exposureId = parts[2] ? Number(parts[2]) : undefined
-  const currentType = parts.length >= 3 ? `${parts[0]}:${parts[1]}` as DataType : undefined
+  const currentId = currentQuicklook.id
+  const exposureDimension = currentId ? getSingleDimensionName(currentId) : undefined
+  const exposureValue = currentId ? getSingleDimensionValue(currentId) : undefined
+  const exposureId = exposureDimension === "exposure" && exposureValue?.match(/^\d+$/) ? Number(exposureValue) : undefined
+  const currentType = currentId ? extractScopeIdFromVisitId(currentId) : undefined
   const { data, isFetching } = useGetExposureDataTypesQuery({ id: exposureId! }, {
     skip: !exposureId,
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
   })
-  const types = (isFetching ? [] : data!) ?? []
+  const types = (isFetching ? [] : data) ?? []
   const dispatch = useAppDispatch()
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
-  const ccdDataTypes = useAppSelector(state => state.copyTemplate.ccdDataTypes)
+  const butlerScopes = useAppSelector(state => state.copyTemplate.butlerScopes)
 
-  const changeType = useCallback((type: DataType) => {
-    changeCurrentQuicklook(`${type}:${exposureId}`)
-    dispatch(homeSlice.actions.setDataSource(type))
+  const changeType = useCallback((scopeId: string) => {
+    if (exposureId === undefined) return
+    const visitId = buildVisitId({
+      ...parseScopeId(scopeId),
+      dimensions: { exposure: exposureId },
+    })
+    changeCurrentQuicklook(visitId)
+    dispatch(homeSlice.actions.setDataSource(scopeId))
   }, [changeCurrentQuicklook, dispatch, exposureId])
+
+  if (exposureId === undefined) {
+    return null
+  }
 
   return (
     <>
-      {ccdDataTypes.map(({ data_type, display_name, repository_name }) => {
-        const key = `${repository_name}:${data_type}`
+      {butlerScopes.map((scope) => {
+        const key = scope.id ?? ""
         return (
           <button
             key={key}
             className={classNames(currentType === key && styles.selectedType)}
-            disabled={!types.includes(key as DataType)}
-            onClick={() => changeType(key as DataType)}
+            disabled={!types.includes(key)}
+            onClick={() => changeType(key)}
           >
-            {display_name}
+            {scope.display_name}
           </button>
         )
       })}

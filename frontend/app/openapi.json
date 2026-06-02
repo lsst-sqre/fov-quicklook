@@ -69,7 +69,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     },
@@ -134,7 +134,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     },
@@ -225,7 +225,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     }
@@ -263,7 +263,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     }
@@ -319,7 +319,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     }
@@ -359,7 +359,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     }
@@ -392,35 +392,78 @@
                 "operationId": "list_visits",
                 "parameters": [
                     {
-                        "name": "exposure",
+                        "name": "repository_name",
                         "in": "query",
-                        "required": false,
+                        "required": true,
                         "schema": {
-                            "anyOf": [
-                                {
-                                    "type": "integer"
-                                },
-                                {
-                                    "type": "null"
-                                }
-                            ],
-                            "title": "Exposure"
+                            "type": "string",
+                            "title": "Repository Name"
                         }
                     },
                     {
-                        "name": "day_obs",
+                        "name": "collection",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Collection"
+                        }
+                    },
+                    {
+                        "name": "dataset_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Dataset Type"
+                        }
+                    },
+                    {
+                        "name": "where",
                         "in": "query",
                         "required": false,
                         "schema": {
                             "anyOf": [
                                 {
-                                    "type": "integer"
+                                    "type": "string"
                                 },
                                 {
                                     "type": "null"
                                 }
                             ],
-                            "title": "Day Obs"
+                            "title": "Where"
+                        }
+                    },
+                    {
+                        "name": "order_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Order By"
+                        }
+                    },
+                    {
+                        "name": "reverse",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "boolean"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Reverse"
                         }
                     },
                     {
@@ -435,21 +478,14 @@
                         }
                     },
                     {
-                        "name": "data_type",
+                        "name": "offset",
                         "in": "query",
-                        "required": true,
+                        "required": false,
                         "schema": {
-                            "type": "string",
-                            "title": "Data Type"
-                        }
-                    },
-                    {
-                        "name": "repository_name",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "title": "Repository Name"
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0,
+                            "title": "Offset"
                         }
                     }
                 ],
@@ -497,21 +533,30 @@
                         }
                     },
                     {
-                        "name": "data_type",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "title": "Data Type"
-                        }
-                    },
-                    {
                         "name": "repository_name",
                         "in": "query",
                         "required": true,
                         "schema": {
                             "type": "string",
                             "title": "Repository Name"
+                        }
+                    },
+                    {
+                        "name": "collection",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Collection"
+                        }
+                    },
+                    {
+                        "name": "dataset_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Dataset Type"
                         }
                     }
                 ],
@@ -723,7 +768,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     },
@@ -970,6 +1015,51 @@
                 ],
                 "title": "BBox"
             },
+            "ButlerScopeConfig": {
+                "properties": {
+                    "id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Id"
+                    },
+                    "dataset_type": {
+                        "type": "string",
+                        "title": "Dataset Type"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "title": "Display Name"
+                    },
+                    "collection": {
+                        "type": "string",
+                        "title": "Collection"
+                    },
+                    "repository_name": {
+                        "type": "string",
+                        "title": "Repository Name",
+                        "default": "embargo"
+                    },
+                    "instrument": {
+                        "type": "string",
+                        "title": "Instrument",
+                        "default": "LSSTCam"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "dataset_type",
+                    "display_name",
+                    "collection"
+                ],
+                "title": "ButlerScopeConfig",
+                "description": "UI \u4e0a\u306e\u691c\u7d22\u30d7\u30ea\u30bb\u30c3\u30c8\u3002"
+            },
             "CacheEntry": {
                 "properties": {
                     "visit_name": {
@@ -1017,63 +1107,6 @@
                 "type": "array",
                 "maxItems": 4,
                 "minItems": 4
-            },
-            "CcdDataTypeConfig": {
-                "properties": {
-                    "data_type": {
-                        "type": "string",
-                        "title": "Data Type"
-                    },
-                    "display_name": {
-                        "type": "string",
-                        "title": "Display Name"
-                    },
-                    "collections": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "title": "Collections"
-                    },
-                    "data_id_dimension": {
-                        "type": "string",
-                        "title": "Data Id Dimension",
-                        "default": "exposure"
-                    },
-                    "order_by": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "title": "Order By",
-                        "default": [
-                            "-exposure"
-                        ]
-                    },
-                    "partial": {
-                        "type": "boolean",
-                        "title": "Partial",
-                        "default": false
-                    },
-                    "repository_name": {
-                        "type": "string",
-                        "title": "Repository Name",
-                        "default": "embargo"
-                    },
-                    "instrument": {
-                        "type": "string",
-                        "title": "Instrument",
-                        "default": "LSSTCam"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "data_type",
-                    "display_name",
-                    "collections"
-                ],
-                "title": "CcdDataTypeConfig",
-                "description": "CCD\u30c7\u30fc\u30bf\u30bf\u30a4\u30d7\u306e\u8a2d\u5b9a"
             },
             "CcdMetadata": {
                 "properties": {
@@ -1337,6 +1370,10 @@
                     "id": {
                         "type": "string",
                         "title": "Id"
+                    },
+                    "cache_version": {
+                        "type": "integer",
+                        "title": "Cache Version"
                     }
                 },
                 "type": "object",
@@ -1705,12 +1742,20 @@
                         "type": "integer",
                         "title": "Max Object Storage Usage"
                     },
-                    "ccd_data_types": {
+                    "butler_scopes": {
                         "items": {
-                            "$ref": "#/components/schemas/CcdDataTypeConfig"
+                            "$ref": "#/components/schemas/ButlerScopeConfig"
                         },
                         "type": "array",
-                        "title": "Ccd Data Types"
+                        "title": "Butler Scopes"
+                    },
+                    "datasets": {
+                        "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "type": "array",
+                        "title": "Datasets"
                     }
                 },
                 "type": "object",
@@ -1718,7 +1763,8 @@
                     "admin_page",
                     "context_menu_templates",
                     "max_object_storage_usage",
-                    "ccd_data_types"
+                    "butler_scopes",
+                    "datasets"
                 ],
                 "title": "SystemInfo"
             },
@@ -1804,6 +1850,14 @@
                         "type": "string",
                         "title": "Id"
                     },
+                    "display_id": {
+                        "type": "string",
+                        "title": "Display Id"
+                    },
+                    "scope_id": {
+                        "type": "string",
+                        "title": "Scope Id"
+                    },
                     "day_obs": {
                         "type": "integer",
                         "title": "Day Obs"
@@ -1851,6 +1905,8 @@
                 "type": "object",
                 "required": [
                     "id",
+                    "display_id",
+                    "scope_id",
                     "day_obs",
                     "physical_filter",
                     "obs_id",

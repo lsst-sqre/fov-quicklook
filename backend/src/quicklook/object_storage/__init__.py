@@ -179,14 +179,14 @@ class VisitObjectStorage:
         return packed[index]
 
     def _put_sync(self, key: str, value: bytes) -> int:
-        return put_object(f'quicklooks/{self.visit}/{key}', value, cache_version=self.cache_version)
+        return put_object(f'quicklooks/{self.visit.cache_key}/{key}', value, cache_version=self.cache_version)
 
     def _get_sync(self, key: str) -> bytes:
-        return get_object(f'quicklooks/{self.visit}/{key}', cache_version=self.cache_version)
+        return get_object(f'quicklooks/{self.visit.cache_key}/{key}', cache_version=self.cache_version)
 
     def delete_all_sync(self) -> None:
         """このvisitに関連するすべてのオブジェクトを削除"""
-        delete_objects_by_prefix(f'quicklooks/{self.visit}/', cache_version=self.cache_version)
+        delete_objects_by_prefix(f'quicklooks/{self.visit.cache_key}/', cache_version=self.cache_version)
 
     def put_fits_headers_sync(self, ccd_name: CcdName, headers: list[HeaderType]) -> int:
         """FITS headerをobject storageに保存"""

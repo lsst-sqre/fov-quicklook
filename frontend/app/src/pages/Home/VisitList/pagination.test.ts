@@ -10,13 +10,15 @@ import {
 describe("visit list pagination helpers", () => {
   it("builds a paged query from the current filters", () => {
     expect(buildVisitListPageQuery({
-      dayObs: 20250519,
-      dataType: "raw",
       repositoryName: "embargo",
+      collection: "LSSTCam/raw/all",
+      datasetType: "raw",
+      where: "day_obs=20250519",
     }, 2)).toEqual({
-      dayObs: 20250519,
-      dataType: "raw",
       repositoryName: "embargo",
+      collection: "LSSTCam/raw/all",
+      datasetType: "raw",
+      where: "day_obs=20250519",
       limit: VISIT_LIST_PAGE_SIZE + 1,
       offset: VISIT_LIST_PAGE_SIZE * 2,
     })
@@ -24,7 +26,9 @@ describe("visit list pagination helpers", () => {
 
   it("shows only the entries for the current page", () => {
     const entries = Array.from({ length: VISIT_LIST_PAGE_SIZE + 2 }, (_, index) => ({
-      id: `embargo:raw:${index}`,
+      id: `embargo:LSSTCam!-raw!-all:raw:exposure=${index}`,
+      display_id: `embargo:LSSTCam/raw/all:raw:exposure=${index}`,
+      scope_id: "embargo:LSSTCam!-raw!-all:raw",
       day_obs: 20250519,
       physical_filter: "r",
       obs_id: `obs-${index}`,

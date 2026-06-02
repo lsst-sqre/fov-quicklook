@@ -1,4 +1,5 @@
 import type { ListVisitsApiArg } from "../../store/api/openapi"
+import { buildByUuidVisitName as buildByUuidVisitNameInternal, parseScopeId } from "../../quicklookId"
 
 type QueryBuildResult = {
   args: ListVisitsApiArg | null
@@ -23,26 +24,26 @@ export function buildDefaultQueryInput(dataSource: string | null | undefined, li
   if (!dataSource) {
     return ""
   }
-
-  const separatorIndex = dataSource.indexOf(":")
-  if (separatorIndex <= 0 || separatorIndex >= dataSource.length - 1) {
+  let scope
+  try {
+    scope = parseScopeId(dataSource)
+  } catch {
     return ""
   }
-
-  const repositoryName = dataSource.slice(0, separatorIndex)
-  const dataType = dataSource.slice(separatorIndex + 1)
   const params = new URLSearchParams({
-    data_type: dataType,
-    repository_name: repositoryName,
+    repository_name: scope.repositoryName,
+    collection: scope.collection,
+    dataset_type: scope.datasetType,
     limit: String(limit),
   })
   return params.toString()
 }
 
 export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildResult {
-  const dataType = searchParams.get("data_type")
   const repositoryName = searchParams.get("repository_name")
-  if (!dataType || !repositoryName) {
+  const collection = searchParams.get("collection")
+  const datasetType = searchParams.get("dataset_type")
+  if (!repositoryName || !collection || !datasetType) {
     return { args: null, error: null }
   }
 
@@ -50,33 +51,26 @@ export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildRes
   if (limit.error) {
     return { args: null, error: limit.error }
   }
-  const exposure = parseOptionalInteger(searchParams.get("exposure"), "exposure")
-  if (exposure.error) {
-    return { args: null, error: exposure.error }
-  }
   const offset = parseOptionalInteger(searchParams.get("offset"), "offset")
   if (offset.error) {
     return { args: null, error: offset.error }
   }
-  const dayObs = parseOptionalInteger(searchParams.get("day_obs"), "day_obs")
-  if (dayObs.error) {
-    return { args: null, error: dayObs.error }
-  }
 
   return {
     args: {
-      dataType,
       repositoryName,
+      collection,
+      datasetType,
+      where: searchParams.get("where"),
+      orderBy: searchParams.get("order_by"),
+      reverse: searchParams.get("reverse") === null ? undefined : searchParams.get("reverse") === "true",
       ...(limit.value !== undefined ? { limit: limit.value } : {}),
-      ...(exposure.value !== undefined ? { exposure: exposure.value } : {}),
       ...(offset.value !== undefined ? { offset: offset.value } : {}),
-      ...(dayObs.value !== undefined ? { dayObs: dayObs.value } : {}),
     },
     error: null,
   }
 }
 
 export function buildByUuidVisitName(visitName: string, uuid: string): string {
-  const repositoryName = visitName.split(":", 1)[0]
-  return `${repositoryName}:by_uuid:${uuid}`
+  return buildByUuidVisitNameInternal(visitName, uuid)
 }

@@ -2,7 +2,6 @@ from fastapi import HTTPException
 
 from quicklook.datasource.types import ResolvedVisitInfo, VisitDayCount, VisitRepresentativeUuid, VisitResolutionError
 from quicklook.frontend.api import visits
-from quicklook.types import CcdDataType
 from quicklook.types import VisitName
 
 
@@ -17,21 +16,25 @@ async def test_list_visits_forwards_limit_and_offset(monkeypatch):
     monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
 
     result = await visits.list_visits(
-        exposure=None,
-        day_obs=None,
-        data_type=CcdDataType('raw'),
         repository_name='repo',
+        collection='LSSTCam/raw/all',
+        dataset_type='raw',
+        where='day_obs=20250301',
+        order_by='day_obs',
+        reverse=True,
         limit=1000,
         offset=1000,
     )
 
     assert result == []
-    assert captured["query"].data_type == CcdDataType('raw')
     assert captured["query"].repository_name == 'repo'
+    assert captured["query"].collection == 'LSSTCam/raw/all'
+    assert captured["query"].dataset_type == 'raw'
     assert captured["query"].limit == 1000
     assert captured["query"].offset == 1000
-    assert captured["query"].exposure is None
-    assert captured["query"].day_obs is None
+    assert captured["query"].where == 'day_obs=20250301'
+    assert captured["query"].order_by == 'day_obs'
+    assert captured["query"].reverse is True
 
 
 async def test_get_visit_metadata_returns_404_for_unknown_uuid(monkeypatch):
@@ -56,7 +59,7 @@ async def test_get_visit_resolution_returns_detector(monkeypatch):
         async def resolve_visit_info(self, visit: VisitName) -> ResolvedVisitInfo:
             assert visit == VisitName('repo:by_uuid:uuid-1')
             return ResolvedVisitInfo(
-                visit_name=VisitName('repo:raw:4242'),
+                visit_name=VisitName('repo:LSSTCam!-raw!-all:raw:exposure=4242'),
                 detector=90,
             )
 
@@ -65,7 +68,7 @@ async def test_get_visit_resolution_returns_detector(monkeypatch):
     resolved = await visits.get_visit_resolution('repo:by_uuid:uuid-1')
 
     assert resolved == ResolvedVisitInfo(
-        visit_name=VisitName('repo:raw:4242'),
+        visit_name=VisitName('repo:LSSTCam!-raw!-all:raw:exposure=4242'),
         detector=90,
     )
 
@@ -73,12 +76,12 @@ async def test_get_visit_resolution_returns_detector(monkeypatch):
 async def test_get_visit_representative_uuid_returns_uuid(monkeypatch):
     class FakeDataSource:
         async def get_visit_representative_uuid(self, visit: VisitName) -> str:
-            assert visit == VisitName('repo:raw:4242')
+            assert visit == VisitName('repo:LSSTCam!-raw!-all:raw:exposure=4242')
             return 'uuid-4242'
 
     monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
 
-    representative = await visits.get_visit_representative_uuid('repo:raw:4242')
+    representative = await visits.get_visit_representative_uuid('repo:LSSTCam!-raw!-all:raw:exposure=4242')
 
     assert representative == VisitRepresentativeUuid(uuid='uuid-4242')
 
@@ -88,7 +91,8 @@ async def test_list_visit_day_counts_returns_backend_counts(monkeypatch):
         async def query_visit_day_counts(self, q):
             assert q.calendar_month == '2025-03'
             assert q.repository_name == 'repo'
-            assert q.data_type == 'raw'
+            assert q.collection == 'LSSTCam/raw/all'
+            assert q.dataset_type == 'raw'
             return [
                 VisitDayCount(day_obs=20250301, count=2),
                 VisitDayCount(day_obs=20250302, count=5),
@@ -98,8 +102,9 @@ async def test_list_visit_day_counts_returns_backend_counts(monkeypatch):
 
     counts = await visits.list_visit_day_counts(
         calendar_month='2025-03',
-        data_type=CcdDataType('raw'),
         repository_name='repo',
+        collection='LSSTCam/raw/all',
+        dataset_type='raw',
     )
 
     assert counts == [
