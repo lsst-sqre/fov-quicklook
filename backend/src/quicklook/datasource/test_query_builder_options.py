@@ -4,7 +4,6 @@ from lsst.daf.butler._exceptions import MissingCollectionError, MissingDatasetTy
 
 from quicklook.datasource import butler_datasource as butler_datasource_module
 from quicklook.datasource.butler_datasource import ButlerDataSource
-from quicklook.datasource.types import QueryWhereExample
 
 
 def test_build_contains_glob():
@@ -45,7 +44,7 @@ def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatc
     assert dataset_types_called is True
 
 
-def test_get_query_builder_options_uses_exact_selection_for_where_examples(monkeypatch):
+def test_get_query_builder_options_keeps_exact_selection_metadata_only(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
     monkeypatch.setattr(
         butler_datasource_module,
@@ -70,10 +69,7 @@ def test_get_query_builder_options_uses_exact_selection_for_where_examples(monke
     monkeypatch.setattr(
         butler_datasource_module,
         '_get_scope_datasource',
-        lambda **kwargs: SimpleNamespace(
-            query_where_examples=lambda: [QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
-            **kwargs,
-        ),
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError(f'_get_scope_datasource should not be called: {kwargs}')),
     )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
@@ -85,7 +81,7 @@ def test_get_query_builder_options_uses_exact_selection_for_where_examples(monke
 
     assert result.collections == ['LSSTCam/raw/all']
     assert result.dataset_types == ['raw']
-    assert result.where_examples == [QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')]
+    assert result.where_examples == []
 
 
 def test_collection_exists_for_repository_returns_false_for_partial_match(monkeypatch):
