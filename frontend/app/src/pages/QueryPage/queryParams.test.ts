@@ -18,7 +18,21 @@ describe("query params helpers", () => {
         limit: 2,
         offset: 1000,
         where: "day_obs=20260128",
-        orderBy: null,
+        reverse: undefined,
+      },
+      error: null,
+    })
+  })
+
+  it("omits missing optional query params from the visit args", () => {
+    const result = buildVisitListArgs(new URLSearchParams("repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"))
+
+    expect(result).toEqual({
+      args: {
+        repositoryName: "embargo",
+        collection: "LSSTCam/raw/all",
+        datasetType: "raw",
+        limit: 100,
         reverse: undefined,
       },
       error: null,
