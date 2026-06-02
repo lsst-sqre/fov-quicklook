@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { Provider } from "react-redux"
-import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom"
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { QueryPage } from "."
 import { makeStore } from "../../store"
@@ -49,11 +49,15 @@ function buildOptions(urlText: string) {
 
   return {
     repositories: ["embargo", "main"],
-    collections: ["LSSTCam/raw/all", "LSSTCam/runs/nightlyValidation"],
+    collections: collection?.includes("nightly")
+      ? ["LSSTCam/runs/nightlyValidation"]
+      : ["LSSTCam/raw/all", "LSSTCam/runs/nightlyValidation"],
     dataset_types: collection === "LSSTCam/runs/nightlyValidation"
       ? ["difference_image", "preliminary_visit_image"]
       : ["raw", "calexp"],
-    where_examples: datasetType === "raw"
+    where_examples: datasetType === "difference_image"
+      ? [{ label: "Latest visit (7001)", where: "visit=7001" }]
+      : datasetType === "raw"
       ? [{ label: "Latest day_obs (20260128)", where: "day_obs=20260128" }]
       : [],
   }
@@ -69,16 +73,28 @@ function QueryRoute() {
   )
 }
 
-function VisitRoute() {
-  const { visitId } = useParams()
-  return <div>{visitId}</div>
-}
-
 const systemInfo = {
   admin_page: false,
   context_menu_templates: [],
   max_object_storage_usage: 0,
-  butler_scopes: [],
+  butler_scopes: [
+    {
+      id: "main:main!-raw:main_raw",
+      repository_name: "main",
+      collection: "main/raw",
+      dataset_type: "main_raw",
+      display_name: "Main Raw",
+      instrument: "LSSTCam",
+    },
+    {
+      id: "embargo:LSSTCam!-raw!-all:raw",
+      repository_name: "embargo",
+      collection: "LSSTCam/raw/all",
+      dataset_type: "raw",
+      display_name: "Embargo Raw",
+      instrument: "LSSTCam",
+    },
+  ],
   datasets: [],
 }
 
@@ -88,7 +104,6 @@ function renderQueryPage(initialEntries: string[]) {
       <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route element={<QueryRoute />} path="/query" />
-          <Route element={<VisitRoute />} path="/visits/:visitId" />
         </Routes>
       </MemoryRouter>
     </Provider>,
@@ -123,9 +138,6 @@ describe("QueryPage", () => {
       if (urlText.includes("/api/visits/query_builder_options")) {
         return jsonResponse(buildOptions(urlText))
       }
-      if (urlText.includes("/representative_uuid")) {
-        return jsonResponse({ uuid: "uuid-1" })
-      }
       throw new Error(`Unexpected fetch: ${urlText}`)
     }))
   })
@@ -144,50 +156,45 @@ describe("QueryPage", () => {
     expect(useListVisitsQuery).toHaveBeenCalled()
     expect(screen.getByText("embargo:LSSTCam/raw/all:raw:exposure=2026012800342")).toBeTruthy()
     expect(screen.getByText("field-342")).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /Open by UUID/i })).toBeNull()
   })
 
-  it("keeps /query empty until the user submits a query", async () => {
+  it("preselects the first configured butler scope without navigating", async () => {
     renderQueryPage(["/query"])
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
+      expect(screen.getByDisplayValue("main")).toBeTruthy()
     })
-    expect((screen.getByLabelText("Query string") as HTMLInputElement).value).toBe("")
+    expect((screen.getByLabelText("Query string") as HTMLInputElement).value).toBe("repository_name=main&collection=main%2Fraw&dataset_type=main_raw&order_by=day_obs&limit=100")
     expect(screen.getByTestId("location-search").textContent).toBe("")
     const lastCall = useListVisitsQuery.mock.calls[useListVisitsQuery.mock.calls.length - 1]
     expect(lastCall?.[1]?.skip).toBe(true)
   })
 
-  it("lets the helper controls build the query string and where example", async () => {
+  it("lets the helper controls build the query string with combobox filtering", async () => {
     renderQueryPage(["/query"])
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
-    })
-
-    fireEvent.change(screen.getByDisplayValue("embargo"), { target: { value: "main" } })
-    await waitFor(() => {
       expect(screen.getByDisplayValue("main")).toBeTruthy()
     })
-    await waitFor(() => {
-      expect(screen.getByDisplayValue("main_raw")).toBeTruthy()
-    })
-    fireEvent.change(screen.getByDisplayValue("Select example"), { target: { value: "exposure=42" } })
 
-    expect(screen.getByDisplayValue("repository_name=main&collection=main%2Fraw&dataset_type=main_raw&order_by=day_obs&limit=100&where=exposure%3D42")).toBeTruthy()
+    fireEvent.change(screen.getByDisplayValue("main"), { target: { value: "embargo" } })
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
+    })
+    fireEvent.change(screen.getByLabelText("Collection"), { target: { value: "LSSTCam/runs/nightlyValidation" } })
+    fireEvent.change(screen.getByLabelText("Dataset Type"), { target: { value: "difference_image" } })
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("difference_image")).toBeTruthy()
+    })
+    fireEvent.change(screen.getByDisplayValue("Select example"), { target: { value: "visit=7001" } })
+
+    expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&order_by=visit&limit=100&where=visit%3D7001")).toBeTruthy()
 
     fireEvent.click(screen.getByRole("button", { name: "Search" }))
 
     await waitFor(() => {
-      expect(screen.getByTestId("location-search").textContent).toContain("repository_name=main")
+      expect(screen.getByTestId("location-search").textContent).toContain("repository_name=embargo")
     })
-  })
-
-  it("opens the selected visit via by_uuid", async () => {
-    renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
-
-    fireEvent.click(screen.getByRole("button", { name: "Open embargo:LSSTCam/raw/all:raw:exposure=2026012800342 by UUID" }))
-
-    expect(await screen.findByText("embargo:by_uuid:uuid-1")).toBeTruthy()
   })
 })

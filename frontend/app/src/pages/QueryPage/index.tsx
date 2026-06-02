@@ -1,8 +1,11 @@
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react"
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useSelector } from "react-redux"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { env } from "../../env"
-import { useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
-import { buildByUuidVisitName, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { buildScopeId } from "../../quicklookId"
+import { AppState } from "../../store"
+import { ButlerScopeConfig, useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
+import { buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 
 const DEFAULT_LIMIT = "100"
 
@@ -38,6 +41,7 @@ const EMPTY_OPTIONS: QueryBuilderOptions = {
 export function QueryPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const butlerScopes = useSelector((state: AppState) => state.copyTemplate.butlerScopes)
   const currentQuery = searchParams.toString()
   const effectiveSearchParams = useMemo(() => new URLSearchParams(currentQuery), [currentQuery])
   const [queryInput, setQueryInput] = useState(() => normalizeQueryInput(currentQuery))
@@ -45,8 +49,7 @@ export function QueryPage() {
   const [options, setOptions] = useState<QueryBuilderOptions>(EMPTY_OPTIONS)
   const [optionsError, setOptionsError] = useState<string | null>(null)
   const [loadingOptions, setLoadingOptions] = useState(false)
-  const [openError, setOpenError] = useState<string | null>(null)
-  const [openingVisit, setOpeningVisit] = useState<string | null>(null)
+  const appliedDefaultScope = useRef(false)
   const parsedQuery = useMemo(() => buildVisitListArgs(effectiveSearchParams), [effectiveSearchParams])
   const { data, error, isFetching, isLoading } = useListVisitsQuery(parsedQuery.args!, {
     skip: parsedQuery.args === null || parsedQuery.error !== null,
@@ -61,6 +64,26 @@ export function QueryPage() {
   }, [currentQuery])
 
   useEffect(() => {
+    if (currentQuery || appliedDefaultScope.current) {
+      return
+    }
+    const scope = findDefaultScope(butlerScopes)
+    if (!scope || hasQueryBuilderSelection(form)) {
+      return
+    }
+    const nextForm = buildFormFromScope(scope)
+    setForm(nextForm)
+    setQueryInput(buildQueryInput(nextForm))
+    appliedDefaultScope.current = true
+  }, [butlerScopes, currentQuery, form])
+
+  useEffect(() => {
+    if (!form.repositoryName) {
+      setOptions(EMPTY_OPTIONS)
+      setOptionsError(null)
+      setLoadingOptions(false)
+      return
+    }
     const controller = new AbortController()
     setLoadingOptions(true)
     setOptionsError(null)
@@ -72,11 +95,11 @@ export function QueryPage() {
       },
       controller.signal,
     ).then((nextOptions) => {
-      setOptions(nextOptions)
-      setForm((current) => normalizeFormState(current, nextOptions))
-    }).catch((fetchError) => {
-      if (controller.signal.aborted) {
-        return
+        setOptions(nextOptions)
+        setForm((current) => normalizeFormState(current, nextOptions))
+      }).catch((fetchError) => {
+        if (controller.signal.aborted) {
+          return
       }
       setOptions(EMPTY_OPTIONS)
       setOptionsError(fetchError instanceof Error ? fetchError.message : "Failed to load query options.")
@@ -94,14 +117,19 @@ export function QueryPage() {
   }, [])
 
   const updateRepository = useCallback((repositoryName: string) => {
+    const defaultScope = findDefaultScope(butlerScopes, repositoryName)
+    const datasetType = defaultScope?.dataset_type ?? ""
+    const collection = defaultScope?.collection ?? ""
+    const orderBy = getDatasetOrderFields(datasetType)[0] ?? "day_obs"
     applyForm({
       ...form,
       repositoryName,
-      collection: "",
-      datasetType: "",
-      orderBy: "day_obs",
+      collection,
+      datasetType,
+      orderBy,
+      where: "",
     })
-  }, [applyForm, form])
+  }, [applyForm, butlerScopes, form])
 
   const updateCollection = useCallback((collection: string) => {
     applyForm({
@@ -109,6 +137,7 @@ export function QueryPage() {
       collection,
       datasetType: "",
       orderBy: "day_obs",
+      where: "",
     })
   }, [applyForm, form])
 
@@ -118,6 +147,7 @@ export function QueryPage() {
       ...form,
       datasetType,
       orderBy: nextOrderBy,
+      where: "",
     })
   }, [applyForm, form])
 
@@ -144,27 +174,14 @@ export function QueryPage() {
     commitQuery()
   }, [commitQuery])
 
-  const openByUuid = useCallback(async (visitName: string) => {
-    setOpenError(null)
-    setOpeningVisit(visitName)
-    try {
-      const representativeUuid = await fetchRepresentativeUuid(visitName)
-      navigate(`/visits/${encodeURIComponent(buildByUuidVisitName(visitName, representativeUuid))}`)
-    } catch (e) {
-      setOpenError(e instanceof Error ? e.message : "Failed to open the selected dataset.")
-    } finally {
-      setOpeningVisit((current) => current === visitName ? null : current)
-    }
-  }, [navigate])
-
   return (
     <div style={pageStyle}>
       <div style={sectionStyle}>
         <h1 style={{ margin: 0, fontSize: "1.25rem" }}>Data Query</h1>
         <p style={hintStyle}>
-          Build a query string for arbitrary `repository` / `collection` / `dataset_type`, or edit the query string directly.
+          Build a query string for arbitrary `repository` / `collection` / `dataset_type`, or edit the query string directly. Type in the comboboxes to narrow large option lists.
         </p>
-        <form onSubmit={handleSubmit} style={sectionStyle}>
+        <form onSubmit={handleSubmit} style={formStyle}>
           <label style={fullWidthFieldStyle}>
             <span>Query string</span>
             <input
@@ -185,17 +202,31 @@ export function QueryPage() {
             </label>
             <label style={fieldStyle}>
               <span>Collection</span>
-              <select value={form.collection} onChange={(event) => updateCollection(event.target.value)}>
-                <option value="">Select collection</option>
-                {options.collections.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
+              <input
+                list="query-page-collections"
+                spellCheck={false}
+                type="text"
+                value={form.collection}
+                onChange={(event) => updateCollection(event.target.value)}
+                placeholder="Type to filter collections"
+              />
+              <datalist id="query-page-collections">
+                {options.collections.map((option) => <option key={option} value={option} />)}
+              </datalist>
             </label>
             <label style={fieldStyle}>
               <span>Dataset Type</span>
-              <select value={form.datasetType} onChange={(event) => updateDatasetType(event.target.value)}>
-                <option value="">Select dataset type</option>
-                {options.dataset_types.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
+              <input
+                list="query-page-dataset-types"
+                spellCheck={false}
+                type="text"
+                value={form.datasetType}
+                onChange={(event) => updateDatasetType(event.target.value)}
+                placeholder="Type to filter dataset types"
+              />
+              <datalist id="query-page-dataset-types">
+                {options.dataset_types.map((option) => <option key={option} value={option} />)}
+              </datalist>
             </label>
             <label style={fieldStyle}>
               <span>Order By</span>
@@ -248,7 +279,6 @@ export function QueryPage() {
 
       {optionsError && <p role="alert">{optionsError}</p>}
       {parsedQuery.error && <p role="alert">{parsedQuery.error}</p>}
-      {openError && <p role="alert">{openError}</p>}
       {parsedQuery.args !== null && (
         <>
           <div style={summaryStyle}>
@@ -262,7 +292,6 @@ export function QueryPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th>Open</th>
                     <th>Visit</th>
                     <th>Day Obs</th>
                     <th>Filter</th>
@@ -276,12 +305,7 @@ export function QueryPage() {
                 </thead>
                 <tbody>
                   {data.map((entry) => (
-                    <VisitRow
-                      entry={entry}
-                      isOpening={openingVisit === entry.id}
-                      key={entry.id}
-                      onOpenByUuid={openByUuid}
-                    />
+                    <VisitRow entry={entry} key={entry.id} />
                   ))}
                 </tbody>
               </table>
@@ -305,6 +329,33 @@ function createEmptyForm(): QueryFormState {
   }
 }
 
+function hasQueryBuilderSelection(form: QueryFormState): boolean {
+  return Boolean(form.repositoryName || form.collection || form.datasetType)
+}
+
+function scopeIdFromConfig(scope: ButlerScopeConfig): string {
+  return scope.id ?? buildScopeId({
+    repositoryName: scope.repository_name ?? "",
+    collection: scope.collection ?? "",
+    datasetType: scope.dataset_type ?? "",
+  })
+}
+
+function findDefaultScope(
+  scopes: ButlerScopeConfig[],
+  repositoryName?: string,
+): ButlerScopeConfig | undefined {
+  if (repositoryName) {
+    return scopes.find((scope) => scope.repository_name === repositoryName)
+  }
+  return scopes[0]
+}
+
+function buildFormFromScope(scope: ButlerScopeConfig): QueryFormState {
+  const queryInput = buildDefaultQueryInput(scopeIdFromConfig(scope), Number(DEFAULT_LIMIT))
+  return mergeFormWithSearchParams(createEmptyForm(), new URLSearchParams(queryInput))
+}
+
 function buildQueryInput(form: QueryFormState): string {
   const params = new URLSearchParams()
   if (form.repositoryName) params.set("repository_name", form.repositoryName)
@@ -318,14 +369,15 @@ function buildQueryInput(form: QueryFormState): string {
 }
 
 function mergeFormWithSearchParams(form: QueryFormState, searchParams: URLSearchParams): QueryFormState {
+  const hasParams = Array.from(searchParams.keys()).length > 0
   return {
-    repositoryName: searchParams.get("repository_name") ?? form.repositoryName,
-    collection: searchParams.get("collection") ?? form.collection,
-    datasetType: searchParams.get("dataset_type") ?? form.datasetType,
-    orderBy: searchParams.get("order_by") ?? form.orderBy,
-    reverse: searchParams.has("reverse") ? searchParams.get("reverse") === "true" : form.reverse,
-    limit: searchParams.get("limit") ?? form.limit,
-    where: searchParams.get("where") ?? form.where,
+    repositoryName: searchParams.get("repository_name") ?? (hasParams ? "" : form.repositoryName),
+    collection: searchParams.get("collection") ?? (hasParams ? "" : form.collection),
+    datasetType: searchParams.get("dataset_type") ?? (hasParams ? "" : form.datasetType),
+    orderBy: searchParams.get("order_by") ?? (hasParams ? "day_obs" : form.orderBy),
+    reverse: searchParams.has("reverse") ? searchParams.get("reverse") === "true" : (hasParams ? false : form.reverse),
+    limit: searchParams.get("limit") ?? (hasParams ? DEFAULT_LIMIT : form.limit),
+    where: searchParams.get("where") ?? (hasParams ? "" : form.where),
   }
 }
 
@@ -333,19 +385,11 @@ function normalizeFormState(form: QueryFormState, options: QueryBuilderOptions):
   const repositoryName = options.repositories.includes(form.repositoryName)
     ? form.repositoryName
     : (options.repositories[0] ?? "")
-  const collection = options.collections.includes(form.collection)
-    ? form.collection
-    : (options.collections[0] ?? "")
-  const datasetType = options.dataset_types.includes(form.datasetType)
-    ? form.datasetType
-    : (options.dataset_types[0] ?? "")
-  const orderByFields = getDatasetOrderFields(datasetType)
+  const orderByFields = getDatasetOrderFields(form.datasetType)
   const orderBy = orderByFields.includes(form.orderBy) ? form.orderBy : (orderByFields[0] ?? "day_obs")
   return {
     ...form,
     repositoryName,
-    collection,
-    datasetType,
     orderBy,
     limit: form.limit || DEFAULT_LIMIT,
   }
@@ -362,17 +406,9 @@ function getDatasetOrderFields(datasetType: string): string[] {
   return defaultFields
 }
 
-function VisitRow(
-  { entry, isOpening, onOpenByUuid }:
-  { entry: VisitEntry, isOpening: boolean, onOpenByUuid: (visitName: string) => Promise<void> }
-) {
+function VisitRow({ entry }: { entry: VisitEntry }) {
   return (
     <tr>
-      <td>
-        <button aria-label={`Open ${entry.display_id} by UUID`} disabled={isOpening} onClick={() => void onOpenByUuid(entry.id)}>
-          {isOpening ? "Opening..." : "Open by UUID"}
-        </button>
-      </td>
       <td>
         <Link to={`/visits/${encodeURIComponent(entry.id)}`}>{entry.display_id}</Link>
       </td>
@@ -414,26 +450,6 @@ async function fetchQueryBuilderOptions(
     throw new Error("Failed to load query options.")
   }
   return payload as QueryBuilderOptions
-}
-
-async function fetchRepresentativeUuid(visitName: string): Promise<string> {
-  const response = await fetch(
-    `${env.baseUrl}/api/visits/${encodeURIComponent(visitName)}/representative_uuid`,
-  )
-  if (!response.ok) {
-    const detail = await readErrorDetail(response)
-    throw new Error(detail ?? `Failed to resolve a dataset UUID for ${visitName}.`)
-  }
-  const payload: unknown = await response.json()
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !("uuid" in payload) ||
-    typeof payload.uuid !== "string"
-  ) {
-    throw new Error(`Failed to resolve a dataset UUID for ${visitName}.`)
-  }
-  return payload.uuid
 }
 
 async function readErrorDetail(response: Response): Promise<string | null> {
@@ -487,6 +503,12 @@ const sectionStyle = {
   gap: "12px",
 } as const
 
+const formStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+} as const
+
 const hintStyle = {
   margin: 0,
   lineHeight: 1.5,
@@ -515,7 +537,7 @@ const wideFieldStyle = {
 
 const fullWidthFieldStyle = {
   ...fieldStyle,
-  minWidth: "100%",
+  width: "100%",
 } as const
 
 const checkboxStyle = {

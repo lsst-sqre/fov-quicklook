@@ -3,6 +3,7 @@ from collections import Counter
 from datetime import date
 from functools import lru_cache
 from itertools import islice
+import re
 from types import EllipsisType
 from typing import TYPE_CHECKING, Any, Iterable, cast
 from uuid import UUID
@@ -31,6 +32,7 @@ else:
 
 
 BY_UUID_DATA_TYPE = CcdDataType('by_uuid')
+_QUERY_BUILDER_SUGGESTION_LIMIT = 100
 _resolved_visit_runs: dict[str, str] = {}
 _resolved_visit_runs_lock = threading.Lock()
 
@@ -72,10 +74,24 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
                 where_examples=[],
             )
 
-        collections = _query_collections_for_repository(selected_repository)
-        selected_collection = collection if collection in collections else None
-        dataset_types = _query_dataset_types_for_repository(selected_repository)
-        selected_dataset_type = dataset_type if dataset_type in dataset_types else None
+        collections = _query_collections_for_repository(
+            selected_repository,
+            search_text=collection,
+        )
+        selected_collection = (
+            collection
+            if collection and _collection_exists_for_repository(selected_repository, collection)
+            else None
+        )
+        dataset_types = _query_dataset_types_for_repository(
+            selected_repository,
+            search_text=dataset_type,
+        )
+        selected_dataset_type = (
+            dataset_type
+            if dataset_type and _dataset_type_exists_for_repository(selected_repository, dataset_type)
+            else None
+        )
         where_examples: list[QueryWhereExample] = []
         if selected_collection is not None and selected_dataset_type is not None:
             where_examples = _get_scope_datasource(
@@ -674,60 +690,98 @@ def _dataset_required_dimension_names(dataset_type: Any) -> tuple[str, ...]:
     return tuple(sorted(cast(str, getattr(dimension, 'name', str(dimension))) for dimension in required))
 
 
-def _query_collections_for_repository(repository_name: str, *, dataset_type: str | None = None) -> list[str]:
+def _query_collections_for_repository(repository_name: str, *, search_text: str | None = None) -> list[str]:
+    if not (search := _normalize_option_search_text(search_text)):
+        return []
     instrument = _repository_instrument(repository_name)
     thread_id = threading.get_ident()
-    return list(_query_collections_for_repository_cache(repository_name, instrument, dataset_type, thread_id=thread_id))
+    return list(_query_collections_for_repository_cache(repository_name, instrument, search, thread_id=thread_id))
 
 
 @lru_cache(128)
 def _query_collections_for_repository_cache(
     repository_name: str,
     instrument: str,
-    dataset_type: str | None,
+    search_text: str,
     thread_id: int,
 ) -> tuple[str, ...]:
     del thread_id
     butler = _get_query_repository_butler(repository_name, instrument)
-    kwargs: dict[str, Any] = {
-        'flattenChains': False,
-    }
-    if dataset_type:
-        kwargs['datasetType'] = dataset_type
-    return tuple(sorted(cast(str, collection) for collection in butler.registry.queryCollections(**kwargs)))
+    collections = butler.registry.queryCollections(
+        re.compile(re.escape(search_text), re.IGNORECASE),
+        flattenChains=False,
+    )
+    return tuple(sorted(cast(str, collection) for collection in islice(collections, _QUERY_BUILDER_SUGGESTION_LIMIT)))
 
 
-def _query_dataset_types_for_repository(repository_name: str, *, collection: str | None = None) -> list[str]:
+def _query_dataset_types_for_repository(repository_name: str, *, search_text: str | None = None) -> list[str]:
+    if not (search := _normalize_option_search_text(search_text)):
+        return []
     instrument = _repository_instrument(repository_name)
     thread_id = threading.get_ident()
-    return list(_query_dataset_types_for_repository_cache(repository_name, instrument, collection, thread_id=thread_id))
+    return list(_query_dataset_types_for_repository_cache(repository_name, instrument, search, thread_id=thread_id))
 
 
 @lru_cache(128)
 def _query_dataset_types_for_repository_cache(
     repository_name: str,
     instrument: str,
-    collection: str | None,
+    search_text: str,
     thread_id: int,
 ) -> tuple[str, ...]:
-    cache_thread_id = thread_id
     del thread_id
     butler = _get_query_repository_butler(repository_name, instrument)
     dataset_types: list[str] = []
-    for dataset_type in butler.registry.queryDatasetTypes():
+    for dataset_type in butler.registry.queryDatasetTypes(re.compile(re.escape(search_text), re.IGNORECASE)):
         dataset_type_name = cast(str, dataset_type.name)
         try:
             get_dataset(dataset_type_name).quicklook_dimensions(_dataset_required_dimension_names(dataset_type))
         except ValueError:
             continue
-        if collection is not None:
-            collections = _query_collections_for_repository_cache(
-                repository_name,
-                instrument,
-                dataset_type_name,
-                cache_thread_id,
-            )
-            if collection not in collections:
-                continue
         dataset_types.append(dataset_type_name)
+        if len(dataset_types) >= _QUERY_BUILDER_SUGGESTION_LIMIT:
+            break
     return tuple(sorted(set(dataset_types)))
+
+
+def _collection_exists_for_repository(repository_name: str, collection: str) -> bool:
+    instrument = _repository_instrument(repository_name)
+    thread_id = threading.get_ident()
+    return _collection_exists_for_repository_cache(repository_name, instrument, collection, thread_id=thread_id)
+
+
+@lru_cache(256)
+def _collection_exists_for_repository_cache(
+    repository_name: str,
+    instrument: str,
+    collection: str,
+    thread_id: int,
+) -> bool:
+    del thread_id
+    butler = _get_query_repository_butler(repository_name, instrument)
+    return collection in butler.registry.queryCollections(collection, flattenChains=False)
+
+
+def _dataset_type_exists_for_repository(repository_name: str, dataset_type: str) -> bool:
+    instrument = _repository_instrument(repository_name)
+    thread_id = threading.get_ident()
+    return _dataset_type_exists_for_repository_cache(repository_name, instrument, dataset_type, thread_id=thread_id)
+
+
+@lru_cache(256)
+def _dataset_type_exists_for_repository_cache(
+    repository_name: str,
+    instrument: str,
+    dataset_type: str,
+    thread_id: int,
+) -> bool:
+    del thread_id
+    butler = _get_query_repository_butler(repository_name, instrument)
+    return any(cast(str, candidate.name) == dataset_type for candidate in butler.registry.queryDatasetTypes(dataset_type))
+
+
+def _normalize_option_search_text(text: str | None) -> str | None:
+    if text is None:
+        return None
+    normalized = text.strip()
+    return normalized or None
