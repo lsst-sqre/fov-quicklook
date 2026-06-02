@@ -5,6 +5,10 @@ from quicklook.datasource.butler_datasource import ButlerDataSource
 from quicklook.datasource.types import QueryWhereExample
 
 
+def test_build_contains_glob():
+    assert butler_datasource_module._build_contains_glob('nightly') == '*nightly*'
+
+
 def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['embargo', 'main'])
 

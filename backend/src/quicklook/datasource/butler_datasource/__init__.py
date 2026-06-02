@@ -3,7 +3,6 @@ from collections import Counter
 from datetime import date
 from functools import lru_cache
 from itertools import islice
-import re
 from types import EllipsisType
 from typing import TYPE_CHECKING, Any, Iterable, cast
 from uuid import UUID
@@ -708,7 +707,7 @@ def _query_collections_for_repository_cache(
     del thread_id
     butler = _get_query_repository_butler(repository_name, instrument)
     collections = butler.registry.queryCollections(
-        re.compile(re.escape(search_text), re.IGNORECASE),
+        _build_contains_glob(search_text),
         flattenChains=False,
     )
     return tuple(sorted(cast(str, collection) for collection in islice(collections, _QUERY_BUILDER_SUGGESTION_LIMIT)))
@@ -732,7 +731,7 @@ def _query_dataset_types_for_repository_cache(
     del thread_id
     butler = _get_query_repository_butler(repository_name, instrument)
     dataset_types: list[str] = []
-    for dataset_type in butler.registry.queryDatasetTypes(re.compile(re.escape(search_text), re.IGNORECASE)):
+    for dataset_type in butler.registry.queryDatasetTypes(_build_contains_glob(search_text)):
         dataset_type_name = cast(str, dataset_type.name)
         try:
             get_dataset(dataset_type_name).quicklook_dimensions(_dataset_required_dimension_names(dataset_type))
@@ -785,3 +784,7 @@ def _normalize_option_search_text(text: str | None) -> str | None:
         return None
     normalized = text.strip()
     return normalized or None
+
+
+def _build_contains_glob(search_text: str) -> str:
+    return f'*{search_text}*'
