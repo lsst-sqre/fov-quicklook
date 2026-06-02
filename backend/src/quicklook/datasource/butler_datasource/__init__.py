@@ -73,6 +73,16 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
                 where_examples=[],
             )
 
+        selected_collection = _normalize_option_search_text(collection)
+        selected_dataset_type = _normalize_option_search_text(dataset_type)
+        if selected_collection is not None and selected_dataset_type is not None:
+            return QueryBuilderOptions(
+                repositories=repositories,
+                collections=[selected_collection],
+                dataset_types=[selected_dataset_type],
+                where_examples=[],
+            )
+
         collections = _query_collections_for_repository(
             selected_repository,
             search_text=collection,
