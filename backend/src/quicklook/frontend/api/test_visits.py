@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from lsst.daf.butler._exceptions import MissingCollectionError
 
 from quicklook.datasource.types import (
     QueryBuilderOptions,
@@ -127,6 +128,32 @@ async def test_list_visits_rejects_unknown_order_by(monkeypatch):
         raise AssertionError('HTTPException was not raised')
 
 
+async def test_list_visits_returns_422_for_unknown_collection(monkeypatch):
+    class FakeDataSource:
+        async def query_visits(self, q):
+            del q
+            raise MissingCollectionError("No collection with name 'nightlyValidation/raw/all' found.")
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    try:
+        await visits.list_visits(
+            repository_name='repo',
+            collection='nightlyValidation/raw/all',
+            dataset_type='raw',
+            where=None,
+            order_by='day_obs',
+            reverse=None,
+            limit=100,
+            offset=0,
+        )
+    except HTTPException as e:
+        assert e.status_code == 422
+        assert e.detail == "No collection with name 'nightlyValidation/raw/all' found."
+    else:  # pragma: no cover
+        raise AssertionError('HTTPException was not raised')
+
+
 async def test_get_visit_metadata_returns_404_for_unknown_uuid(monkeypatch):
     class FakeDataSource:
         async def get_metadata(self, ref):
@@ -201,3 +228,25 @@ async def test_list_visit_day_counts_returns_backend_counts(monkeypatch):
         VisitDayCount(day_obs=20250301, count=2),
         VisitDayCount(day_obs=20250302, count=5),
     ]
+
+
+async def test_list_visit_day_counts_returns_422_for_unknown_collection(monkeypatch):
+    class FakeDataSource:
+        async def query_visit_day_counts(self, q):
+            del q
+            raise MissingCollectionError("No collection with name 'nightlyValidation/raw/all' found.")
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    try:
+        await visits.list_visit_day_counts(
+            calendar_month='2025-03',
+            repository_name='repo',
+            collection='nightlyValidation/raw/all',
+            dataset_type='raw',
+        )
+    except HTTPException as e:
+        assert e.status_code == 422
+        assert e.detail == "No collection with name 'nightlyValidation/raw/all' found."
+    else:  # pragma: no cover
+        raise AssertionError('HTTPException was not raised')
