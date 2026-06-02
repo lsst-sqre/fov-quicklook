@@ -101,6 +101,11 @@ class DataSourceBase(abc.ABC):
 
     get_query_builder_options = async_wrap(get_query_builder_options_sync)
 
+    def warm_query_builder_options_metadata_sync(self) -> None:
+        return None
+
+    warm_query_builder_options_metadata = async_wrap(warm_query_builder_options_metadata_sync)
+
     @abc.abstractmethod
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:  # pragma: no cover
         ...

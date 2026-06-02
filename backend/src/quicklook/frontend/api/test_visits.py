@@ -46,21 +46,19 @@ async def test_list_visits_forwards_limit_and_offset(monkeypatch):
 
 
 async def test_get_query_builder_options_forwards_filters(monkeypatch):
-    class FakeDataSource:
-        async def get_query_builder_options(self, **kwargs):
-            assert kwargs == {
-                'repository_name': 'repo',
-                'collection': 'LSSTCam/raw/all',
-                'dataset_type': 'raw',
-            }
-            return QueryBuilderOptions(
-                repositories=['repo'],
-                collections=['LSSTCam/raw/all'],
-                dataset_types=['raw'],
-                where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
-            )
+    captured = {}
 
-    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+    async def fake_http_request(method: str, url: str, **kwargs):
+        captured["request"] = (method, url, kwargs)
+        return QueryBuilderOptions(
+            repositories=['repo'],
+            collections=['LSSTCam/raw/all'],
+            dataset_types=['raw'],
+            where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+        )
+
+    monkeypatch.setattr(visits, 'http_request', fake_http_request)
+    monkeypatch.setattr(visits.config, 'coordinator_base_url', 'http://coordinator:9501')
 
     result = await visits.get_query_builder_options(
         repository_name='repo',
@@ -73,6 +71,11 @@ async def test_get_query_builder_options_forwards_filters(monkeypatch):
         collections=['LSSTCam/raw/all'],
         dataset_types=['raw'],
         where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+    )
+    assert captured["request"] == (
+        'get',
+        'http://coordinator:9501/query_builder_options?repository_name=repo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw',
+        {},
     )
 
 
