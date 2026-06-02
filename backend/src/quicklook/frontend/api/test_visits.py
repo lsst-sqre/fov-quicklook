@@ -102,6 +102,32 @@ async def test_list_visits_rejects_unsafe_where(monkeypatch):
         raise AssertionError('HTTPException was not raised')
 
 
+async def test_list_visits_treats_literal_null_where_as_absent(monkeypatch):
+    captured = {}
+
+    class FakeDataSource:
+        async def query_visits(self, q):
+            captured["query"] = q
+            return []
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    result = await visits.list_visits(
+        repository_name='repo',
+        collection='LSSTCam/raw/all',
+        dataset_type='raw',
+        where='null',
+        order_by='null',
+        reverse=None,
+        limit=100,
+        offset=0,
+    )
+
+    assert result == []
+    assert captured["query"].where is None
+    assert captured["query"].order_by is None
+
+
 async def test_list_visits_rejects_unknown_order_by(monkeypatch):
     class FakeDataSource:
         async def query_visits(self, q):  # pragma: no cover

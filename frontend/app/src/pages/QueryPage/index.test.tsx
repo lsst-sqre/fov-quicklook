@@ -197,4 +197,28 @@ describe("QueryPage", () => {
       expect(screen.getByTestId("location-search").textContent).toContain("repository_name=embargo")
     })
   })
+
+  it("submits the default query without adding where=null", async () => {
+    renderQueryPage(["/query"])
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("main")).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Search" }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search").textContent).toContain("repository_name=main")
+    })
+    expect(screen.getByTestId("location-search").textContent).not.toContain("where=null")
+    const queryCall = useListVisitsQuery.mock.calls.find((call) => call[0]?.repositoryName === "main" && call[1]?.skip === false)
+    expect(queryCall?.[0]).toEqual({
+      repositoryName: "main",
+      collection: "main/raw",
+      datasetType: "main_raw",
+      orderBy: "day_obs",
+      limit: 100,
+      reverse: undefined,
+    })
+  })
 })

@@ -28,6 +28,8 @@ def _normalize_where(where: str | None) -> str | None:
     normalized = where.strip()
     if not normalized:
         return None
+    if normalized.casefold() in {'null', 'undefined'}:
+        return None
     if len(normalized) > _MAX_WHERE_LENGTH:
         raise HTTPException(status_code=422, detail=f'where must be at most {_MAX_WHERE_LENGTH} characters long.')
     if _INVALID_WHERE_PATTERN.search(normalized):
@@ -40,6 +42,8 @@ def _normalize_order_by(dataset_type: str, order_by: str | None) -> str | None:
         return None
     normalized = order_by.strip()
     if not normalized:
+        return None
+    if normalized.casefold() in {'null', 'undefined'}:
         return None
     allowed_fields = get_dataset(dataset_type).order_by_fields
     if normalized not in allowed_fields:
