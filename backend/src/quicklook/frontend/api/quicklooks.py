@@ -247,7 +247,7 @@ async def _get_quicklook_metadata_from_db(visit: VisitName) -> QuicklookMetadata
     async with get_db_session() as session:
         result = await session.execute(
             select(Quicklook).where(
-                Quicklook.visit_name == visit,
+                Quicklook.visit_name == visit.cache_key,
                 Quicklook.ready == True,
             )
         )

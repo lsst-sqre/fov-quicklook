@@ -1,14 +1,11 @@
 from quicklook.config import Config, config
+from quicklook.datasets import get_dataset
 
 
 def test_difference_image_uses_visit_dimension():
-    difference_image = next(
-        dt
-        for dt in config.ccd_data_types
-        if dt.repository_name == 'embargo' and dt.data_type == 'difference_image'
-    )
+    difference_image = get_dataset('difference_image')
 
-    assert difference_image.data_id_dimension == 'visit'
+    assert difference_image.quicklook_dimension == 'visit'
     assert difference_image.partial is True
 
 
@@ -38,12 +35,12 @@ def test_config_ignores_non_quicklook_entries_in_env_file(tmp_path, monkeypatch)
     assert loaded.data_source == "butler"
 
 
-def test_config_adds_missing_default_ccd_data_types_from_env_file(tmp_path, monkeypatch):
+def test_config_adds_missing_default_butler_scopes_from_env_file(tmp_path, monkeypatch):
     env_file = tmp_path / "stale-review-app.env"
     env_file.write_text(
         "\n".join(
             [
-                'QUICKLOOK_ccd_data_types=[{"data_type":"raw","display_name":"Raw (Embargo)","collections":["LSSTCam/raw/all"],"data_id_dimension":"exposure","order_by":["-day_obs","-exposure"],"partial":false,"repository_name":"embargo","instrument":"LSSTCam"},{"data_type":"post_isr_image","display_name":"Post-ISR (Embargo)","collections":["LSSTCam/runs/nightlyValidation"],"data_id_dimension":"exposure","order_by":["-exposure"],"partial":true,"repository_name":"embargo","instrument":"LSSTCam"},{"data_type":"preliminary_visit_image","display_name":"Preliminary (Embargo)","collections":["LSSTCam/runs/nightlyValidation"],"data_id_dimension":"visit","order_by":["-visit"],"partial":true,"repository_name":"embargo","instrument":"LSSTCam"}]',
+                'QUICKLOOK_ccd_data_types=[{"data_type":"raw","display_name":"Raw (Embargo)","collections":["LSSTCam/raw/all"],"repository_name":"embargo","instrument":"LSSTCam"},{"data_type":"post_isr_image","display_name":"Post-ISR (Embargo)","collections":["LSSTCam/runs/nightlyValidation"],"repository_name":"embargo","instrument":"LSSTCam"},{"data_type":"preliminary_visit_image","display_name":"Preliminary (Embargo)","collections":["LSSTCam/runs/nightlyValidation"],"repository_name":"embargo","instrument":"LSSTCam"}]',
                 "",
             ]
         )
@@ -53,21 +50,20 @@ def test_config_adds_missing_default_ccd_data_types_from_env_file(tmp_path, monk
     loaded = Config(_env_file=env_file)
 
     difference_image = next(
-        dt
-        for dt in loaded.ccd_data_types
-        if dt.repository_name == 'embargo' and dt.data_type == 'difference_image'
+        scope
+        for scope in loaded.butler_scopes
+        if scope.repository_name == 'embargo' and scope.dataset_type == 'difference_image'
     )
 
-    assert difference_image.data_id_dimension == 'visit'
-    assert difference_image.partial is True
+    assert difference_image.collection == 'LSSTCam/runs/nightlyValidation'
 
 
-def test_system_info_ccd_data_types_excludes_injected_defaults_from_env_file(tmp_path, monkeypatch):
+def test_system_info_butler_scopes_excludes_injected_defaults_from_env_file(tmp_path, monkeypatch):
     env_file = tmp_path / "stale-review-app.env"
     env_file.write_text(
         "\n".join(
             [
-                'QUICKLOOK_ccd_data_types=[{"data_type":"raw","display_name":"Raw (Embargo)","collections":["LSSTCam/raw/all"],"data_id_dimension":"exposure","order_by":["-day_obs","-exposure"],"partial":false,"repository_name":"embargo","instrument":"LSSTCam"},{"data_type":"post_isr_image","display_name":"Post-ISR (Embargo)","collections":["LSSTCam/runs/nightlyValidation"],"data_id_dimension":"exposure","order_by":["-exposure"],"partial":true,"repository_name":"embargo","instrument":"LSSTCam"},{"data_type":"preliminary_visit_image","display_name":"Preliminary (Embargo)","collections":["LSSTCam/runs/nightlyValidation"],"data_id_dimension":"visit","order_by":["-visit"],"partial":true,"repository_name":"embargo","instrument":"LSSTCam"}]',
+                'QUICKLOOK_ccd_data_types=[{"data_type":"raw","display_name":"Raw (Embargo)","collections":["LSSTCam/raw/all"],"repository_name":"embargo","instrument":"LSSTCam"},{"data_type":"post_isr_image","display_name":"Post-ISR (Embargo)","collections":["LSSTCam/runs/nightlyValidation"],"repository_name":"embargo","instrument":"LSSTCam"},{"data_type":"preliminary_visit_image","display_name":"Preliminary (Embargo)","collections":["LSSTCam/runs/nightlyValidation"],"repository_name":"embargo","instrument":"LSSTCam"}]',
                 "",
             ]
         )
@@ -76,7 +72,7 @@ def test_system_info_ccd_data_types_excludes_injected_defaults_from_env_file(tmp
     monkeypatch.delenv("QUICKLOOK_ccd_data_types", raising=False)
     loaded = Config(_env_file=env_file)
 
-    assert [(dt.repository_name, dt.data_type) for dt in loaded.system_info_ccd_data_types] == [
+    assert [(scope.repository_name, scope.dataset_type) for scope in loaded.system_info_butler_scopes] == [
         ("embargo", "raw"),
         ("embargo", "post_isr_image"),
         ("embargo", "preliminary_visit_image"),
@@ -88,7 +84,7 @@ def test_config_does_not_inject_default_repositories_into_custom_fixture_env(tmp
     env_file.write_text(
         "\n".join(
             [
-                'QUICKLOOK_ccd_data_types=[{"data_type":"raw","display_name":"Raw (CI fixture)","collections":["LSSTCam/raw/all"],"data_id_dimension":"exposure","order_by":["-day_obs","-exposure"],"partial":false,"repository_name":"reviewapp-ci","instrument":"LSSTCam"}]',
+                'QUICKLOOK_ccd_data_types=[{"data_type":"raw","display_name":"Raw (CI fixture)","collections":["LSSTCam/raw/all"],"repository_name":"reviewapp-ci","instrument":"LSSTCam"}]',
                 "",
             ]
         )
@@ -97,6 +93,6 @@ def test_config_does_not_inject_default_repositories_into_custom_fixture_env(tmp
     monkeypatch.delenv("QUICKLOOK_ccd_data_types", raising=False)
     loaded = Config(_env_file=env_file)
 
-    assert [(dt.repository_name, dt.data_type) for dt in loaded.ccd_data_types] == [
+    assert [(scope.repository_name, scope.dataset_type) for scope in loaded.butler_scopes] == [
         ("reviewapp-ci", "raw")
     ]

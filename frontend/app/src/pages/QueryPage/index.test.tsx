@@ -15,9 +15,13 @@ vi.mock("../../env", () => ({
   },
 }))
 
-vi.mock("../../store/api/openapi", () => ({
-  useListVisitsQuery,
-}))
+vi.mock("../../store/api/openapi", async () => {
+  const actual = await vi.importActual<typeof import("../../store/api/openapi")>("../../store/api/openapi")
+  return {
+    ...actual,
+    useListVisitsQuery,
+  }
+})
 
 function QueryRoute() {
   const location = useLocation()
@@ -38,18 +42,25 @@ const systemInfo = {
   admin_page: false,
   context_menu_templates: [],
   max_object_storage_usage: 0,
-  ccd_data_types: [
+  butler_scopes: [
     {
-      data_type: "main_raw",
+      id: "embargo:LSSTCam!-raw!-all:raw",
+      dataset_type: "raw",
+      display_name: "Embargo Raw",
+      collection: "LSSTCam/raw/all",
+      repository_name: "embargo",
+      instrument: "LSSTCam",
+    },
+    {
+      id: "main:main!-raw:main_raw",
+      dataset_type: "main_raw",
       display_name: "Main Raw",
-      collections: ["main/raw"],
-      data_id_dimension: "exposure",
-      order_by: ["-day_obs", "-exposure"],
-      partial: false,
+      collection: "main/raw",
       repository_name: "main",
       instrument: "LSSTCam",
     },
   ],
+  datasets: [],
 }
 
 function renderQueryPage(initialEntries: string[]) {
@@ -71,7 +82,9 @@ describe("QueryPage", () => {
     useListVisitsQuery.mockReturnValue({
       data: [
         {
-          id: "embargo:raw:2026012800342",
+          id: "embargo:LSSTCam!-raw!-all:raw:exposure=2026012800342",
+          display_id: "embargo:LSSTCam/raw/all:raw:exposure=2026012800342",
+          scope_id: "embargo:LSSTCam!-raw!-all:raw",
           day_obs: 20260128,
           physical_filter: "r_57",
           obs_id: "obs-342",
@@ -93,11 +106,11 @@ describe("QueryPage", () => {
   })
 
   it("renders search results from the current query string", () => {
-    renderQueryPage(["/query?data_type=raw&repository_name=embargo&limit=2"])
+    renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=2"])
 
     expect(useListVisitsQuery).toHaveBeenCalled()
-    expect(screen.getByDisplayValue("data_type=raw&repository_name=embargo&limit=2")).toBeTruthy()
-    expect(screen.getByText("embargo:raw:2026012800342")).toBeTruthy()
+    expect(screen.getByDisplayValue("embargo")).toBeTruthy()
+    expect(screen.getByText("embargo:LSSTCam/raw/all:raw:exposure=2026012800342")).toBeTruthy()
     expect(screen.getByText("field-342")).toBeTruthy()
   })
 
@@ -105,20 +118,18 @@ describe("QueryPage", () => {
     renderQueryPage(["/query"])
 
     await waitFor(() => {
-      expect(screen.getByTestId("location-search").textContent).toBe("?data_type=main_raw&repository_name=main&limit=2")
+      expect(screen.getByTestId("location-search").textContent).toBe("?repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=2")
     })
-    expect(screen.getByDisplayValue("data_type=main_raw&repository_name=main&limit=2")).toBeTruthy()
   })
 
-  it("re-runs the query when the input loses focus", async () => {
-    renderQueryPage(["/query?data_type=raw&repository_name=embargo"])
+  it("re-runs the query when the form is submitted", async () => {
+    renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw"])
 
-    const input = screen.getByLabelText("Query string")
-    fireEvent.change(input, { target: { value: "data_type=raw&repository_name=main&limit=2" } })
-    fireEvent.blur(input)
+    fireEvent.change(screen.getByDisplayValue("embargo"), { target: { value: "main" } })
+    fireEvent.click(screen.getByRole("button", { name: "Search" }))
 
     await waitFor(() => {
-      expect(screen.getByTestId("location-search").textContent).toBe("?data_type=raw&repository_name=main&limit=2")
+      expect(screen.getByTestId("location-search").textContent).toContain("repository_name=main")
     })
   })
 
@@ -128,9 +139,9 @@ describe("QueryPage", () => {
       json: async () => ({ uuid: "uuid-1" }),
     } as Response)
 
-    renderQueryPage(["/query?data_type=raw&repository_name=embargo&limit=2"])
+    renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=2"])
 
-    fireEvent.click(screen.getByRole("button", { name: "Open embargo:raw:2026012800342 by UUID" }))
+    fireEvent.click(screen.getByRole("button", { name: "Open embargo:LSSTCam/raw/all:raw:exposure=2026012800342 by UUID" }))
 
     expect(await screen.findByText("embargo:by_uuid:uuid-1")).toBeTruthy()
   })

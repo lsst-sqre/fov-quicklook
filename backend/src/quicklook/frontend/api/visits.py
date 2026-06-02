@@ -17,20 +17,24 @@ router = APIRouter()
 
 @router.get('/api/visits', response_model=list[VisitEntry])
 async def list_visits(
-    exposure: int | None = Query(None),
-    day_obs: int | None = Query(None),
+    repository_name: str = Query(...),
+    collection: str = Query(...),
+    dataset_type: str = Query(...),
+    where: str | None = Query(None),
+    order_by: str | None = Query(None),
+    reverse: bool | None = Query(None),
     limit: int = Query(default=1000, le=10000),
     offset: int = Query(default=0, ge=0),
-    data_type: CcdDataType = Query(...),
-    repository_name: str = Query(...),
 ):
     ds = get_datasource()
     return await ds.query_visits(
         DataSourceQuery(
-            data_type=data_type,
             repository_name=repository_name,
-            exposure=exposure,
-            day_obs=day_obs,
+            collection=collection,
+            dataset_type=dataset_type,
+            where=where,
+            order_by=order_by,
+            reverse=reverse,
             limit=limit,
             offset=offset,
         )
@@ -40,15 +44,17 @@ async def list_visits(
 @router.get('/api/visits/day_counts', response_model=list[VisitDayCount])
 async def list_visit_day_counts(
     calendar_month: str = Query(..., pattern=r'^\d{4}-\d{2}$'),
-    data_type: CcdDataType = Query(...),
     repository_name: str = Query(...),
+    collection: str = Query(...),
+    dataset_type: str = Query(...),
 ):
     ds = get_datasource()
     try:
         return await ds.query_visit_day_counts(
             VisitDayCountQuery(
-                data_type=data_type,
                 repository_name=repository_name,
+                collection=collection,
+                dataset_type=dataset_type,
                 calendar_month=calendar_month,
             )
         )

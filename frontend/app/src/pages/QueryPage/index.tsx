@@ -1,25 +1,36 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { env } from "../../env"
-import { useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
+import { ButlerScopeConfig, useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
 import { useAppSelector } from "../../store/hooks"
-import { buildByUuidVisitName, buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { buildByUuidVisitName, buildDefaultQueryInput, buildVisitListArgs } from "./queryParams"
+
+type QueryFormState = {
+  repositoryName: string
+  collection: string
+  datasetType: string
+  orderBy: string
+  reverse: boolean
+  limit: string
+  where: string
+}
 
 export function QueryPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const currentQuery = searchParams.toString()
   const currentDataSource = useAppSelector((state) => state.home.dataSource)
+  const butlerScopes = useAppSelector((state) => state.copyTemplate.butlerScopes)
   const defaultQuery = useMemo(() => buildDefaultQueryInput(currentDataSource), [currentDataSource])
   const effectiveQuery = currentQuery || defaultQuery
   const effectiveSearchParams = useMemo(() => new URLSearchParams(effectiveQuery), [effectiveQuery])
-  const [queryInput, setQueryInput] = useState(effectiveQuery)
   const [openError, setOpenError] = useState<string | null>(null)
   const [openingVisit, setOpeningVisit] = useState<string | null>(null)
+  const [form, setForm] = useState<QueryFormState>(() => buildFormState(effectiveSearchParams, butlerScopes))
 
   useEffect(() => {
-    setQueryInput(effectiveQuery)
-  }, [effectiveQuery])
+    setForm(buildFormState(effectiveSearchParams, butlerScopes))
+  }, [butlerScopes, effectiveSearchParams])
 
   useEffect(() => {
     if (!currentQuery && defaultQuery) {
@@ -33,13 +44,65 @@ export function QueryPage() {
     refetchOnMountOrArgChange: true,
   })
 
+  const repositoryOptions = useMemo(
+    () => [...new Set(butlerScopes.map((scope) => scope.repository_name ?? "embargo"))],
+    [butlerScopes],
+  )
+  const collectionOptions = useMemo(
+    () => [...new Set(
+      butlerScopes
+        .filter((scope) => (scope.repository_name ?? "embargo") === form.repositoryName)
+        .map((scope) => scope.collection),
+    )],
+    [butlerScopes, form.repositoryName],
+  )
+  const datasetTypeOptions = useMemo(
+    () => butlerScopes
+      .filter((scope) =>
+        (scope.repository_name ?? "embargo") === form.repositoryName &&
+        scope.collection === form.collection,
+      )
+      .map((scope) => scope.dataset_type),
+    [butlerScopes, form.collection, form.repositoryName],
+  )
+  const orderByOptions = useMemo(
+    () => getDatasetOrderFields(form.datasetType, butlerScopes),
+    [butlerScopes, form.datasetType],
+  )
+
+  const updateRepository = useCallback((repositoryName: string) => {
+    setForm((current) => normalizeFormState({
+      ...current,
+      repositoryName,
+    }, butlerScopes))
+  }, [butlerScopes])
+
+  const updateCollection = useCallback((collection: string) => {
+    setForm((current) => normalizeFormState({
+      ...current,
+      collection,
+    }, butlerScopes))
+  }, [butlerScopes])
+
+  const updateDatasetType = useCallback((datasetType: string) => {
+    setForm((current) => normalizeFormState({
+      ...current,
+      datasetType,
+    }, butlerScopes))
+  }, [butlerScopes])
+
   const commitQuery = useCallback(() => {
-    const normalized = normalizeQueryInput(queryInput)
-    if (normalized === currentQuery) {
-      return
-    }
-    navigate(normalized ? `/query?${normalized}` : "/query")
-  }, [currentQuery, navigate, queryInput])
+    const params = new URLSearchParams()
+    params.set("repository_name", form.repositoryName)
+    params.set("collection", form.collection)
+    params.set("dataset_type", form.datasetType)
+    if (form.orderBy) params.set("order_by", form.orderBy)
+    if (form.reverse) params.set("reverse", "true")
+    if (form.limit) params.set("limit", form.limit)
+    if (form.where) params.set("where", form.where)
+    const query = params.toString()
+    navigate(query ? `/query?${query}` : "/query")
+  }, [form, navigate])
 
   const handleSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -64,27 +127,67 @@ export function QueryPage() {
       <div style={sectionStyle}>
         <h1 style={{ margin: 0, fontSize: "1.25rem" }}>Data Query</h1>
         <p style={hintStyle}>
-          Enter the query string after <code>/query?</code>. The query runs when the field loses focus or when you press Enter.
+          Choose a Butler scope and query options, then run the query.
         </p>
-        <form onSubmit={handleSubmit} style={formStyle}>
-          <input
-            aria-label="Query string"
-            onBlur={commitQuery}
-            onChange={(event) => setQueryInput(event.target.value)}
-            spellCheck={false}
-            style={inputStyle}
-            type="text"
-            value={queryInput}
-          />
-          <button type="submit">Search</button>
+        <form onSubmit={handleSubmit} style={formGridStyle}>
+          <label style={fieldStyle}>
+            <span>Repository</span>
+            <select value={form.repositoryName} onChange={(event) => updateRepository(event.target.value)}>
+              {repositoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label style={fieldStyle}>
+            <span>Collection</span>
+            <select value={form.collection} onChange={(event) => updateCollection(event.target.value)}>
+              {collectionOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label style={fieldStyle}>
+            <span>Dataset Type</span>
+            <select value={form.datasetType} onChange={(event) => updateDatasetType(event.target.value)}>
+              {datasetTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label style={fieldStyle}>
+            <span>Order By</span>
+            <select value={form.orderBy} onChange={(event) => setForm((current) => ({ ...current, orderBy: event.target.value }))}>
+              {orderByOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label style={fieldStyle}>
+            <span>Limit</span>
+            <input
+              inputMode="numeric"
+              type="text"
+              value={form.limit}
+              onChange={(event) => setForm((current) => ({ ...current, limit: event.target.value }))}
+            />
+          </label>
+          <label style={checkboxStyle}>
+            <input
+              checked={form.reverse}
+              onChange={(event) => setForm((current) => ({ ...current, reverse: event.target.checked }))}
+              type="checkbox"
+            />
+            <span>Reverse</span>
+          </label>
+          <label style={{ ...fieldStyle, gridColumn: "1 / -1" }}>
+            <span>Where</span>
+            <input
+              spellCheck={false}
+              type="text"
+              value={form.where}
+              onChange={(event) => setForm((current) => ({ ...current, where: event.target.value }))}
+            />
+          </label>
+          <div style={{ gridColumn: "1 / -1", display: "flex", gap: "8px" }}>
+            <button type="submit">Search</button>
+          </div>
         </form>
       </div>
 
       {parsedQuery.error && <p role="alert">{parsedQuery.error}</p>}
       {openError && <p role="alert">{openError}</p>}
-      {parsedQuery.args === null && parsedQuery.error === null && (
-        <p>Set <code>data_type</code> and <code>repository_name</code> to run a query.</p>
-      )}
       {parsedQuery.args !== null && (
         <>
           <div style={summaryStyle}>
@@ -99,7 +202,7 @@ export function QueryPage() {
                 <thead>
                   <tr>
                     <th>Open</th>
-                    <th>Visit / Exposure</th>
+                    <th>Visit</th>
                     <th>Day Obs</th>
                     <th>Filter</th>
                     <th>Exposure Time</th>
@@ -129,6 +232,51 @@ export function QueryPage() {
   )
 }
 
+function buildFormState(searchParams: URLSearchParams, scopes: ButlerScopeConfig[]): QueryFormState {
+  return normalizeFormState({
+    repositoryName: searchParams.get("repository_name") ?? scopes[0]?.repository_name ?? "embargo",
+    collection: searchParams.get("collection") ?? scopes[0]?.collection ?? "",
+    datasetType: searchParams.get("dataset_type") ?? scopes[0]?.dataset_type ?? "",
+    orderBy: searchParams.get("order_by") ?? "day_obs",
+    reverse: searchParams.get("reverse") === "true",
+    limit: searchParams.get("limit") ?? "2",
+    where: searchParams.get("where") ?? "",
+  }, scopes)
+}
+
+function normalizeFormState(form: QueryFormState, scopes: ButlerScopeConfig[]): QueryFormState {
+  const repositoryName = scopes.some((scope) => (scope.repository_name ?? "embargo") === form.repositoryName)
+    ? form.repositoryName
+    : (scopes[0]?.repository_name ?? "embargo")
+  const repositoryScopes = scopes.filter((scope) => (scope.repository_name ?? "embargo") === repositoryName)
+  const collection = repositoryScopes.some((scope) => scope.collection === form.collection)
+    ? form.collection
+    : (repositoryScopes[0]?.collection ?? "")
+  const datasetType = repositoryScopes.some((scope) => scope.collection === collection && scope.dataset_type === form.datasetType)
+    ? form.datasetType
+    : (repositoryScopes.find((scope) => scope.collection === collection)?.dataset_type ?? "")
+  const orderByFields = getDatasetOrderFields(datasetType, scopes)
+  const orderBy = orderByFields.includes(form.orderBy) ? form.orderBy : (orderByFields[0] ?? "day_obs")
+  return {
+    ...form,
+    repositoryName,
+    collection,
+    datasetType,
+    orderBy,
+  }
+}
+
+function getDatasetOrderFields(datasetType: string, scopes: ButlerScopeConfig[]): string[] {
+  const defaultFields = ["day_obs", "exposure", "visit", "obs_id", "physical_filter", "exposure_time"]
+  if (!datasetType) {
+    return defaultFields
+  }
+  if (datasetType === "difference_image" || datasetType === "preliminary_visit_image") {
+    return ["visit", ...defaultFields.filter((field) => field !== "visit")]
+  }
+  return defaultFields
+}
+
 function VisitRow(
   { entry, isOpening, onOpenByUuid }:
   { entry: VisitEntry, isOpening: boolean, onOpenByUuid: (visitName: string) => Promise<void> }
@@ -136,12 +284,12 @@ function VisitRow(
   return (
     <tr>
       <td>
-        <button aria-label={`Open ${entry.id} by UUID`} disabled={isOpening} onClick={() => void onOpenByUuid(entry.id)}>
+        <button aria-label={`Open ${entry.display_id} by UUID`} disabled={isOpening} onClick={() => void onOpenByUuid(entry.id)}>
           {isOpening ? "Opening..." : "Open by UUID"}
         </button>
       </td>
       <td>
-        <Link to={`/visits/${encodeURIComponent(entry.id)}`}>{entry.id}</Link>
+        <Link to={`/visits/${encodeURIComponent(entry.id)}`}>{entry.display_id}</Link>
       </td>
       <td>{entry.day_obs}</td>
       <td>{entry.physical_filter}</td>
@@ -231,16 +379,24 @@ const hintStyle = {
   lineHeight: 1.5,
 } as const
 
-const formStyle = {
+const formGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+} as const
+
+const fieldStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "4px",
+} as const
+
+const checkboxStyle = {
   display: "flex",
   gap: "8px",
   alignItems: "center",
-} as const
-
-const inputStyle = {
-  flexGrow: 1,
-  fontFamily: "ui-monospace, SFMono-Regular, SFMono, Menlo, Consolas, Liberation Mono, monospace",
-  padding: "8px 10px",
+  minHeight: "38px",
 } as const
 
 const summaryStyle = {

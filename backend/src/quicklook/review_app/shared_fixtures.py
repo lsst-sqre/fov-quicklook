@@ -16,10 +16,10 @@ from botocore.client import Config as BotoConfig
 from botocore.exceptions import ClientError
 from lsst.daf.butler import Butler, Config, DatasetType
 
-from quicklook.config import CcdDataTypeConfig, config
+from quicklook.config import ButlerScopeConfig, config
 from quicklook.datasource.butler_datasource.instrument import Instrument
 from quicklook.review_app.synthetic import render_virtual_raw_fits_bytes, review_projection_ccd_names
-from quicklook.types import CcdName
+from quicklook.types import CcdName, VisitName
 from quicklook.utils.s3 import NoSuchKey, S3Config, s3_download_object, s3_upload_object
 
 FIXTURE_VERSION = "20260506-v4"
@@ -54,7 +54,14 @@ class FixtureVisit:
 
     @property
     def dummy_visit_id(self) -> str:
-        return f"dummy:raw:{self.exposure_id}"
+        return str(
+            VisitName.from_parts(
+                repository_name=FIXTURE_REPOSITORY_NAME,
+                collection=FIXTURE_COLLECTION,
+                dataset_type='raw',
+                dimensions={'exposure': self.exposure_id},
+            )
+        )
 
     def manifest_entry(self, ccd_names: Sequence[CcdName]) -> dict[str, object]:
         entry = {
@@ -158,13 +165,10 @@ def default_butler_ccd_names() -> tuple[CcdName, ...]:
 
 def build_fixture_config(repository_name: str = FIXTURE_REPOSITORY_NAME) -> list[dict[str, object]]:
     return [
-        CcdDataTypeConfig(
-            data_type="raw",
+        ButlerScopeConfig(
+            dataset_type="raw",
             display_name="Raw (CI fixture)",
-            collections=[FIXTURE_COLLECTION],
-            data_id_dimension="exposure",
-            order_by=["-day_obs", "-exposure"],
-            partial=False,
+            collection=FIXTURE_COLLECTION,
             repository_name=repository_name,
             instrument="LSSTCam",
         )

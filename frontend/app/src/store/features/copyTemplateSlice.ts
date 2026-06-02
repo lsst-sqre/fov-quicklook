@@ -1,11 +1,11 @@
 import { createSlice } from "@reduxjs/toolkit"
 import { makeLocalStorageAccessor } from "../../utils/localStorage"
-import { CcdDataTypeConfig, SystemInfo } from "../api/openapi"
+import { ButlerScopeConfig, SystemInfo } from "../api/openapi"
 import { getSystemInfoSync } from "../../systemInfo"
 
 type State = {
   templates: CopyTemplate[]
-  ccdDataTypes: CcdDataTypeConfig[]
+  butlerScopes: ButlerScopeConfig[]
 }
 
 const copyTemplateLocalStorage = makeLocalStorageAccessor<CopyTemplate[]>('copyTemplates', [])
@@ -35,7 +35,7 @@ function initialState(systemInfo?: SystemInfo): State {
   ]
   return { 
     templates, 
-    ccdDataTypes: systemInfo?.ccd_data_types ?? [] 
+    butlerScopes: systemInfo?.butler_scopes ?? [] 
   }
 }
 

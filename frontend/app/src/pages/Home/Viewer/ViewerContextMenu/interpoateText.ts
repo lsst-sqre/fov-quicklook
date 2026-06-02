@@ -1,4 +1,5 @@
 import { DataSourceCcdMetadata } from "../../../../store/api/openapi"
+import { extractScopeIdFromVisitId } from "../../../../quicklookId"
 
 // パイプライン処理のマップ
 type PipeHandler = {
@@ -60,8 +61,7 @@ export function interpoateText(template: string, meta: DataSourceCcdMetadata): s
 
 
   const meta2 = { ...meta, visit: meta.visit_name } as Meta2
-  const visitParts = meta.visit_name.split(':')
-  meta2.dataType = visitParts.slice(0, -1).join(':')
+  meta2.dataType = extractScopeIdFromVisitId(meta.visit_name) ?? meta.visit_name
 
   return template.replace(/%\((\w+(?:\|\w+(?:\(\d+\))?)*)\)/g, (match, expr) => {
     const [key, ...pipes] = expr.split('|')

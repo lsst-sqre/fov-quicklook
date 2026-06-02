@@ -78,7 +78,7 @@ type JobDict = dict[VisitName, Job]
 async def route_create_quicklook(params: CreateQuicklookRequest):
     visit = VisitName(params.visit)
     async with get_db_session() as session:
-        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
+        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit.cache_key))
         quicklook = result.scalar_one_or_none()
 
         if quicklook is not None:
@@ -119,10 +119,10 @@ async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_nam
     priority.user_count += 1
     
     async with get_db_session() as session:
-        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
+        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit.cache_key))
         quicklook = result.scalar_one_or_none()
         if quicklook is not None:
-            access = Access(visit_name=visit, accessed_at=datetime.now())
+            access = Access(visit_name=visit.cache_key, accessed_at=datetime.now())
             session.add(access)
             await session.commit()
     
