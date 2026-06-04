@@ -16,6 +16,9 @@ HTTP / WebSocket 動作を確認する。
 > **役割分担**: ArgoCD sync / restart / branch 切替は `argocd-deployment` skill の担当。
 > この skill は app token を使った動作確認に集中する。
 
+> `/debug` 上の Jupyter で Butler の実データ挙動や任意コード実行まで踏み込む場合は
+> `debug-jupyter` skill を使う。
+
 > **agent-safe 運用**: deploy broker を使う構成では、app access token は broker
 > daemon が保持し、agent は `get-app-token` 相当の broker API から受け取って
 > 直接 HTTP 検証に使える。
