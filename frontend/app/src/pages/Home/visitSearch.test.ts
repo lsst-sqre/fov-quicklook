@@ -12,21 +12,23 @@ describe("visit search helpers", () => {
   })
 
   it("builds a date-only visit query", () => {
-    expect(buildVisitListQuery("2025-05-19", "raw", "embargo")).toEqual({
-      dayObs: 20250519,
-      dataType: "raw",
+    expect(buildVisitListQuery("2025-05-19", "embargo:LSSTCam!-raw!-all:raw")).toEqual({
       repositoryName: "embargo",
+      collection: "LSSTCam/raw/all",
+      datasetType: "raw",
+      where: "day_obs=20250519",
     })
   })
 
   it("does not build an exposure query from a direct exposure id", () => {
-    expect(buildVisitListQuery("2025051900437", "raw", "embargo")).toEqual({
-      dataType: "raw",
+    expect(buildVisitListQuery("2025051900437", "embargo:LSSTCam!-raw!-all:raw")).toEqual({
       repositoryName: "embargo",
+      collection: "LSSTCam/raw/all",
+      datasetType: "raw",
     })
   })
 
   it("extracts a date input value from a visit id", () => {
-    expect(extractSearchDateFromVisitId("embargo:raw:2025051900437")).toBe("2025-05-19")
+    expect(extractSearchDateFromVisitId("embargo:LSSTCam!-raw!-all:raw:exposure=2025051900437")).toBe("2025-05-19")
   })
 })

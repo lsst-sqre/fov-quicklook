@@ -1,4 +1,5 @@
 import { ListVisitsApiArg } from "../../store/api/openapi"
+import { getSingleDimensionValue, parseScopeId } from "../../quicklookId"
 
 export function isValidSearchDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -14,21 +15,20 @@ export function searchDateToDayObs(value: string): number | undefined {
 
 export function buildVisitListQuery(
   searchDate: string,
-  dataType: ListVisitsApiArg["dataType"],
-  repositoryName: ListVisitsApiArg["repositoryName"],
+  scopeId: string,
 ): ListVisitsApiArg {
+  const { repositoryName, collection, datasetType } = parseScopeId(scopeId)
   const dayObs = searchDateToDayObs(searchDate)
 
   if (dayObs === undefined) {
-    return { dataType, repositoryName }
+    return { repositoryName, collection, datasetType }
   }
 
-  return { dayObs, dataType, repositoryName }
+  return { repositoryName, collection, datasetType, where: `day_obs=${dayObs}` }
 }
 
 export function extractSearchDateFromVisitId(visitId: string): string {
-  const parts = visitId.split(":")
-  const last = parts[parts.length - 1]
+  const last = getSingleDimensionValue(visitId)
 
   if (!last?.match(/^\d{13}$/)) {
     return ""

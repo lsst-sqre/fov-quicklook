@@ -19,28 +19,41 @@ import os
 import sys
 
 system_info = json.load(sys.stdin)
-ccd_data_types = system_info.get("ccd_data_types") or []
-if not ccd_data_types:
-    raise SystemExit("no ccd_data_types returned from /api/system_info")
+butler_scopes = system_info.get("butler_scopes") or []
+if not butler_scopes:
+    raise SystemExit("no butler_scopes returned from /api/system_info")
 
-first = ccd_data_types[0]
+first = butler_scopes[0]
 repository_name = first["repository_name"]
-data_type = first["data_type"]
+collection = first["collection"]
+dataset_type = first["dataset_type"]
 expected = os.environ["EXPECTED_REPOSITORY_NAME"]
 if repository_name != expected:
     raise SystemExit(
         f"top-page initial repository mismatch: expected {expected}, got {repository_name}"
     )
 
-print(f"{repository_name} {data_type}")
+print(f"{repository_name} {collection} {dataset_type}")
 '
 )
-IFS=' ' read -r initial_repository_name initial_data_type <<EOF
+IFS=' ' read -r initial_repository_name initial_collection initial_dataset_type <<EOF
 $initial_data_source
 EOF
-curl -fsS "${base_url}/api/visits?data_type=${initial_data_type}&repository_name=${initial_repository_name}&limit=10" >/dev/null
+curl -fsS -G \
+  --data-urlencode "repository_name=${initial_repository_name}" \
+  --data-urlencode "collection=${initial_collection}" \
+  --data-urlencode "dataset_type=${initial_dataset_type}" \
+  --data-urlencode "limit=10" \
+  "${base_url}/api/visits" >/dev/null
 
-visits_json=$(curl -fsS "${base_url}/api/visits?data_type=raw&repository_name=${repository_name}&limit=10")
+visits_json=$(
+  curl -fsS -G \
+    --data-urlencode "repository_name=${initial_repository_name}" \
+    --data-urlencode "collection=${initial_collection}" \
+    --data-urlencode "dataset_type=${initial_dataset_type}" \
+    --data-urlencode "limit=10" \
+    "${base_url}/api/visits"
+)
 sample_visit=$(
   printf '%s' "$visits_json" | SMOKE_REQUESTED_VISIT="$requested_visit" python3 -c '
 import json

@@ -73,16 +73,31 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/quicklooks/${queryArg.visitName}/time_profile`,
       }),
     }),
+    getQueryBuilderOptions: build.query<
+      GetQueryBuilderOptionsApiResponse,
+      GetQueryBuilderOptionsApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/visits/query_builder_options`,
+        params: {
+          repository_name: queryArg.repositoryName,
+          collection: queryArg.collection,
+          dataset_type: queryArg.datasetType,
+        },
+      }),
+    }),
     listVisits: build.query<ListVisitsApiResponse, ListVisitsApiArg>({
       query: (queryArg) => ({
         url: `/api/visits`,
         params: {
-          exposure: queryArg.exposure,
-          day_obs: queryArg.dayObs,
+          repository_name: queryArg.repositoryName,
+          collection: queryArg.collection,
+          dataset_type: queryArg.datasetType,
+          where: queryArg.where,
+          order_by: queryArg.orderBy,
+          reverse: queryArg.reverse,
           limit: queryArg.limit,
           offset: queryArg.offset,
-          data_type: queryArg.dataType,
-          repository_name: queryArg.repositoryName,
         },
       }),
     }),
@@ -94,8 +109,9 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/visits/day_counts`,
         params: {
           calendar_month: queryArg.calendarMonth,
-          data_type: queryArg.dataType,
           repository_name: queryArg.repositoryName,
+          collection: queryArg.collection,
+          dataset_type: queryArg.datasetType,
         },
       }),
     }),
@@ -234,22 +250,32 @@ export type GetTimeProfileApiResponse =
 export type GetTimeProfileApiArg = {
   visitName: string;
 };
+export type GetQueryBuilderOptionsApiResponse =
+  /** status 200 Successful Response */ QueryBuilderOptions;
+export type GetQueryBuilderOptionsApiArg = {
+  repositoryName?: string | null;
+  collection?: string | null;
+  datasetType?: string | null;
+};
 export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitEntry[];
 export type ListVisitsApiArg = {
-  exposure?: number | null;
-  dayObs?: number | null;
+  repositoryName: string;
+  collection: string;
+  datasetType: string;
+  where?: string | null;
+  orderBy?: string | null;
+  reverse?: boolean | null;
   limit?: number;
   offset?: number;
-  dataType: string;
-  repositoryName: string;
 };
 export type ListVisitDayCountsApiResponse =
   /** status 200 Successful Response */ VisitDayCount[];
 export type ListVisitDayCountsApiArg = {
   calendarMonth: string;
-  dataType: string;
   repositoryName: string;
+  collection: string;
+  datasetType: string;
 };
 export type GetVisitMetadataApiResponse =
   /** status 200 Successful Response */ DataSourceCcdMetadata;
@@ -304,13 +330,11 @@ export type ContextMenuTemplate = {
   template: string;
   is_url: boolean;
 };
-export type CcdDataTypeConfig = {
-  data_type: string;
+export type ButlerScopeConfig = {
+  id?: string | null;
+  dataset_type: string;
   display_name: string;
-  collections: string[];
-  data_id_dimension?: string;
-  order_by?: string[];
-  partial?: boolean;
+  collection: string;
   repository_name?: string;
   instrument?: string;
 };
@@ -318,7 +342,11 @@ export type SystemInfo = {
   admin_page: boolean;
   context_menu_templates: ContextMenuTemplate[];
   max_object_storage_usage: number;
-  ccd_data_types: CcdDataTypeConfig[];
+  query_builder_input_mode: string;
+  butler_scopes: ButlerScopeConfig[];
+  datasets: {
+    [key: string]: any;
+  }[];
 };
 export type MemoryStats = {
   /** Anonymous memory usage in bytes (private memory not backed by files) */
@@ -389,6 +417,7 @@ export type CreateQuicklookRequest = {
 export type Job = {
   visit: string;
   id?: string;
+  cache_version?: number;
 };
 export type Progress = {
   total: number;
@@ -466,8 +495,20 @@ export type QuicklookMetadata =
   | QuicklookMetadataProgress
   | QuicklookMetadataPending
   | QuicklookMetadataError;
+export type QueryWhereExample = {
+  label: string;
+  where: string;
+};
+export type QueryBuilderOptions = {
+  repositories: string[];
+  collections: string[];
+  dataset_types: string[];
+  where_examples: QueryWhereExample[];
+};
 export type VisitEntry = {
   id: string;
+  display_id: string;
+  scope_id: string;
   day_obs: number;
   physical_filter: string;
   obs_id: string;
@@ -527,6 +568,7 @@ export const {
   useGetAllQuicklookJobsQuery,
   useGetQuicklookMetadataQuery,
   useGetTimeProfileQuery,
+  useGetQueryBuilderOptionsQuery,
   useListVisitsQuery,
   useListVisitDayCountsQuery,
   useGetVisitMetadataQuery,

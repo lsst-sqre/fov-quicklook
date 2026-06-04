@@ -159,7 +159,7 @@ async def delete_one_quicklook(visit_name: str) -> int:
         logger.info(f"Marked quicklook {visit_name} as not ready")
 
     # object storageのデータを削除
-    storage = VisitObjectStorage.from_visit(VisitName(visit_name))
+    storage = VisitObjectStorage.from_visit(VisitName.from_cache_key(visit_name))
     await storage.delete_all()
     logger.info(f"Deleted object storage data for {visit_name}")
 

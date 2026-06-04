@@ -13,6 +13,7 @@ from quicklook.comm.coordinator import lifespan as coordinator_lifespan
 from quicklook.comm.coordinator import router as comm_coordinator_router
 from quicklook.utils.http_client import managed_session
 from quicklook.coordinator.api.deps import dep_visit_name
+from quicklook.coordinator.api.query_builder_options import router as query_builder_options_router
 from quicklook.coordinator.api.status import router as status_router
 from quicklook.coordinator.api.types import (
     CreateQuicklookRequest,
@@ -39,18 +40,23 @@ async def lifespan(app: FastAPI):
     from quicklook.revision import GIT_REVISION
     logger.info("Coordinator starting, revision=%s", GIT_REVISION)
 
+    logger.info("Coordinator startup step=prepare_stale_cache_cleanup")
     stale_cache_cleanup_plan = await prepare_stale_cache_cleanup()
     stale_cache_cleanup_task = None
     if stale_cache_cleanup_plan.stale_versions:
         stale_cache_cleanup_task = asyncio.create_task(
             delete_stale_cache_versions(stale_cache_cleanup_plan.stale_versions)
         )
+    logger.info("Coordinator startup step=cleanup_at_startup")
     await cleanup_at_startup()
 
     try:
         async with managed_session():
+            logger.info("Coordinator startup step=coordinator_lifespan_enter")
             async with coordinator_lifespan(app):
+                logger.info("Coordinator startup step=run_quicklook_pipeline_enter")
                 async with run_quicklook_pipeline() as running_pipeline:
+                    logger.info("Coordinator startup step=ready")
                     yield
     finally:
         if stale_cache_cleanup_task is not None and not stale_cache_cleanup_task.done():
@@ -63,6 +69,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(comm_coordinator_router)
+app.include_router(query_builder_options_router)
 app.include_router(status_router)
 
 
@@ -78,7 +85,7 @@ type JobDict = dict[VisitName, Job]
 async def route_create_quicklook(params: CreateQuicklookRequest):
     visit = VisitName(params.visit)
     async with get_db_session() as session:
-        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
+        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit.cache_key))
         quicklook = result.scalar_one_or_none()
 
         if quicklook is not None:
@@ -119,10 +126,10 @@ async def route_vote_quicklook(visit: Annotated[VisitName, Depends(dep_visit_nam
     priority.user_count += 1
     
     async with get_db_session() as session:
-        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit))
+        result = await session.execute(select(Quicklook).where(Quicklook.visit_name == visit.cache_key))
         quicklook = result.scalar_one_or_none()
         if quicklook is not None:
-            access = Access(visit_name=visit, accessed_at=datetime.now())
+            access = Access(visit_name=visit.cache_key, accessed_at=datetime.now())
             session.add(access)
             await session.commit()
     

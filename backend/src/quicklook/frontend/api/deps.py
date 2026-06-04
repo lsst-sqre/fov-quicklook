@@ -6,7 +6,7 @@ from quicklook.datasource import get_datasource
 from quicklook.datasource.types import VisitResolutionError
 from quicklook.types import CcdDataRef, CcdName, TilePos, VisitName
 
-VISIT_NAME_PATH_PATTERN = r'^[^:/]+:[^:/]+:[^:/]+$'
+VISIT_NAME_PATH_PATTERN = r'^[^/]+$'
 
 
 async def dep_visit_name(
