@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 import quicklook.mylogging
 from quicklook.config import config
+from quicklook.utils.coordinator_url import get_coordinator_base_url
 from quicklook.utils.http_request import http_request
 from quicklook.utils.system_status import ContainerStatus, get_container_status, get_memory_current
 from quicklook.utils.ttlcache import ttlcache
@@ -32,7 +33,7 @@ async def get_cached_status() -> SystemStatus:
     try:
         coordinator_data = await http_request(
             "get",
-            f"{config.coordinator_base_url}/status",
+            f"{get_coordinator_base_url()}/status",
         )
         coordinator_status = ContainerStatus(**coordinator_data["coordinator"])
         generators_status = {

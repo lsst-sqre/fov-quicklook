@@ -1,4 +1,5 @@
 import pickle
+import socket
 from typing import cast
 
 import pytest
@@ -22,7 +23,7 @@ async def test_create_quicklook_resolves_visit_before_forwarding(monkeypatch):
     class FakeDataSource:
         async def resolve_visit_info(self, visit: VisitName) -> ResolvedVisitInfo:
             received_visits.append(visit)
-            return ResolvedVisitInfo(visit_name=VisitName('repo:raw:4242'))
+            return ResolvedVisitInfo(visit_name=VisitName('repo:LSSTCam!-raw!-all:raw:exposure=4242'))
 
     async def fake_http_request(method: str, url: str, **kwargs):
         forwarded_requests.append((method, url, kwargs))
@@ -39,7 +40,7 @@ async def test_create_quicklook_resolves_visit_before_forwarding(monkeypatch):
         (
             'post',
             f'{quicklooks.config.coordinator_base_url}/quicklooks',
-            {'json': {'visit': 'repo:raw:4242'}},
+            {'json': {'visit': 'repo:LSSTCam!-raw!-all:raw:exposure=4242'}},
         )
     ]
 
@@ -102,6 +103,34 @@ async def test_status_relay_keeps_retrying_without_shutdown(monkeypatch):
     assert len(connect_calls) == 7
     assert sleep_calls == [1, 2, 4, 8, 16, 32]
     assert {kwargs['max_size'] for _, kwargs in connect_calls} == {None}
+    assert all('family' not in kwargs for _, kwargs in connect_calls)
+
+
+async def test_status_relay_uses_ipv4_when_enabled(monkeypatch):
+    connect_calls: list[tuple[str, dict]] = []
+
+    class StopLoop(BaseException):
+        pass
+
+    class FakeConnect:
+        async def __aenter__(self):
+            raise StopLoop()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+    def fake_connect(url: str, **kwargs):
+        connect_calls.append((url, kwargs))
+        return FakeConnect()
+
+    monkeypatch.setattr(quicklooks.config, "comm_force_ipv4_internal", True)
+    monkeypatch.setattr(quicklooks.websockets, 'connect', fake_connect)
+
+    with pytest.raises(StopLoop):
+        await quicklooks._status_relay_main_loop()
+
+    assert {kwargs['family'] for _, kwargs in connect_calls} == {socket.AF_INET}
 
 
 async def test_status_relay_updates_job_status_from_binary_message(monkeypatch):
@@ -138,6 +167,21 @@ async def test_status_relay_updates_job_status_from_binary_message(monkeypatch):
         await quicklooks._status_relay_main_loop()
 
     assert quicklooks._job_status_dict.last_value() == {job.visit: job.status}
+
+
+def test_get_coordinator_base_url_ignores_service_host_by_default(monkeypatch):
+    monkeypatch.setattr(quicklooks.config, "coordinator_base_url", "http://fov-quicklook-coordinator:9501")
+    monkeypatch.setenv("FOV_QUICKLOOK_COORDINATOR_SERVICE_HOST", "10.96.123.45")
+
+    assert quicklooks.get_coordinator_base_url() == "http://fov-quicklook-coordinator:9501"
+
+
+def test_get_coordinator_base_url_prefers_service_host_when_enabled(monkeypatch):
+    monkeypatch.setattr(quicklooks.config, "coordinator_base_url", "http://fov-quicklook-coordinator:9501")
+    monkeypatch.setattr(quicklooks.config, "comm_use_coordinator_service_host", True)
+    monkeypatch.setenv("FOV_QUICKLOOK_COORDINATOR_SERVICE_HOST", "10.96.123.45")
+
+    assert quicklooks.get_coordinator_base_url() == "http://10.96.123.45:9501"
 
 
 def test_apply_shared_status_message_moves_ready_metadata_to_short_lived_cache(monkeypatch):

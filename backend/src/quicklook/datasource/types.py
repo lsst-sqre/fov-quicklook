@@ -17,24 +17,29 @@ class ResolvedVisitInfo:
 
 @dataclass
 class Query:
-    data_type: CcdDataType
     repository_name: str
+    collection: str
+    dataset_type: str
     limit: int
     offset: int = 0
-    exposure: int | None = None
-    day_obs: int | None = None
+    where: str | None = None
+    order_by: str | None = None
+    reverse: bool | None = None
 
 
 @dataclass
 class VisitDayCountQuery:
-    data_type: CcdDataType
     repository_name: str
+    collection: str
+    dataset_type: str
     calendar_month: str
 
 
 @dataclass
 class VisitEntry:
     id: str
+    display_id: str
+    scope_id: str
     day_obs: int
     physical_filter: str
     obs_id: str
@@ -57,6 +62,20 @@ class VisitRepresentativeUuid:
     uuid: str
 
 
+@dataclass
+class QueryWhereExample:
+    label: str
+    where: str
+
+
+@dataclass
+class QueryBuilderOptions:
+    repositories: list[str]
+    collections: list[str]
+    dataset_types: list[str]
+    where_examples: list[QueryWhereExample]
+
+
 class DataSourceBase(abc.ABC):
     @abc.abstractmethod
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:  # pragma: no cover
@@ -69,6 +88,23 @@ class DataSourceBase(abc.ABC):
         ...
 
     query_visit_day_counts = async_wrap(query_visit_day_counts_sync)
+
+    @abc.abstractmethod
+    def get_query_builder_options_sync(
+        self,
+        *,
+        repository_name: str | None = None,
+        collection: str | None = None,
+        dataset_type: str | None = None,
+    ) -> QueryBuilderOptions:  # pragma: no cover
+        ...
+
+    get_query_builder_options = async_wrap(get_query_builder_options_sync)
+
+    def warm_query_builder_options_metadata_sync(self) -> None:
+        return None
+
+    warm_query_builder_options_metadata = async_wrap(warm_query_builder_options_metadata_sync)
 
     @abc.abstractmethod
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:  # pragma: no cover

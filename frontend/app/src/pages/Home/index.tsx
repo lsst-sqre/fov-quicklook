@@ -1,8 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
 import { useGetVisitResolutionQuery } from "../../store/api/openapi"
-import { CcdDataType, hasExplicitDetectorSelection, homeSlice, parseDetectorName, writeHighlightedCcds } from "../../store/features/homeSlice"
+import { ButlerScopeId, hasExplicitDetectorSelection, homeSlice, parseDetectorName, writeHighlightedCcds } from "../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../store/hooks"
+import { extractScopeIdFromVisitId, parseVisitId } from "../../quicklookId"
 import { ShortcutHelpDialog } from "./ShortcutHelpDialog"
 import { wrapByHomeContext } from "./context"
 import { HomeShortcutHandlers, useHomeKeyboardShortcuts } from "./keyboardShortcuts"
@@ -77,7 +78,7 @@ const useSetInitialSearchConditions = () => {
 
   useEffect(() => {
     if (visitId) {
-      const dataSource = extractDataTypeFromVisitId(visitId)
+      const dataSource = extractScopeIdFromVisitId(visitId)
       if (dataSource) {
         dispatch(homeSlice.actions.setDataSource(dataSource))
       }
@@ -87,21 +88,20 @@ const useSetInitialSearchConditions = () => {
 }
 
 
-function extractDataTypeFromVisitId(visitId: string): CcdDataType | undefined {
-  /*
-   * embargo:raw:2025051900437 のようなテキストから embargo:raw を抽出する
-   * 形式がマッチしなければ undefined を返す
-   */
-  const parts = visitId.split(':')
-  if (parts.length < 3) {
-    return undefined
-  }
-  return parts.slice(0, -1).join(':') as CcdDataType
+function extractDataTypeFromVisitId(visitId: string): ButlerScopeId | undefined {
+  return extractScopeIdFromVisitId(visitId) as ButlerScopeId | undefined
 }
 
 
 function isByUuidVisitId(visitId: string | undefined) {
-  return visitId?.split(':').slice(-2, -1)[0] === 'by_uuid'
+  if (!visitId) {
+    return false
+  }
+  try {
+    return parseVisitId(visitId).isByUuid
+  } catch {
+    return false
+  }
 }
 
 

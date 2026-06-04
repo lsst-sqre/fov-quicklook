@@ -221,7 +221,7 @@ async def _create_quicklook_record(job: Job):
     """DBにquicklookの初期レコードを作成（ready=False）"""
     async with get_db_session() as session:
         quicklook = Quicklook(
-            visit_name=str(job.visit),
+            visit_name=job.visit.cache_key,
             job_id=job.id,
             disk_usage=0,
             ready=False,
@@ -272,7 +272,7 @@ async def _finalize_success(result: _PipelineResult):
 
         stmt = (
             update(Quicklook)
-            .where(Quicklook.visit_name == str(job.visit))
+            .where(Quicklook.visit_name == job.visit.cache_key)
             .values(ready=True, disk_usage=total_uploaded_size)
         )
         await session.execute(stmt)
@@ -299,7 +299,7 @@ async def _finalize_error(job: Job, error_message: str | None = None):
     async with get_db_session() as session:
         from sqlalchemy import select
 
-        stmt = select(Quicklook).where(Quicklook.visit_name == str(job.visit))
+        stmt = select(Quicklook).where(Quicklook.visit_name == job.visit.cache_key)
         result = await session.execute(stmt)
         quicklook = result.scalar_one_or_none()
         if quicklook:

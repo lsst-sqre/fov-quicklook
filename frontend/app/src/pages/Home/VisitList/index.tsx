@@ -3,6 +3,7 @@ import classNames from 'classnames'
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MaterialSymbol } from '../../../components/MaterialSymbol'
 import { ListVisitsApiResponse, useListVisitDayCountsQuery, useListVisitsQuery } from "../../../store/api/openapi"
+import { getSingleDimensionValue, parseScopeId } from '../../../quicklookId'
 import { homeSlice } from '../../../store/features/homeSlice'
 import { useAppDispatch, useAppSelector } from '../../../store/hooks'
 import homeStyles from '../styles.module.scss'
@@ -51,10 +52,9 @@ function formatExposureTime(exposureTime: number, digits: number): string {
 function useVisitList(page: number) {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
-  const [repositoryName, dataType] = dataSource.split(':')
   const baseQuery = useMemo(
-    () => buildVisitListQuery(searchString, dataType, repositoryName),
-    [dataType, repositoryName, searchString],
+    () => buildVisitListQuery(searchString, dataSource),
+    [dataSource, searchString],
   )
   const query = useMemo(
     () => buildVisitListPageQuery(baseQuery, page),
@@ -242,7 +242,7 @@ function VisitGroup({ group }: { group: VisitListEntryType[] }) {
 
 function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-  const selected = currentQuicklook?.split(':').slice(-1)[0] === entry.id.split(':').slice(-1)[0]
+  const selected = currentQuicklook === entry.id
   const entryRef = useRef<HTMLDivElement>(null)
   const listContainerRef = React.useContext(ListScrollContainerContext)
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
@@ -264,7 +264,7 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
       onClick={select}
       title={`obs_id: ${entry.obs_id};\nexposure_time: ${entry.exposure_time}s`}
     >
-      {entry.id.split(':').slice(-1)[0]}
+      {getSingleDimensionValue(entry.id) ?? entry.display_id}
     </div>
   )
 }
@@ -357,12 +357,12 @@ function SearchBox({ onRefresh }: { onRefresh: () => void }) {
   const dataSource = useAppSelector(state => state.home.dataSource)
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
-  const ccdDataTypes = useAppSelector(state => state.copyTemplate.ccdDataTypes)
-  const [repositoryName, dataType] = dataSource.split(':')
+  const butlerScopes = useAppSelector(state => state.copyTemplate.butlerScopes)
+  const { repositoryName, collection, datasetType } = useMemo(() => parseScopeId(dataSource), [dataSource])
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => getInitialCalendarMonth(currentQuicklook))
   const { data: calendarVisitDayCounts, isFetching: isCalendarFetching } = useListVisitDayCountsQuery(
-    { dataType, repositoryName, calendarMonth },
+    { repositoryName, collection, datasetType, calendarMonth },
     { skip: !calendarOpen },
   )
 
@@ -416,9 +416,9 @@ function SearchBox({ onRefresh }: { onRefresh: () => void }) {
               flexGrow: 1,
             }}
           >
-            {ccdDataTypes.map((dt) => {
-              const key = `${dt.repository_name}:${dt.data_type}`
-              return <option key={key} value={key}>{dt.display_name}</option>
+            {butlerScopes.map((scope) => {
+              const key = scope.id ?? ""
+              return <option key={key} value={key}>{scope.display_name}</option>
             })}
           </select>
           <Menu
