@@ -85,7 +85,7 @@ const baseSystemInfo = {
   admin_page: false,
   context_menu_templates: [],
   max_object_storage_usage: 0,
-  query_builder_input_mode: "select",
+  query_builder_input_mode: "combobox",
   butler_scopes: [
     {
       id: "main:main!-raw:main_raw",
@@ -186,46 +186,14 @@ describe("QueryPage", () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue("main")).toBeTruthy()
     })
-    expect((screen.getByLabelText("Query string") as HTMLInputElement).value).toBe("repository_name=main&collection=main%2Fraw&dataset_type=main_raw&order_by=day_obs&limit=100")
+    expect((screen.getByLabelText("Query string") as HTMLInputElement).value).toBe("repository_name=main&collection=main%2Fraw&dataset_type=main_raw&order_by=day_obs&limit=100&where=")
     expect(screen.getByTestId("location-search").textContent).toBe("")
     const lastCall = useListVisitsQuery.mock.calls[useListVisitsQuery.mock.calls.length - 1]
     expect(lastCall?.[1]?.skip).toBe(true)
   })
 
-  it("builds the query string from configured select options by default", async () => {
+  it("supports dynamic narrowing in combobox mode by default", async () => {
     renderQueryPage(["/query"])
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue("main")).toBeTruthy()
-    })
-
-    fireEvent.change(screen.getByDisplayValue("main"), { target: { value: "embargo" } })
-    await waitFor(() => {
-      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
-    })
-    fireEvent.change(screen.getByLabelText("Collection"), { target: { value: "LSSTCam/runs/nightlyValidation" } })
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue("difference_image")).toBeTruthy()
-    })
-
-    expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&order_by=visit&limit=100")).toBeTruthy()
-
-    fireEvent.click(screen.getByRole("button", { name: "Search" }))
-
-    await waitFor(() => {
-      expect(screen.getByTestId("location-search").textContent).toContain("repository_name=embargo")
-    })
-  })
-
-  it("supports dynamic narrowing in combobox mode", async () => {
-    renderQueryPage(
-      ["/query"],
-      {
-        ...baseSystemInfo,
-        query_builder_input_mode: "combobox",
-      },
-    )
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("main")).toBeTruthy()
@@ -243,6 +211,12 @@ describe("QueryPage", () => {
     fireEvent.change(screen.getByDisplayValue("Select example"), { target: { value: "visit=7001" } })
 
     expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&order_by=visit&limit=100&where=visit%3D7001")).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: "Search" }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search").textContent).toContain("repository_name=embargo")
+    })
   })
 
   it("submits the default query without adding where=null", async () => {
@@ -263,6 +237,7 @@ describe("QueryPage", () => {
       repositoryName: "main",
       collection: "main/raw",
       datasetType: "main_raw",
+      where: "",
       orderBy: "day_obs",
       limit: 100,
       reverse: undefined,

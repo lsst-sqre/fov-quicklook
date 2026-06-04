@@ -51,8 +51,8 @@ describe("query params helpers", () => {
   })
 
   it("builds a default query string from the current datasource", () => {
-    expect(buildDefaultQueryInput("main:LSSTCam!-raw!-all:raw")).toBe("repository_name=main&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100")
-    expect(buildDefaultQueryInput("embargo:LSSTCam!-runs!-nightlyValidation:difference_image", 5)).toBe("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&limit=5")
+    expect(buildDefaultQueryInput("main:LSSTCam!-raw!-all:raw")).toBe("repository_name=main&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100&where=")
+    expect(buildDefaultQueryInput("embargo:LSSTCam!-runs!-nightlyValidation:difference_image", 5)).toBe("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&limit=5&where=")
   })
 
   it("builds runnable python code from the current query string", () => {
@@ -79,11 +79,13 @@ describe("query params helpers", () => {
       + "def normalize_order_by(dataset_type: str, order_by: str | None, reverse: bool | None) -> list[str]:\n"
       + "    default = default_order_by(dataset_type)\n"
       + "    selected_field = order_by or default.removeprefix('-')\n"
-      + "    selected_reverse = default.startswith('-') if reverse is None else reverse\n"
+      + "    selected_reverse = default.startswith('-') if selected_field == default.removeprefix('-') else False\n"
+      + "    if reverse:\n"
+      + "        selected_reverse = not selected_reverse\n"
       + "    prefix = '-' if selected_reverse else ''\n"
       + "    return [f'{prefix}{selected_field}']\n\n"
       + "query_string = 'repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100'\n"
-      + "params = {key: values[-1] for key, values in parse_qs(query_string).items()}\n\n"
+      + "params = {key: values[-1] for key, values in parse_qs(query_string, keep_blank_values=True).items()}\n\n"
       + "repository_name = params['repository_name']\n"
       + "collection = params['collection']\n"
       + "dataset_type = params['dataset_type']\n"
@@ -97,14 +99,14 @@ describe("query params helpers", () => {
       + "query_kwargs = {'datasets': dataset_type}\n"
       + "if dataset_type == 'difference_image':\n"
       + "    query_kwargs['collections'] = ...\n"
-      + "if where:\n"
-      + "    query_kwargs['where'] = where\n"
-      + "else:\n"
+      + "if where is None:\n"
       + "    latest_records = list(\n"
       + "        butler.registry.queryDimensionRecords(dimension, **query_kwargs).order_by('-day_obs').limit(1)\n"
       + "    )\n"
       + "    if latest_records:\n"
-      + "        query_kwargs['where'] = f\"day_obs={int(latest_records[0].day_obs)}\"\n\n"
+      + "        query_kwargs['where'] = f\"day_obs={int(latest_records[0].day_obs)}\"\n"
+      + "elif where:\n"
+      + "    query_kwargs['where'] = where\n\n"
       + "records = butler.registry.queryDimensionRecords(dimension, **query_kwargs).order_by(\n"
       + "    *normalize_order_by(dataset_type, order_by, reverse)\n"
       + ")\n"

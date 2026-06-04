@@ -29,7 +29,7 @@ def test_get_system_info_excludes_query_only_injected_defaults(monkeypatch):
             admin_page=False,
             context_menu_templates=[],
             max_object_storage_usage=123,
-            query_builder_input_mode='select',
+            query_builder_input_mode='combobox',
             system_info_butler_scopes=visible,
             datasets=[],
         ),
@@ -38,4 +38,4 @@ def test_get_system_info_excludes_query_only_injected_defaults(monkeypatch):
     response = systeminfo.get_system_info()
 
     assert response.butler_scopes == visible
-    assert response.query_builder_input_mode == 'select'
+    assert response.query_builder_input_mode == 'combobox'

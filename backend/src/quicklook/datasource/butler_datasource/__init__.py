@@ -78,12 +78,6 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
                 where_examples=[],
             )
 
-        logger.info(
-            "Data Query options request repository=%s collection=%r dataset_type=%r",
-            selected_repository,
-            collection,
-            dataset_type,
-        )
         selected_collection = _normalize_option_search_text(collection)
         selected_dataset_type = _normalize_option_search_text(dataset_type)
         if (
@@ -92,12 +86,6 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             and _collection_exists_for_repository(selected_repository, selected_collection)
             and _dataset_type_exists_for_repository(selected_repository, selected_dataset_type)
         ):
-            logger.info(
-                "Data Query options exact selection repository=%s collection=%s dataset_type=%s",
-                selected_repository,
-                selected_collection,
-                selected_dataset_type,
-            )
             return QueryBuilderOptions(
                 repositories=repositories,
                 collections=[selected_collection],
@@ -122,14 +110,6 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             dataset_type
             if dataset_type and _dataset_type_exists_for_repository(selected_repository, dataset_type)
             else None
-        )
-        logger.info(
-            "Data Query options direct lookup repository=%s collection_search=%r dataset_type_search=%r collections=%d dataset_types=%d",
-            selected_repository,
-            collection,
-            dataset_type,
-            len(collections),
-            len(dataset_types),
         )
         return QueryBuilderOptions(
             repositories=repositories,
@@ -233,7 +213,7 @@ class ScopedButlerDataSource:
         records = self._query_dimension_records(
             self.data_id_dimension,
             datasets=self.dataset_type,
-            where=q.where or self._build_latest_day_where(),
+            where=q.where if q.where is not None else self._build_latest_day_where(),
             limit=q.limit,
             offset=q.offset,
             order_by=self._normalize_order_by(q.order_by, q.reverse),
@@ -387,7 +367,9 @@ class ScopedButlerDataSource:
         default_field = default.removeprefix('-')
         default_reverse = default.startswith('-')
         selected_field = field or default_field
-        selected_reverse = default_reverse if reverse is None else reverse
+        selected_reverse = default_reverse if selected_field == default_field else False
+        if reverse:
+            selected_reverse = not selected_reverse
         prefix = '-' if selected_reverse else ''
         return [f'{prefix}{selected_field}']
 

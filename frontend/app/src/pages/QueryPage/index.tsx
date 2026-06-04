@@ -422,13 +422,14 @@ function buildFormFromScope(scope: ButlerScopeConfig): QueryFormState {
 
 function buildQueryInput(form: QueryFormState): string {
   const params = new URLSearchParams()
+  const hasScopedSelection = Boolean(form.repositoryName || form.collection || form.datasetType)
   if (form.repositoryName) params.set("repository_name", form.repositoryName)
   if (form.collection) params.set("collection", form.collection)
   if (form.datasetType) params.set("dataset_type", form.datasetType)
   if (form.orderBy) params.set("order_by", form.orderBy)
   if (form.reverse) params.set("reverse", "true")
   if (form.limit) params.set("limit", form.limit)
-  if (form.where) params.set("where", form.where)
+  if (hasScopedSelection || form.where) params.set("where", form.where)
   return params.toString()
 }
 

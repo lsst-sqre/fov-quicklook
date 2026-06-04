@@ -11,7 +11,7 @@ def test_build_contains_glob():
     assert butler_datasource_module._build_contains_glob('nightly') == '*nightly*'
 
 
-def test_butler_datasource_init_only_chowns_pgpass(monkeypatch):
+def test_butler_datasource_init_does_not_trigger_query_builder_lookup(monkeypatch):
     calls: list[str] = []
     monkeypatch.setitem(
         sys.modules,
@@ -24,18 +24,7 @@ def test_butler_datasource_init_only_chowns_pgpass(monkeypatch):
     assert calls == ['chown']
 
 
-def test_warm_query_builder_options_metadata_sync_is_noop(monkeypatch):
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_query_repository_names',
-        lambda: (_ for _ in ()).throw(AssertionError('_query_repository_names should not be called')),
-    )
-
-    ds = ButlerDataSource.__new__(ButlerDataSource)
-    ds.warm_query_builder_options_metadata_sync()
-
-
-def test_get_query_builder_options_skips_unbounded_queries_without_search(monkeypatch):
+def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['embargo', 'main'])
 
     collections_called = False
@@ -69,7 +58,7 @@ def test_get_query_builder_options_skips_unbounded_queries_without_search(monkey
     assert dataset_types_called is True
 
 
-def test_get_query_builder_options_keeps_exact_selection_without_suggestions(monkeypatch):
+def test_get_query_builder_options_keeps_exact_selection_only(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
     monkeypatch.setattr(
         butler_datasource_module,
@@ -95,6 +84,11 @@ def test_get_query_builder_options_keeps_exact_selection_without_suggestions(mon
         '_dataset_type_exists_for_repository',
         lambda repository_name, dataset_type: repository_name == 'main' and dataset_type == 'raw',
     )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_get_scope_datasource',
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError(f'_get_scope_datasource should not be called: {kwargs}')),
+    )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
     result = ds.get_query_builder_options_sync(
@@ -108,13 +102,19 @@ def test_get_query_builder_options_keeps_exact_selection_without_suggestions(mon
     assert result.where_examples == []
 
 
-def test_get_query_builder_options_filters_partial_collection_via_direct_lookup(monkeypatch):
+def test_get_query_builder_options_filters_partial_collection_with_direct_query(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    monkeypatch.setattr(butler_datasource_module, '_repository_instrument', lambda repository_name: 'LSSTCam')
     monkeypatch.setattr(
         butler_datasource_module,
-        '_query_collections_for_repository_cache',
-        lambda repository_name, instrument, search_text, thread_id: ('LSSTCam/runs/nightlyValidation/10',),
+        '_query_collections_for_repository',
+        lambda repository_name, *, search_text=None: (
+            ['LSSTCam/runs/nightlyValidation/10'] if repository_name == 'main' and search_text == 'nightly' else []
+        ),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_dataset_types_for_repository',
+        lambda repository_name, *, search_text=None: [],
     )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
@@ -127,26 +127,21 @@ def test_get_query_builder_options_filters_partial_collection_via_direct_lookup(
 
 def test_get_query_builder_options_does_not_short_circuit_partial_dataset_type(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    monkeypatch.setattr(butler_datasource_module, '_repository_instrument', lambda repository_name: 'LSSTCam')
     monkeypatch.setattr(
         butler_datasource_module,
-        '_collection_exists_for_repository_cache',
-        lambda repository_name, instrument, collection, thread_id: collection == 'LSSTCam/runs/nightlyValidation/10',
+        '_query_collections_for_repository',
+        lambda repository_name, *, search_text=None: (
+            ['LSSTCam/runs/nightlyValidation/10']
+            if repository_name == 'main' and search_text == 'LSSTCam/runs/nightlyValidation/10'
+            else []
+        ),
     )
     monkeypatch.setattr(
         butler_datasource_module,
-        '_dataset_type_exists_for_repository_cache',
-        lambda repository_name, instrument, dataset_type, thread_id: False,
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_query_collections_for_repository_cache',
-        lambda repository_name, instrument, search_text, thread_id: ('LSSTCam/runs/nightlyValidation/10',),
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_query_dataset_types_for_repository_cache',
-        lambda repository_name, instrument, search_text, thread_id: ('preliminary_visit_image',),
+        '_query_dataset_types_for_repository',
+        lambda repository_name, *, search_text=None: (
+            ['preliminary_visit_image'] if repository_name == 'main' and search_text == 'prelim' else []
+        ),
     )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
@@ -159,6 +154,17 @@ def test_get_query_builder_options_does_not_short_circuit_partial_dataset_type(m
     assert result.collections == ['LSSTCam/runs/nightlyValidation/10']
     assert result.dataset_types == ['preliminary_visit_image']
     assert result.where_examples == []
+
+
+def test_query_builder_helpers_fall_back_to_empty_list(monkeypatch):
+    monkeypatch.setattr(butler_datasource_module, '_repository_instrument', lambda repository_name: 'LSSTCam')
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_collections_for_repository_cache',
+        lambda repository_name, instrument, search_text, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
+    )
+
+    assert butler_datasource_module._query_collections_for_repository('main', search_text='raw') == []
 
 
 def test_collection_exists_for_repository_returns_false_for_partial_match(monkeypatch):
@@ -200,70 +206,3 @@ def test_dataset_type_exists_for_repository_returns_false_for_partial_match(monk
         'raw',
         thread_id=1002,
     ) is False
-
-
-def test_dataset_type_exists_for_repository_filters_non_quicklook_dataset_types(monkeypatch):
-    class FakeDatasetType:
-        name = 'not_quicklook'
-        dimensions = SimpleNamespace(required=(SimpleNamespace(name='visit'),))
-
-    class FakeRegistry:
-        def queryDatasetTypes(self, expression):
-            assert expression == 'not_quicklook'
-            return [FakeDatasetType()]
-
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_get_query_repository_butler',
-        lambda repository_name, instrument: SimpleNamespace(registry=FakeRegistry()),
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        'get_dataset',
-        lambda dataset_type_name: SimpleNamespace(
-            quicklook_dimensions=lambda dims: (_ for _ in ()).throw(ValueError('unsupported'))
-        ),
-    )
-
-    assert butler_datasource_module._dataset_type_exists_for_repository_cache(
-        'embargo',
-        'LSSTCam',
-        'not_quicklook',
-        thread_id=1003,
-    ) is False
-
-
-def test_get_query_builder_options_returns_empty_options_when_direct_fallback_raises(monkeypatch):
-    monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
-    monkeypatch.setattr(butler_datasource_module, '_repository_instrument', lambda repository_name: 'LSSTCam')
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_collection_exists_for_repository_cache',
-        lambda repository_name, instrument, collection, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_dataset_type_exists_for_repository_cache',
-        lambda repository_name, instrument, dataset_type, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_query_collections_for_repository_cache',
-        lambda repository_name, instrument, search_text, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
-    )
-    monkeypatch.setattr(
-        butler_datasource_module,
-        '_query_dataset_types_for_repository_cache',
-        lambda repository_name, instrument, search_text, thread_id: (_ for _ in ()).throw(RuntimeError('boom')),
-    )
-
-    ds = ButlerDataSource.__new__(ButlerDataSource)
-    result = ds.get_query_builder_options_sync(
-        repository_name='main',
-        collection='LSSTCam/raw/all',
-        dataset_type='difference_image',
-    )
-
-    assert result.collections == []
-    assert result.dataset_types == []
-    assert result.where_examples == []

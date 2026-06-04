@@ -31,7 +31,7 @@ def _normalize_where(where: str | None) -> str | None:
         return None
     normalized = where.strip()
     if not normalized:
-        return None
+        return ''
     if normalized.casefold() in {'null', 'undefined'}:
         return None
     if len(normalized) > _MAX_WHERE_LENGTH:
