@@ -261,7 +261,7 @@ export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitEntry[];
 export type ListVisitsApiArg = {
   repositoryName: string;
-  collection: string;
+  collection?: string;
   datasetType: string;
   where?: string | null;
   orderBy?: string | null;

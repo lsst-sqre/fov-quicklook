@@ -1,8 +1,9 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSelector } from "react-redux"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { Combobox } from "../../components/Combobox"
 import { env } from "../../env"
-import { buildScopeId } from "../../quicklookId"
+import { buildScopeId, parseVisitId } from "../../quicklookId"
 import { AppState } from "../../store"
 import { ButlerScopeConfig, useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
 import { copyTextToClipboard } from "../../utils/copyTextToClipboard"
@@ -73,6 +74,7 @@ export function QueryPage() {
   )
   const collectionOptions = queryBuilderInputMode === "select" ? configuredCollections : options.collections
   const datasetTypeOptions = queryBuilderInputMode === "select" ? configuredDatasetTypes : options.dataset_types
+  const showCollectionColumn = !parsedQuery.args?.collection
 
   useEffect(() => {
     const normalizedQuery = normalizeQueryInput(currentQuery)
@@ -174,7 +176,7 @@ export function QueryPage() {
   const updateCollection = useCallback((collection: string) => {
     const datasetType = queryBuilderInputMode === "select"
       ? (getConfiguredDatasetTypes(butlerScopes, form.repositoryName, collection)[0] ?? "")
-      : ""
+      : form.datasetType
     applyForm({
       ...form,
       collection,
@@ -252,25 +254,13 @@ export function QueryPage() {
             <label style={fieldStyle}>
               <span>Collection</span>
               {queryBuilderInputMode === "combobox" ? (
-                <>
-                  <input
-                    list="query-page-collections"
-                    spellCheck={false}
-                    type="text"
-                    value={form.collection}
-                    onChange={(event) => {
-                      if (event.target.value === "...") {
-                        return
-                      }
-                      updateCollection(event.target.value)
-                    }}
-                    placeholder="Type to filter collections"
-                  />
-                  <datalist id="query-page-collections">
-                    {collectionOptions.map((option) => <option key={option} value={option} />)}
-                    {options.collections_truncated && <option value="..." />}
-                  </datalist>
-                </>
+                <Combobox
+                  value={form.collection}
+                  options={collectionOptions}
+                  truncated={options.collections_truncated}
+                  onChange={updateCollection}
+                  placeholder="Type to filter collections"
+                />
               ) : (
                 <select value={form.collection} onChange={(event) => updateCollection(event.target.value)}>
                   <option value="">Select collection</option>
@@ -281,25 +271,13 @@ export function QueryPage() {
             <label style={fieldStyle}>
               <span>Dataset Type</span>
               {queryBuilderInputMode === "combobox" ? (
-                <>
-                  <input
-                    list="query-page-dataset-types"
-                    spellCheck={false}
-                    type="text"
-                    value={form.datasetType}
-                    onChange={(event) => {
-                      if (event.target.value === "...") {
-                        return
-                      }
-                      updateDatasetType(event.target.value)
-                    }}
-                    placeholder="Type to filter dataset types"
-                  />
-                  <datalist id="query-page-dataset-types">
-                    {datasetTypeOptions.map((option) => <option key={option} value={option} />)}
-                    {options.dataset_types_truncated && <option value="..." />}
-                  </datalist>
-                </>
+                <Combobox
+                  value={form.datasetType}
+                  options={datasetTypeOptions}
+                  truncated={options.dataset_types_truncated}
+                  onChange={updateDatasetType}
+                  placeholder="Type to filter dataset types"
+                />
               ) : (
                 <select value={form.datasetType} onChange={(event) => updateDatasetType(event.target.value)}>
                   <option value="">Select dataset type</option>
@@ -373,6 +351,7 @@ export function QueryPage() {
                 <thead>
                   <tr>
                     <th>Visit</th>
+                    {showCollectionColumn && <th>Collection</th>}
                     <th>Day Obs</th>
                     <th>Filter</th>
                     <th>Exposure Time</th>
@@ -385,7 +364,7 @@ export function QueryPage() {
                 </thead>
                 <tbody>
                   {data.map((entry) => (
-                    <VisitRow entry={entry} key={entry.id} />
+                    <VisitRow entry={entry} key={entry.id} showCollectionColumn={showCollectionColumn} />
                   ))}
                 </tbody>
               </table>
@@ -552,12 +531,14 @@ function getDatasetOrderFields(datasetType: string): string[] {
   return defaultFields
 }
 
-function VisitRow({ entry }: { entry: VisitEntry }) {
+function VisitRow({ entry, showCollectionColumn }: { entry: VisitEntry, showCollectionColumn: boolean }) {
+  const collection = getVisitCollection(entry.id)
   return (
     <tr>
       <td>
         <Link to={`/visits/${encodeURIComponent(entry.id)}`}>{entry.display_id}</Link>
       </td>
+      {showCollectionColumn && <td>{collection}</td>}
       <td>{entry.day_obs}</td>
       <td>{entry.physical_filter}</td>
       <td>{entry.exposure_time}</td>
@@ -568,6 +549,14 @@ function VisitRow({ entry }: { entry: VisitEntry }) {
       <td>{entry.obs_id}</td>
     </tr>
   )
+}
+
+function getVisitCollection(visitId: string): string {
+  try {
+    return parseVisitId(visitId).collection
+  } catch {
+    return ""
+  }
 }
 
 async function fetchQueryBuilderOptions(

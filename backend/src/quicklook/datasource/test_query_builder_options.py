@@ -50,7 +50,7 @@ def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatc
         return butler_datasource_module._QueryBuilderSuggestionResult(())
 
     monkeypatch.setattr(butler_datasource_module, '_query_collections_for_repository_result', fake_query_collections)
-    monkeypatch.setattr(butler_datasource_module, '_query_dataset_types_for_collection', fake_query_dataset_types)
+    monkeypatch.setattr(butler_datasource_module, '_query_dataset_types_for_repository_result', fake_query_dataset_types)
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
     result = ds.get_query_builder_options_sync(repository_name='main')
@@ -65,6 +65,34 @@ def test_get_query_builder_options_skips_unbounded_collection_queries(monkeypatc
     assert dataset_types_called is True
 
 
+def test_get_query_builder_options_returns_options_for_empty_input(monkeypatch):
+    monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_collections_for_repository_result',
+        lambda repository_name, *, search_text=None: (
+            butler_datasource_module._QueryBuilderSuggestionResult(('LSSTCam/raw/all', 'LSSTCam/runs/nightlyValidation'))
+            if repository_name == 'main' and search_text is None
+            else butler_datasource_module._QueryBuilderSuggestionResult(())
+        ),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_dataset_types_for_repository_result',
+        lambda repository_name, *, search_text=None: (
+            butler_datasource_module._QueryBuilderSuggestionResult(('raw', 'difference_image'))
+            if repository_name == 'main' and search_text is None
+            else butler_datasource_module._QueryBuilderSuggestionResult(())
+        ),
+    )
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    result = ds.get_query_builder_options_sync(repository_name='main')
+
+    assert result.collections == ['LSSTCam/raw/all', 'LSSTCam/runs/nightlyValidation']
+    assert result.dataset_types == ['raw', 'difference_image']
+
+
 def test_get_query_builder_options_keeps_exact_selection_only(monkeypatch):
     monkeypatch.setattr(butler_datasource_module, '_query_repository_names', lambda: ['main'])
     monkeypatch.setattr(
@@ -76,10 +104,10 @@ def test_get_query_builder_options_keeps_exact_selection_only(monkeypatch):
     )
     monkeypatch.setattr(
         butler_datasource_module,
-        '_query_dataset_types_for_collection',
-        lambda repository_name, collection, *, search_text=None: (_ for _ in ()).throw(
+        '_query_dataset_types_for_repository_result',
+        lambda repository_name, *, search_text=None: (_ for _ in ()).throw(
             AssertionError(
-                f'_query_dataset_types_for_collection should not be called: {repository_name}, {collection}, {search_text}'
+                f'_query_dataset_types_for_repository_result should not be called: {repository_name}, {search_text}'
             )
         ),
     )
@@ -90,10 +118,8 @@ def test_get_query_builder_options_keeps_exact_selection_only(monkeypatch):
     )
     monkeypatch.setattr(
         butler_datasource_module,
-        '_dataset_type_exists_for_collection',
-        lambda repository_name, collection, dataset_type: (
-            repository_name == 'main' and collection == 'LSSTCam/raw/all' and dataset_type == 'raw'
-        ),
+        '_dataset_type_exists_for_repository',
+        lambda repository_name, dataset_type: repository_name == 'main' and dataset_type == 'raw',
     )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
@@ -121,8 +147,8 @@ def test_get_query_builder_options_filters_partial_collection_with_direct_query(
     )
     monkeypatch.setattr(
         butler_datasource_module,
-        '_query_dataset_types_for_collection',
-        lambda repository_name, collection, *, search_text=None: butler_datasource_module._QueryBuilderSuggestionResult(()),
+        '_query_dataset_types_for_repository_result',
+        lambda repository_name, *, search_text=None: butler_datasource_module._QueryBuilderSuggestionResult(()),
     )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
@@ -152,12 +178,17 @@ def test_get_query_builder_options_does_not_short_circuit_partial_dataset_type(m
     )
     monkeypatch.setattr(
         butler_datasource_module,
-        '_query_dataset_types_for_collection',
-        lambda repository_name, collection, *, search_text=None: (
+        '_query_dataset_types_for_repository_result',
+        lambda repository_name, *, search_text=None: (
             butler_datasource_module._QueryBuilderSuggestionResult(('preliminary_visit_image',))
-            if repository_name == 'main' and collection == 'LSSTCam/runs/nightlyValidation/10' and search_text == 'prelim'
+            if repository_name == 'main' and search_text == 'prelim'
             else butler_datasource_module._QueryBuilderSuggestionResult(())
         ),
+    )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_dataset_type_exists_for_repository',
+        lambda repository_name, dataset_type: False,
     )
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
@@ -223,14 +254,8 @@ def test_collection_exists_for_repository_returns_false_when_sql_query_is_empty(
     ) is False
 
 
-def test_dataset_type_exists_for_collection_returns_false_when_sql_query_is_empty(monkeypatch):
-    dataset_type_table = sqlalchemy.table('dataset_type', sqlalchemy.column('name'), sqlalchemy.column('id'))
-    summary_table = sqlalchemy.table(
-        'collection_summary_dataset_type',
-        sqlalchemy.column('dataset_type_id'),
-        sqlalchemy.column('collection_id'),
-    )
-    collection_table = sqlalchemy.table('collection', sqlalchemy.column('name'), sqlalchemy.column('collection_id'))
+def test_dataset_type_exists_for_repository_returns_false_when_sql_query_is_empty(monkeypatch):
+    dataset_type_table = sqlalchemy.table('dataset_type', sqlalchemy.column('name'))
 
     class FakeConnection:
         def __enter__(self):
@@ -256,24 +281,15 @@ def test_dataset_type_exists_for_collection_returns_false_when_sql_query_is_empt
             _managers=SimpleNamespace(
                 datasets=SimpleNamespace(
                     _static=SimpleNamespace(dataset_type=dataset_type_table),
-                    _summaries=SimpleNamespace(
-                        _tables=SimpleNamespace(datasetType=summary_table),
-                        _collectionKeyName='collection_id',
-                    ),
-                ),
-                collections=SimpleNamespace(
-                    _tables=SimpleNamespace(collection=collection_table),
-                    _collectionIdName='collection_id',
                 ),
             ),
         ),
     )
     monkeypatch.setattr(butler_datasource_module, '_get_db_connection', lambda registry: FakeConnection())
 
-    assert butler_datasource_module._dataset_type_exists_for_collection_cache(
+    assert butler_datasource_module._dataset_type_exists_for_repository_cache(
         'embargo',
         'LSSTCam',
-        'LSSTCam/raw/all',
         'raw',
         thread_id=1002,
     ) is False

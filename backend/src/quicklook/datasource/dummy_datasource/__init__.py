@@ -63,17 +63,14 @@ class DummyDataSource(DataSourceBase):
         collections = sorted({
             VisitName(visit.id).collection
             for visit in scoped_visits
-            if collection_search and collection_search.casefold() in VisitName(visit.id).collection.casefold()
+            if not collection_search or collection_search.casefold() in VisitName(visit.id).collection.casefold()
         })
         selected_collection = collection if collection and any(candidate == collection for candidate in collections) else None
         dataset_type_search = dataset_type.strip() if dataset_type else ''
         dataset_types = sorted({
             VisitName(visit.id).dataset_type
             for visit in scoped_visits
-            if selected_collection is not None
-            and VisitName(visit.id).collection == selected_collection
-            and dataset_type_search
-            and dataset_type_search.casefold() in VisitName(visit.id).dataset_type.casefold()
+            if not dataset_type_search or dataset_type_search.casefold() in VisitName(visit.id).dataset_type.casefold()
         })
         selected_dataset_type = dataset_type if dataset_type and any(candidate == dataset_type for candidate in dataset_types) else None
         where_examples = _build_dummy_where_examples(

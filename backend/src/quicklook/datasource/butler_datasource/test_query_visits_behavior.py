@@ -97,3 +97,48 @@ def test_query_visits_reverse_flips_default_order(monkeypatch):
     )
 
     assert order_calls == [('day_obs',)]
+
+
+def test_query_visits_resolves_collection_from_dataset_run_when_collection_is_empty(monkeypatch):
+    record = SimpleNamespace(
+        id=2026012800342,
+        day_obs=20260128,
+        physical_filter='r_57',
+        exposure_time=30.0,
+        science_program='nightly',
+        observation_type='science',
+        observation_reason='survey',
+        target_name='field-342',
+        obs_id='obs-342',
+    )
+
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            assert dimension == 'exposure'
+            assert kwargs == {
+                'datasets': 'raw',
+                'where': 'day_obs=20250301',
+            }
+            return FakeDimensionRecordResults([record])
+
+    ds = _make_datasource(dataset_type='raw', registry=FakeRegistry())
+    ds._collection = ''
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
+    monkeypatch.setattr(
+        ds,
+        '_query_datasets',
+        lambda where, **kwargs: [SimpleNamespace(run='LSSTCam/raw/all')],
+    )
+
+    visits = ds.query_visits(
+        Query(
+            repository_name='repo',
+            collection='',
+            dataset_type='raw',
+            limit=5,
+        )
+    )
+
+    assert [visit.display_id for visit in visits] == [
+        'repo:LSSTCam/raw/all:raw:exposure=2026012800342',
+    ]
