@@ -2,7 +2,8 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from quicklook.datasets import get_dataset
-from quicklook.datasource.butler_datasource import ScopedButlerDataSource
+from quicklook.datasource import butler_datasource as butler_datasource_module
+from quicklook.datasource.butler_datasource import ButlerDataSource, ScopedButlerDataSource
 from quicklook.datasource.types import Query
 
 
@@ -176,3 +177,43 @@ def test_query_visits_resolves_collection_from_dataset_run_when_collection_is_em
     assert [visit.display_id for visit in visits] == [
         'repo:LSSTCam/raw/all:raw:exposure=2026012800342',
     ]
+
+
+def test_query_visits_sync_uses_matching_scopes_when_collection_is_empty(monkeypatch):
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_matching_scope_configs',
+        lambda repository_name, dataset_type: [
+            SimpleNamespace(repository_name=repository_name, collection='c1', dataset_type=dataset_type, instrument='LSSTCam'),
+            SimpleNamespace(repository_name=repository_name, collection='c2', dataset_type=dataset_type, instrument='LSSTCam'),
+        ],
+    )
+    def fake_get_scope_datasource(**kwargs: object):
+        collection = cast(str, kwargs['collection'])
+        calls.append(collection)
+        return SimpleNamespace(
+            query_visits=lambda q: [
+                SimpleNamespace(id=f'{collection}-visit', display_id=f'{collection}-visit'),
+            ],
+        )
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_get_scope_datasource',
+        fake_get_scope_datasource,
+    )
+    monkeypatch.setattr(butler_datasource_module, '_sort_visit_entries', lambda entries, **kwargs: entries)
+
+    ds = ButlerDataSource.__new__(ButlerDataSource)
+    visits = ds.query_visits_sync(
+        Query(
+            repository_name='repo',
+            collection='',
+            dataset_type='raw',
+            limit=2,
+        )
+    )
+
+    assert calls == ['c1', 'c2']
+    assert [visit.display_id for visit in visits] == ['c1-visit', 'c2-visit']

@@ -59,6 +59,8 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
         logger.info("Skipping Data Query metadata warmup to avoid unbounded Butler registry scans")
 
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
+        if not q.collection:
+            return _query_visits_across_scopes(q)
         return _get_scope_datasource(
             repository_name=q.repository_name,
             collection=q.collection,
@@ -624,6 +626,85 @@ def _find_scope_config(repository_name: str, collection: str, dataset_type: str)
         if scope.repository_name == repository_name and scope.dataset_type == dataset_type:
             return scope
     return None
+
+
+def _matching_scope_configs(repository_name: str, dataset_type: str) -> list[ButlerScopeConfig]:
+    return [
+        scope
+        for scope in config.butler_scopes
+        if scope.repository_name == repository_name and scope.dataset_type == dataset_type
+    ]
+
+
+def _query_visits_across_scopes(q: Query) -> list[VisitEntry]:
+    scopes = _matching_scope_configs(q.repository_name, q.dataset_type)
+    if not scopes:
+        return _get_scope_datasource(
+            repository_name=q.repository_name,
+            collection='',
+            dataset_type=q.dataset_type,
+        ).query_visits(q)
+
+    per_scope_limit = q.limit + q.offset
+    entries: list[VisitEntry] = []
+    seen_ids: set[str] = set()
+    for scope in scopes:
+        datasource = _get_scope_datasource(
+            repository_name=scope.repository_name,
+            collection=scope.collection,
+            dataset_type=scope.dataset_type,
+            instrument=scope.instrument,
+        )
+        for entry in datasource.query_visits(
+            Query(
+                repository_name=q.repository_name,
+                collection=scope.collection,
+                dataset_type=q.dataset_type,
+                limit=per_scope_limit,
+                offset=0,
+                where=q.where,
+                order_by=q.order_by,
+                reverse=q.reverse,
+            )
+        ):
+            if entry.id in seen_ids:
+                continue
+            seen_ids.add(entry.id)
+            entries.append(entry)
+
+    sorted_entries = _sort_visit_entries(entries, dataset_type=q.dataset_type, order_by=q.order_by, reverse=q.reverse)
+    return sorted_entries[q.offset : q.offset + q.limit]
+
+
+def _sort_visit_entries(
+    entries: list[VisitEntry],
+    *,
+    dataset_type: str,
+    order_by: str | None,
+    reverse: bool | None,
+) -> list[VisitEntry]:
+    default = get_dataset(dataset_type).default_order_by[0]
+    default_field = default.removeprefix('-')
+    default_reverse = default.startswith('-')
+    selected_field = order_by or default_field
+    selected_reverse = default_reverse if selected_field == default_field else False
+    if reverse:
+        selected_reverse = not selected_reverse
+    return sorted(
+        entries,
+        key=lambda entry: (_visit_entry_sort_value(entry, selected_field), entry.display_id),
+        reverse=selected_reverse,
+    )
+
+
+def _visit_entry_sort_value(entry: VisitEntry, field: str) -> Any:
+    match field:
+        case 'exposure' | 'visit':
+            visit = VisitName(entry.id)
+            value = visit.dimensions.get(field)
+            return -1 if value is None else int(value)
+        case _:
+            return getattr(entry, field)
 
 
 def _get_visit_datasource(visit: VisitName) -> ScopedButlerDataSource:
