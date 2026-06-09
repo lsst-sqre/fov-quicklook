@@ -15,7 +15,7 @@ from typing import Any, ContextManager, Generator, Iterable, cast
 import quicklook.mylogging
 from quicklook.comm.generator import GeneratorIdInitializer
 from quicklook.config import config
-from quicklook.datasource import get_datasource
+from quicklook.generator.ccd_download import AdaptiveDownloadTimeout, download_ccd_to_path
 from quicklook.generator.iteratetiles import iterate_tiles
 from quicklook.generator.preprocess_ccd import AmpMetadata, ImageStat, PreProcessedCcd, preprocess_ccd
 from quicklook.job.job import Job
@@ -25,8 +25,6 @@ from quicklook.utils.imap_unordered_threadpool import imap_unordered_threadpool
 from quicklook.utils.timer import Timer
 
 logger = quicklook.mylogging.getLogger(__name__)
-
-ds = get_datasource()
 
 # ダウンロード済み（未処理）のtmpファイル数を制限するセマフォ。
 # ローカルFSからの読み込みは非常に高速なため、制限なしでは全CCDが
@@ -63,6 +61,10 @@ def generate_single_fits_tiles_pipeline(
     job: Job,
     refs: Iterable[CcdDataRef],
 ) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
+    refs = list(refs)
+    if not refs:
+        return
+
     with tempfile.TemporaryDirectory() as tmpdir, multiprocessing.Manager() as manager:
         q = cast(
             queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata | None],
@@ -73,6 +75,7 @@ def generate_single_fits_tiles_pipeline(
         # download()でacquire → _process_ccd()のunlink後にrelease。
         # Manager経由で作成し、プロセス間で共有可能にする。
         download_sem = manager.Semaphore(_download_semaphore_size)
+        adaptive_timeout = AdaptiveDownloadTimeout(total_downloads=len(refs))
 
         # パイプライン各段階のタイムスタンプ記録用
         ccd_timestamps: dict[str, float] = {}  # ccd_name → ccd_generator yield時刻
@@ -93,15 +96,20 @@ def generate_single_fits_tiles_pipeline(
             download_sem.acquire()
             t_sem = time.monotonic()
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd, progress=Progress(4, 1)))
-            data_bytes = ds.get_data_sync(ref)
-            t_dl = time.monotonic()
             outpath = Path(tmpdir) / f"{ref.ccd}_{uuid.uuid4().hex[:8]}.fits"
-            outpath.write_bytes(data_bytes)
+            download_result = download_ccd_to_path(
+                ref,
+                outpath,
+                timeout=adaptive_timeout,
+            )
+            t_dl = download_result.download_done_time
             logger.info(
                 "Downloaded %s (%d bytes) queue_wait=%.3fs sem_wait=%.3fs download=%.3fs total=%.3fs",
-                ref.ccd, len(data_bytes),
+                ref.ccd, download_result.bytes_written,
                 t0 - t_yield if t_yield > 0 else 0.0,
-                t_sem - t0, t_dl - t_sem, t_dl - t_yield if t_yield > 0 else t_dl - t0,
+                t_sem - t0,
+                download_result.elapsed,
+                t_dl - t_yield if t_yield > 0 else t_dl - t0,
             )
             q.put(GenerateSingleFitsTilesProgress(ccd_name=ref.ccd, progress=Progress(4, 2)))
             return (ref, outpath, t_dl)
