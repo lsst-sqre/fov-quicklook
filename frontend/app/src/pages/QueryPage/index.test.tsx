@@ -48,7 +48,9 @@ function buildOptions(urlText: string) {
     return {
       repositories: ["embargo", "main"],
       collections: ["main/raw"],
+      collections_truncated: false,
       dataset_types: ["main_raw"],
+      dataset_types_truncated: false,
       where_examples: datasetType === "main_raw"
         ? [{ label: "Latest exposure (42)", where: "exposure=42" }]
         : [],
@@ -60,9 +62,11 @@ function buildOptions(urlText: string) {
     collections: collection?.includes("nightly")
       ? ["LSSTCam/runs/nightlyValidation"]
       : ["LSSTCam/raw/all", "LSSTCam/runs/nightlyValidation"],
+    collections_truncated: collection?.includes("nightly") ?? false,
     dataset_types: collection === "LSSTCam/runs/nightlyValidation"
       ? ["difference_image", "preliminary_visit_image"]
       : ["raw", "calexp"],
+    dataset_types_truncated: false,
     where_examples: datasetType === "difference_image"
       ? [{ label: "Latest visit (7001)", where: "visit=7001" }]
       : datasetType === "raw"
@@ -217,6 +221,30 @@ describe("QueryPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("location-search").textContent).toContain("repository_name=embargo")
     })
+  })
+
+  it("shows a trailing ellipsis option for truncated collection results without selecting it", async () => {
+    const { container } = renderQueryPage(["/query"])
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("main")).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByDisplayValue("main"), { target: { value: "embargo" } })
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
+    })
+
+    const collectionInput = screen.getByLabelText("Collection") as HTMLInputElement
+    fireEvent.change(collectionInput, { target: { value: "nightly" } })
+
+    await waitFor(() => {
+      expect(container.querySelector('datalist#query-page-collections option[value="..."]')).toBeTruthy()
+    })
+
+    fireEvent.change(collectionInput, { target: { value: "..." } })
+
+    expect(collectionInput.value).toBe("nightly")
   })
 
   it("submits the default query without adding where=null", async () => {

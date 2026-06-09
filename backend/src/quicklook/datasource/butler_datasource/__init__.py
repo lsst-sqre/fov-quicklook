@@ -1,5 +1,6 @@
 import threading
 from collections import Counter
+from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
 from itertools import islice
@@ -8,6 +9,8 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, cast
 from uuid import UUID
 
 from lsst.resources import ResourcePath
+from sqlalchemy import select
+from sqlalchemy.engine import Connection
 
 import quicklook.mylogging
 from quicklook.config import ButlerScopeConfig, config
@@ -23,11 +26,13 @@ if TYPE_CHECKING:
     from lsst.daf.butler import Butler as ButlerType
     from lsst.daf.butler import DatasetRef as ButlerDatasetRef
     from lsst.daf.butler import DimensionRecord as ButlerDimensionRecord
+    from lsst.daf.butler.registry import Registry as ButlerRegistryType
     from lsst.daf.butler.registry import CollectionArgType as ButlerCollectionArgType
 else:
     ButlerType = Any
     ButlerDatasetRef = Any
     ButlerDimensionRecord = Any
+    ButlerRegistryType = Any
     ButlerCollectionArgType = Any
 
 
@@ -36,6 +41,12 @@ _QUERY_BUILDER_SUGGESTION_LIMIT = 100
 _resolved_visit_runs: dict[str, str] = {}
 _resolved_visit_runs_lock = threading.Lock()
 logger = quicklook.mylogging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _QueryBuilderSuggestionResult:
+    values: tuple[str, ...]
+    truncated: bool = False
 
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
@@ -84,7 +95,7 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             selected_collection is not None
             and selected_dataset_type is not None
             and _collection_exists_for_repository(selected_repository, selected_collection)
-            and _dataset_type_exists_for_repository(selected_repository, selected_dataset_type)
+            and _dataset_type_exists_for_collection(selected_repository, selected_collection, selected_dataset_type)
         ):
             return QueryBuilderOptions(
                 repositories=repositories,
@@ -93,7 +104,7 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
                 where_examples=[],
             )
 
-        collections = _query_collections_for_repository(
+        collections = _query_collections_for_repository_result(
             selected_repository,
             search_text=collection,
         )
@@ -102,23 +113,21 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             if collection and _collection_exists_for_repository(selected_repository, collection)
             else None
         )
-        dataset_types = _query_dataset_types_for_repository(
+        dataset_types = _query_dataset_types_for_collection(
             selected_repository,
+            selected_collection,
             search_text=dataset_type,
-        )
-        selected_dataset_type = (
-            dataset_type
-            if dataset_type and _dataset_type_exists_for_repository(selected_repository, dataset_type)
-            else None
         )
         return QueryBuilderOptions(
             repositories=repositories,
-            collections=collections,
-            dataset_types=dataset_types,
+            collections=list(collections.values),
+            dataset_types=list(dataset_types.values),
             # Keep this endpoint limited to registry metadata. Probing dataset
             # contents here made exact matches for large collections unstable
             # enough to flap the deployed frontend.
             where_examples=[],
+            collections_truncated=collections.truncated,
+            dataset_types_truncated=dataset_types.truncated,
         )
 
     def resolve_visit_sync(self, visit: VisitName) -> VisitName:
@@ -155,7 +164,7 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             if datasource.dataset.quicklook_dimension != 'exposure':
                 continue
             if datasource.exposure_exists(exposure_id):
-                scope_ids.append(CcdDataType(scope.id))
+                scope_ids.append(CcdDataType(scope.id or build_scope_id(scope.repository_name, scope.collection, scope.dataset_type)))
         return scope_ids
 
 
@@ -709,19 +718,27 @@ def _dataset_required_dimension_names(dataset_type: Any) -> tuple[str, ...]:
 def _query_collections_for_repository(repository_name: str, *, search_text: str | None = None) -> list[str]:
     if not (search := _normalize_option_search_text(search_text)):
         return []
+    return list(_query_collections_for_repository_result(repository_name, search_text=search).values)
+
+
+def _query_collections_for_repository_result(
+    repository_name: str,
+    *,
+    search_text: str | None = None,
+) -> _QueryBuilderSuggestionResult:
+    if not (search := _normalize_option_search_text(search_text)):
+        return _QueryBuilderSuggestionResult(())
     instrument = _repository_instrument(repository_name)
     thread_id = threading.get_ident()
     return _run_query_builder_fallback(
         repository_name=repository_name,
         action='collection suggestions',
-        default=[],
-        func=lambda: list(
-            _query_collections_for_repository_cache(
-                repository_name,
-                instrument,
-                search,
-                thread_id=thread_id,
-            )
+        default=_QueryBuilderSuggestionResult(()),
+        func=lambda: _query_collections_for_repository_cache(
+            repository_name,
+            instrument,
+            search,
+            thread_id=thread_id,
         ),
     )
 
@@ -732,56 +749,163 @@ def _query_collections_for_repository_cache(
     instrument: str,
     search_text: str,
     thread_id: int,
-) -> tuple[str, ...]:
+) -> _QueryBuilderSuggestionResult:
     del thread_id
     butler = _get_query_repository_butler(repository_name, instrument)
-    collections = butler.registry.queryCollections(
-        _build_contains_glob(search_text),
-        flattenChains=False,
+    return _query_collection_suggestions(butler, search_text)
+
+
+def _query_collection_suggestions(
+    butler: ButlerType,
+    search_text: str,
+) -> _QueryBuilderSuggestionResult:
+    sql_registry = _get_sql_registry(butler.registry)
+    collection_table = sql_registry._managers.collections._tables.collection
+    sql = (
+        select(collection_table.c['name'])
+        .where(collection_table.c['name'].contains(search_text, autoescape=True))
+        .order_by(collection_table.c['name'])
+        .limit(_QUERY_BUILDER_SUGGESTION_LIMIT + 1)
     )
-    return tuple(sorted(cast(str, collection) for collection in islice(collections, _QUERY_BUILDER_SUGGESTION_LIMIT)))
+    with _get_db_connection(butler.registry) as db:
+        values = tuple(cast(str, value) for value in db.execute(sql).scalars().all())
+    return _limit_query_builder_suggestions(values)
 
 
-def _query_dataset_types_for_repository(repository_name: str, *, search_text: str | None = None) -> list[str]:
-    if not (search := _normalize_option_search_text(search_text)):
-        return []
+def query_collections(butler: ButlerType, search_pattern: str) -> Iterable[str]:
+    return _query_collection_suggestions(butler, search_pattern).values
+
+
+def _query_dataset_types_for_collection(
+    repository_name: str,
+    collection: str | None,
+    *,
+    search_text: str | None = None,
+) -> _QueryBuilderSuggestionResult:
+    if collection is None or not (search := _normalize_option_search_text(search_text)):
+        return _QueryBuilderSuggestionResult(())
     instrument = _repository_instrument(repository_name)
     thread_id = threading.get_ident()
     return _run_query_builder_fallback(
         repository_name=repository_name,
         action='dataset type suggestions',
-        default=[],
-        func=lambda: list(
-            _query_dataset_types_for_repository_cache(
-                repository_name,
-                instrument,
-                search,
-                thread_id=thread_id,
-            )
+        default=_QueryBuilderSuggestionResult(()),
+        func=lambda: _query_dataset_types_for_collection_cache(
+            repository_name,
+            instrument,
+            collection,
+            search,
+            thread_id=thread_id,
         ),
     )
 
 
 @lru_cache(128)
-def _query_dataset_types_for_repository_cache(
+def _query_dataset_types_for_collection_cache(
     repository_name: str,
     instrument: str,
+    collection: str,
     search_text: str,
     thread_id: int,
-) -> tuple[str, ...]:
+) -> _QueryBuilderSuggestionResult:
     del thread_id
     butler = _get_query_repository_butler(repository_name, instrument)
+    return _query_dataset_type_suggestions_for_collection(
+        butler,
+        collection=collection,
+        search_text=search_text,
+    )
+
+
+def _query_dataset_type_suggestions_for_collection(
+    butler: ButlerType,
+    *,
+    collection: str,
+    search_text: str,
+) -> _QueryBuilderSuggestionResult:
+    sql_registry = _get_sql_registry(butler.registry)
+    dataset_manager = sql_registry._managers.datasets
+    collection_manager = sql_registry._managers.collections
+    dataset_type_table = dataset_manager._static.dataset_type
+    summary_table = dataset_manager._summaries._tables.datasetType
+    collection_table = collection_manager._tables.collection
+    collection_key_name = dataset_manager._summaries._collectionKeyName
+    collection_id_name = collection_manager._collectionIdName
+    sql = (
+        select(dataset_type_table.c['name'])
+        .select_from(
+            dataset_type_table
+            .join(summary_table, summary_table.c['dataset_type_id'] == dataset_type_table.c['id'])
+            .join(collection_table, collection_table.c[collection_id_name] == summary_table.c[collection_key_name])
+        )
+        .where(collection_table.c['name'] == collection)
+        .where(dataset_type_table.c['name'].contains(search_text, autoescape=True))
+        .order_by(dataset_type_table.c['name'])
+        .distinct()
+    )
+    return _filter_query_builder_dataset_types(
+        butler=butler,
+        dataset_type_sql=sql,
+    )
+
+
+def query_datasets_for_collection(
+    butler: ButlerType,
+    collection: str,
+    search_pattern: str,
+) -> Iterable[str]:
+    return _query_dataset_type_suggestions_for_collection(
+        butler,
+        collection=collection,
+        search_text=search_pattern,
+    ).values
+
+
+def _filter_query_builder_dataset_types(
+    *,
+    butler: ButlerType,
+    dataset_type_sql: Any,
+) -> _QueryBuilderSuggestionResult:
     dataset_types: list[str] = []
-    for dataset_type in butler.registry.queryDatasetTypes(_build_contains_glob(search_text)):
-        dataset_type_name = cast(str, dataset_type.name)
-        try:
-            get_dataset(dataset_type_name).quicklook_dimensions(_dataset_required_dimension_names(dataset_type))
-        except ValueError:
-            continue
-        dataset_types.append(dataset_type_name)
-        if len(dataset_types) >= _QUERY_BUILDER_SUGGESTION_LIMIT:
-            break
-    return tuple(sorted(set(dataset_types)))
+    seen: set[str] = set()
+    batch_size = _QUERY_BUILDER_SUGGESTION_LIMIT + 1
+    offset = 0
+    with _get_db_connection(butler.registry) as db:
+        while len(dataset_types) <= _QUERY_BUILDER_SUGGESTION_LIMIT:
+            names = tuple(cast(str, value) for value in db.execute(dataset_type_sql.limit(batch_size).offset(offset)).scalars().all())
+            if not names:
+                break
+            offset += len(names)
+            for dataset_type_name in names:
+                if dataset_type_name in seen:
+                    continue
+                seen.add(dataset_type_name)
+                if not _dataset_type_supports_query_builder(butler, dataset_type_name):
+                    continue
+                dataset_types.append(dataset_type_name)
+                if len(dataset_types) > _QUERY_BUILDER_SUGGESTION_LIMIT:
+                    return _limit_query_builder_suggestions(tuple(dataset_types))
+            if len(names) < batch_size:
+                break
+    return _limit_query_builder_suggestions(tuple(dataset_types))
+
+
+def _limit_query_builder_suggestions(matches: tuple[str, ...]) -> _QueryBuilderSuggestionResult:
+    return _QueryBuilderSuggestionResult(
+        values=matches[:_QUERY_BUILDER_SUGGESTION_LIMIT],
+        truncated=len(matches) > _QUERY_BUILDER_SUGGESTION_LIMIT,
+    )
+
+
+def _get_sql_registry(registry: ButlerRegistryType) -> Any:
+    sql_registry = getattr(registry, '_registry', registry)
+    if not hasattr(sql_registry, '_db') or not hasattr(sql_registry, '_managers'):
+        raise TypeError(f'Query builder registry does not expose SQL internals: {type(registry)!r}')
+    return sql_registry
+
+
+def _get_db_connection(registry: ButlerRegistryType) -> Connection:
+    return _get_sql_registry(registry)._db._engine.connect()
 
 
 def _collection_exists_for_repository(repository_name: str, collection: str) -> bool:
@@ -808,23 +932,73 @@ def _collection_exists_for_repository_cache(
     thread_id: int,
 ) -> bool:
     del thread_id
-    from lsst.daf.butler._exceptions import MissingCollectionError
-
     butler = _get_query_repository_butler(repository_name, instrument)
-    try:
-        return collection in butler.registry.queryCollections(collection, flattenChains=False)
-    except MissingCollectionError:
-        return False
+    sql_registry = _get_sql_registry(butler.registry)
+    collection_table = sql_registry._managers.collections._tables.collection
+    sql = select(collection_table.c['name']).where(collection_table.c['name'] == collection).limit(1)
+    with _get_db_connection(butler.registry) as db:
+        return db.execute(sql).scalar_one_or_none() is not None
 
 
-def _dataset_type_exists_for_repository(repository_name: str, dataset_type: str) -> bool:
+def _dataset_type_exists_for_collection(repository_name: str, collection: str, dataset_type: str) -> bool:
     instrument = _repository_instrument(repository_name)
     thread_id = threading.get_ident()
     return _run_query_builder_fallback(
         repository_name=repository_name,
         action='dataset type existence check',
         default=False,
-        func=lambda: _dataset_type_exists_for_repository_cache(
+        func=lambda: _dataset_type_exists_for_collection_cache(
+            repository_name,
+            instrument,
+            collection,
+            dataset_type,
+            thread_id=thread_id,
+        ),
+    )
+
+
+@lru_cache(256)
+def _dataset_type_exists_for_collection_cache(
+    repository_name: str,
+    instrument: str,
+    collection: str,
+    dataset_type: str,
+    thread_id: int,
+) -> bool:
+    del thread_id
+    butler = _get_query_repository_butler(repository_name, instrument)
+    if not _is_query_builder_dataset_type(repository_name, instrument, dataset_type):
+        return False
+    sql_registry = _get_sql_registry(butler.registry)
+    dataset_manager = sql_registry._managers.datasets
+    collection_manager = sql_registry._managers.collections
+    dataset_type_table = dataset_manager._static.dataset_type
+    summary_table = dataset_manager._summaries._tables.datasetType
+    collection_table = collection_manager._tables.collection
+    collection_key_name = dataset_manager._summaries._collectionKeyName
+    collection_id_name = collection_manager._collectionIdName
+    sql = (
+        select(dataset_type_table.c['name'])
+        .select_from(
+            dataset_type_table
+            .join(summary_table, summary_table.c['dataset_type_id'] == dataset_type_table.c['id'])
+            .join(collection_table, collection_table.c[collection_id_name] == summary_table.c[collection_key_name])
+        )
+        .where(collection_table.c['name'] == collection)
+        .where(dataset_type_table.c['name'] == dataset_type)
+        .limit(1)
+    )
+    with _get_db_connection(butler.registry) as db:
+        return db.execute(sql).scalar_one_or_none() is not None
+
+
+def _is_query_builder_dataset_type(repository_name: str, instrument: str, dataset_type: str) -> bool:
+    thread_id = threading.get_ident()
+    return _run_query_builder_fallback(
+        repository_name=repository_name,
+        action='dataset type compatibility check',
+        default=False,
+        func=lambda: _is_query_builder_dataset_type_cache(
             repository_name,
             instrument,
             dataset_type,
@@ -834,29 +1008,29 @@ def _dataset_type_exists_for_repository(repository_name: str, dataset_type: str)
 
 
 @lru_cache(256)
-def _dataset_type_exists_for_repository_cache(
+def _is_query_builder_dataset_type_cache(
     repository_name: str,
     instrument: str,
     dataset_type: str,
     thread_id: int,
 ) -> bool:
     del thread_id
+    butler = _get_query_repository_butler(repository_name, instrument)
+    return _dataset_type_supports_query_builder(butler, dataset_type)
+
+
+def _dataset_type_supports_query_builder(butler: ButlerType, dataset_type: str) -> bool:
     from lsst.daf.butler._exceptions import MissingDatasetTypeError
 
-    butler = _get_query_repository_butler(repository_name, instrument)
     try:
-        for candidate in butler.registry.queryDatasetTypes(dataset_type):
-            dataset_type_name = cast(str, candidate.name)
-            if dataset_type_name != dataset_type:
-                continue
-            try:
-                get_dataset(dataset_type_name).quicklook_dimensions(_dataset_required_dimension_names(candidate))
-            except ValueError:
-                continue
-            return True
-        return False
+        candidate = butler.registry.getDatasetType(dataset_type)
     except MissingDatasetTypeError:
         return False
+    try:
+        get_dataset(dataset_type).quicklook_dimensions(_dataset_required_dimension_names(candidate))
+    except ValueError:
+        return False
+    return True
 
 
 def _normalize_option_search_text(text: str | None) -> str | None:
@@ -864,10 +1038,6 @@ def _normalize_option_search_text(text: str | None) -> str | None:
         return None
     normalized = text.strip()
     return normalized or None
-
-
-def _build_contains_glob(search_text: str) -> str:
-    return f'*{search_text}*'
 
 
 def _run_query_builder_fallback(

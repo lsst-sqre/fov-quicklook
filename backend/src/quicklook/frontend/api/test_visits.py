@@ -55,6 +55,8 @@ async def test_get_query_builder_options_forwards_filters(monkeypatch):
             collections=['LSSTCam/raw/all'],
             dataset_types=['raw'],
             where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+            collections_truncated=False,
+            dataset_types_truncated=False,
         )
 
     monkeypatch.setattr(visits, 'http_request', fake_http_request)
@@ -71,6 +73,8 @@ async def test_get_query_builder_options_forwards_filters(monkeypatch):
         collections=['LSSTCam/raw/all'],
         dataset_types=['raw'],
         where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+        collections_truncated=False,
+        dataset_types_truncated=False,
     )
     assert captured["request"] == (
         'get',

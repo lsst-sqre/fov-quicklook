@@ -70,7 +70,10 @@ class DummyDataSource(DataSourceBase):
         dataset_types = sorted({
             VisitName(visit.id).dataset_type
             for visit in scoped_visits
-            if dataset_type_search and dataset_type_search.casefold() in VisitName(visit.id).dataset_type.casefold()
+            if selected_collection is not None
+            and VisitName(visit.id).collection == selected_collection
+            and dataset_type_search
+            and dataset_type_search.casefold() in VisitName(visit.id).dataset_type.casefold()
         })
         selected_dataset_type = dataset_type if dataset_type and any(candidate == dataset_type for candidate in dataset_types) else None
         where_examples = _build_dummy_where_examples(

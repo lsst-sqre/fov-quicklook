@@ -74,6 +74,8 @@ class QueryBuilderOptions:
     collections: list[str]
     dataset_types: list[str]
     where_examples: list[QueryWhereExample]
+    collections_truncated: bool = False
+    dataset_types_truncated: bool = False
 
 
 class DataSourceBase(abc.ABC):

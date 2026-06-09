@@ -28,14 +28,18 @@ type QueryWhereExample = {
 type QueryBuilderOptions = {
   repositories: string[]
   collections: string[]
+  collections_truncated: boolean
   dataset_types: string[]
+  dataset_types_truncated: boolean
   where_examples: QueryWhereExample[]
 }
 
 const EMPTY_OPTIONS: QueryBuilderOptions = {
   repositories: [],
   collections: [],
+  collections_truncated: false,
   dataset_types: [],
+  dataset_types_truncated: false,
   where_examples: [],
 }
 
@@ -254,11 +258,17 @@ export function QueryPage() {
                     spellCheck={false}
                     type="text"
                     value={form.collection}
-                    onChange={(event) => updateCollection(event.target.value)}
+                    onChange={(event) => {
+                      if (event.target.value === "...") {
+                        return
+                      }
+                      updateCollection(event.target.value)
+                    }}
                     placeholder="Type to filter collections"
                   />
                   <datalist id="query-page-collections">
                     {collectionOptions.map((option) => <option key={option} value={option} />)}
+                    {options.collections_truncated && <option value="..." />}
                   </datalist>
                 </>
               ) : (
@@ -277,11 +287,17 @@ export function QueryPage() {
                     spellCheck={false}
                     type="text"
                     value={form.datasetType}
-                    onChange={(event) => updateDatasetType(event.target.value)}
+                    onChange={(event) => {
+                      if (event.target.value === "...") {
+                        return
+                      }
+                      updateDatasetType(event.target.value)
+                    }}
                     placeholder="Type to filter dataset types"
                   />
                   <datalist id="query-page-dataset-types">
                     {datasetTypeOptions.map((option) => <option key={option} value={option} />)}
+                    {options.dataset_types_truncated && <option value="..." />}
                   </datalist>
                 </>
               ) : (
@@ -579,7 +595,19 @@ async function fetchQueryBuilderOptions(
   ) {
     throw new Error("Failed to load query options.")
   }
-  return payload as QueryBuilderOptions
+  const collectionsTruncated = (payload as { collections_truncated?: unknown }).collections_truncated
+  const datasetTypesTruncated = (payload as { dataset_types_truncated?: unknown }).dataset_types_truncated
+  if (collectionsTruncated !== undefined && typeof collectionsTruncated !== "boolean") {
+    throw new Error("Failed to load query options.")
+  }
+  if (datasetTypesTruncated !== undefined && typeof datasetTypesTruncated !== "boolean") {
+    throw new Error("Failed to load query options.")
+  }
+  return {
+    ...(payload as Omit<QueryBuilderOptions, "collections_truncated" | "dataset_types_truncated">),
+    collections_truncated: collectionsTruncated === true,
+    dataset_types_truncated: datasetTypesTruncated === true,
+  }
 }
 
 async function readErrorDetail(response: Response): Promise<string | null> {

@@ -502,7 +502,9 @@ export type QueryWhereExample = {
 export type QueryBuilderOptions = {
   repositories: string[];
   collections: string[];
+  collections_truncated?: boolean;
   dataset_types: string[];
+  dataset_types_truncated?: boolean;
   where_examples: QueryWhereExample[];
 };
 export type VisitEntry = {
