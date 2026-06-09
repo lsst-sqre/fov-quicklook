@@ -99,6 +99,39 @@ def test_query_visits_reverse_flips_default_order(monkeypatch):
     assert order_calls == [('day_obs',)]
 
 
+def test_query_visits_passes_all_collections_when_collection_is_empty(monkeypatch):
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            calls.append((dimension, kwargs))
+            return FakeDimensionRecordResults([])
+
+    ds = _make_datasource(dataset_type='raw', registry=FakeRegistry())
+    ds._collection = ''
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
+
+    ds.query_visits(
+        Query(
+            repository_name='repo',
+            collection='',
+            dataset_type='raw',
+            limit=5,
+        )
+    )
+
+    assert calls == [
+        (
+            'exposure',
+            {
+                'datasets': 'raw',
+                'collections': ...,
+                'where': 'day_obs=20250301',
+            },
+        )
+    ]
+
+
 def test_query_visits_resolves_collection_from_dataset_run_when_collection_is_empty(monkeypatch):
     record = SimpleNamespace(
         id=2026012800342,
@@ -117,6 +150,7 @@ def test_query_visits_resolves_collection_from_dataset_run_when_collection_is_em
             assert dimension == 'exposure'
             assert kwargs == {
                 'datasets': 'raw',
+                'collections': ...,
                 'where': 'day_obs=20250301',
             }
             return FakeDimensionRecordResults([record])

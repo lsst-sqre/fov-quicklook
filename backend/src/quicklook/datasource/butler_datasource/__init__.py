@@ -404,7 +404,7 @@ class ScopedButlerDataSource:
         kwargs: dict[str, Any] = {}
         if datasets is not None:
             kwargs['datasets'] = datasets
-            if self.dataset_type == 'difference_image':
+            if not self.collection or self.dataset_type == 'difference_image':
                 kwargs['collections'] = self._query_collections()
         if where:
             kwargs['where'] = where
@@ -430,7 +430,7 @@ class ScopedButlerDataSource:
         kwargs: dict[str, Any] = {}
         if datasets is not None:
             kwargs['datasets'] = datasets
-            if self.dataset_type == 'difference_image':
+            if not self.collection or self.dataset_type == 'difference_image':
                 kwargs['collections'] = self._query_collections()
         if where:
             kwargs['where'] = where
