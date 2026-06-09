@@ -30,6 +30,7 @@ logger = quicklook.mylogging.getLogger(__name__)
 # ローカルFSからの読み込みは非常に高速なため、制限なしでは全CCDが
 # 一度にダウンロードされてtmpディレクトリとメモリを圧迫する。
 _download_semaphore_size = config.generator_max_concurrent_ccds_per_job + 2
+_QUEUE_DONE = object()
 
 
 @dataclass
@@ -66,8 +67,9 @@ def generate_single_fits_tiles_pipeline(
         return
 
     with tempfile.TemporaryDirectory() as tmpdir, multiprocessing.Manager() as manager:
-        q = cast(
-            queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata | None],
+        q: queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata | object] = queue.Queue()
+        progress_queue = cast(
+            queue.Queue[GenerateSingleFitsTilesProgress | None],
             manager.Queue(),
         )
 
@@ -131,7 +133,7 @@ def generate_single_fits_tiles_pipeline(
                                 job,
                                 ref,
                                 path,
-                                q,  # type:ignore
+                                progress_queue,  # type:ignore
                                 download_sem,
                                 pool_submit_time=time.monotonic(),
                                 download_done_time=dl_done_time,
@@ -147,13 +149,29 @@ def generate_single_fits_tiles_pipeline(
                 raise
             finally:
                 logger.info(f"main() finished, total CcdMetadata queued: {ccd_count}")
-                q.put(None)  # type: ignore
+                progress_queue.put(None)  # type: ignore
+                q.put(_QUEUE_DONE)
 
-        with ThreadPoolExecutor(1) as executor:
+        def drain_progress_queue():
+            while True:
+                msg = progress_queue.get()
+                if msg is None:
+                    break
+                q.put(msg)
+            q.put(_QUEUE_DONE)
+
+        with ThreadPoolExecutor(2) as executor:
             fut = executor.submit(main)
-            while msg := q.get():
+            progress_fut = executor.submit(drain_progress_queue)
+            done_count = 0
+            while done_count < 2:
+                msg = q.get()
+                if msg is _QUEUE_DONE:
+                    done_count += 1
+                    continue
                 yield msg
             fut.result()
+            progress_fut.result()
 
     gc.collect()
 
