@@ -70,6 +70,7 @@ export function Combobox({ value, options, truncated, placeholder, onChange }: C
         aria-expanded={isOpen}
         role="combobox"
         spellCheck={false}
+        style={inputStyle}
         type="text"
         value={value}
         onBlur={() => setIsOpen(false)}
@@ -127,10 +128,23 @@ const listboxStyle = {
   maxWidth: "min(90vw, 64rem)",
   maxHeight: "18rem",
   overflowY: "auto",
-  border: "1px solid #c8d1dc",
-  borderRadius: "6px",
-  backgroundColor: "#fff",
-  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.16)",
+  border: "1px solid rgba(255, 255, 255, 0.15)",
+  borderRadius: "8px",
+  backgroundColor: "rgba(31, 31, 31, 0.94)",
+  color: "rgba(255, 255, 255, 0.92)",
+  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.4)",
+  backdropFilter: "blur(6px)",
+} as const
+
+const inputStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  minHeight: "38px",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  border: "1px solid rgba(255, 255, 255, 0.15)",
+  backgroundColor: "rgba(255, 255, 255, 0.05)",
+  color: "inherit",
 } as const
 
 const optionStyle = {
@@ -140,11 +154,11 @@ const optionStyle = {
 } as const
 
 const activeOptionStyle = {
-  backgroundColor: "#e8eefc",
+  backgroundColor: "rgba(255, 255, 255, 0.16)",
 } as const
 
 const ellipsisStyle = {
   padding: "8px 12px",
-  color: "#6b7280",
+  color: "rgba(255, 255, 255, 0.6)",
   whiteSpace: "nowrap",
 } as const

@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useSta
 import { useSelector } from "react-redux"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { Combobox } from "../../components/Combobox"
+import { LoadingSpinner } from "../../components/Loading"
 import { env } from "../../env"
 import { buildScopeId, parseVisitId } from "../../quicklookId"
 import { AppState } from "../../store"
@@ -341,11 +342,10 @@ export function QueryPage() {
         <>
           <div style={summaryStyle}>
             <span>Results: {data?.length ?? 0}</span>
-            {(isLoading || isFetching) && <span>Loading...</span>}
           </div>
           {error && <p role="alert">{formatQueryError(error)}</p>}
-          {!isLoading && !error && data?.length === 0 && <p>No visits matched the query.</p>}
-          {data && data.length > 0 && (
+          {!isLoading && !isFetching && !error && data?.length === 0 && <p>No visits matched the query.</p>}
+          {(data || isLoading || isFetching) && (
             <div style={tableContainerStyle}>
               <table style={tableStyle}>
                 <thead>
@@ -363,11 +363,16 @@ export function QueryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((entry) => (
+                  {(data ?? []).map((entry) => (
                     <VisitRow entry={entry} key={entry.id} showCollectionColumn={showCollectionColumn} />
                   ))}
                 </tbody>
               </table>
+              {(isLoading || isFetching) && (
+                <div style={loadingOverlayStyle}>
+                  <LoadingSpinner size="100px" />
+                </div>
+              )}
             </div>
           )}
         </>
@@ -712,10 +717,22 @@ const summaryStyle = {
 } as const
 
 const tableContainerStyle = {
+  position: "relative",
   overflow: "auto",
+  minHeight: "220px",
 } as const
 
 const tableStyle = {
   width: "100%",
   borderCollapse: "collapse",
+} as const
+
+const loadingOverlayStyle = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "rgba(0, 0, 0, 0.35)",
+  backdropFilter: "blur(1px)",
 } as const
