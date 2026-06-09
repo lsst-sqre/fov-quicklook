@@ -123,3 +123,33 @@ def test_download_ccd_to_path_raises_after_second_timeout(tmp_path: Path) -> Non
     assert first.terminated
     assert second.terminated
     assert not outpath.exists()
+
+
+def test_download_ccd_to_path_uses_bootstrap_timeout_before_adaptive_timeout_is_fixed(tmp_path: Path) -> None:
+    timeout = AdaptiveDownloadTimeout(total_downloads=4, bootstrap_timeout_seconds=3.0)
+    assert timeout.timeout_seconds is None
+    assert timeout.active_timeout_seconds == pytest.approx(3.0)
+
+    clock = FakeClock()
+    created_operations: list[FakeDownloadOperation] = []
+    outpath = tmp_path / "ccd.fits"
+
+    def start_operation(ref: CcdDataRef, path: Path) -> FakeDownloadOperation:
+        path.write_bytes(b"partial")
+        operation = FakeDownloadOperation(clock, finish_after=None, bytes_written=1)
+        created_operations.append(operation)
+        return operation
+
+    with pytest.raises(CcdDownloadTimeoutError, match="limit 3.000s"):
+        download_ccd_to_path(
+            make_ref("R00_S03"),
+            outpath,
+            timeout=timeout,
+            start_operation=start_operation,
+            monotonic=clock.monotonic,
+            sleep=clock.sleep,
+            poll_interval_seconds=0.5,
+        )
+
+    assert len(created_operations) == 2
+    assert all(operation.terminated for operation in created_operations)

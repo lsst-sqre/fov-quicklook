@@ -18,6 +18,7 @@ logger = quicklook.mylogging.getLogger(__name__)
 
 _DEFAULT_POLL_INTERVAL_SECONDS = 0.1
 _MAX_DOWNLOAD_ATTEMPTS = 2
+_BOOTSTRAP_DOWNLOAD_TIMEOUT_SECONDS = 60.0
 
 
 class DownloadOperation(Protocol):
@@ -51,12 +52,15 @@ class CcdDownloadTimeoutError(TimeoutError):
 
 
 class AdaptiveDownloadTimeout:
-    def __init__(self, *, total_downloads: int):
+    def __init__(self, *, total_downloads: int, bootstrap_timeout_seconds: float = _BOOTSTRAP_DOWNLOAD_TIMEOUT_SECONDS):
         if total_downloads <= 0:
             raise ValueError("total_downloads must be positive")
+        if bootstrap_timeout_seconds <= 0:
+            raise ValueError("bootstrap_timeout_seconds must be positive")
         self._sample_target = (total_downloads + 1) // 2
         self._durations: list[float] = []
         self._timeout_seconds: float | None = None
+        self._bootstrap_timeout_seconds = bootstrap_timeout_seconds
         self._lock = threading.Lock()
 
     @property
@@ -67,6 +71,11 @@ class AdaptiveDownloadTimeout:
     def timeout_seconds(self) -> float | None:
         with self._lock:
             return self._timeout_seconds
+
+    @property
+    def active_timeout_seconds(self) -> float:
+        with self._lock:
+            return self._timeout_seconds or self._bootstrap_timeout_seconds
 
     def record_success(self, ref: CcdDataRef, elapsed: float) -> None:
         with self._lock:
@@ -217,16 +226,15 @@ def _wait_for_download(
     poll_interval_seconds: float,
 ) -> int:
     while not operation.is_finished():
-        timeout_seconds = timeout.timeout_seconds
-        if timeout_seconds is not None:
-            elapsed = monotonic() - started_at
-            if elapsed >= timeout_seconds:
-                operation.terminate()
-                raise CcdDownloadTimeoutError(
-                    ref,
-                    elapsed=elapsed,
-                    timeout_seconds=timeout_seconds,
-                    attempt=attempt,
-                )
+        timeout_seconds = timeout.active_timeout_seconds
+        elapsed = monotonic() - started_at
+        if elapsed >= timeout_seconds:
+            operation.terminate()
+            raise CcdDownloadTimeoutError(
+                ref,
+                elapsed=elapsed,
+                timeout_seconds=timeout_seconds,
+                attempt=attempt,
+            )
         sleep(poll_interval_seconds)
     return operation.result()
