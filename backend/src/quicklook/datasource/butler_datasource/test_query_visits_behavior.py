@@ -109,6 +109,7 @@ def test_query_visits_passes_all_collections_when_collection_is_empty(monkeypatc
 
     ds = _make_datasource(dataset_type='raw', registry=FakeRegistry())
     ds._collection = ''
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
 
     ds.query_visits(
         Query(
@@ -125,6 +126,7 @@ def test_query_visits_passes_all_collections_when_collection_is_empty(monkeypatc
             {
                 'datasets': 'raw',
                 'collections': ...,
+                'where': 'day_obs=20250301',
             },
         )
     ]
@@ -149,11 +151,13 @@ def test_query_visits_resolves_collection_from_dataset_run_when_collection_is_em
             assert kwargs == {
                 'datasets': 'raw',
                 'collections': ...,
+                'where': 'day_obs=20250301',
             }
             return FakeDimensionRecordResults([record])
 
     ds = _make_datasource(dataset_type='raw', registry=FakeRegistry())
     ds._collection = ''
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
     monkeypatch.setattr(
         ds,
         '_query_datasets',

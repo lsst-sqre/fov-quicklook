@@ -222,11 +222,10 @@ class ScopedButlerDataSource:
         return self.dataset.partial
 
     def query_visits(self, q: Query) -> list[VisitEntry]:
-        default_where = None if not self.collection else self._build_latest_day_where()
         records = self._query_dimension_records(
             self.data_id_dimension,
             datasets=self.dataset_type,
-            where=q.where if q.where is not None else default_where,
+            where=q.where if q.where is not None else self._build_latest_day_where(),
             limit=q.limit,
             offset=q.offset,
             order_by=self._normalize_order_by(q.order_by, q.reverse),
