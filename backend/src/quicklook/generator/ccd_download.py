@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import multiprocessing
-import queue
+import json
 import statistics
+import subprocess
+import sys
 import threading
 import time
-import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
 import quicklook.mylogging
-from quicklook.datasource import get_datasource
 from quicklook.types import CcdDataRef
 
 logger = quicklook.mylogging.getLogger(__name__)
@@ -97,69 +96,55 @@ class AdaptiveDownloadTimeout:
             )
 
 
-@dataclass
-class _DownloadWorkerResult:
-    bytes_written: int | None = None
-    error_type: str | None = None
-    error_message: str | None = None
-    traceback_text: str | None = None
-
-
-def _download_to_file_worker(ref: CcdDataRef, outpath: str, result_queue: Any) -> None:
-    try:
-        data = get_datasource().get_data_sync(ref)
-        bytes_written = Path(outpath).write_bytes(data)
-        result_queue.put(_DownloadWorkerResult(bytes_written=bytes_written))
-    except Exception as e:
-        result_queue.put(
-            _DownloadWorkerResult(
-                error_type=type(e).__name__,
-                error_message=str(e),
-                traceback_text=traceback.format_exc(),
-            )
-        )
-
-
 class _SubprocessDownloadOperation:
     def __init__(self, ref: CcdDataRef, outpath: Path):
-        ctx = multiprocessing.get_context("spawn")
-        self._queue = ctx.Queue(maxsize=1)
-        self._process = ctx.Process(
-            target=_download_to_file_worker,
-            args=(ref, str(outpath), self._queue),
+        self._process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "quicklook.generator.ccd_download_worker",
+                str(ref.visit),
+                str(ref.ccd),
+                str(outpath),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
-        self._process.start()
         self._closed = False
 
     def is_finished(self) -> bool:
-        return not self._process.is_alive()
+        return self._process.poll() is not None
 
     def result(self) -> int:
-        self._process.join()
+        stdout, stderr = self._process.communicate()
+        self._close()
         try:
-            result = self._queue.get(timeout=1.0)
-        except queue.Empty as e:
-            raise RuntimeError(f"Download worker exited without a result (exitcode={self._process.exitcode})") from e
-        finally:
-            self._close()
-        if result.bytes_written is not None:
-            return result.bytes_written
-        error_type = result.error_type or "RuntimeError"
-        error_message = result.error_message or "unknown download failure"
-        details = result.traceback_text or ""
+            result = json.loads(stdout or "{}")
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                f"Download worker returned invalid JSON (returncode={self._process.returncode}): {stderr or stdout}"
+            ) from e
+        if result.get("bytes_written") is not None and self._process.returncode == 0:
+            return int(result["bytes_written"])
+        error_type = result.get("error_type") or "RuntimeError"
+        error_message = result.get("error_message") or stderr or "unknown download failure"
+        details = result.get("traceback_text") or stderr or ""
         raise RuntimeError(f"{error_type}: {error_message}\n{details}".rstrip())
 
     def terminate(self) -> None:
-        if self._process.is_alive():
+        if self._process.poll() is None:
             self._process.terminate()
-        self._process.join()
+            self._process.wait(timeout=5)
         self._close()
 
     def _close(self) -> None:
         if self._closed:
             return
-        self._queue.close()
-        self._process.close()
+        if self._process.stdout is not None:
+            self._process.stdout.close()
+        if self._process.stderr is not None:
+            self._process.stderr.close()
         self._closed = True
 
 
