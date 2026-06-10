@@ -62,10 +62,6 @@ def generate_single_fits_tiles_pipeline(
     job: Job,
     refs: Iterable[CcdDataRef],
 ) -> Generator[GenerateSingleFitsTilesProgress | CcdMetadata]:
-    refs = list(refs)
-    if not refs:
-        return
-
     with tempfile.TemporaryDirectory() as tmpdir, multiprocessing.Manager() as manager:
         q: queue.Queue[GenerateSingleFitsTilesProgress | CcdMetadata | object] = queue.Queue()
         progress_queue = cast(
@@ -77,7 +73,12 @@ def generate_single_fits_tiles_pipeline(
         # download()でacquire → _process_ccd()のunlink後にrelease。
         # Manager経由で作成し、プロセス間で共有可能にする。
         download_sem = manager.Semaphore(_download_semaphore_size)
-        adaptive_timeout = AdaptiveDownloadTimeout(total_downloads=len(refs))
+        # refs is a live stream from the coordinator. Materializing it here would
+        # block until the coordinator sends the terminal sentinel, which only
+        # happens after CCD processing completes.
+        adaptive_timeout = AdaptiveDownloadTimeout(
+            sample_target=max((config.generator_max_concurrent_ccds_per_job + 1) // 2, 1)
+        )
 
         # パイプライン各段階のタイムスタンプ記録用
         ccd_timestamps: dict[str, float] = {}  # ccd_name → ccd_generator yield時刻

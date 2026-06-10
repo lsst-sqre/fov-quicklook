@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 
 import pytest
@@ -54,6 +55,16 @@ def test_adaptive_timeout_is_fixed_after_half_downloads() -> None:
     assert timeout.timeout_seconds == pytest.approx(4.0)
 
     timeout.record_success(make_ref("R00_S03"), 99.0)
+    assert timeout.timeout_seconds == pytest.approx(4.0)
+
+
+def test_adaptive_timeout_accepts_explicit_sample_target() -> None:
+    timeout = AdaptiveDownloadTimeout(sample_target=2)
+
+    timeout.record_success(make_ref("R00_S00"), 1.0)
+    assert timeout.timeout_seconds is None
+
+    timeout.record_success(make_ref("R00_S01"), 3.0)
     assert timeout.timeout_seconds == pytest.approx(4.0)
 
 
@@ -153,3 +164,20 @@ def test_download_ccd_to_path_uses_bootstrap_timeout_before_adaptive_timeout_is_
 
     assert len(created_operations) == 2
     assert all(operation.terminated for operation in created_operations)
+
+
+def test_ccd_download_timeout_error_is_picklable() -> None:
+    error = CcdDownloadTimeoutError.from_ref(
+        make_ref("R00_S04"),
+        elapsed=12.5,
+        timeout_seconds=10.0,
+        attempt=2,
+    )
+
+    restored = pickle.loads(pickle.dumps(error))
+
+    assert str(restored) == str(error)
+    assert restored.ref == error.ref
+    assert restored.elapsed == error.elapsed
+    assert restored.timeout_seconds == error.timeout_seconds
+    assert restored.attempt == error.attempt

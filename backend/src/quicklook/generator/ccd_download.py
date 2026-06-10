@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 import quicklook.mylogging
-from quicklook.types import CcdDataRef
+from quicklook.types import CcdDataRef, CcdName, VisitName
 
 logger = quicklook.mylogging.getLogger(__name__)
 
@@ -39,24 +39,57 @@ class DownloadedCcd:
 
 
 class CcdDownloadTimeoutError(TimeoutError):
-    def __init__(self, ref: CcdDataRef, *, elapsed: float, timeout_seconds: float, attempt: int):
-        super().__init__(
-            f"Timed out downloading {ref.ccd} after {elapsed:.3f}s "
-            f"(limit {timeout_seconds:.3f}s, attempt {attempt}/{_MAX_DOWNLOAD_ATTEMPTS})"
-        )
-        self.ref = ref
+    def __init__(self, visit: str, ccd_name: str, elapsed: float, timeout_seconds: float, attempt: int):
+        self._pickle_args = (visit, ccd_name, elapsed, timeout_seconds, attempt)
+        self.ref = CcdDataRef(visit=VisitName(visit), ccd=CcdName(ccd_name))
         self.elapsed = elapsed
         self.timeout_seconds = timeout_seconds
         self.attempt = attempt
+        super().__init__(
+            f"Timed out downloading {ccd_name} after {elapsed:.3f}s "
+            f"(limit {timeout_seconds:.3f}s, attempt {attempt}/{_MAX_DOWNLOAD_ATTEMPTS})"
+        )
+
+    @classmethod
+    def from_ref(
+        cls,
+        ref: CcdDataRef,
+        *,
+        elapsed: float,
+        timeout_seconds: float,
+        attempt: int,
+    ) -> "CcdDownloadTimeoutError":
+        return cls(
+            str(ref.visit),
+            str(ref.ccd),
+            elapsed,
+            timeout_seconds,
+            attempt,
+        )
+
+    def __reduce__(self):
+        return (type(self), self._pickle_args)
 
 
 class AdaptiveDownloadTimeout:
-    def __init__(self, *, total_downloads: int, bootstrap_timeout_seconds: float = _BOOTSTRAP_DOWNLOAD_TIMEOUT_SECONDS):
-        if total_downloads <= 0:
+    def __init__(
+        self,
+        *,
+        total_downloads: int | None = None,
+        sample_target: int | None = None,
+        bootstrap_timeout_seconds: float = _BOOTSTRAP_DOWNLOAD_TIMEOUT_SECONDS,
+    ):
+        if total_downloads is not None and total_downloads <= 0:
             raise ValueError("total_downloads must be positive")
+        if sample_target is None:
+            if total_downloads is None:
+                raise ValueError("total_downloads or sample_target must be provided")
+            sample_target = (total_downloads + 1) // 2
+        if sample_target <= 0:
+            raise ValueError("sample_target must be positive")
         if bootstrap_timeout_seconds <= 0:
             raise ValueError("bootstrap_timeout_seconds must be positive")
-        self._sample_target = (total_downloads + 1) // 2
+        self._sample_target = sample_target
         self._durations: list[float] = []
         self._timeout_seconds: float | None = None
         self._bootstrap_timeout_seconds = bootstrap_timeout_seconds
@@ -215,7 +248,7 @@ def _wait_for_download(
         elapsed = monotonic() - started_at
         if elapsed >= timeout_seconds:
             operation.terminate()
-            raise CcdDownloadTimeoutError(
+            raise CcdDownloadTimeoutError.from_ref(
                 ref,
                 elapsed=elapsed,
                 timeout_seconds=timeout_seconds,
