@@ -7,7 +7,13 @@ import pytest
 
 from quicklook.comm.generator import set_generator_id_for_test
 from quicklook.datasource import get_datasource
-from quicklook.generator.generate_single_fits_tiles import ProcessCcdArgs, _process_ccd, generate_single_fits_tiles_pipeline  # generate_single_fits_tiles,
+from quicklook.generator.generate_single_fits_tiles import (
+    CcdMetadata,
+    GenerateSingleFitsTilesProgress,
+    ProcessCcdArgs,
+    _process_ccd,
+    generate_single_fits_tiles_pipeline,
+)
 from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, CcdName, VisitName
 
@@ -61,5 +67,7 @@ def test_generate_single_fits_tiles_pipeline(broccoli_visit: VisitName):
         CcdDataRef(visit=broccoli_visit, ccd=CcdName('R00_SG0')),
         CcdDataRef(visit=broccoli_visit, ccd=CcdName('R00_SG1')),
     ]
-    for _ in generate_single_fits_tiles_pipeline(job, ccd_refs):
-        print(_)
+    messages = list(generate_single_fits_tiles_pipeline(job, ccd_refs))
+
+    assert any(isinstance(message, GenerateSingleFitsTilesProgress) for message in messages)
+    assert any(isinstance(message, CcdMetadata) for message in messages)

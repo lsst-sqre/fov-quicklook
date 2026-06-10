@@ -261,7 +261,7 @@ export type ListVisitsApiResponse =
   /** status 200 Successful Response */ VisitEntry[];
 export type ListVisitsApiArg = {
   repositoryName: string;
-  collection: string;
+  collection?: string;
   datasetType: string;
   where?: string | null;
   orderBy?: string | null;
@@ -502,7 +502,9 @@ export type QueryWhereExample = {
 export type QueryBuilderOptions = {
   repositories: string[];
   collections: string[];
+  collections_truncated?: boolean;
   dataset_types: string[];
+  dataset_types_truncated?: boolean;
   where_examples: QueryWhereExample[];
 };
 export type VisitEntry = {

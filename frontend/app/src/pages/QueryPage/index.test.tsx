@@ -48,7 +48,9 @@ function buildOptions(urlText: string) {
     return {
       repositories: ["embargo", "main"],
       collections: ["main/raw"],
+      collections_truncated: false,
       dataset_types: ["main_raw"],
+      dataset_types_truncated: false,
       where_examples: datasetType === "main_raw"
         ? [{ label: "Latest exposure (42)", where: "exposure=42" }]
         : [],
@@ -60,9 +62,11 @@ function buildOptions(urlText: string) {
     collections: collection?.includes("nightly")
       ? ["LSSTCam/runs/nightlyValidation"]
       : ["LSSTCam/raw/all", "LSSTCam/runs/nightlyValidation"],
-    dataset_types: collection === "LSSTCam/runs/nightlyValidation"
-      ? ["difference_image", "preliminary_visit_image"]
-      : ["raw", "calexp"],
+    collections_truncated: collection?.includes("nightly") ?? false,
+    dataset_types: datasetType === "prelim"
+      ? ["preliminary_visit_image"]
+      : ["raw", "calexp", "difference_image", "preliminary_visit_image"],
+    dataset_types_truncated: false,
     where_examples: datasetType === "difference_image"
       ? [{ label: "Latest visit (7001)", where: "visit=7001" }]
       : datasetType === "raw"
@@ -162,7 +166,6 @@ describe("QueryPage", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
-    vi.restoreAllMocks()
   })
 
   it("renders search results from the current query string", async () => {
@@ -219,6 +222,68 @@ describe("QueryPage", () => {
     })
   })
 
+  it("shows a trailing ellipsis option for truncated collection results without selecting it", async () => {
+    const { container } = renderQueryPage(["/query"])
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("main")).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByDisplayValue("main"), { target: { value: "embargo" } })
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
+    })
+
+    const collectionInput = screen.getByLabelText("Collection") as HTMLInputElement
+    fireEvent.change(collectionInput, { target: { value: "nightly" } })
+
+    await waitFor(() => {
+      expect(container.querySelector('[role="listbox"]')?.textContent).toContain("...")
+    })
+
+    fireEvent.keyDown(collectionInput, { key: "Escape" })
+
+    expect(collectionInput.value).toBe("nightly")
+  })
+
+  it("shows all collection options when the combobox input is empty", async () => {
+    renderQueryPage(["/query"])
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("main")).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByDisplayValue("main"), { target: { value: "embargo" } })
+    const collectionInput = screen.getByLabelText("Collection") as HTMLInputElement
+    fireEvent.focus(collectionInput)
+
+    await waitFor(() => {
+      expect(screen.getByRole("listbox").textContent).toContain("LSSTCam/raw/all")
+    })
+    expect(screen.getByRole("listbox").textContent).toContain("LSSTCam/runs/nightlyValidation")
+  })
+
+  it("supports keyboard selection in the custom combobox", async () => {
+    renderQueryPage(["/query"])
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("main")).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByDisplayValue("main"), { target: { value: "embargo" } })
+    const collectionInput = screen.getByLabelText("Collection") as HTMLInputElement
+    fireEvent.change(collectionInput, { target: { value: "nightly" } })
+
+    await waitFor(() => {
+      expect(screen.getByRole("listbox").textContent).toContain("LSSTCam/runs/nightlyValidation")
+    })
+
+    fireEvent.keyDown(collectionInput, { key: "ArrowDown" })
+    fireEvent.keyDown(collectionInput, { key: "Enter" })
+
+    expect(collectionInput.value).toBe("LSSTCam/runs/nightlyValidation")
+  })
+
   it("submits the default query without adding where=null", async () => {
     renderQueryPage(["/query"])
 
@@ -256,5 +321,44 @@ describe("QueryPage", () => {
 
     expect(copyTextToClipboard).toHaveBeenCalledTimes(1)
     expect(copyTextToClipboard).toHaveBeenCalledWith(buildQueryPythonSnippet(queryInput.value))
+  })
+
+  it("queries across all collections when collection is empty and shows a collection column", async () => {
+    useListVisitsQuery.mockReturnValue({
+      data: [
+        {
+          id: "embargo:LSSTCam!-raw!-all:raw:exposure=2026012800342",
+          display_id: "embargo:LSSTCam/raw/all:raw:exposure=2026012800342",
+          scope_id: "embargo:LSSTCam!-raw!-all:raw",
+          day_obs: 20260128,
+          physical_filter: "r_57",
+          obs_id: "obs-342",
+          exposure_time: 30,
+          science_program: "nightly",
+          observation_type: "science",
+          observation_reason: "survey",
+          target_name: "field-342",
+        },
+      ],
+      error: undefined,
+      isFetching: false,
+      isLoading: false,
+    })
+
+    renderQueryPage(["/query?repository_name=embargo&dataset_type=raw&limit=100"])
+
+    await waitFor(() => {
+      expect(useListVisitsQuery).toHaveBeenCalled()
+    })
+
+    expect(screen.getAllByText("Collection").length).toBeGreaterThan(1)
+    expect(screen.getByText("LSSTCam/raw/all")).toBeTruthy()
+    const queryCall = useListVisitsQuery.mock.calls.find((call) => call[1]?.skip === false)
+    expect(queryCall?.[0]).toEqual({
+      repositoryName: "embargo",
+      datasetType: "raw",
+      limit: 100,
+      reverse: undefined,
+    })
   })
 })

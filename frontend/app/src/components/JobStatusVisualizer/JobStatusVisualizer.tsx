@@ -1,5 +1,6 @@
 import classNames from 'classnames'
 import { Link } from 'react-router-dom'
+import { formatVisitIdForDisplay } from '../../quicklookId'
 import { Progress } from '../Progress'
 import { JobStatus, Progress as ProgressType } from '../../store/api/openapi'
 import styles from './styles.module.scss'
@@ -8,7 +9,7 @@ export function JobStatusVisualizer({ status, isHighlighted = false }: { status:
   return (
     <div className={classNames(styles.jobStatus, isHighlighted && styles.highlighted)}>
       <h2>
-        Job: <Link to={`/visits/${encodeURIComponent(status.job.visit)}`}>{status.job.visit}</Link>
+        Job: <Link to={`/visits/${encodeURIComponent(status.job.visit)}`}>{formatVisitIdForDisplay(status.job.visit)}</Link>
       </h2>
       <div className={styles.container}>
         {status.generate_single_fits_tiles && (

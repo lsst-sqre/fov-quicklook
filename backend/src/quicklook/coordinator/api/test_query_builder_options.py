@@ -15,6 +15,8 @@ async def test_get_query_builder_options_uses_datasource(monkeypatch):
                 collections=['LSSTCam/raw/all'],
                 dataset_types=['raw'],
                 where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+                collections_truncated=False,
+                dataset_types_truncated=False,
             )
 
     monkeypatch.setattr(query_builder_options, 'get_datasource', lambda: FakeDataSource())
@@ -30,4 +32,6 @@ async def test_get_query_builder_options_uses_datasource(monkeypatch):
         collections=['LSSTCam/raw/all'],
         dataset_types=['raw'],
         where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+        collections_truncated=False,
+        dataset_types_truncated=False,
     )
