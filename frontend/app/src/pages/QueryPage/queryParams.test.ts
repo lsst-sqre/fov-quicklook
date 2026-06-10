@@ -39,6 +39,20 @@ describe("query params helpers", () => {
     })
   })
 
+  it("allows cross-collection visit queries when collection is omitted", () => {
+    const result = buildVisitListArgs(new URLSearchParams("repository_name=embargo&dataset_type=raw&limit=100"))
+
+    expect(result).toEqual({
+      args: {
+        repositoryName: "embargo",
+        datasetType: "raw",
+        limit: 100,
+        reverse: undefined,
+      },
+      error: null,
+    })
+  })
+
   it("reports invalid integer parameters", () => {
     expect(buildVisitListArgs(new URLSearchParams("repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=two"))).toEqual({
       args: null,
@@ -87,17 +101,20 @@ describe("query params helpers", () => {
       + "query_string = 'repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100'\n"
       + "params = {key: values[-1] for key, values in parse_qs(query_string, keep_blank_values=True).items()}\n\n"
       + "repository_name = params['repository_name']\n"
-      + "collection = params['collection']\n"
+      + "collection = params.get('collection')\n"
       + "dataset_type = params['dataset_type']\n"
       + "where = params.get('where')\n"
       + "order_by = params.get('order_by')\n"
       + "reverse = None if 'reverse' not in params else params['reverse'].lower() == 'true'\n"
       + "limit = int(params['limit']) if 'limit' in params else 100\n"
       + "offset = int(params['offset']) if 'offset' in params else 0\n\n"
-      + "butler = Butler(repository_name, instrument='LSSTCam', collections=[collection])\n"
+      + "butler_kwargs = {'instrument': 'LSSTCam'}\n"
+      + "if collection:\n"
+      + "    butler_kwargs['collections'] = [collection]\n"
+      + "butler = Butler(repository_name, **butler_kwargs)\n"
       + "dimension = quicklook_dimension(dataset_type)\n"
       + "query_kwargs = {'datasets': dataset_type}\n"
-      + "if dataset_type == 'difference_image':\n"
+      + "if dataset_type == 'difference_image' and collection:\n"
       + "    query_kwargs['collections'] = ...\n"
       + "if where is None:\n"
       + "    latest_records = list(\n"

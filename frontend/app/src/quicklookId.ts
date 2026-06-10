@@ -125,3 +125,22 @@ export function buildByUuidVisitName(visitId: string, uuid: string): string {
   const { repositoryName } = parseVisitId(visitId)
   return `${repositoryName}:by_uuid:${uuid}`
 }
+
+function formatVisitDimensions(dimensions: Record<string, string>): string {
+  return Object.entries(dimensions)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join(",")
+}
+
+export function formatVisitIdForDisplay(visitId: string): string {
+  try {
+    const parsed = parseVisitId(visitId)
+    if (parsed.isByUuid) {
+      return `${parsed.repositoryName}:by_uuid:${parsed.dimensions.uuid}`
+    }
+    return `${parsed.repositoryName}:${parsed.collection}:${parsed.datasetType}:${formatVisitDimensions(parsed.dimensions)}`
+  } catch {
+    return visitId
+  }
+}

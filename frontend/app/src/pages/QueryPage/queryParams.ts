@@ -83,7 +83,7 @@ export function buildQueryPythonSnippet(queryInput: string): string {
     "params = {key: values[-1] for key, values in parse_qs(query_string, keep_blank_values=True).items()}",
     "",
     "repository_name = params['repository_name']",
-    "collection = params['collection']",
+    "collection = params.get('collection')",
     "dataset_type = params['dataset_type']",
     "where = params.get('where')",
     "order_by = params.get('order_by')",
@@ -91,10 +91,13 @@ export function buildQueryPythonSnippet(queryInput: string): string {
     "limit = int(params['limit']) if 'limit' in params else 100",
     "offset = int(params['offset']) if 'offset' in params else 0",
     "",
-    "butler = Butler(repository_name, instrument='LSSTCam', collections=[collection])",
+    "butler_kwargs = {'instrument': 'LSSTCam'}",
+    "if collection:",
+    "    butler_kwargs['collections'] = [collection]",
+    "butler = Butler(repository_name, **butler_kwargs)",
     "dimension = quicklook_dimension(dataset_type)",
     "query_kwargs = {'datasets': dataset_type}",
-    "if dataset_type == 'difference_image':",
+    "if dataset_type == 'difference_image' and collection:",
     "    query_kwargs['collections'] = ...",
     "if where is None:",
     "    latest_records = list(",
@@ -120,9 +123,8 @@ export function buildQueryPythonSnippet(queryInput: string): string {
 
 export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildResult {
   const repositoryName = searchParams.get("repository_name")
-  const collection = searchParams.get("collection")
   const datasetType = searchParams.get("dataset_type")
-  if (!repositoryName || !collection || !datasetType) {
+  if (!repositoryName || !datasetType) {
     return { args: null, error: null }
   }
 
@@ -138,8 +140,8 @@ export function buildVisitListArgs(searchParams: URLSearchParams): QueryBuildRes
   return {
     args: {
       repositoryName,
-      collection,
       datasetType,
+      ...(searchParams.get("collection") !== null ? { collection: searchParams.get("collection")! } : {}),
       reverse: searchParams.get("reverse") === null ? undefined : searchParams.get("reverse") === "true",
       ...(searchParams.get("where") !== null ? { where: searchParams.get("where")! } : {}),
       ...(searchParams.get("order_by") !== null ? { orderBy: searchParams.get("order_by")! } : {}),

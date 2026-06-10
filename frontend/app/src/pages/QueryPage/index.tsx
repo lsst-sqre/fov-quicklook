@@ -1,8 +1,10 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSelector } from "react-redux"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { Combobox } from "../../components/Combobox"
+import { LoadingSpinner } from "../../components/Loading"
 import { env } from "../../env"
-import { buildScopeId } from "../../quicklookId"
+import { buildScopeId, parseVisitId } from "../../quicklookId"
 import { AppState } from "../../store"
 import { ButlerScopeConfig, useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
 import { copyTextToClipboard } from "../../utils/copyTextToClipboard"
@@ -28,14 +30,18 @@ type QueryWhereExample = {
 type QueryBuilderOptions = {
   repositories: string[]
   collections: string[]
+  collections_truncated: boolean
   dataset_types: string[]
+  dataset_types_truncated: boolean
   where_examples: QueryWhereExample[]
 }
 
 const EMPTY_OPTIONS: QueryBuilderOptions = {
   repositories: [],
   collections: [],
+  collections_truncated: false,
   dataset_types: [],
+  dataset_types_truncated: false,
   where_examples: [],
 }
 
@@ -69,6 +75,7 @@ export function QueryPage() {
   )
   const collectionOptions = queryBuilderInputMode === "select" ? configuredCollections : options.collections
   const datasetTypeOptions = queryBuilderInputMode === "select" ? configuredDatasetTypes : options.dataset_types
+  const showCollectionColumn = !parsedQuery.args?.collection
 
   useEffect(() => {
     const normalizedQuery = normalizeQueryInput(currentQuery)
@@ -170,7 +177,7 @@ export function QueryPage() {
   const updateCollection = useCallback((collection: string) => {
     const datasetType = queryBuilderInputMode === "select"
       ? (getConfiguredDatasetTypes(butlerScopes, form.repositoryName, collection)[0] ?? "")
-      : ""
+      : form.datasetType
     applyForm({
       ...form,
       collection,
@@ -248,19 +255,13 @@ export function QueryPage() {
             <label style={fieldStyle}>
               <span>Collection</span>
               {queryBuilderInputMode === "combobox" ? (
-                <>
-                  <input
-                    list="query-page-collections"
-                    spellCheck={false}
-                    type="text"
-                    value={form.collection}
-                    onChange={(event) => updateCollection(event.target.value)}
-                    placeholder="Type to filter collections"
-                  />
-                  <datalist id="query-page-collections">
-                    {collectionOptions.map((option) => <option key={option} value={option} />)}
-                  </datalist>
-                </>
+                <Combobox
+                  value={form.collection}
+                  options={collectionOptions}
+                  truncated={options.collections_truncated}
+                  onChange={updateCollection}
+                  placeholder="Type to filter collections"
+                />
               ) : (
                 <select value={form.collection} onChange={(event) => updateCollection(event.target.value)}>
                   <option value="">Select collection</option>
@@ -271,19 +272,13 @@ export function QueryPage() {
             <label style={fieldStyle}>
               <span>Dataset Type</span>
               {queryBuilderInputMode === "combobox" ? (
-                <>
-                  <input
-                    list="query-page-dataset-types"
-                    spellCheck={false}
-                    type="text"
-                    value={form.datasetType}
-                    onChange={(event) => updateDatasetType(event.target.value)}
-                    placeholder="Type to filter dataset types"
-                  />
-                  <datalist id="query-page-dataset-types">
-                    {datasetTypeOptions.map((option) => <option key={option} value={option} />)}
-                  </datalist>
-                </>
+                <Combobox
+                  value={form.datasetType}
+                  options={datasetTypeOptions}
+                  truncated={options.dataset_types_truncated}
+                  onChange={updateDatasetType}
+                  placeholder="Type to filter dataset types"
+                />
               ) : (
                 <select value={form.datasetType} onChange={(event) => updateDatasetType(event.target.value)}>
                   <option value="">Select dataset type</option>
@@ -347,16 +342,16 @@ export function QueryPage() {
         <>
           <div style={summaryStyle}>
             <span>Results: {data?.length ?? 0}</span>
-            {(isLoading || isFetching) && <span>Loading...</span>}
           </div>
           {error && <p role="alert">{formatQueryError(error)}</p>}
-          {!isLoading && !error && data?.length === 0 && <p>No visits matched the query.</p>}
-          {data && data.length > 0 && (
+          {!isLoading && !isFetching && !error && data?.length === 0 && <p>No visits matched the query.</p>}
+          {(data || isLoading || isFetching) && (
             <div style={tableContainerStyle}>
               <table style={tableStyle}>
                 <thead>
                   <tr>
                     <th>Visit</th>
+                    {showCollectionColumn && <th>Collection</th>}
                     <th>Day Obs</th>
                     <th>Filter</th>
                     <th>Exposure Time</th>
@@ -368,11 +363,16 @@ export function QueryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((entry) => (
-                    <VisitRow entry={entry} key={entry.id} />
+                  {(data ?? []).map((entry) => (
+                    <VisitRow entry={entry} key={entry.id} showCollectionColumn={showCollectionColumn} />
                   ))}
                 </tbody>
               </table>
+              {(isLoading || isFetching) && (
+                <div style={loadingOverlayStyle}>
+                  <LoadingSpinner size="100px" />
+                </div>
+              )}
             </div>
           )}
         </>
@@ -536,12 +536,14 @@ function getDatasetOrderFields(datasetType: string): string[] {
   return defaultFields
 }
 
-function VisitRow({ entry }: { entry: VisitEntry }) {
+function VisitRow({ entry, showCollectionColumn }: { entry: VisitEntry, showCollectionColumn: boolean }) {
+  const collection = getVisitCollection(entry.id)
   return (
     <tr>
       <td>
         <Link to={`/visits/${encodeURIComponent(entry.id)}`}>{entry.display_id}</Link>
       </td>
+      {showCollectionColumn && <td>{collection}</td>}
       <td>{entry.day_obs}</td>
       <td>{entry.physical_filter}</td>
       <td>{entry.exposure_time}</td>
@@ -552,6 +554,14 @@ function VisitRow({ entry }: { entry: VisitEntry }) {
       <td>{entry.obs_id}</td>
     </tr>
   )
+}
+
+function getVisitCollection(visitId: string): string {
+  try {
+    return parseVisitId(visitId).collection
+  } catch {
+    return ""
+  }
 }
 
 async function fetchQueryBuilderOptions(
@@ -579,7 +589,19 @@ async function fetchQueryBuilderOptions(
   ) {
     throw new Error("Failed to load query options.")
   }
-  return payload as QueryBuilderOptions
+  const collectionsTruncated = (payload as { collections_truncated?: unknown }).collections_truncated
+  const datasetTypesTruncated = (payload as { dataset_types_truncated?: unknown }).dataset_types_truncated
+  if (collectionsTruncated !== undefined && typeof collectionsTruncated !== "boolean") {
+    throw new Error("Failed to load query options.")
+  }
+  if (datasetTypesTruncated !== undefined && typeof datasetTypesTruncated !== "boolean") {
+    throw new Error("Failed to load query options.")
+  }
+  return {
+    ...(payload as Omit<QueryBuilderOptions, "collections_truncated" | "dataset_types_truncated">),
+    collections_truncated: collectionsTruncated === true,
+    dataset_types_truncated: datasetTypesTruncated === true,
+  }
 }
 
 async function readErrorDetail(response: Response): Promise<string | null> {
@@ -695,10 +717,22 @@ const summaryStyle = {
 } as const
 
 const tableContainerStyle = {
+  position: "relative",
   overflow: "auto",
+  minHeight: "220px",
 } as const
 
 const tableStyle = {
   width: "100%",
   borderCollapse: "collapse",
+} as const
+
+const loadingOverlayStyle = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "rgba(0, 0, 0, 0.35)",
+  backdropFilter: "blur(1px)",
 } as const

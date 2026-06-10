@@ -45,6 +45,31 @@ async def test_list_visits_forwards_limit_and_offset(monkeypatch):
     assert captured["query"].reverse is True
 
 
+async def test_list_visits_allows_missing_collection(monkeypatch):
+    captured = {}
+
+    class FakeDataSource:
+        async def query_visits(self, q):
+            captured["query"] = q
+            return []
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    result = await visits.list_visits(
+        repository_name='repo',
+        collection=None,
+        dataset_type='raw',
+        where=None,
+        order_by=None,
+        reverse=None,
+        limit=100,
+        offset=0,
+    )
+
+    assert result == []
+    assert captured["query"].collection == ''
+
+
 async def test_get_query_builder_options_forwards_filters(monkeypatch):
     captured = {}
 
@@ -55,6 +80,8 @@ async def test_get_query_builder_options_forwards_filters(monkeypatch):
             collections=['LSSTCam/raw/all'],
             dataset_types=['raw'],
             where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+            collections_truncated=False,
+            dataset_types_truncated=False,
         )
 
     monkeypatch.setattr(visits, 'http_request', fake_http_request)
@@ -71,6 +98,8 @@ async def test_get_query_builder_options_forwards_filters(monkeypatch):
         collections=['LSSTCam/raw/all'],
         dataset_types=['raw'],
         where_examples=[QueryWhereExample(label='Latest day_obs', where='day_obs=20250301')],
+        collections_truncated=False,
+        dataset_types_truncated=False,
     )
     assert captured["request"] == (
         'get',

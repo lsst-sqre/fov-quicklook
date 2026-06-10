@@ -83,6 +83,8 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
 
     # パイプライン状態
     ccd_queue: asyncio.Queue[CcdDataRef | None] = asyncio.Queue()
+    # Keep network I/O on the event loop. Sending directly from the pipeline
+    # worker thread caused coordinator progress delivery to stall in practice.
     result_queue: asyncio.Queue[GeneratorMessage | None] = asyncio.Queue()
     cancel_event = asyncio.Event()
 
@@ -129,7 +131,9 @@ async def websocket_generate_tiles_raw(websocket: WebSocket) -> None:
                         logger.info(f"send_results: CompletedMessage for {msg.ccd_name} sent successfully")
                 else:
                     if isinstance(msg, CompletedMessage):
-                        logger.warning(f"send_results: WebSocket not connected, dropping CompletedMessage for {msg.ccd_name}")
+                        logger.warning(
+                            f"send_results: WebSocket not connected, dropping CompletedMessage for {msg.ccd_name}"
+                        )
         except WebSocketDisconnect:
             logger.warning("send_results: WebSocket disconnected")
         except Exception as e:

@@ -83,7 +83,7 @@ async def get_query_builder_options(
 @router.get('/api/visits', response_model=list[VisitEntry])
 async def list_visits(
     repository_name: str = Query(...),
-    collection: str = Query(...),
+    collection: str | None = Query(None),
     dataset_type: str = Query(...),
     where: str | None = Query(None),
     order_by: str | None = Query(None),
@@ -96,7 +96,7 @@ async def list_visits(
         return await ds.query_visits(
             DataSourceQuery(
                 repository_name=repository_name,
-                collection=collection,
+                collection=collection or '',
                 dataset_type=dataset_type,
                 where=_normalize_where(where),
                 order_by=_normalize_order_by(dataset_type, order_by),
