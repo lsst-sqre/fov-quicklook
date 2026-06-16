@@ -131,7 +131,12 @@ def test_get_query_builder_options_keeps_exact_selection_only(monkeypatch):
 
     assert result.collections == ['LSSTCam/raw/all']
     assert result.dataset_types == ['raw']
-    assert result.where_examples == []
+    assert result.where_examples == [
+        butler_datasource_module.QueryWhereExample(
+            label='Spatial science point (RA 270, Dec -30)',
+            where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270, -30)",
+        )
+    ]
 
 
 def test_get_query_builder_options_filters_partial_collection_with_direct_query(monkeypatch):
@@ -201,6 +206,16 @@ def test_get_query_builder_options_does_not_short_circuit_partial_dataset_type(m
     assert result.collections == ['LSSTCam/runs/nightlyValidation/10']
     assert result.dataset_types == ['preliminary_visit_image']
     assert result.where_examples == []
+
+
+def test_query_builder_where_examples_are_scope_specific():
+    assert butler_datasource_module._query_builder_where_examples('main', 'LSSTCam/raw/all', 'raw') == [
+        butler_datasource_module.QueryWhereExample(
+            label='Spatial science point (RA 270, Dec -30)',
+            where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270, -30)",
+        )
+    ]
+    assert butler_datasource_module._query_builder_where_examples('embargo', 'LSSTCam/raw/all', 'raw') == []
 
 
 def test_query_builder_helpers_fall_back_to_empty_result(monkeypatch):
