@@ -42,24 +42,49 @@ _resolved_visit_runs: dict[str, str] = {}
 _resolved_visit_runs_lock = threading.Lock()
 logger = quicklook.mylogging.getLogger(__name__)
 
-_RAW_SPATIAL_QUERY_WHERE_EXAMPLES = (
+_SPATIAL_QUERY_WHERE_EXAMPLES = (
     QueryWhereExample(
-        label='Spatial science point (RA 270, Dec -30)',
-        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270, -30)",
+        label='Spatial point (RA 270, Dec -30)',
+        where="visit.region OVERLAPS POINT(270, -30)",
     ),
     QueryWhereExample(
         label='Trifid Nebula / NGC 6514',
-        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270.921, -23.02)",
+        where="visit.region OVERLAPS POINT(270.921, -23.02)",
     ),
     QueryWhereExample(
         label='NGC 6357',
-        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(258.01, -34.75)",
+        where="visit.region OVERLAPS POINT(258.01, -34.75)",
     ),
     QueryWhereExample(
         label='Omega Centauri / NGC 5139',
-        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(201.69, -47.48)",
+        where="visit.region OVERLAPS POINT(201.69, -47.48)",
     ),
 )
+
+_EXPOSURE_FILTER_WHERE_EXAMPLES = (
+    QueryWhereExample(
+        label='Observation type: science',
+        where="observation_type='science'",
+    ),
+    QueryWhereExample(
+        label='Science program: BLOCK-407',
+        where="science_program='BLOCK-407'",
+    ),
+    QueryWhereExample(
+        label='Day Obs: 20260528 or 20260606',
+        where='day_obs=20260528 or day_obs=20260606',
+    ),
+)
+
+_VISIT_FILTER_WHERE_EXAMPLES = (
+    QueryWhereExample(
+        label='Science program: BLOCK-407',
+        where="science_program='BLOCK-407'",
+    ),
+)
+
+_EXPOSURE_SPATIAL_QUERY_DATASET_TYPES = frozenset({'raw', 'post_isr_image', 'calexp'})
+_VISIT_SPATIAL_QUERY_DATASET_TYPES = frozenset({'difference_image', 'preliminary_visit_image'})
 
 
 @dataclass(frozen=True)
@@ -74,8 +99,11 @@ def _query_builder_where_examples(
     dataset_type: str,
 ) -> list[QueryWhereExample]:
     del repository_name
-    if collection == 'LSSTCam/raw/all' and dataset_type == 'raw':
-        return list(_RAW_SPATIAL_QUERY_WHERE_EXAMPLES)
+    del collection
+    if dataset_type in _EXPOSURE_SPATIAL_QUERY_DATASET_TYPES:
+        return [*_SPATIAL_QUERY_WHERE_EXAMPLES, *_EXPOSURE_FILTER_WHERE_EXAMPLES]
+    if dataset_type in _VISIT_SPATIAL_QUERY_DATASET_TYPES:
+        return [*_SPATIAL_QUERY_WHERE_EXAMPLES, *_VISIT_FILTER_WHERE_EXAMPLES]
     return []
 
 
