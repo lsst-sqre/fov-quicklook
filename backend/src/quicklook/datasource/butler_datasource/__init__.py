@@ -42,18 +42,24 @@ _resolved_visit_runs: dict[str, str] = {}
 _resolved_visit_runs_lock = threading.Lock()
 logger = quicklook.mylogging.getLogger(__name__)
 
-_STATIC_QUERY_WHERE_EXAMPLES: dict[tuple[str, str, str], tuple[QueryWhereExample, ...]] = {
-    (
-        'main',
-        'LSSTCam/raw/all',
-        'raw',
-    ): (
-        QueryWhereExample(
-            label='Spatial science point (RA 270, Dec -30)',
-            where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270, -30)",
-        ),
+_RAW_SPATIAL_QUERY_WHERE_EXAMPLES = (
+    QueryWhereExample(
+        label='Spatial science point (RA 270, Dec -30)',
+        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270, -30)",
     ),
-}
+    QueryWhereExample(
+        label='Trifid Nebula / NGC 6514',
+        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270.921, -23.02)",
+    ),
+    QueryWhereExample(
+        label='NGC 6357',
+        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(258.01, -34.75)",
+    ),
+    QueryWhereExample(
+        label='Omega Centauri / NGC 5139',
+        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(201.69, -47.48)",
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -67,7 +73,10 @@ def _query_builder_where_examples(
     collection: str,
     dataset_type: str,
 ) -> list[QueryWhereExample]:
-    return list(_STATIC_QUERY_WHERE_EXAMPLES.get((repository_name, collection, dataset_type), ()))
+    del repository_name
+    if collection == 'LSSTCam/raw/all' and dataset_type == 'raw':
+        return list(_RAW_SPATIAL_QUERY_WHERE_EXAMPLES)
+    return []
 
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover

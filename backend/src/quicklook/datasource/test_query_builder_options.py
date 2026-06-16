@@ -7,6 +7,26 @@ from quicklook.datasource import butler_datasource as butler_datasource_module
 from quicklook.datasource.butler_datasource import ButlerDataSource
 
 
+RAW_SPATIAL_EXAMPLES = [
+    butler_datasource_module.QueryWhereExample(
+        label='Spatial science point (RA 270, Dec -30)',
+        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270, -30)",
+    ),
+    butler_datasource_module.QueryWhereExample(
+        label='Trifid Nebula / NGC 6514',
+        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270.921, -23.02)",
+    ),
+    butler_datasource_module.QueryWhereExample(
+        label='NGC 6357',
+        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(258.01, -34.75)",
+    ),
+    butler_datasource_module.QueryWhereExample(
+        label='Omega Centauri / NGC 5139',
+        where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(201.69, -47.48)",
+    ),
+]
+
+
 def test_limit_query_builder_suggestions_marks_truncation():
     result = butler_datasource_module._limit_query_builder_suggestions(tuple(f"collection-{index}" for index in range(101)))
 
@@ -131,12 +151,7 @@ def test_get_query_builder_options_keeps_exact_selection_only(monkeypatch):
 
     assert result.collections == ['LSSTCam/raw/all']
     assert result.dataset_types == ['raw']
-    assert result.where_examples == [
-        butler_datasource_module.QueryWhereExample(
-            label='Spatial science point (RA 270, Dec -30)',
-            where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270, -30)",
-        )
-    ]
+    assert result.where_examples == RAW_SPATIAL_EXAMPLES
 
 
 def test_get_query_builder_options_filters_partial_collection_with_direct_query(monkeypatch):
@@ -209,13 +224,9 @@ def test_get_query_builder_options_does_not_short_circuit_partial_dataset_type(m
 
 
 def test_query_builder_where_examples_are_scope_specific():
-    assert butler_datasource_module._query_builder_where_examples('main', 'LSSTCam/raw/all', 'raw') == [
-        butler_datasource_module.QueryWhereExample(
-            label='Spatial science point (RA 270, Dec -30)',
-            where="observation_type='science' and visit_detector_region.region OVERLAPS POINT(270, -30)",
-        )
-    ]
-    assert butler_datasource_module._query_builder_where_examples('embargo', 'LSSTCam/raw/all', 'raw') == []
+    assert butler_datasource_module._query_builder_where_examples('main', 'LSSTCam/raw/all', 'raw') == RAW_SPATIAL_EXAMPLES
+    assert butler_datasource_module._query_builder_where_examples('embargo', 'LSSTCam/raw/all', 'raw') == RAW_SPATIAL_EXAMPLES
+    assert butler_datasource_module._query_builder_where_examples('embargo', 'LSSTCam/runs/nightlyValidation', 'raw') == []
 
 
 def test_query_builder_helpers_fall_back_to_empty_result(monkeypatch):
