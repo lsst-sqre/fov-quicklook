@@ -42,11 +42,69 @@ _resolved_visit_runs: dict[str, str] = {}
 _resolved_visit_runs_lock = threading.Lock()
 logger = quicklook.mylogging.getLogger(__name__)
 
+_SPATIAL_QUERY_WHERE_EXAMPLES = (
+    QueryWhereExample(
+        label='Spatial point (RA 270, Dec -30)',
+        where="visit.region OVERLAPS POINT(270, -30)",
+    ),
+    QueryWhereExample(
+        label='Trifid Nebula / NGC 6514',
+        where="visit.region OVERLAPS POINT(270.921, -23.02)",
+    ),
+    QueryWhereExample(
+        label='NGC 6357',
+        where="visit.region OVERLAPS POINT(258.01, -34.75)",
+    ),
+    QueryWhereExample(
+        label='Omega Centauri / NGC 5139',
+        where="visit.region OVERLAPS POINT(201.69, -47.48)",
+    ),
+)
+
+_EXPOSURE_FILTER_WHERE_EXAMPLES = (
+    QueryWhereExample(
+        label='Observation type: science',
+        where="observation_type='science'",
+    ),
+    QueryWhereExample(
+        label='Science program: BLOCK-407',
+        where="science_program='BLOCK-407'",
+    ),
+    QueryWhereExample(
+        label='Day Obs: 20260528 or 20260606',
+        where='day_obs=20260528 or day_obs=20260606',
+    ),
+)
+
+_VISIT_FILTER_WHERE_EXAMPLES = (
+    QueryWhereExample(
+        label='Science program: BLOCK-407',
+        where="science_program='BLOCK-407'",
+    ),
+)
+
+_EXPOSURE_SPATIAL_QUERY_DATASET_TYPES = frozenset({'raw', 'post_isr_image', 'calexp'})
+_VISIT_SPATIAL_QUERY_DATASET_TYPES = frozenset({'difference_image', 'preliminary_visit_image'})
+
 
 @dataclass(frozen=True)
 class _QueryBuilderSuggestionResult:
     values: tuple[str, ...]
     truncated: bool = False
+
+
+def _query_builder_where_examples(
+    repository_name: str,
+    collection: str,
+    dataset_type: str,
+) -> list[QueryWhereExample]:
+    del repository_name
+    del collection
+    if dataset_type in _EXPOSURE_SPATIAL_QUERY_DATASET_TYPES:
+        return [*_SPATIAL_QUERY_WHERE_EXAMPLES, *_EXPOSURE_FILTER_WHERE_EXAMPLES]
+    if dataset_type in _VISIT_SPATIAL_QUERY_DATASET_TYPES:
+        return [*_SPATIAL_QUERY_WHERE_EXAMPLES, *_VISIT_FILTER_WHERE_EXAMPLES]
+    return []
 
 
 class ButlerDataSource(DataSourceBase):  # pragma: no cover
@@ -103,7 +161,11 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
                 repositories=repositories,
                 collections=[selected_collection],
                 dataset_types=[selected_dataset_type],
-                where_examples=[],
+                where_examples=_query_builder_where_examples(
+                    selected_repository,
+                    selected_collection,
+                    selected_dataset_type,
+                ),
             )
 
         collections = _query_collections_for_repository_result(
@@ -126,7 +188,11 @@ class ButlerDataSource(DataSourceBase):  # pragma: no cover
             # Keep this endpoint limited to registry metadata. Probing dataset
             # contents here made exact matches for large collections unstable
             # enough to flap the deployed frontend.
-            where_examples=[],
+            where_examples=(
+                _query_builder_where_examples(selected_repository, selected_collection, selected_dataset_type)
+                if selected_collection is not None and selected_dataset_type is not None
+                else []
+            ),
             collections_truncated=collections.truncated,
             dataset_types_truncated=dataset_types.truncated,
         )
