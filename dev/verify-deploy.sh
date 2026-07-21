@@ -239,7 +239,7 @@ cmd_visits() {
 
     echo "=== visit一覧 (${repository_name}:${data_type}, limit=${limit}) ==="
     local body
-    body="$(api_get "/api/visits?data_type=${data_type}&repository_name=${repository_name}&limit=${limit}")" || return 1
+    body="$(api_get "/api/visits?dataset_type=${data_type}&repository_name=${repository_name}&limit=${limit}")" || return 1
 
     echo "$body" | $PYTHON -c "
 import sys, json
