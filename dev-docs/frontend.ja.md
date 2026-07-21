@@ -3,7 +3,7 @@
 ## 概要
 
 このドキュメントはフロントエンド（React/TypeScript）開発に特化したガイドです。
-プロジェクト全体の概要は `/.github/copilot-instructions.md` を参照してください。
+システム全体の構成は `/dev-docs/architecture.ja.md`、microk8s 上の開発フローは `/dev-docs/dev.ja.md` を参照してください。
 
 ---
 

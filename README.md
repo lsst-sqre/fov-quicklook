@@ -99,11 +99,11 @@ backend/                         # Python 3.13 FastAPI backend
     frontend/                    # Web API for UI (REST + WebSocket)
     datasource/                  # Data abstraction layer (Butler or dummy)
     db/                          # SQLAlchemy models (PostgreSQL)
+    rpc/                         # HTTP streaming RPC layer
     utils/
-      rpc/                       # HTTP streaming RPC layer
       pipeline/                  # Configurable multi-stage pipeline
     types.py                     # Core type definitions
-    config.py                    # Pydantic configuration (env: QUICKLOOK_*)
+    config/__init__.py           # Pydantic configuration (env: QUICKLOOK_*)
   tests/
     integration_tests/           # Full system tests with auto-launched components
     coordinator/                 # Unit tests for coordinator logic
@@ -140,7 +140,7 @@ notes/
 - Node.js 18+
 - PostgreSQL 13+
 - S3-compatible object storage (MinIO or AWS S3)
-- Kubernetes cluster (for production) or local Docker
+- Kubernetes cluster (microk8s for development)
 
 ### Backend Setup
 
@@ -158,29 +158,35 @@ cd frontend/app
 npm install
 ```
 
-### Local Development (3 Terminal Tabs)
+### Development on microk8s
 
-**Terminal 1 - Coordinator (Port 9501)**:
+Run the interactive dev environment on the microk8s node that has this checkout mounted:
+
 ```bash
-make dev/coordinator
+git submodule update --init --recursive
+sh dev/microk8s-dev/run.sh all
+sh dev/microk8s-dev/run.sh status
 ```
 
-**Terminal 2 - Generator (Port 9502)**:
+Attach to the tmux sessions inside the dev pods:
+
 ```bash
-make dev/generator
+kubectl -n fov-quicklook-dev exec -it deploy/backend-dev -- tmux a
+kubectl -n fov-quicklook-dev exec -it deploy/frontend-dev -- tmux a
 ```
 
-**Terminal 3 - Frontend (Port 9500)**:
+Access the UI through port-forwarding:
+
 ```bash
-cd frontend/app
-npm run dev
+kubectl -n fov-quicklook-dev port-forward svc/frontend-dev 5173:5173
 ```
 
-Access the UI at `http://localhost:5173` (Vite dev server)
+Then open `http://127.0.0.1:5173/fov-quicklook-dev/`.
 
 ### Running Tests
 
 ```bash
+cd backend
 make test              # Fast tests only (default: skip @pytest.mark.slow)
 make test/all          # Include slow tests
 make test/cov-server   # View coverage HTML at localhost:4000
@@ -189,25 +195,15 @@ make test/cov-server   # View coverage HTML at localhost:4000
 ### Type Checking
 
 ```bash
+cd backend
 make pyright           # One-time check
 make pyright/watch     # Continuous monitoring
 ```
 
-### Production Build & Deployment
+### Deployment
 
-```bash
-# Build Docker image with optional type checking
-PYRIGHT_BEFORE_PUSH=1 make build
-
-# Push to local k8s registry
-make push
-
-# Deploy to Kubernetes cluster
-make deploy
-
-# Or push to GitHub Container Registry
-make push-to-ghcr
-```
+Branch images are built by GitHub Actions on push.
+ArgoCD / broker deployment workflow is documented in `/dev-docs/phalanx.ja.md`.
 
 ## Configuration
 
@@ -241,7 +237,7 @@ QUICKLOOK_job_local_dir=/tmp/quicklook
 QUICKLOOK_admin_page=true|false
 ```
 
-See `backend/src/quicklook/config.py` for complete configuration options.
+See `backend/src/quicklook/config/__init__.py` for complete configuration options.
 
 ## RPC Communication Protocol
 
@@ -284,21 +280,22 @@ npm run scss-types  # Regenerate style type definitions
 ### Debugging Failed Tests
 
 ```bash
+cd backend
 make test -- -vv -k test_name  # Verbose output
-make test -- -s                 # Show print statements
+make test -- -s                # Show print statements
 ```
 
 ## Documentation
 
-- **System Design**: `/docs/concept.md` - Architecture, components, pipeline phases
-- **Development Setup**: `/docs/dev.md` - Local development environment
-- **API Reference**: `/docs/request.md` - HTTP request examples
-- **Butler/Data Query Guide**: `/docs/butler-data-query.ja.md` - How Data Query maps onto Butler queries, dimensions, and datasets
-- **Task Definitions**: `/docs/tasks.md` - RPC task specifications
-- **Review App Planning**: `/docs/review-app-ci.ja.md` - CI review app requirements and phased approach
-- **Review App Fixtures**: `/docs/review-app-shared-fixtures.ja.md` - Shared Butler/sample fixture generation for CI
-- **Backend Details**: `/backend/.github/copilot-instructions.md` - Python patterns, testing, RPC design
-- **Frontend Details**: `/frontend/app/.github/copilot-instructions.md` - SCSS build, type generation
+- **Architecture**: `/dev-docs/architecture.ja.md` - System structure, data flow, runtime assumptions
+- **Development Setup**: `/dev-docs/dev.ja.md` - microk8s-based development workflow
+- **Backend Details**: `/dev-docs/backend.ja.md` - Python patterns, testing, configuration
+- **Frontend Details**: `/dev-docs/frontend.ja.md` - SCSS build, RTK Query, test workflow
+- **CI / Review App**: `/dev-docs/ci.ja.md` - review app pipeline and shared fixtures
+- **Butler/Data Query Guide**: `/dev-docs/features/butler-data-query.ja.md` - How Data Query maps onto Butler queries, dimensions, and datasets
+- **Deployment**: `/dev-docs/phalanx.ja.md` - ArgoCD / Phalanx deployment workflow
+- **Routes Note**: `/docs/routes.md` - Route inventory
+- **Templating Note**: `/docs/templating.md` - Template-related memo
 
 ## Code Style Guidelines
 

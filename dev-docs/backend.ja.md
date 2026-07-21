@@ -3,13 +3,13 @@
 ## 概要
 
 このドキュメントはバックエンド（Python）開発に特化したガイドです。
-プロジェクト全体の概要は `/.github/copilot-instructions.md` を参照してください。
+システム全体の構成は `/dev-docs/architecture.ja.md`、開発環境の立ち上げは `/dev-docs/dev.ja.md` を参照してください。
 
 ---
 
 ## アーキテクチャ概要
 
-詳細は `/docs/concept.ja.md` を参照してください。
+概要は `/dev-docs/architecture.ja.md` を参照してください。
 
 **主要コンポーネント**:
 - **Coordinator** (`src/quicklook/coordinator/`): 単一オーケストレーター、RPC でタイル生成ジョブを発行
@@ -32,7 +32,7 @@
 | `src/quicklook/generator/` | タイル生成・マージ・転送ワーカー |
 | `src/quicklook/frontend/` | UI 向け REST + WebSocket API |
 | `src/quicklook/datasource/` | データ層抽象化 (Butler/dummy) |
-| `src/quicklook/utils/rpc/` | HTTP ストリーミング RPC レイヤー |
+| `src/quicklook/rpc/` | HTTP ストリーミング RPC レイヤー |
 | `src/quicklook/object_storage/` | S3/MinIO 操作 |
 | `src/quicklook/job/` | ジョブ管理 |
 | `tests/` | 単体テスト |
@@ -43,7 +43,7 @@
 | ファイル | 内容 |
 |---------|------|
 | `src/quicklook/types.py` | コア型定義 (Visit, TilePos, CcdId 等) |
-| `src/quicklook/config.py` | Pydantic 設定 (env: `QUICKLOOK_*`) |
+| `src/quicklook/config/__init__.py` | Pydantic 設定 (env: `QUICKLOOK_*`) |
 | `pytest.ini` | テスト設定 |
 
 ---
@@ -89,6 +89,7 @@
 ### コマンド
 
 ```bash
+cd backend
 make test              # 高速テストのみ
 make test/all          # 遅いテストも含む
 make test/cov-server   # カバレッジを localhost:4000 で表示
@@ -99,6 +100,7 @@ make test/cov-server   # カバレッジを localhost:4000 で表示
 ## 型チェック
 
 ```bash
+cd backend
 make pyright           # ワンショット
 make pyright/watch     # ウォッチモード
 ```
@@ -114,7 +116,7 @@ make pyright/watch     # ウォッチモード
 
 ---
 
-## RPC 通信 (`src/quicklook/comm/`)
+## RPC 通信
 
 - Coordinator → Generator は HTTP ストリーミング上で pickle 化した関数呼び出し
 - Generator は定期的なハートビートで Coordinator に登録
@@ -199,7 +201,7 @@ make pyright/watch     # ウォッチモード
 
 ---
 
-## 国際化
+## 関連資料
 
-- `*.ja.md` は日本語ドキュメント
-- 翻訳が求められた場合、対応する英語版 `*.md` を生成
+- `/dev-docs/features/butler-data-query.ja.md` — Butler / Data Query 周りの詳細
+- `/dev-docs/phalanx.ja.md` — デプロイと運用
