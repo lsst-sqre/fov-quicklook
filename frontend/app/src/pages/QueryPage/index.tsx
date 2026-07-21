@@ -8,6 +8,7 @@ import { buildScopeId, parseVisitId } from "../../quicklookId"
 import { AppState } from "../../store"
 import { ButlerScopeConfig, useListVisitsQuery, VisitEntry } from "../../store/api/openapi"
 import { copyTextToClipboard } from "../../utils/copyTextToClipboard"
+import { makeSessionStorageAccessor } from "../../utils/localStorage"
 import { buildDefaultQueryInput, buildQueryPythonSnippet, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 
 const DEFAULT_LIMIT = "100"
@@ -44,6 +45,7 @@ const EMPTY_OPTIONS: QueryBuilderOptions = {
   dataset_types_truncated: false,
   where_examples: [],
 }
+const querySessionStorage = makeSessionStorageAccessor<string>("queryPageSearch", "")
 
 export function QueryPage() {
   const navigate = useNavigate()
@@ -51,12 +53,19 @@ export function QueryPage() {
   const butlerScopes = useSelector((state: AppState) => state.copyTemplate.butlerScopes)
   const queryBuilderInputMode = useSelector((state: AppState) => state.copyTemplate.queryBuilderInputMode)
   const currentQuery = searchParams.toString()
-  const effectiveSearchParams = useMemo(() => new URLSearchParams(currentQuery), [currentQuery])
-  const [queryInput, setQueryInput] = useState(() => normalizeQueryInput(currentQuery))
+  const restoredQuery = useMemo(
+    () => currentQuery ? "" : normalizeQueryInput(querySessionStorage.get()),
+    [currentQuery],
+  )
+  const effectiveQuery = currentQuery || restoredQuery
+  const effectiveSearchParams = useMemo(() => new URLSearchParams(effectiveQuery), [effectiveQuery])
+  const [queryInput, setQueryInput] = useState(() => normalizeQueryInput(effectiveQuery))
   const [form, setForm] = useState<QueryFormState>(createEmptyForm)
   const [options, setOptions] = useState<QueryBuilderOptions>(EMPTY_OPTIONS)
   const [optionsError, setOptionsError] = useState<string | null>(null)
+  const [headerError, setHeaderError] = useState<string | null>(null)
   const [loadingOptions, setLoadingOptions] = useState(false)
+  const [openingHeaderVisitId, setOpeningHeaderVisitId] = useState<string | null>(null)
   const appliedDefaultScope = useRef(false)
   const parsedQuery = useMemo(() => buildVisitListArgs(effectiveSearchParams), [effectiveSearchParams])
   const { data, error, isFetching, isLoading } = useListVisitsQuery(parsedQuery.args!, {
@@ -78,13 +87,20 @@ export function QueryPage() {
   const showCollectionColumn = !parsedQuery.args?.collection
 
   useEffect(() => {
-    const normalizedQuery = normalizeQueryInput(currentQuery)
+    const normalizedQuery = normalizeQueryInput(effectiveQuery)
     setQueryInput(normalizedQuery)
     setForm((current) => mergeFormWithSearchParams(current, new URLSearchParams(normalizedQuery)))
-  }, [currentQuery])
+  }, [effectiveQuery])
 
   useEffect(() => {
-    if (currentQuery || appliedDefaultScope.current) {
+    if (!effectiveQuery) {
+      return
+    }
+    querySessionStorage.set(effectiveQuery)
+  }, [effectiveQuery])
+
+  useEffect(() => {
+    if (effectiveQuery || appliedDefaultScope.current) {
       return
     }
     const scope = findDefaultScope(butlerScopes)
@@ -95,7 +111,7 @@ export function QueryPage() {
     setForm(nextForm)
     setQueryInput(buildQueryInput(nextForm))
     appliedDefaultScope.current = true
-  }, [butlerScopes, currentQuery, form])
+  }, [butlerScopes, effectiveQuery, form])
 
   useEffect(() => {
     if (queryBuilderInputMode !== "combobox") {
@@ -146,14 +162,14 @@ export function QueryPage() {
     if (queryBuilderInputMode !== "select") {
       return
     }
-    if (currentQuery && !hasQueryBuilderSelection(form)) {
+    if (effectiveQuery && !hasQueryBuilderSelection(form)) {
       return
     }
     const nextForm = normalizeSelectFormState(form, butlerScopes)
     if (!areFormsEqual(form, nextForm)) {
       applyForm(nextForm)
     }
-  }, [applyForm, butlerScopes, currentQuery, form, queryBuilderInputMode])
+  }, [applyForm, butlerScopes, effectiveQuery, form, queryBuilderInputMode])
 
   const updateRepository = useCallback((repositoryName: string) => {
     const defaultScope = findDefaultScope(butlerScopes, repositoryName)
@@ -212,6 +228,11 @@ export function QueryPage() {
 
   const commitQuery = useCallback(() => {
     const normalized = normalizeQueryInput(queryInput)
+    if (normalized) {
+      querySessionStorage.set(normalized)
+    } else {
+      querySessionStorage.remove()
+    }
     navigate(normalized ? `/query?${normalized}` : "/query")
   }, [navigate, queryInput])
 
@@ -223,6 +244,30 @@ export function QueryPage() {
   const handleCopyPython = useCallback(async () => {
     await copyTextToClipboard(buildQueryPythonSnippet(queryInput))
   }, [queryInput])
+
+  const handleOpenHeader = useCallback(async (visitId: string) => {
+    setHeaderError(null)
+    setOpeningHeaderVisitId(visitId)
+    const popup = window.open("", "_blank")
+    try {
+      const ccds = await fetchVisitCcds(visitId)
+      const firstCcd = ccds[0]
+      if (!firstCcd) {
+        throw new Error("No CCDs found for this visit.")
+      }
+      const headerUrl = `${env.baseUrl}/header/${encodeURIComponent(visitId)}/${encodeURIComponent(firstCcd)}`
+      if (popup) {
+        popup.location.href = headerUrl
+      } else if (window.open(headerUrl, "_blank") === null) {
+        throw new Error("Failed to open the header.")
+      }
+    } catch (openError) {
+      popup?.close()
+      setHeaderError(openError instanceof Error ? openError.message : "Failed to open the header.")
+    } finally {
+      setOpeningHeaderVisitId((current) => current === visitId ? null : current)
+    }
+  }, [])
 
   return (
     <div style={pageStyle}>
@@ -343,6 +388,7 @@ export function QueryPage() {
           <div style={summaryStyle}>
             <span>Results: {data?.length ?? 0}</span>
           </div>
+          {headerError && <p role="alert">{headerError}</p>}
           {error && <p role="alert">{formatQueryError(error)}</p>}
           {!isLoading && !isFetching && !error && data?.length === 0 && <p>No visits matched the query.</p>}
           {(data || isLoading || isFetching) && (
@@ -351,8 +397,10 @@ export function QueryPage() {
                 <thead>
                   <tr>
                     <th>Visit</th>
+                    <th>Header</th>
                     {showCollectionColumn && <th>Collection</th>}
                     <th>Day Obs</th>
+                    <th>UTC</th>
                     <th>Filter</th>
                     <th>Exposure Time</th>
                     <th>Observation Type</th>
@@ -364,7 +412,13 @@ export function QueryPage() {
                 </thead>
                 <tbody>
                   {(data ?? []).map((entry) => (
-                    <VisitRow entry={entry} key={entry.id} showCollectionColumn={showCollectionColumn} />
+                    <VisitRow
+                      entry={entry}
+                      key={entry.id}
+                      onOpenHeader={handleOpenHeader}
+                      openingHeaderVisitId={openingHeaderVisitId}
+                      showCollectionColumn={showCollectionColumn}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -536,15 +590,33 @@ function getDatasetOrderFields(datasetType: string): string[] {
   return defaultFields
 }
 
-function VisitRow({ entry, showCollectionColumn }: { entry: VisitEntry, showCollectionColumn: boolean }) {
+function VisitRow(
+  { entry, onOpenHeader, openingHeaderVisitId, showCollectionColumn }: {
+    entry: VisitEntry
+    onOpenHeader: (visitId: string) => Promise<void>
+    openingHeaderVisitId: string | null
+    showCollectionColumn: boolean
+  },
+) {
   const collection = getVisitCollection(entry.id)
   return (
     <tr>
       <td>
         <Link to={`/visits/${encodeURIComponent(entry.id)}`}>{entry.display_id}</Link>
       </td>
+      <td>
+        <button
+          disabled={openingHeaderVisitId === entry.id}
+          onClick={() => void onOpenHeader(entry.id)}
+          title="Show the Header of the first CCD"
+          type="button"
+        >
+          Header
+        </button>
+      </td>
       {showCollectionColumn && <td>{collection}</td>}
       <td>{entry.day_obs}</td>
+      <td>{entry.utc_start ?? ""}</td>
       <td>{entry.physical_filter}</td>
       <td>{entry.exposure_time}</td>
       <td>{entry.observation_type}</td>
@@ -602,6 +674,19 @@ async function fetchQueryBuilderOptions(
     collections_truncated: collectionsTruncated === true,
     dataset_types_truncated: datasetTypesTruncated === true,
   }
+}
+
+async function fetchVisitCcds(visitId: string): Promise<string[]> {
+  const response = await fetch(`${env.baseUrl}/api/visits/${encodeURIComponent(visitId)}/ccds`)
+  if (!response.ok) {
+    const detail = await readErrorDetail(response)
+    throw new Error(detail ?? "Failed to load CCDs.")
+  }
+  const payload: unknown = await response.json()
+  if (!Array.isArray(payload) || payload.some((ccd) => typeof ccd !== "string")) {
+    throw new Error("Failed to load CCDs.")
+  }
+  return payload
 }
 
 async function readErrorDetail(response: Response): Promise<string | null> {

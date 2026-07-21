@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { Provider } from "react-redux"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -133,6 +133,7 @@ function renderQueryPage(initialEntries: string[], systemInfo = baseSystemInfo) 
 
 describe("QueryPage", () => {
   beforeEach(() => {
+    sessionStorage.clear()
     useListVisitsQuery.mockReset()
     copyTextToClipboard.mockReset()
     useListVisitsQuery.mockReturnValue({
@@ -142,6 +143,7 @@ describe("QueryPage", () => {
           display_id: "embargo:LSSTCam/raw/all:raw:exposure=2026012800342",
           scope_id: "embargo:LSSTCam!-raw!-all:raw",
           day_obs: 20260128,
+          utc_start: "2026-01-28T03:42:00+00:00",
           physical_filter: "r_57",
           obs_id: "obs-342",
           exposure_time: 30,
@@ -160,12 +162,18 @@ describe("QueryPage", () => {
       if (urlText.includes("/api/visits/query_builder_options")) {
         return jsonResponse(buildOptions(urlText))
       }
+      if (urlText.includes("/api/visits/") && urlText.endsWith("/ccds")) {
+        return jsonResponse(["R22_S11", "R22_S12"])
+      }
       throw new Error(`Unexpected fetch: ${urlText}`)
     }))
   })
 
   afterEach(() => {
+    cleanup()
+    sessionStorage.clear()
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it("renders search results from the current query string", async () => {
@@ -179,8 +187,67 @@ describe("QueryPage", () => {
     expect(queryInput.value).toContain("dataset_type=raw")
     expect(useListVisitsQuery).toHaveBeenCalled()
     expect(screen.getByText("embargo:LSSTCam/raw/all:raw:exposure=2026012800342")).toBeTruthy()
+    expect(screen.getByText("UTC")).toBeTruthy()
+    expect(screen.getByText("2026-01-28T03:42:00+00:00")).toBeTruthy()
     expect(screen.getByText("field-342")).toBeTruthy()
     expect(screen.queryByRole("button", { name: /Open by UUID/i })).toBeNull()
+  })
+
+  it("opens the header page for the first CCD", async () => {
+    const openedWindow = {
+      close: vi.fn(),
+      location: { href: "" },
+    } as unknown as Window
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(openedWindow)
+
+    renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
+
+    const button = await screen.findByRole("button", { name: "Header" })
+    expect(button.getAttribute("title")).toBe("Show the Header of the first CCD")
+
+    fireEvent.click(button)
+
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith("", "_blank")
+      expect(openedWindow.location.href).toBe(
+        `http://example.test/header/${encodeURIComponent("embargo:LSSTCam!-raw!-all:raw:exposure=2026012800342")}/${encodeURIComponent("R22_S11")}`,
+      )
+    })
+  })
+
+  it("restores the last query from session storage when reopened", async () => {
+    const savedQuery = new URLSearchParams({
+      repository_name: "embargo",
+      collection: "LSSTCam/raw/all",
+      dataset_type: "raw",
+      limit: "25",
+    }).toString()
+    const firstRender = renderQueryPage([`/query?${savedQuery}`])
+
+    await waitFor(() => {
+      expect(sessionStorage.getItem("fov-quicklook/queryPageSearch")).toBe(
+        JSON.stringify(savedQuery),
+      )
+    })
+
+    firstRender.unmount()
+    useListVisitsQuery.mockClear()
+
+    renderQueryPage(["/query"])
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Query string") as HTMLInputElement).value).toBe(savedQuery)
+    })
+
+    expect(screen.getByTestId("location-search").textContent).toBe("")
+    const queryCall = useListVisitsQuery.mock.calls.find((call) => call[1]?.skip === false)
+    expect(queryCall?.[0]).toEqual({
+      repositoryName: "embargo",
+      collection: "LSSTCam/raw/all",
+      datasetType: "raw",
+      limit: 25,
+      reverse: undefined,
+    })
   })
 
   it("preselects the first configured butler scope without navigating", async () => {
@@ -331,6 +398,7 @@ describe("QueryPage", () => {
           display_id: "embargo:LSSTCam/raw/all:raw:exposure=2026012800342",
           scope_id: "embargo:LSSTCam!-raw!-all:raw",
           day_obs: 20260128,
+          utc_start: "2026-01-28T03:42:00+00:00",
           physical_filter: "r_57",
           obs_id: "obs-342",
           exposure_time: 30,

@@ -3,8 +3,8 @@ function prefixKey(key: string) {
 }
 
 
-function getLocalStorage<T>(key: string): T | undefined {
-  const item = localStorage.getItem(prefixKey(key))
+function getStorage<T>(storage: Storage, key: string): T | undefined {
+  const item = storage.getItem(prefixKey(key))
   if (item === null) {
     return undefined
   }
@@ -12,15 +12,25 @@ function getLocalStorage<T>(key: string): T | undefined {
 }
 
 
-function setLocalStorage<T>(key: string, value: T) {
-  localStorage.setItem(prefixKey(key), JSON.stringify(value))
+function setStorage<T>(storage: Storage, key: string, value: T) {
+  storage.setItem(prefixKey(key), JSON.stringify(value))
+}
+
+
+function makeStorageAccessor<T>(storage: Storage, key: string, defaultValue: T) {
+  return {
+    get: () => getStorage<T>(storage, key) ?? defaultValue,
+    set: (value: T) => setStorage(storage, key, value),
+    remove: () => storage.removeItem(prefixKey(key)),
+  }
 }
 
 
 export function makeLocalStorageAccessor<T>(key: string, defaultValue: T) {
-  return {
-    get: () => getLocalStorage<T>(key) ?? defaultValue,
-    set: (value: T) => setLocalStorage(key, value),
-    remove: () => localStorage.removeItem(prefixKey(key)),
-  }
+  return makeStorageAccessor(localStorage, key, defaultValue)
+}
+
+
+export function makeSessionStorageAccessor<T>(key: string, defaultValue: T) {
+  return makeStorageAccessor(sessionStorage, key, defaultValue)
 }

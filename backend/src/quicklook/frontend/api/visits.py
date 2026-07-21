@@ -130,6 +130,15 @@ async def list_visit_day_counts(
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+@router.get('/api/visits/{visit_name}/ccds', response_model=list[CcdName])
+async def list_visit_ccds(visit_name: str) -> list[CcdName]:
+    ds = get_datasource()
+    try:
+        return await ds.list_ccds(VisitName(visit_name))
+    except VisitResolutionError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
 @router.get(
     '/api/visits/{visit_name}/ccds/{ccd_name}',
     response_model=DataSourceCcdMetadata,
