@@ -14,10 +14,10 @@
 
 既定では次を生成する。
 
-- `dummy` 用には 3 visit / 2 CCD (`R01_S00`, `R01_S01`) の軽量 sample
+- `dummy` 用には 3 visit / 9 CCD (`R22_S00..R22_S22`) の review projection sample
 - `butler` 用には約 2000 exposure の catalog
 - Butler catalog は画面中央の 9 CCD (`R22_S00..S22`) だけを持ち、filter / program / reason / target / observation type を循環させる
-- review app で `DataSource.get_data_sync()` が呼ばれた時点で、添付 JPEG のチャネル画像を `180` 度回転し、中央 3x3 CCD 領域へ bilinear で引き伸ばした仮想 raw FITS をオンザフライ生成する
+- review app で `DataSource.get_data_sync()` が呼ばれた時点で、`backend/src/quicklook/review_app/assets/haru.jpeg` と `backend/src/quicklook/review_app/assets/IMG_9685.jpeg` のチャネル画像を `180` 度回転し、中央 3x3 CCD 領域へ bilinear で引き伸ばした仮想 raw FITS をオンザフライ生成する
 
 visit ID は `910001` から始まる固定値で、毎回同じ version なら同じ fixture root を再利用する。
 

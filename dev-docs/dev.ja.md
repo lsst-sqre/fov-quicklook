@@ -150,6 +150,16 @@ make dev-update   # デバッグ値でヘルムアップグレード (notes/dev-
 make restart  # 既存のコーディネーター、ジェネレーター、フロントエンドポッドを削除
 ```
 
+### microk8s 上で pod 開発する場合
+
+CI review-app とは別に、**sleep で待機する frontend/backend pod に source tree を hostPath mount して** 手動起動する経路があります。
+
+```bash
+sh dev/microk8s-dev/run.sh all
+```
+
+詳細: `docs/microk8s-dev.ja.md`
+
 ---
 
 ## 一般的な開発タスク

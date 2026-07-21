@@ -47,27 +47,52 @@ export default defineConfig(async ({ mode }) => {
     },
   }
 
-  if (mode === 'development' && getGafaelfawrToken) {
+  if (mode === 'development') {
+    const proxyTarget = env.VITE_API_PROXY_TARGET
+    if (proxyTarget) {
+      return {
+        ...config,
+        server: {
+          proxy: {
+            [`${base}/api/`]: {
+              target: proxyTarget,
+              changeOrigin: true,
+              ws: true,
+            },
+          },
+          watch: {
+            ignored: ['**/node_modules/**'],
+          },
+        },
+      }
+    }
+
+    if (getGafaelfawrToken) {
+      return {
+        ...config,
+        server: {
+          proxy: {
+            [`${base}/api/`]: {
+              target: 'https://usdf-rsp-dev.slac.stanford.edu',
+              secure: true,
+              changeOrigin: true,
+              cookieDomainRewrite: 'localhost',
+              headers: {
+                Cookie: `gafaelfawr=${getGafaelfawrToken()}`,
+              },
+              ws: true,
+            },
+          },
+          watch: {
+            ignored: ['**/node_modules/**'],
+          },
+        },
+      }
+    }
+
     return {
       ...config,
       server: {
-        proxy: {
-          // [`${base}/api/`]: {
-          //   target: 'http://127.0.0.1:9500',
-          //   ws: true,
-          //   // rewrite: (path) => path.replace(/\/api\//, '/fov-quicklook/api/'),
-          // },
-          [`${base}/api/`]: {
-            target: 'https://usdf-rsp-dev.slac.stanford.edu',
-            secure: true,
-            changeOrigin: true,
-            cookieDomainRewrite: 'localhost',
-            headers: {
-              Cookie: `gafaelfawr=${getGafaelfawrToken()}`,
-            },
-            ws: true,
-          },
-        },
         watch: {
           ignored: ['**/node_modules/**'],
         },

@@ -25,10 +25,11 @@ def test_prepare_shared_fixtures_creates_manifest_and_env_files(tmp_path):
     info = json.loads(paths.info_path.read_text())
     assert manifest["version"]
     assert len(manifest["visits"]) == 2
+    assert manifest["visits"][0]["ccds"] == [str(ccd) for ccd in default_butler_ccd_names()]
     assert paths.dummy_env_path.exists()
     assert paths.butler_env_path.exists()
-    assert (paths.dummy_s3_root / "raw" / "910001" / "R01_S00.fits").exists()
-    assert (paths.dummy_s3_root / "raw" / "910002" / "R01_S01.fits").exists()
+    assert (paths.dummy_s3_root / "raw" / "910001" / "R22_S00.fits").exists()
+    assert (paths.dummy_s3_root / "raw" / "910002" / "R22_S22.fits").exists()
     assert info["butler"]["visit_count"] == 2
 
 
@@ -50,7 +51,7 @@ def test_prepare_shared_fixtures_builds_queryable_butler_repo(tmp_path, monkeypa
     refs = list(butler.query_datasets("raw", where="exposure=910001", collections=[FIXTURE_COLLECTION]))
 
     assert [record.id for record in exposures] == [910001, 910002]
-    assert len(refs) == 2
+    assert len(refs) == len(default_butler_ccd_names())
 
 
 def test_prepare_shared_fixtures_defaults_to_large_butler_catalog(tmp_path, monkeypatch):
@@ -77,6 +78,7 @@ def test_prepare_shared_fixtures_defaults_to_large_butler_catalog(tmp_path, monk
 
 
 def test_default_butler_ccd_names_uses_central_raft():
+    assert shared_fixtures.DEFAULT_CCDS == default_butler_ccd_names()
     assert default_butler_ccd_names() == (
         "R22_S00",
         "R22_S01",

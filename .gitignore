@@ -3,3 +3,4 @@
 /k8s/phalanx/
 __pycache__
 *.pyc
+/REQUEST.md

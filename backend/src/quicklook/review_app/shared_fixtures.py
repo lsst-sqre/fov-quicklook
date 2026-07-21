@@ -20,9 +20,9 @@ from quicklook.config import ButlerScopeConfig, config
 from quicklook.datasource.butler_datasource.instrument import Instrument
 from quicklook.review_app.synthetic import render_virtual_raw_fits_bytes, review_projection_ccd_names
 from quicklook.types import CcdName, VisitName
-from quicklook.utils.s3 import NoSuchKey, S3Config, s3_download_object, s3_upload_object
+from quicklook.utils.s3 import NoSuchKey, S3Config, s3_delete_objects_with_prefix, s3_download_object, s3_upload_object
 
-FIXTURE_VERSION = "20260506-v4"
+FIXTURE_VERSION = "20260721-v6"
 FIXTURE_REPOSITORY_NAME = "reviewapp-ci"
 FIXTURE_MANIFEST_KEY = "_fixtures/review-app/sample-manifest.json"
 FIXTURE_VERSION_KEY = "_fixtures/review-app/version.txt"
@@ -30,7 +30,7 @@ FIXTURE_COLLECTION = "LSSTCam/raw/all"
 FIXTURE_RUN = "u/review-app-fixtures/raw"
 DEFAULT_DUMMY_VISIT_COUNT = 3
 DEFAULT_BUTLER_VISIT_COUNT = 2000
-DEFAULT_CCDS = (CcdName("R01_S00"), CcdName("R01_S01"))
+DEFAULT_CCDS = review_projection_ccd_names()
 
 
 @dataclass(frozen=True)
@@ -288,6 +288,13 @@ def sync_dummy_fixture_to_s3(paths: SharedFixturePaths, s3_config: S3Config) -> 
     wanted_version = paths.version_path.read_text().strip()
     if current_version == wanted_version:
         return
+
+    raw_prefixes = {
+        f"{path.parent.relative_to(paths.dummy_s3_root).as_posix()}/"
+        for path in paths.dummy_s3_root.glob("raw/*/*.fits")
+    }
+    for prefix in sorted(raw_prefixes):
+        s3_delete_objects_with_prefix(s3_config, prefix)
 
     for path in sorted(paths.dummy_s3_root.rglob("*")):
         if not path.is_file():
@@ -640,7 +647,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--ccd",
         action="append",
         default=None,
-        help="CCD name to include. May be specified multiple times. Default: R01_S00 and R01_S01",
+        help="CCD name to include. May be specified multiple times. Default: review projection central 3x3 (R22_S00..R22_S22)",
     )
     parser.add_argument(
         "--butler-ccd",
