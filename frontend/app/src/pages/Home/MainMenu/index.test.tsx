@@ -53,7 +53,7 @@ describe("MainMenu", () => {
     vi.clearAllMocks()
   })
 
-  it("opens Data Query without carrying over the current search params", () => {
+  it("does not duplicate the Data Query link in the menu", () => {
     render(
       <Provider store={makeStore(systemInfo as never)}>
         <MainMenu />
@@ -61,11 +61,7 @@ describe("MainMenu", () => {
     )
 
     fireEvent.click(screen.getByRole("button"))
-    fireEvent.click(screen.getByRole("menuitem", { name: "Data Query" }))
-
-    expect(navigateMock).toHaveBeenCalledWith({
-      pathname: "/query",
-      search: "",
-    })
+    expect(screen.queryByRole("menuitem", { name: "Data Query" })).toBeNull()
+    expect(navigateMock).not.toHaveBeenCalled()
   })
 })

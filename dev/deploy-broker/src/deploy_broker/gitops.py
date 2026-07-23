@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import tempfile
 from pathlib import Path
 
 from .config import Settings
@@ -65,6 +66,10 @@ def ensure_clean_worktree(repo_path: Path) -> None:
         raise RuntimeError(f"repository has uncommitted changes: {repo_path}")
 
 
+def _worktree_is_clean(repo_path: Path) -> bool:
+    return not run_command(["git", "status", "--porcelain"], cwd=repo_path).strip()
+
+
 def current_branch(repo_path: Path, revision: str = "HEAD") -> str:
     return run_command(
         ["git", "rev-parse", "--abbrev-ref", revision],
@@ -84,23 +89,114 @@ def maybe_merge_base(repo_path: Path, left: str, right: str) -> str | None:
 
 
 def create_bundle(repo_path: Path, revision: str, output_path: Path) -> dict[str, str | None]:
-    ensure_clean_worktree(repo_path)
     branch_name = current_branch(repo_path, revision)
     if branch_name == "HEAD":
         raise RuntimeError("bundle creation requires a named branch, not detached HEAD")
-    head_sha = rev_parse(repo_path, revision)
     base_sha = maybe_merge_base(repo_path, revision, "origin/main")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    run_command(
-        ["git", "bundle", "create", str(output_path), branch_name],
-        cwd=repo_path,
-    )
+    if _worktree_is_clean(repo_path):
+        head_sha = rev_parse(repo_path, revision)
+        run_command(
+            ["git", "bundle", "create", str(output_path), branch_name],
+            cwd=repo_path,
+        )
+        return {
+            "branch_name": branch_name,
+            "head_sha": head_sha,
+            "base_sha": base_sha,
+        }
+
+    if rev_parse(repo_path, revision) != rev_parse(repo_path, "HEAD"):
+        raise RuntimeError(
+            "bundle creation from a dirty worktree requires revision to resolve to HEAD"
+        )
+    head_sha = _create_bundle_from_dirty_worktree(repo_path, branch_name, output_path)
     return {
         "branch_name": branch_name,
         "head_sha": head_sha,
         "base_sha": base_sha,
     }
+
+
+def _create_bundle_from_dirty_worktree(
+    repo_path: Path,
+    branch_name: str,
+    output_path: Path,
+) -> str:
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        workspace = Path(temp_dir_name) / "workspace"
+        clone_workspace(repo_path, workspace, str(repo_path))
+        _apply_dirty_worktree(repo_path, workspace)
+        run_command(["git", "add", "-A"], cwd=workspace)
+        if run_command(["git", "status", "--porcelain"], cwd=workspace).strip():
+            run_command(["git", "config", "user.name", "Deploy Broker"], cwd=workspace)
+            run_command(
+                ["git", "config", "user.email", "deploy-broker@example.invalid"],
+                cwd=workspace,
+            )
+            run_command(["git", "commit", "-m", "deploy-broker snapshot"], cwd=workspace)
+        head_sha = rev_parse(workspace, "HEAD")
+        run_command(["git", "bundle", "create", str(output_path), branch_name], cwd=workspace)
+        return head_sha
+
+
+def _apply_dirty_worktree(source_repo: Path, workspace: Path) -> None:
+    status_output = run_command(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        cwd=source_repo,
+    )
+    for line in status_output.splitlines():
+        if not line:
+            continue
+        status = line[:2]
+        if "U" in status:
+            raise RuntimeError(f"repository has unresolved merge conflicts: {source_repo}")
+        if status == "!!":
+            continue
+
+        path_text = line[3:]
+        if " -> " in path_text and "R" in status:
+            old_path, new_path = [part.strip() for part in path_text.split(" -> ", 1)]
+            _remove_path(workspace / old_path)
+            _copy_worktree_path(source_repo / new_path, workspace / new_path)
+            continue
+        if " -> " in path_text and "C" in status:
+            _copy_worktree_path(
+                source_repo / path_text.split(" -> ", 1)[1].strip(),
+                workspace / path_text.split(" -> ", 1)[1].strip(),
+            )
+            continue
+        if "D" in status:
+            _remove_path(workspace / path_text)
+            continue
+        _copy_worktree_path(source_repo / path_text, workspace / path_text)
+
+
+def _copy_worktree_path(source_path: Path, target_path: Path) -> None:
+    if not source_path.exists() and not source_path.is_symlink():
+        raise RuntimeError(f"dirty worktree path disappeared while bundling: {source_path}")
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    if source_path.is_symlink():
+        _remove_path(target_path)
+        target_path.symlink_to(source_path.readlink())
+        return
+    if source_path.is_dir():
+        _remove_path(target_path)
+        shutil.copytree(source_path, target_path, ignore=shutil.ignore_patterns(".git"))
+        return
+    if target_path.exists() and target_path.is_dir():
+        shutil.rmtree(target_path)
+    shutil.copy2(source_path, target_path)
+
+
+def _remove_path(path: Path) -> None:
+    if not path.exists() and not path.is_symlink():
+        return
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+        return
+    path.unlink()
 
 
 def validate_remote_url(repo_path: Path, expected_urls: set[str]) -> None:

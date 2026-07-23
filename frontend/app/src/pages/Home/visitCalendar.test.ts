@@ -9,6 +9,7 @@ import {
   getSelectedCalendarDate,
   getTodaySearchDate,
   isValidCalendarMonth,
+  parseCalendarMonthInput,
   shiftCalendarMonth,
 } from "./visitCalendar"
 
@@ -46,6 +47,11 @@ describe("visit calendar helpers", () => {
   it("validates calendar month strings", () => {
     expect(isValidCalendarMonth("2025-05")).toBe(true)
     expect(isValidCalendarMonth("2025-5")).toBe(false)
+  })
+
+  it("normalizes editable month input", () => {
+    expect(parseCalendarMonthInput(" 2025-05 ")).toBe("2025-05")
+    expect(parseCalendarMonthInput("2025-5")).toBeUndefined()
   })
 
   it("creates a six-week calendar grid", () => {

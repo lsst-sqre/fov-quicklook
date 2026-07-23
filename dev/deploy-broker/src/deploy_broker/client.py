@@ -12,6 +12,17 @@ from .config import Settings
 from .gitops import create_bundle
 
 
+def _user_broker_config_dir() -> Path:
+    return Path.home() / ".fov-quicklook2"
+
+
+def _read_text_if_exists(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    value = path.read_text(encoding="utf-8").strip()
+    return value or None
+
+
 class BrokerClient:
     def __init__(self, base_url: str, api_token: str | None) -> None:
         headers = {"Authorization": f"Bearer {api_token}"} if api_token else None
@@ -124,11 +135,15 @@ class BrokerClient:
 
 def _settings_defaults() -> tuple[str, str | None]:
     settings = Settings()
+    config_dir = _user_broker_config_dir()
+    base_url = _read_text_if_exists(config_dir / "broker-url") or "http://127.0.0.1:8010"
     api_token = settings.api_token
     if api_token is None and settings.api_token_file and settings.api_token_file.exists():
         api_token = settings.api_token_file.read_text(encoding="utf-8").strip() or None
+    if api_token is None:
+        api_token = _read_text_if_exists(config_dir / "broker-token")
     return (
-        "http://127.0.0.1:8010",
+        base_url,
         api_token,
     )
 

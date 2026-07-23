@@ -34,13 +34,13 @@ review app の公開 path は既定で `/review-apps/<project-path-slug>/<mr-or-
 
 `ci/review-app/prepare-shared-fixtures.sh` が、CI をまたいで再利用する fixture を作る。
 
-- `dummy` datasource 用の sample FITS と manifest
+- `dummy` datasource 用の sample FITS 1 visit 分と manifest
 - `butler` datasource 用の小さな Butler repository と env file
 - `dummy.env` / `butler.env`
 - fixture version marker
 
 `butler` が既定で、catalog metadata は PostgreSQL-backed Butler registry へ流し込み、
-raw FITS は `get_data_sync()` 時に仮想生成する。`dummy` に切り替えると、同じ root の sample FITS を `s3_test_data` へ同期して使う。
+raw FITS は `get_data_sync()` 時に仮想生成する。`dummy` に切り替えると、同じ root の **1 visit 分だけの** sample FITS を `s3_test_data` へ同期し、全 dummy visit で使い回す。
 
 ## よく使う入口
 
@@ -49,7 +49,7 @@ fixture だけ準備:
 ```bash
 ci/review-app/run.sh fixtures \
   --root /var/tmp/fov-quicklook-review-app-fixtures \
-  --visit-count 3 \
+  --visit-count 50 \
   --butler-visit-count 2000
 ```
 

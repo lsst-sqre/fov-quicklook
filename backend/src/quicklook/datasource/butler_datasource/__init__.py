@@ -1,7 +1,7 @@
 import threading
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from functools import lru_cache
 from itertools import islice
 from types import EllipsisType
@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, cast
 from uuid import UUID
 
 from lsst.resources import ResourcePath
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.engine import Connection
 
 import quicklook.mylogging
@@ -302,6 +302,17 @@ class ScopedButlerDataSource:
 
     def query_visit_day_counts(self, calendar_month: str) -> list[VisitDayCount]:
         start_day_obs, end_day_obs = _calendar_month_day_obs_range(calendar_month)
+        sql_counts = _query_visit_day_counts_with_sql(
+            registry=self._butler.registry,
+            collection=self.collection,
+            dataset_type=self.dataset_type,
+            data_id_dimension=self.data_id_dimension,
+            instrument=self.instrument,
+            start_day_obs=start_day_obs,
+            end_day_obs=end_day_obs,
+        )
+        if sql_counts is not None:
+            return sql_counts
         data_ids = self._query_data_ids(
             ['day_obs', self.data_id_dimension],
             datasets=self.dataset_type,
@@ -528,6 +539,7 @@ class ScopedButlerDataSource:
             observation_type=_record_string_attr(record, 'observation_type'),
             observation_reason=_record_string_attr(record, 'observation_reason'),
             target_name=_record_string_attr(record, 'target_name'),
+            utc_start=_record_utc_start_attr(record),
         )
 
     def _resolved_collection_for_record(self, record: ButlerDimensionRecord) -> str:
@@ -608,6 +620,82 @@ def _day_obs_month_range(day_obs: int) -> tuple[int, int]:
     return _calendar_month_day_obs_range(f'{day_obs_text[:4]}-{day_obs_text[4:6]}')
 
 
+def _query_visit_day_counts_with_sql(
+    *,
+    registry: ButlerRegistryType,
+    collection: str,
+    dataset_type: str,
+    data_id_dimension: str,
+    instrument: str,
+    start_day_obs: int,
+    end_day_obs: int,
+) -> list[VisitDayCount] | None:
+    if not collection:
+        return None
+
+    try:
+        sql_registry = _get_sql_registry(registry)
+        collection_table = sql_registry._managers.collections._tables.collection
+        dimension_table = sql_registry._managers.dimensions._tables[data_id_dimension]
+        dataset_storage = sql_registry._managers.datasets._find_storage(dataset_type)
+        tag_table = sql_registry._managers.datasets._get_tags_table(dataset_storage.dynamic_tables)
+        data_id_column = tag_table.c[data_id_dimension]
+        day_obs_column = dimension_table.c['day_obs']
+        dimension_id_column = dimension_table.c['id']
+        dimension_instrument_column = dimension_table.c['instrument']
+    except (AttributeError, KeyError, TypeError, ValueError) as e:
+        logger.info(
+            "Falling back to Butler day-count query dataset_type=%s collection=%s reason=%s",
+            dataset_type,
+            collection,
+            e,
+        )
+        return None
+
+    with _get_db_connection(registry) as db:
+        collection_id = db.execute(
+            select(collection_table.c['collection_id'])
+            .where(collection_table.c['name'] == collection)
+            .limit(1)
+        ).scalar_one_or_none()
+        if collection_id is None:
+            logger.info(
+                "Falling back to Butler day-count query dataset_type=%s collection=%s reason=collection-not-found",
+                dataset_type,
+                collection,
+            )
+            return None
+        rows = db.execute(
+            select(
+                day_obs_column,
+                func.count(data_id_column.distinct()).label('visit_count'),
+            )
+            .select_from(
+                tag_table.join(
+                    dimension_table,
+                    and_(
+                        tag_table.c['instrument'] == dimension_instrument_column,
+                        data_id_column == dimension_id_column,
+                    ),
+                )
+            )
+            .where(tag_table.c['collection_id'] == collection_id)
+            .where(tag_table.c['instrument'] == instrument)
+            .where(day_obs_column >= start_day_obs)
+            .where(day_obs_column < end_day_obs)
+            .group_by(day_obs_column)
+            .order_by(day_obs_column)
+        ).all()
+
+    return [
+        VisitDayCount(
+            day_obs=cast(int, row._mapping['day_obs']),
+            count=cast(int, row._mapping['visit_count']),
+        )
+        for row in rows
+    ]
+
+
 def _resolve_visit_info(visit: VisitName) -> ResolvedVisitInfo:
     if visit.data_type != BY_UUID_DATA_TYPE:
         return ResolvedVisitInfo(visit_name=visit)
@@ -678,6 +766,25 @@ def _record_float_attr(record: ButlerDimensionRecord, name: str, default: float 
     if value is None:
         return default
     return float(value)
+
+
+def _record_utc_start_attr(record: ButlerDimensionRecord) -> datetime | None:
+    timespan = getattr(record, 'timespan', None)
+    if timespan is None:
+        return None
+    value = getattr(timespan, 'start', None)
+    if value is None:
+        value = getattr(timespan, 'begin', None)
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    utc_value = getattr(value, 'utc', None)
+    if utc_value is None:
+        return None
+    return utc_value.to_datetime(timezone=timezone.utc)
 
 
 def _find_scope_config(repository_name: str, collection: str, dataset_type: str) -> ButlerScopeConfig | None:

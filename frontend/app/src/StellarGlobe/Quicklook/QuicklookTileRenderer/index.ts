@@ -200,7 +200,9 @@ class TileTexture extends tile.TileTexture {
 
 async function loadRemoteNpy(url: string) {
   // urlで取得したレスポンスのcontent-typeによってzstd解答をする
-  const response = await fetch(url)
+  // ponytail: keep cache in npyCache, not the browser; delete-regenerate reuses
+  // the same tile URL for a visit and stale HTTP cache breaks reloads.
+  const response = await fetch(url, { cache: 'no-store' })
   const contentType = response.headers.get('content-type')
 
   switch (contentType) {

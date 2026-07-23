@@ -481,9 +481,16 @@
                     {
                         "name": "collection",
                         "in": "query",
-                        "required": true,
+                        "required": false,
                         "schema": {
-                            "type": "string",
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
                             "title": "Collection"
                         }
                     },
@@ -1681,6 +1688,16 @@
                         },
                         "type": "array",
                         "title": "Where Examples"
+                    },
+                    "collections_truncated": {
+                        "type": "boolean",
+                        "title": "Collections Truncated",
+                        "default": false
+                    },
+                    "dataset_types_truncated": {
+                        "type": "boolean",
+                        "title": "Dataset Types Truncated",
+                        "default": false
                     }
                 },
                 "type": "object",
@@ -2041,6 +2058,18 @@
                             }
                         ],
                         "title": "Uuid"
+                    },
+                    "utc_start": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Utc Start"
                     }
                 },
                 "type": "object",

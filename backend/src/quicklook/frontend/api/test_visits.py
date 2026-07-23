@@ -10,7 +10,7 @@ from quicklook.datasource.types import (
     VisitResolutionError,
 )
 from quicklook.frontend.api import visits
-from quicklook.types import VisitName
+from quicklook.types import CcdName, VisitName
 
 
 async def test_list_visits_forwards_limit_and_offset(monkeypatch):
@@ -332,5 +332,35 @@ async def test_list_visit_day_counts_returns_422_for_unknown_collection(monkeypa
     except HTTPException as e:
         assert e.status_code == 422
         assert e.detail == "No collection with name 'nightlyValidation/raw/all' found."
+    else:  # pragma: no cover
+        raise AssertionError('HTTPException was not raised')
+
+
+async def test_list_visit_ccds_returns_backend_ccd_names(monkeypatch):
+    class FakeDataSource:
+        async def list_ccds(self, visit: VisitName):
+            assert visit == VisitName('repo:LSSTCam!-raw!-all:raw:exposure=4242')
+            return [CcdName('R22_S11'), CcdName('R22_S12')]
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    ccds = await visits.list_visit_ccds('repo:LSSTCam!-raw!-all:raw:exposure=4242')
+
+    assert ccds == [CcdName('R22_S11'), CcdName('R22_S12')]
+
+
+async def test_list_visit_ccds_returns_404_for_unknown_uuid(monkeypatch):
+    class FakeDataSource:
+        async def list_ccds(self, visit: VisitName):
+            assert visit == VisitName('repo:by_uuid:uuid-1')
+            raise VisitResolutionError('Unknown dataset UUID: uuid-1')
+
+    monkeypatch.setattr(visits, 'get_datasource', lambda: FakeDataSource())
+
+    try:
+        await visits.list_visit_ccds('repo:by_uuid:uuid-1')
+    except HTTPException as e:
+        assert e.status_code == 404
+        assert e.detail == 'Unknown dataset UUID: uuid-1'
     else:  # pragma: no cover
         raise AssertionError('HTTPException was not raised')

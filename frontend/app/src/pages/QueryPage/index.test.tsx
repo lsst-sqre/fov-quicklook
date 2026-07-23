@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { Provider } from "react-redux"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -133,6 +133,7 @@ function renderQueryPage(initialEntries: string[], systemInfo = baseSystemInfo) 
 
 describe("QueryPage", () => {
   beforeEach(() => {
+    sessionStorage.clear()
     useListVisitsQuery.mockReset()
     copyTextToClipboard.mockReset()
     useListVisitsQuery.mockReturnValue({
@@ -142,6 +143,7 @@ describe("QueryPage", () => {
           display_id: "embargo:LSSTCam/raw/all:raw:exposure=2026012800342",
           scope_id: "embargo:LSSTCam!-raw!-all:raw",
           day_obs: 20260128,
+          utc_start: "2026-01-28T03:42:00+00:00",
           physical_filter: "r_57",
           obs_id: "obs-342",
           exposure_time: 30,
@@ -160,27 +162,94 @@ describe("QueryPage", () => {
       if (urlText.includes("/api/visits/query_builder_options")) {
         return jsonResponse(buildOptions(urlText))
       }
+      if (urlText.includes("/api/visits/") && urlText.endsWith("/ccds")) {
+        return jsonResponse(["R22_S11", "R22_S12"])
+      }
       throw new Error(`Unexpected fetch: ${urlText}`)
     }))
   })
 
   afterEach(() => {
+    cleanup()
+    sessionStorage.clear()
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it("renders search results from the current query string", async () => {
     renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
-    const queryInput = screen.getByLabelText("Query string") as HTMLInputElement
 
     await waitFor(() => {
-      expect(queryInput.value).toContain("repository_name=embargo")
+      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
     })
-    expect(queryInput.value).toContain("collection=LSSTCam")
-    expect(queryInput.value).toContain("dataset_type=raw")
+    expect((screen.getByLabelText("Collection") as HTMLInputElement).value).toBe("LSSTCam/raw/all")
+    expect((screen.getByLabelText("Dataset Type") as HTMLInputElement).value).toBe("raw")
     expect(useListVisitsQuery).toHaveBeenCalled()
-    expect(screen.getByText("embargo:LSSTCam/raw/all:raw:exposure=2026012800342")).toBeTruthy()
+    expect(screen.getByText("exposure=2026012800342")).toBeTruthy()
+    expect(screen.getByText("UTC")).toBeTruthy()
+    expect(screen.getByText("2026-01-28T03:42:00+00:00")).toBeTruthy()
     expect(screen.getByText("field-342")).toBeTruthy()
     expect(screen.queryByRole("button", { name: /Open by UUID/i })).toBeNull()
+  })
+
+  it("opens the header page for the first CCD", async () => {
+    const openedWindow = {
+      close: vi.fn(),
+      location: { href: "" },
+    } as unknown as Window
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(openedWindow)
+
+    renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
+
+    const button = await screen.findByRole("button", { name: "Header" })
+    expect(button.getAttribute("title")).toBe("Show the Header of the first CCD")
+
+    fireEvent.click(button)
+
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith("", "_blank")
+      expect(openedWindow.location.href).toBe(
+        `http://example.test/header/${encodeURIComponent("embargo:LSSTCam!-raw!-all:raw:exposure=2026012800342")}/${encodeURIComponent("R22_S11")}`,
+      )
+    })
+  })
+
+  it("restores the last query from session storage when reopened", async () => {
+    const savedQuery = new URLSearchParams({
+      repository_name: "embargo",
+      collection: "LSSTCam/raw/all",
+      dataset_type: "raw",
+      limit: "25",
+    }).toString()
+    const firstRender = renderQueryPage([`/query?${savedQuery}`])
+
+    await waitFor(() => {
+      expect(sessionStorage.getItem("fov-quicklook/queryPageSearch")).toBe(
+        JSON.stringify(savedQuery),
+      )
+    })
+
+    firstRender.unmount()
+    useListVisitsQuery.mockClear()
+
+    renderQueryPage(["/query"])
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
+    })
+
+    expect((screen.getByLabelText("Collection") as HTMLInputElement).value).toBe("LSSTCam/raw/all")
+    expect((screen.getByLabelText("Dataset Type") as HTMLInputElement).value).toBe("raw")
+    expect(screen.getByDisplayValue("25")).toBeTruthy()
+    expect(screen.getByTestId("location-search").textContent).toBe("")
+    const queryCall = useListVisitsQuery.mock.calls.find((call) => call[1]?.skip === false)
+    expect(queryCall?.[0]).toEqual({
+      repositoryName: "embargo",
+      collection: "LSSTCam/raw/all",
+      datasetType: "raw",
+      limit: 25,
+      reverse: undefined,
+    })
   })
 
   it("preselects the first configured butler scope without navigating", async () => {
@@ -189,7 +258,8 @@ describe("QueryPage", () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue("main")).toBeTruthy()
     })
-    expect((screen.getByLabelText("Query string") as HTMLInputElement).value).toBe("repository_name=main&collection=main%2Fraw&dataset_type=main_raw&order_by=day_obs&limit=100&where=")
+    expect((screen.getByLabelText("Collection") as HTMLInputElement).value).toBe("main/raw")
+    expect((screen.getByLabelText("Dataset Type") as HTMLInputElement).value).toBe("main_raw")
     expect(screen.getByTestId("location-search").textContent).toBe("")
     const lastCall = useListVisitsQuery.mock.calls[useListVisitsQuery.mock.calls.length - 1]
     expect(lastCall?.[1]?.skip).toBe(true)
@@ -213,7 +283,7 @@ describe("QueryPage", () => {
     })
     fireEvent.change(screen.getByDisplayValue("Select example"), { target: { value: "visit=7001" } })
 
-    expect(screen.getByDisplayValue("repository_name=embargo&collection=LSSTCam%2Fruns%2FnightlyValidation&dataset_type=difference_image&order_by=visit&limit=100&where=visit%3D7001")).toBeTruthy()
+    expect((screen.getByLabelText("Where") as HTMLInputElement).value).toBe("visit=7001")
 
     fireEvent.click(screen.getByRole("button", { name: "Search" }))
 
@@ -311,16 +381,17 @@ describe("QueryPage", () => {
 
   it("copies runnable python code for the current query string", async () => {
     renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
-    const queryInput = screen.getByLabelText("Query string") as HTMLInputElement
 
     await waitFor(() => {
-      expect(queryInput.value).toContain("repository_name=embargo")
+      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
     })
 
     fireEvent.click(screen.getByRole("button", { name: "Copy Python" }))
 
     expect(copyTextToClipboard).toHaveBeenCalledTimes(1)
-    expect(copyTextToClipboard).toHaveBeenCalledWith(buildQueryPythonSnippet(queryInput.value))
+    expect(copyTextToClipboard).toHaveBeenCalledWith(
+      buildQueryPythonSnippet("repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100"),
+    )
   })
 
   it("queries across all collections when collection is empty and shows a collection column", async () => {
@@ -331,6 +402,7 @@ describe("QueryPage", () => {
           display_id: "embargo:LSSTCam/raw/all:raw:exposure=2026012800342",
           scope_id: "embargo:LSSTCam!-raw!-all:raw",
           day_obs: 20260128,
+          utc_start: "2026-01-28T03:42:00+00:00",
           physical_filter: "r_57",
           obs_id: "obs-342",
           exposure_time: 30,

@@ -13,6 +13,7 @@ from quicklook.object_storage import (
     TileCacheMetadata,
     TileCacheMetadataError,
     VisitObjectStorage,
+    clear_visit_object_storage_caches,
     delete_cache_version,
     get_tile_cache_metadata,
     list_cache_versions,
@@ -161,6 +162,7 @@ async def delete_one_quicklook(visit_name: str) -> int:
     # object storageのデータを削除
     storage = VisitObjectStorage.from_visit(VisitName.from_cache_key(visit_name))
     await storage.delete_all()
+    clear_visit_object_storage_caches()
     logger.info(f"Deleted object storage data for {visit_name}")
 
     # DBエントリーを削除（ORMを使ってカスケード削除）

@@ -6,15 +6,17 @@ import { JobStatus, Progress as ProgressType } from '../../store/api/openapi'
 import styles from './styles.module.scss'
 
 export function JobStatusVisualizer({ status, isHighlighted = false }: { status: JobStatus; isHighlighted?: boolean }) {
+  const visitLabel = formatVisitIdForDisplay(status.job.visit)
+
   return (
     <div className={classNames(styles.jobStatus, isHighlighted && styles.highlighted)}>
       <h2>
-        Job: <Link to={`/visits/${encodeURIComponent(status.job.visit)}`}>{formatVisitIdForDisplay(status.job.visit)}</Link>
+        Job: <Link to={`/visits/${encodeURIComponent(status.job.visit)}`}>{visitLabel}</Link>
       </h2>
       <div className={styles.container}>
         {status.generate_single_fits_tiles && (
           <div className={styles.section}>
-            <GenerateSingleFitsTilesVisualizer tiles={status.generate_single_fits_tiles} height="20px" gap={false} />
+            <GenerateSingleFitsTilesVisualizer tiles={status.generate_single_fits_tiles} targetLabel={visitLabel} height="20px" gap={false} />
           </div>
         )}
         {status.merge_tiles && (
@@ -74,11 +76,12 @@ function parseTileKey(key: string): TilePosition | null {
 
 type GenerateSingleFitsTilesVisualizerProps = {
   tiles: Record<string, ProgressType>
+  targetLabel: string
   height?: string
   gap?: boolean
 }
 
-export function GenerateSingleFitsTilesVisualizer({ tiles, height = '100px', gap = false }: GenerateSingleFitsTilesVisualizerProps) {
+export function GenerateSingleFitsTilesVisualizer({ tiles, targetLabel, height = '100px', gap = false }: GenerateSingleFitsTilesVisualizerProps) {
   const tileData: Array<{ key: string; pos: TilePosition; ratio: number }> = []
 
   for (const [key, progress] of Object.entries(tiles)) {
@@ -90,7 +93,7 @@ export function GenerateSingleFitsTilesVisualizer({ tiles, height = '100px', gap
 
   return (
     <div className={styles.generateSingleFitsTiles} style={{ '--tile-height': height, '--tile-gap': gap ? '2px' : '0px' } as React.CSSProperties} data-gap={gap}>
-      <h3>Generate Single FITS Tiles</h3>
+      <h3>Generating Tiles for {targetLabel}</h3>
       <div className={styles.tileGrid}>
         {Array.from({ length: 5 }, (_, raftY) => (
           <div key={raftY} className={styles.raftRow}>

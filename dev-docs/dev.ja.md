@@ -27,18 +27,43 @@ sh dev/microk8s-dev/run.sh status
 
 どちらの pod も `/workspace/fov-quicklook` に現在の checkout を `hostPath` mount する。
 
+checkout 上のファイル変更は pod 内にも即時で見える。backend は `backend/src/**/*.py` の変更を自動で再読込する。`dev/microk8s-dev/*.sh` や環境変数を変えたときだけ process を再起動する。
+
 ## 起動と入り方
 
-初回または image を作り直したいとき:
+初回または Dockerfile / 依存を作り直したいとき:
 
 ```bash
 sh dev/microk8s-dev/run.sh all
 ```
 
+既存の dev 環境を捨てて作り直したいとき:
+
+```bash
+sh dev/microk8s-dev/run.sh redeploy
+```
+
+`redeploy` の `seed-fixtures` / `bootstrap-db` も checkout を `hostPath` mount して実行するので、**source だけの変更なら image 再 build は不要**。
+
 pod はそのままで tmux だけ起動し直したいとき:
 
 ```bash
 sh dev/microk8s-dev/run.sh start
+```
+
+backend を pod の外からまとめて再起動したいとき:
+
+```bash
+sh dev/microk8s-dev/run.sh restart-backend
+```
+
+backend pod の中から tmux で手動再起動したいとき:
+
+```bash
+sh dev/microk8s-dev/backend-restart.sh all
+sh dev/microk8s-dev/backend-restart.sh coordinator
+sh dev/microk8s-dev/backend-restart.sh frontend-api
+sh dev/microk8s-dev/backend-restart.sh generator
 ```
 
 backend pod:
@@ -108,3 +133,5 @@ sh dev/microk8s-dev/run.sh stop
 | `FQ_DEV_SOURCE_ROOT` | mount する checkout の絶対パス |
 | `FQ_DEV_IMAGE` | 使う image を丸ごと上書き |
 | `FQ_DEV_BASE_PATH` | Vite / backend の共通 path prefix |
+| `FQ_DEV_DUMMY_VISIT_COUNT` | DummyDataSource で作る visit 数（既定 50） |
+| `FQ_DEV_BUTLER_VISIT_COUNT` | 併せて作る Butler catalog 件数（既定 0） |

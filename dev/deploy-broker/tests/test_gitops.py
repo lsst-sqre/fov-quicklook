@@ -37,14 +37,43 @@ def test_create_bundle_for_clean_repo(tmp_path: Path) -> None:
     assert metadata["head_sha"] == rev_parse(repo_path, "HEAD")
 
 
-def test_create_bundle_rejects_dirty_repo(tmp_path: Path) -> None:
+def test_create_bundle_includes_dirty_worktree_snapshot(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
     _init_repo(repo_path)
+    run_command(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=repo_path)
+    (repo_path / "README.txt").write_text("dirty\n", encoding="utf-8")
+    (repo_path / "extra.txt").write_text("extra\n", encoding="utf-8")
+    original_head = rev_parse(repo_path, "HEAD")
+    bundle_path = tmp_path / "bundle.bundle"
+
+    metadata = create_bundle(repo_path, "HEAD", bundle_path)
+
+    assert bundle_path.exists()
+    assert metadata["branch_name"] == "feature-branch"
+    assert metadata["head_sha"] != original_head
+    cloned_bundle = tmp_path / "bundle-clone"
+    run_command(
+        ["git", "clone", "-b", "feature-branch", str(bundle_path), str(cloned_bundle)],
+        cwd=tmp_path,
+    )
+    assert (cloned_bundle / "README.txt").read_text(encoding="utf-8") == "dirty\n"
+    assert (cloned_bundle / "extra.txt").read_text(encoding="utf-8") == "extra\n"
+
+
+def test_create_bundle_requires_head_revision_for_dirty_worktree(tmp_path: Path) -> None:
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    _init_repo(repo_path)
+    run_command(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=repo_path)
+    run_command(["git", "checkout", "-b", "topic"], cwd=repo_path)
+    (repo_path / "topic.txt").write_text("topic\n", encoding="utf-8")
+    run_command(["git", "add", "topic.txt"], cwd=repo_path)
+    run_command(["git", "commit", "-m", "topic commit"], cwd=repo_path)
     (repo_path / "README.txt").write_text("dirty\n", encoding="utf-8")
 
-    with pytest.raises(RuntimeError):
-        create_bundle(repo_path, "HEAD", tmp_path / "bundle.bundle")
+    with pytest.raises(RuntimeError, match="requires revision to resolve to HEAD"):
+        create_bundle(repo_path, "feature-branch", tmp_path / "bundle.bundle")
 
 
 def test_derive_build_branch_sanitizes_suffix() -> None:

@@ -191,7 +191,7 @@ review_app_shared_fixture_path() {
 }
 
 review_app_dummy_visit_count() {
-  printf '%s\n' "${REVIEW_APP_DUMMY_VISIT_COUNT:-3}"
+  printf '%s\n' "${REVIEW_APP_DUMMY_VISIT_COUNT:-50}"
 }
 
 review_app_butler_visit_count() {

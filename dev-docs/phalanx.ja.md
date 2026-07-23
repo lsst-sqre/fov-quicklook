@@ -197,10 +197,10 @@ Phalanx / `system_info` に `difference_image` を明示しなくても、Data Q
 ### 標準手順
 
 ```bash
-# app repo は commit 済みの branch を使う
-git branch --show-current
+# 今の作業ツリーをそのまま deploy する
+./dev/deploy-current.sh
 
-# agent-safe な deploy request を broker に送る
+# tracked branch を明示したいときは従来どおり request-deploy でもよい
 cd dev/deploy-broker
 uv run deploy-broker-client request-deploy \
   u/michitaro/fov-quicklook-diffimage-20260311-0512 \
@@ -210,7 +210,7 @@ uv run deploy-broker-client request-deploy \
 
 `deploy-broker-client request-deploy` は次をまとめて実行する。
 
-1. app repo の commit を `git bundle` 化して broker に送る
+1. app repo の current branch snapshot（未コミット差分を含んでよい）を `git bundle` 化して broker に送る
 2. broker が `fov-quicklook-local-*` build branch に push
 3. GitHub Actions `build-and-push.yml` の完了待ち
 4. broker が `k8s/phalanx/applications/fov-quicklook/values.yaml` の `image.tag` を更新して push

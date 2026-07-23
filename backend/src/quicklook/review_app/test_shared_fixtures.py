@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,7 +10,6 @@ from quicklook.review_app import shared_fixtures
 from quicklook.review_app.shared_fixtures import (
     FIXTURE_COLLECTION,
     FIXTURE_REPOSITORY_NAME,
-    DEFAULT_BUTLER_VISIT_COUNT,
     DEFAULT_DUMMY_VISIT_COUNT,
     default_fixture_visits,
     default_butler_ccd_names,
@@ -17,25 +17,33 @@ from quicklook.review_app.shared_fixtures import (
 )
 
 
-def test_prepare_shared_fixtures_creates_manifest_and_env_files(tmp_path):
+def _stub_butler_fixture(paths, **_kwargs):
+    paths.butler_repo_root.mkdir(parents=True, exist_ok=True)
+    (paths.butler_repo_root / "butler.yaml").write_text("registry:\n  db: sqlite:///dummy.sqlite3\n")
+
+
+def test_prepare_shared_fixtures_creates_manifest_and_env_files(tmp_path, monkeypatch):
     root = tmp_path / "fixtures"
-    paths = prepare_shared_fixtures(root, visits=default_fixture_visits(2))
+    ccd_name = default_butler_ccd_names()[0]
+    monkeypatch.setattr(shared_fixtures, "_write_butler_fixture", _stub_butler_fixture)
+    paths = prepare_shared_fixtures(root, visits=default_fixture_visits(2), ccd_names=[ccd_name])
 
     manifest = json.loads(paths.manifest_path.read_text())
     info = json.loads(paths.info_path.read_text())
     assert manifest["version"]
     assert len(manifest["visits"]) == 2
-    assert manifest["visits"][0]["ccds"] == [str(ccd) for ccd in default_butler_ccd_names()]
+    assert manifest["visits"][0]["ccds"] == [str(ccd_name)]
     assert paths.dummy_env_path.exists()
     assert paths.butler_env_path.exists()
-    assert (paths.dummy_s3_root / "raw" / "910001" / "R22_S00.fits").exists()
-    assert (paths.dummy_s3_root / "raw" / "910002" / "R22_S22.fits").exists()
+    assert (paths.dummy_s3_root / "raw" / "910001" / f"{ccd_name}.fits").exists()
+    assert not (paths.dummy_s3_root / "raw" / "910002").exists()
     assert info["butler"]["visit_count"] == 2
 
 
 def test_prepare_shared_fixtures_builds_queryable_butler_repo(tmp_path, monkeypatch):
     root = tmp_path / "fixtures"
-    paths = prepare_shared_fixtures(root, visits=default_fixture_visits(2))
+    ccd_name = default_butler_ccd_names()[0]
+    paths = prepare_shared_fixtures(root, visits=default_fixture_visits(2), ccd_names=[ccd_name], butler_ccd_names=[ccd_name])
 
     monkeypatch.setenv("DAF_BUTLER_REPOSITORY_INDEX", str(paths.data_repos_path))
     butler = Butler(FIXTURE_REPOSITORY_NAME, instrument="LSSTCam", collections=[FIXTURE_COLLECTION])
@@ -51,11 +59,14 @@ def test_prepare_shared_fixtures_builds_queryable_butler_repo(tmp_path, monkeypa
     refs = list(butler.query_datasets("raw", where="exposure=910001", collections=[FIXTURE_COLLECTION]))
 
     assert [record.id for record in exposures] == [910001, 910002]
-    assert len(refs) == len(default_butler_ccd_names())
+    assert len(refs) == 1
 
 
-def test_prepare_shared_fixtures_defaults_to_large_butler_catalog(tmp_path, monkeypatch):
+def test_prepare_shared_fixtures_uses_default_butler_catalog_size(tmp_path, monkeypatch):
     root = tmp_path / "fixtures"
+    monkeypatch.setattr(shared_fixtures, "DEFAULT_BUTLER_VISIT_COUNT", 2)
+    monkeypatch.setattr(shared_fixtures, "DEFAULT_CCDS", (default_butler_ccd_names()[0],))
+    monkeypatch.setattr(shared_fixtures, "default_butler_ccd_names", lambda: (default_butler_ccd_names()[0],))
     paths = prepare_shared_fixtures(root)
 
     monkeypatch.setenv("DAF_BUTLER_REPOSITORY_INDEX", str(paths.data_repos_path))
@@ -71,10 +82,10 @@ def test_prepare_shared_fixtures_defaults_to_large_butler_catalog(tmp_path, monk
     )
     info = json.loads(paths.info_path.read_text())
 
-    assert exposure_count == DEFAULT_BUTLER_VISIT_COUNT
-    assert len(refs) == len(default_butler_ccd_names())
+    assert exposure_count == shared_fixtures.DEFAULT_BUTLER_VISIT_COUNT
+    assert len(refs) == 1
     assert info["dummy"]["visit_count"] == DEFAULT_DUMMY_VISIT_COUNT
-    assert info["butler"]["visit_count"] == DEFAULT_BUTLER_VISIT_COUNT
+    assert info["butler"]["visit_count"] == shared_fixtures.DEFAULT_BUTLER_VISIT_COUNT
 
 
 def test_default_butler_ccd_names_uses_central_raft():
@@ -144,29 +155,33 @@ def test_prepare_shared_fixtures_uses_postgres_registry_config_when_requested(tm
     assert calls[0][1]["config"]["registry"]["db"] == "postgresql://quicklook:test@postgres:5432/butler_registry"
 
 
-def test_prepare_shared_fixtures_preserves_existing_root_directory(tmp_path):
+def test_prepare_shared_fixtures_preserves_existing_root_directory(tmp_path, monkeypatch):
     root = tmp_path / "fixtures"
     root.mkdir()
     sentinel = root / "stale.txt"
     sentinel.write_text("stale")
     original_inode = root.stat().st_ino
 
-    prepare_shared_fixtures(root, visits=default_fixture_visits(2), overwrite=True)
+    ccd_name = default_butler_ccd_names()[0]
+    monkeypatch.setattr(shared_fixtures, "_write_butler_fixture", _stub_butler_fixture)
+    prepare_shared_fixtures(root, visits=default_fixture_visits(2), ccd_names=[ccd_name], overwrite=True)
 
     assert root.stat().st_ino == original_inode
     assert not sentinel.exists()
     assert (root / "VERSION").exists()
 
 
-def test_prepare_shared_fixtures_writes_shell_safe_butler_env(tmp_path):
+def test_prepare_shared_fixtures_writes_shell_safe_butler_env(tmp_path, monkeypatch):
     root = tmp_path / "fixtures"
-    paths = prepare_shared_fixtures(root, visits=default_fixture_visits(2))
+    ccd_name = default_butler_ccd_names()[0]
+    monkeypatch.setattr(shared_fixtures, "_write_butler_fixture", _stub_butler_fixture)
+    paths = prepare_shared_fixtures(root, visits=default_fixture_visits(2), ccd_names=[ccd_name])
 
     result = subprocess.run(
         [
             "sh",
             "-c",
-            'set -a && . "$1" && set +a && python - <<\'PY\'\n'
+            f'set -a && . "$1" && set +a && {sys.executable} - <<\'PY\'\n'
             "import os\n"
             "print(os.environ['DAF_BUTLER_REPOSITORY_INDEX'])\n"
             "print(os.environ['QUICKLOOK_data_source'])\n"

@@ -17,7 +17,9 @@ minio_access_key=${FQ_DEV_MINIO_ACCESS_KEY:-quicklook}
 minio_secret_key=${FQ_DEV_MINIO_SECRET_KEY:-quicklook-secret}
 tile_bucket=${FQ_DEV_TILE_BUCKET:-quicklook-tile}
 test_data_bucket=${FQ_DEV_TEST_DATA_BUCKET:-quicklook-test-data}
-dummy_visit_count=${FQ_DEV_DUMMY_VISIT_COUNT:-3}
+dummy_visit_count=${FQ_DEV_DUMMY_VISIT_COUNT:-50}
+butler_visit_count=${FQ_DEV_BUTLER_VISIT_COUNT:-0}
+python_bin=${FQ_DEV_PYTHON:-/app/.venv/bin/python}
 
 usage() {
   cat <<'EOF'
@@ -25,11 +27,13 @@ Usage: dev/microk8s-dev/run.sh <command>
 
 Commands:
   build-image  Build and import the dev toolbox image
-  deploy       Deploy support services and sleeping dev pods
+  deploy       Deploy support services and sleeping dev pods into a fresh namespace
+  redeploy     Delete the existing namespace, then deploy and start everything again
   start        Start backend/frontend dev servers inside tmux
+  restart-backend  Restart backend tmux session to reload Python code
   stop         Delete the dev namespace
   status       Show dev namespace resources
-  all          Run build-image -> deploy -> start
+  all          Run build-image -> redeploy
 EOF
 }
 
@@ -45,6 +49,41 @@ ensure_source_root() {
     echo "source tree not found at ${source_root}" >&2
     exit 1
   fi
+}
+
+namespace_exists() {
+  kubectl get namespace "${namespace}" >/dev/null 2>&1
+}
+
+wait_for_namespace_deleted() {
+  if ! namespace_exists; then
+    return
+  fi
+  deadline=$(( $(date +%s) + 300 ))
+  while namespace_exists; do
+    if [ "$(date +%s)" -ge "${deadline}" ]; then
+      echo "timed out waiting for namespace ${namespace} to be deleted" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+}
+
+wait_for_job_pod() {
+  job_name=$1
+  deadline=$(( $(date +%s) + 120 ))
+  while :; do
+    pod_name=$(kubectl -n "${namespace}" get pods -l "job-name=${job_name}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [ -n "${pod_name}" ]; then
+      printf '%s\n' "${pod_name}"
+      return
+    fi
+    if [ "$(date +%s)" -ge "${deadline}" ]; then
+      echo "timed out waiting for pod of job ${job_name}" >&2
+      exit 1
+    fi
+    sleep 1
+  done
 }
 
 image_ref() {
@@ -261,22 +300,30 @@ spec:
         - secretRef:
             name: ${secret_name}
         command:
-        - python
-        - -m
-        - quicklook.review_app.shared_fixtures
-        - --root
-        - /work/fixtures
-        - --visit-count
-        - "${dummy_visit_count}"
-        - --overwrite
-        - --seed-s3
-        - --ensure-tile-bucket
+        - sh
+        - -ceu
+        - |
+          cd /workspace/fov-quicklook/backend
+          export PYTHONPATH="/workspace/fov-quicklook/backend/src\${PYTHONPATH:+:\${PYTHONPATH}}"
+          exec ${python_bin} -u -m quicklook.review_app.shared_fixtures \
+            --root /work/fixtures \
+            --visit-count "${dummy_visit_count}" \
+            --butler-visit-count "${butler_visit_count}" \
+            --overwrite \
+            --seed-s3 \
+            --ensure-tile-bucket
         volumeMounts:
         - name: work
           mountPath: /work
+        - name: source
+          mountPath: /workspace/fov-quicklook
       volumes:
       - name: work
         emptyDir: {}
+      - name: source
+        hostPath:
+          path: ${source_root}
+          type: Directory
 ---
 apiVersion: batch/v1
 kind: Job
@@ -297,16 +344,44 @@ spec:
             name: ${config_name}
         - secretRef:
             name: ${secret_name}
+        volumeMounts:
+        - name: source
+          mountPath: /workspace/fov-quicklook
         command:
         - sh
         - -ceu
         - |
-          cd /app
-          python -m quicklook.scripts.bootstrap_db
+          cd /workspace/fov-quicklook/backend
+          export PYTHONPATH="/workspace/fov-quicklook/backend/src\${PYTHONPATH:+:\${PYTHONPATH}}"
+          exec ${python_bin} -u -m quicklook.scripts.bootstrap_db
+      volumes:
+      - name: source
+        hostPath:
+          path: ${source_root}
+          type: Directory
 EOF
+
+  seed_fixtures_pod=$(wait_for_job_pod seed-fixtures)
+  echo "Streaming logs from ${seed_fixtures_pod}"
+  (
+    deadline=$(( $(date +%s) + 120 ))
+    while :; do
+      if kubectl -n "${namespace}" logs -f "${seed_fixtures_pod}"; then
+        exit 0
+      fi
+      if [ "$(date +%s)" -ge "${deadline}" ]; then
+        echo "timed out waiting to stream logs from ${seed_fixtures_pod}" >&2
+        exit 1
+      fi
+      sleep 1
+    done
+  ) &
+  seed_logs_pid=$!
 
   kubectl -n "${namespace}" wait --for=condition=Complete job/seed-fixtures --timeout=600s
   kubectl -n "${namespace}" wait --for=condition=Complete job/bootstrap-db --timeout=600s
+  kill "${seed_logs_pid}" 2>/dev/null || true
+  wait "${seed_logs_pid}" 2>/dev/null || true
 }
 
 deploy_dev_pods() {
@@ -436,19 +511,46 @@ EOF
 deploy() {
   require_command kubectl
   ensure_source_root
+  if namespace_exists; then
+    echo "namespace ${namespace} already exists; use 'sh dev/microk8s-dev/run.sh redeploy' for a clean rebuild" >&2
+    exit 1
+  fi
   deploy_support
   deploy_dev_pods
 }
 
+start_backend() {
+  kubectl -n "${namespace}" exec deploy/"${backend_name}" -- sh -lc 'cd /workspace/fov-quicklook && sh dev/microk8s-dev/backend-tmux.sh'
+}
+
+start_frontend() {
+  kubectl -n "${namespace}" exec deploy/"${frontend_name}" -- sh -lc 'cd /workspace/fov-quicklook && sh dev/microk8s-dev/frontend-tmux.sh'
+}
+
 start() {
   require_command kubectl
-  kubectl -n "${namespace}" exec deploy/"${backend_name}" -- sh -lc 'cd /workspace/fov-quicklook && sh dev/microk8s-dev/backend-tmux.sh'
-  kubectl -n "${namespace}" exec deploy/"${frontend_name}" -- sh -lc 'cd /workspace/fov-quicklook && sh dev/microk8s-dev/frontend-tmux.sh'
+  start_backend
+  start_frontend
+}
+
+restart_backend() {
+  require_command kubectl
+  start_backend
 }
 
 stop() {
   require_command kubectl
-  kubectl delete namespace "${namespace}" --ignore-not-found=true
+  if ! namespace_exists; then
+    return
+  fi
+  kubectl delete namespace "${namespace}" --ignore-not-found=true --wait=false
+  wait_for_namespace_deleted
+}
+
+redeploy() {
+  stop
+  deploy
+  start
 }
 
 status() {
@@ -465,8 +567,14 @@ case "${command_name}" in
   deploy)
     deploy
     ;;
+  redeploy)
+    redeploy
+    ;;
   start)
     start
+    ;;
+  restart-backend)
+    restart_backend
     ;;
   stop)
     stop
@@ -476,8 +584,7 @@ case "${command_name}" in
     ;;
   all)
     build_image
-    deploy
-    start
+    redeploy
     ;;
   help|-h|--help)
     usage

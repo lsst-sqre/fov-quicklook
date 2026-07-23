@@ -1,5 +1,6 @@
 import abc
 from dataclasses import dataclass
+from datetime import datetime
 
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 from quicklook.utils.async_wrap import async_wrap
@@ -49,6 +50,7 @@ class VisitEntry:
     observation_reason: str
     target_name: str
     uuid: str | None = None
+    utc_start: datetime | None = None
 
 
 @dataclass

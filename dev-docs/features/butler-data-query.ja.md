@@ -133,6 +133,28 @@ counts_by_day_obs = Counter(int(data_id['day_obs']) for data_id in data_ids)
 
 より正確には、「月内の全 record を丸ごと取る」というより、**月内の `day_obs + exposure/visit` の組を 1 回で取って件数化している**、という実装です。
 
+## Butler registry と backend 側 PostgreSQL table の対応
+
+`Data Query` 周りでは public API だけでなく、Butler registry がぶら下げている private な SQL manager も一部使っています。コード上の入口は `backend/src/quicklook/datasource/butler_datasource/__init__.py` の `_get_sql_registry()` / `_get_db_connection()` です。
+
+| 用途 | Butler 側の入口 | PostgreSQL table | 備考 |
+| --- | --- | --- | --- |
+| collection 一覧 / 存在確認 | `sql_registry._managers.collections._tables.collection` | `collection` | `name` と `collection_id` を使う |
+| dataset type 一覧 / 存在確認 | `sql_registry._managers.datasets._static.dataset_type` | `dataset_type` | `tag_association_table` から dataset type ごとの dynamic table 名が分かる |
+| 月次 `day_counts` の高速経路 | `sql_registry._managers.datasets._find_storage(dataset_type).dynamic_tables` と `sql_registry._managers.dimensions._tables[exposure|visit]` | `dataset_tags_*` + `exposure` / `visit` | `collection_id` で絞って `day_obs` ごとに `COUNT(DISTINCT exposure|visit)` する |
+| `by_uuid` 解決 | `registry.getDataset(UUID(...))` | （内部的には `dataset` / `dataset_type` / `run` 由来） | 実装は public API を優先し、table を直読みしない |
+
+### `day_counts` の SQL 経路
+
+現在の backend は、collection が固定されている通常ケースではまず SQL 経路を試します。流れは次のとおりです。
+
+1. `collection.name -> collection.collection_id` を 1 回だけ引く
+2. dataset type から対応する `dataset_tags_*` table を得る
+3. `dataset_tags_*` と `exposure` または `visit` table を `instrument + exposure/visit id` で join する
+4. `day_obs >= ... and day_obs < ...` で月を絞り、`COUNT(DISTINCT exposure|visit)` を `GROUP BY day_obs` する
+
+これは `collection` table との join を毎回 hot path に入れないためで、debug-jupyter での実測でも `queryDataIds(...)+Counter` より速いケースがありました。Butler の private SQL internals が使えない環境では、従来どおり public API の `queryDataIds()` に自動で戻します。
+
 ### 4. 実データ参照
 
 一覧から exposure/visit を選んだ後は、`query_datasets(...)` で dataset ref を引いて detector ごとに整理し、`getURI(...)` から実ファイルを取得します。

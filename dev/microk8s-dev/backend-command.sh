@@ -22,6 +22,13 @@ if [ ! -x "${python_bin}" ]; then
   exit 1
 fi
 
+run_uvicorn() {
+  module=$1
+  port=$2
+  shift 2
+  exec "${python_bin}" -m uvicorn "$module" --host 0.0.0.0 --port "$port" --no-access-log --reload --reload-dir "${backend_root}/src" "$@"
+}
+
 role=${1:-}
 if [ -z "$role" ]; then
   usage >&2
@@ -34,13 +41,13 @@ export PYTHONPATH="${backend_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
 case "$role" in
   frontend|frontend-api)
-    exec "${python_bin}" -m uvicorn quicklook.frontend.api.app:app --host 0.0.0.0 --port 9500 --no-access-log "$@"
+    run_uvicorn quicklook.frontend.api.app:app 9500 "$@"
     ;;
   coordinator)
-    exec "${python_bin}" -m uvicorn quicklook.coordinator.api.app:app --host 0.0.0.0 --port 9501 --no-access-log "$@"
+    run_uvicorn quicklook.coordinator.api.app:app 9501 "$@"
     ;;
   generator)
-    exec "${python_bin}" -m uvicorn quicklook.generator.api.app:app --host 0.0.0.0 --port 9502 --no-access-log "$@"
+    run_uvicorn quicklook.generator.api.app:app 9502 "$@"
     ;;
   bootstrap-db)
     exec "${python_bin}" -m quicklook.scripts.bootstrap_db "$@"

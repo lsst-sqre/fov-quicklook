@@ -24,6 +24,14 @@ export function isValidCalendarMonth(value: string): boolean {
   return /^\d{4}-\d{2}$/.test(value)
 }
 
+export function parseCalendarMonthInput(value: string): string | undefined {
+  const normalized = value.trim()
+  if (!isValidCalendarMonth(normalized)) {
+    return undefined
+  }
+  return normalized
+}
+
 export function dayObsToSearchDate(dayObs: number): string {
   const normalized = `${dayObs}`
   if (!/^\d{8}$/.test(normalized)) {

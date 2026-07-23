@@ -7,9 +7,10 @@ import shlex
 import shutil
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 
 import boto3
 from botocore.client import Config as BotoConfig
@@ -22,15 +23,23 @@ from quicklook.review_app.synthetic import render_virtual_raw_fits_bytes, review
 from quicklook.types import CcdName, VisitName
 from quicklook.utils.s3 import NoSuchKey, S3Config, s3_delete_objects_with_prefix, s3_download_object, s3_upload_object
 
-FIXTURE_VERSION = "20260721-v6"
+FIXTURE_VERSION = "20260721-v8"
 FIXTURE_REPOSITORY_NAME = "reviewapp-ci"
 FIXTURE_MANIFEST_KEY = "_fixtures/review-app/sample-manifest.json"
 FIXTURE_VERSION_KEY = "_fixtures/review-app/version.txt"
 FIXTURE_COLLECTION = "LSSTCam/raw/all"
 FIXTURE_RUN = "u/review-app-fixtures/raw"
-DEFAULT_DUMMY_VISIT_COUNT = 3
+DEFAULT_DUMMY_VISIT_COUNT = 50
 DEFAULT_BUTLER_VISIT_COUNT = 2000
 DEFAULT_CCDS = review_projection_ccd_names()
+
+
+def _log_progress(message: str) -> None:
+    print(f"[shared-fixtures] {message}", flush=True)
+
+
+def _should_log_loop_progress(index: int, total: int) -> bool:
+    return total <= 20 or index == 1 or index == total or index % 100 == 0
 
 
 @dataclass(frozen=True)
@@ -51,6 +60,12 @@ class FixtureVisit:
     @property
     def group_name(self) -> str:
         return f"fixture-group-{self.exposure_id}"
+
+    @property
+    def utc_start(self) -> datetime:
+        offset = self.exposure_id - 910001
+        base = datetime.strptime(str(self.day_obs), "%Y%m%d").replace(hour=3, tzinfo=timezone.utc)
+        return base + timedelta(minutes=offset % 50, seconds=(offset * 7) % 60)
 
     @property
     def dummy_visit_id(self) -> str:
@@ -209,9 +224,16 @@ def prepare_shared_fixtures(
     paths = SharedFixturePaths.from_root(root)
     root.parent.mkdir(parents=True, exist_ok=True)
 
+    _log_progress(
+        f"prepare start root={root} dummy_visits={len(visits)} dummy_ccds={len(ccd_names)} "
+        f"butler_visits={len(butler_visits)} butler_ccds={len(butler_ccd_names)} overwrite={overwrite}"
+    )
     with _exclusive_lock(paths.lock_path):
+        _log_progress(f"acquired lock {paths.lock_path}")
         if not overwrite and _is_fixture_ready(paths, version):
+            _log_progress(f"fixture already ready at {paths.root}")
             if butler_registry_url is not None:
+                _log_progress("refreshing Butler fixture for requested registry URL")
                 _write_butler_fixture(
                     paths,
                     repository_name=repository_name,
@@ -229,11 +251,13 @@ def prepare_shared_fixtures(
                     butler_visits=butler_visits,
                     butler_registry_url=butler_registry_url,
                 )
+                _log_progress("rewrote Butler path-dependent files")
             return paths
 
         with TemporaryDirectory(dir=root.parent, prefix=f".{root.name}-") as staging_dir:
             staging_root = Path(staging_dir) / root.name
             stage_paths = SharedFixturePaths.from_root(staging_root)
+            _log_progress(f"building fixture in staging dir {staging_root}")
             _write_local_fixture(
                 stage_paths,
                 version=version,
@@ -246,8 +270,10 @@ def prepare_shared_fixtures(
             )
 
             if root.exists():
+                _log_progress(f"replacing existing fixture contents under {root}")
                 _replace_directory_contents(root, staging_root)
             else:
+                _log_progress(f"moving staged fixture into place at {root}")
                 staging_root.replace(root)
             final_paths = SharedFixturePaths.from_root(root)
             _write_path_dependent_files(
@@ -260,6 +286,7 @@ def prepare_shared_fixtures(
                 butler_visits=butler_visits,
                 butler_registry_url=butler_registry_url,
             )
+            _log_progress(f"fixture ready at {root}")
 
     return SharedFixturePaths.from_root(root)
 
@@ -278,6 +305,7 @@ def _replace_directory_contents(target_root: Path, source_root: Path) -> None:
 
 
 def sync_dummy_fixture_to_s3(paths: SharedFixturePaths, s3_config: S3Config) -> None:
+    _log_progress(f"syncing dummy fixture to s3 bucket={s3_config.bucket}")
     ensure_bucket_exists(s3_config)
 
     try:
@@ -287,19 +315,16 @@ def sync_dummy_fixture_to_s3(paths: SharedFixturePaths, s3_config: S3Config) -> 
 
     wanted_version = paths.version_path.read_text().strip()
     if current_version == wanted_version:
+        _log_progress(f"s3 already up to date version={wanted_version}")
         return
 
-    raw_prefixes = {
-        f"{path.parent.relative_to(paths.dummy_s3_root).as_posix()}/"
-        for path in paths.dummy_s3_root.glob("raw/*/*.fits")
-    }
-    for prefix in sorted(raw_prefixes):
-        s3_delete_objects_with_prefix(s3_config, prefix)
+    _log_progress("deleting previous raw/ objects from s3")
+    s3_delete_objects_with_prefix(s3_config, "raw/")
 
-    for path in sorted(paths.dummy_s3_root.rglob("*")):
-        if not path.is_file():
-            continue
+    files = [path for path in sorted(paths.dummy_s3_root.rglob("*")) if path.is_file()]
+    for index, path in enumerate(files, start=1):
         key = path.relative_to(paths.dummy_s3_root).as_posix()
+        _log_progress(f"uploading {index}/{len(files)} {key}")
         s3_upload_object(
             s3_config,
             key,
@@ -362,7 +387,9 @@ def _write_local_fixture(
     butler_registry_url: str | None,
 ) -> None:
     paths.root.mkdir(parents=True, exist_ok=True)
+    _log_progress("writing dummy fixture files")
     _write_dummy_fixture(paths, version=version, ccd_names=ccd_names, visits=visits)
+    _log_progress("writing Butler fixture")
     _write_butler_fixture(
         paths,
         repository_name=repository_name,
@@ -371,6 +398,7 @@ def _write_local_fixture(
         butler_registry_url=butler_registry_url,
     )
     paths.version_path.write_text(f"{version}\n")
+    _log_progress("writing env/info files")
     _write_path_dependent_files(
         paths,
         version=version,
@@ -432,6 +460,7 @@ def _write_dummy_fixture(
     visits: Sequence[FixtureVisit],
 ) -> None:
     paths.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    _log_progress(f"writing dummy manifest with {len(visits)} visits")
     manifest = {
         "version": version,
         "visits": [visit.manifest_entry(ccd_names) for visit in visits],
@@ -440,12 +469,17 @@ def _write_dummy_fixture(
     paths.marker_path.parent.mkdir(parents=True, exist_ok=True)
     paths.marker_path.write_text(f"{version}\n")
 
-    for visit in visits:
-        for detector_index, ccd_name in enumerate(ccd_names):
-            output_path = paths.dummy_s3_root / "raw" / str(visit.exposure_id) / f"{ccd_name}.fits"
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            seed = visit.exposure_id * 100 + detector_index
-            output_path.write_bytes(generate_raw_fits_bytes(ccd_name, seed=seed, visit=visit))
+    if not visits:
+        _log_progress("dummy fixture has no visits; skipping FITS generation")
+        return
+
+    shared_visit = visits[0]
+    for detector_index, ccd_name in enumerate(ccd_names, start=1):
+        output_path = paths.dummy_s3_root / "raw" / str(shared_visit.exposure_id) / f"{ccd_name}.fits"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        _log_progress(f"generating shared dummy FITS {detector_index}/{len(ccd_names)} ccd={ccd_name}")
+        seed = shared_visit.exposure_id * 100 + detector_index
+        output_path.write_bytes(generate_raw_fits_bytes(ccd_name, seed=seed, visit=shared_visit))
 
 
 def _write_butler_fixture(
@@ -457,6 +491,10 @@ def _write_butler_fixture(
     butler_registry_url: str | None,
 ) -> None:
     paths.butler_repo_root.parent.mkdir(parents=True, exist_ok=True)
+    _log_progress(
+        f"initializing Butler repo visits={len(visits)} ccds={len(ccd_names)} "
+        f"registry={'postgresql' if butler_registry_url else 'sqlite'}"
+    )
     if butler_registry_url is not None:
         Butler.makeRepo(
             paths.butler_repo_root,
@@ -473,6 +511,7 @@ def _write_butler_fixture(
     instrument = Instrument.get("LSSTCam")
 
     detector_ids = {ccd_name: instrument.ccd_2_detector[ccd_name] for ccd_name in ccd_names}
+    _log_progress(f"registering {len(detector_ids)} Butler detectors")
     registry.insertDimensionData(
         "instrument",
         {
@@ -512,7 +551,9 @@ def _write_butler_fixture(
     registered_filters: set[str] = set()
     registered_days: set[int] = set()
 
-    for visit in visits:
+    for index, visit in enumerate(visits, start=1):
+        if _should_log_loop_progress(index, len(visits)):
+            _log_progress(f"registering Butler exposure {index}/{len(visits)} id={visit.exposure_id}")
         if visit.physical_filter not in registered_filters:
             registry.insertDimensionData(
                 "physical_filter",
@@ -557,6 +598,7 @@ def _write_butler_fixture(
             run=FIXTURE_RUN,
         )
         registry.associate(FIXTURE_COLLECTION, refs)
+    _log_progress("Butler fixture registration finished")
 
 def _write_env_files(paths: SharedFixturePaths, *, repository_name: str) -> None:
     paths.dummy_env_path.write_text(
@@ -616,7 +658,7 @@ def _content_type_for_path(path: Path) -> str:
 
 
 @contextmanager
-def _exclusive_lock(lock_path: Path) -> Iterable[None]:
+def _exclusive_lock(lock_path: Path) -> Iterator[None]:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("w") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
@@ -676,6 +718,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
+    _log_progress("seed fixture command started")
     ccd_names = [CcdName(ccd) for ccd in args.ccd] if args.ccd else list(DEFAULT_CCDS)
     butler_ccd_names = [CcdName(ccd) for ccd in args.butler_ccd] if args.butler_ccd else list(default_butler_ccd_names())
     visits = default_fixture_visits(args.visit_count)
@@ -692,10 +735,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         overwrite=args.overwrite,
     )
     if args.ensure_tile_bucket:
+        _log_progress("ensuring tile bucket exists")
         ensure_bucket_exists(config.s3_tile)
     if args.seed_s3:
         sync_dummy_fixture_to_s3(paths, config.s3_test_data)
 
+    _log_progress("seed fixture command finished")
     print(json.dumps({"root": str(paths.root), "info": str(paths.info_path)}, indent=2))
 
 

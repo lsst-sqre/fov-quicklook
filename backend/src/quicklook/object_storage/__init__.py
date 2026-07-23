@@ -233,6 +233,10 @@ class VisitObjectStorage:
     get_time_profile = async_wrap(get_time_profile_sync)
 
 
+def clear_visit_object_storage_caches() -> None:
+    VisitObjectStorage.get_packed_tile_array_sync.cache_clear()
+
+
 async def put_tile_cache_metadata(metadata: TileCacheMetadata) -> int:
     return await asyncio.to_thread(put_tile_cache_metadata_sync, metadata)
 

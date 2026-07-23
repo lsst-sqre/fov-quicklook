@@ -130,6 +130,7 @@ make pyright/watch     # ウォッチモード
 - 抽象: `DataSourceBase` に `query_visits()`, `list_ccds()`, `get_data()`, `get_metadata()` を定義
 - 実装: `butler`（本番）、`dummy`（テスト）
 - インスタンス取得: `from quicklook.datasource import get_datasource`
+- Butler registry の public/private API と PostgreSQL table の対応は `/dev-docs/features/butler-data-query.ja.md` を参照
 
 ---
 
@@ -138,6 +139,7 @@ make pyright/watch     # ウォッチモード
 - PackedTiles (4×4 グループ) は S3 に `pickle` リストとして保存
 - キー: `quicklooks/{visit}/packed-tile/{level}/{i}/{j}.npy.zstd.list.pickle`
 - LRU キャッシュあり、タイルは ~100-200KB、パック済みは ~1.6-3.2MB
+- 手動 cache delete 時はこの in-process LRU も消して、同じ visit の再生成後に stale tile を返さないようにしている
 
 ---
 

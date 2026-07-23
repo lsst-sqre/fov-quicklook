@@ -7,8 +7,10 @@ from pathlib import Path
 from deploy_broker.client import _settings_defaults
 
 
-def test_client_defaults_to_local_broker(monkeypatch) -> None:
+def test_client_defaults_to_local_broker(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN", raising=False)
+    monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN_FILE", raising=False)
+    monkeypatch.setattr("deploy_broker.client._user_broker_config_dir", lambda: tmp_path)
 
     server, api_token = _settings_defaults()
 
@@ -16,8 +18,9 @@ def test_client_defaults_to_local_broker(monkeypatch) -> None:
     assert api_token is None
 
 
-def test_client_uses_explicit_api_token_env(monkeypatch) -> None:
+def test_client_uses_explicit_api_token_env(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("DEPLOY_BROKER_API_TOKEN", "env-token")
+    monkeypatch.setattr("deploy_broker.client._user_broker_config_dir", lambda: tmp_path)
 
     _, api_token = _settings_defaults()
 
@@ -33,6 +36,21 @@ def test_client_reads_explicit_api_token_file(monkeypatch, tmp_path: Path) -> No
     _, api_token = _settings_defaults()
 
     assert api_token == "file-token"
+
+
+def test_client_reads_user_broker_files(monkeypatch, tmp_path: Path) -> None:
+    config_dir = tmp_path / ".fov-quicklook2"
+    config_dir.mkdir()
+    (config_dir / "broker-url").write_text("http://broker.example:8010\n", encoding="utf-8")
+    (config_dir / "broker-token").write_text("stored-token\n", encoding="utf-8")
+    monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN", raising=False)
+    monkeypatch.delenv("DEPLOY_BROKER_API_TOKEN_FILE", raising=False)
+    monkeypatch.setattr("deploy_broker.client._user_broker_config_dir", lambda: config_dir)
+
+    server, api_token = _settings_defaults()
+
+    assert server == "http://broker.example:8010"
+    assert api_token == "stored-token"
 
 
 def test_main_passes_refresh_flag_to_get_app_token(monkeypatch, capsys) -> None:

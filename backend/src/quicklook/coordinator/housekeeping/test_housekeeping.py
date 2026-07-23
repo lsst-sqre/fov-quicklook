@@ -93,8 +93,14 @@ async def test_select_quicklook_to_delete_no_ready(monkeypatch):
     assert result == "raw:visit2"
 
 
-async def test_delete_one_quicklook():
+async def test_delete_one_quicklook(monkeypatch):
     """quicklookが正しく削除されることを確認"""
+    cache_cleared: list[bool] = []
+    monkeypatch.setattr(
+        "quicklook.coordinator.housekeeping.clear_visit_object_storage_caches",
+        lambda: cache_cleared.append(True),
+    )
+
     async with get_db_session() as session:
         now = datetime.now()
         quicklook = Quicklook(
@@ -110,6 +116,7 @@ async def test_delete_one_quicklook():
     # 削除を実行
     disk_usage = await delete_one_quicklook("raw:test_delete")
     assert disk_usage == 5000
+    assert cache_cleared == [True]
     
     # DBから削除されていることを確認
     async with get_db_session() as session:

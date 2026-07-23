@@ -1,6 +1,6 @@
 import base64
 import binascii
-import json
+from datetime import datetime
 from pathlib import Path
 
 from quicklook.config import config
@@ -13,18 +13,17 @@ from quicklook.datasource.types import (
     VisitEntry,
     VisitResolutionError,
 )
-from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
+from quicklook.review_app.shared_fixtures import DEFAULT_DUMMY_VISIT_COUNT, default_fixture_visits
+from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName, build_scope_id
 from quicklook.utils.fits import fits_partial_load
-from quicklook.utils.s3 import NoSuchKey, s3_download_object, s3_list_objects
+from quicklook.utils.s3 import s3_download_object, s3_list_objects
 
 from ..types import DataSourceBase, DataSourceCcdMetadata, Query
-
-SHARED_SAMPLE_MANIFEST_KEY = "_fixtures/review-app/sample-manifest.json"
 
 
 class DummyDataSource(DataSourceBase):
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
-        visits = _load_shared_dummy_visits() or _default_dummy_visits()
+        visits = _default_dummy_visits()
         visits = _filter_visits(visits, q)
         return visits[q.offset : q.offset + q.limit]
 
@@ -51,7 +50,7 @@ class DummyDataSource(DataSourceBase):
         collection: str | None = None,
         dataset_type: str | None = None,
     ) -> QueryBuilderOptions:
-        visits = _load_shared_dummy_visits() or _default_dummy_visits()
+        visits = _default_dummy_visits()
         repositories = sorted({VisitName(visit.id).repository_name for visit in visits} | {scope.repository_name for scope in config.butler_scopes})
         selected_repository = repository_name if repository_name in repositories else (repositories[0] if repositories else None)
         scoped_visits = [
@@ -126,31 +125,34 @@ class DummyDataSource(DataSourceBase):
 
     def get_exposure_data_types_sync(self, exposure_id: int) -> list[CcdDataType]:
         matched_scope_ids: list[CcdDataType] = []
-        for visit in _load_shared_dummy_visits() or _default_dummy_visits():
+        for visit in _default_dummy_visits():
             visit_name = VisitName(visit.id)
             if visit_name.name != str(exposure_id):
                 continue
             matched_scope_ids.append(CcdDataType(visit.scope_id))
         if matched_scope_ids:
             return matched_scope_ids
-        return [CcdDataType(scope.id) for scope in config.butler_scopes]
+        return [
+            CcdDataType(scope.id or build_scope_id(scope.repository_name, scope.collection, scope.dataset_type))
+            for scope in config.butler_scopes
+        ]
 
 
 def _s3_get_visit_ccd_fits_raw(ref: CcdDataRef) -> bytes:
-    key = f"{ref.visit.dataset_type}/{ref.visit.name}/{ref.ccd}.fits"
+    key = f"{ref.visit.dataset_type}/{_shared_dummy_data_name()}/{ref.ccd}.fits"
     return s3_download_object(config.s3_test_data, key)
 
 
 def _s3_get_visit_ccd_fits_calexp(ref: CcdDataRef) -> bytes:
     def read(start: int, end: int) -> bytes:
-        key = f'{ref.visit.dataset_type}/{ref.visit.name}/{ref.ccd}.fits'
+        key = f'{ref.visit.dataset_type}/{_shared_dummy_data_name()}/{ref.ccd}.fits'
         return s3_download_object(config.s3_test_data, key, offset=start, length=end - start)
 
     return fits_partial_load(read, [0, 1])
 
 
 def _s3_list_visit_ccds(visit: VisitName) -> list[CcdName]:
-    prefix = f"{visit.dataset_type}/{visit.name}/"
+    prefix = f"{visit.dataset_type}/{_shared_dummy_data_name()}/"
     return [
         CcdName(Path(Path(obj.key).name).stem)
         for obj in s3_list_objects(config.s3_test_data, prefix=prefix)
@@ -181,37 +183,34 @@ def _build_dummy_visit(repository_name: str, collection: str, dataset_type: str,
     )
 
 
+def _default_dummy_scope() -> tuple[str, str, str]:
+    raw_scope = next((scope for scope in config.butler_scopes if scope.dataset_type == 'raw'), None)
+    if raw_scope is not None:
+        return raw_scope.repository_name, raw_scope.collection, raw_scope.dataset_type
+    return 'dummy', 'LSSTCam/raw/all', 'raw'
+
+
+def _shared_dummy_data_name() -> str:
+    return str(default_fixture_visits(1)[0].exposure_id)
+
+
 def _default_dummy_visits() -> list[VisitEntry]:
+    repository_name, collection, dataset_type = _default_dummy_scope()
     return [
-        create_dummy_visit_entry(_build_dummy_visit('dummy', 'LSSTCam/raw/all', 'raw', 'broccoli'), 20230101, "r", 30.0, target_name="dummy_target"),
-        create_dummy_visit_entry(_build_dummy_visit('dummy', 'LSSTCam/runs/nightlyValidation', 'calexp', '192350'), 20230102, "g", 15.0, target_name="dummy_target_2"),
-        *[
-            create_dummy_visit_entry(_build_dummy_visit('dummy', 'LSSTCam/raw/all', 'raw', f'dummy-{i}'), 20230104, "z")
-            for i in range(50)
-        ],
+        create_dummy_visit_entry(
+            _build_dummy_visit(repository_name, collection, dataset_type, str(visit.exposure_id)),
+            visit.day_obs,
+            visit.physical_filter,
+            exposure_time=visit.exposure_time,
+            obs_id=visit.obs_id,
+            science_program=visit.science_program,
+            observation_type=visit.observation_type,
+            observation_reason=visit.observation_reason,
+            target_name=visit.target_name,
+            utc_start=visit.utc_start,
+        )
+        for visit in default_fixture_visits(DEFAULT_DUMMY_VISIT_COUNT)
     ]
-
-
-def _load_shared_dummy_visits() -> list[VisitEntry] | None:
-    try:
-        payload = s3_download_object(config.s3_test_data, SHARED_SAMPLE_MANIFEST_KEY)
-    except NoSuchKey:
-        return None
-
-    data = json.loads(payload)
-    visits = data.get("visits")
-    if not isinstance(visits, list):
-        raise ValueError(f"Unexpected manifest format in {SHARED_SAMPLE_MANIFEST_KEY}")
-    entries: list[VisitEntry] = []
-    for visit in visits:
-        if not isinstance(visit, dict):
-            continue
-        visit_name = VisitName(visit['id'])
-        payload = {key: value for key, value in visit.items() if key != "ccds"}
-        payload.setdefault('display_id', visit_name.cache_key)
-        payload.setdefault('scope_id', visit_name.scope_id)
-        entries.append(VisitEntry(**payload))
-    return entries
 
 
 def _filter_visits(visits: list[VisitEntry], q: Query) -> list[VisitEntry]:
@@ -268,6 +267,7 @@ def create_dummy_visit_entry(
     observation_type: str = "science",
     observation_reason: str = "test",
     target_name: str | None = None,
+    utc_start: datetime | None = None,
 ) -> VisitEntry:
     visit_name = VisitName(visit) if isinstance(visit, str) else visit
     if target_name is None:
@@ -286,6 +286,7 @@ def create_dummy_visit_entry(
         observation_reason=observation_reason,
         target_name=target_name,
         uuid=_encode_dummy_visit_uuid(visit_name),
+        utc_start=utc_start,
     )
 
 
