@@ -138,6 +138,7 @@ const tableStyle = {
   width: "100%",
   borderCollapse: "collapse",
   minWidth: "960px",
+  fontSize: "small",
 } as const
 
 const loadingOverlayStyle = {
