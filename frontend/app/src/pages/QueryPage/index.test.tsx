@@ -4,13 +4,9 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { QueryPage } from "."
 import { makeStore } from "../../store"
-import { buildQueryPythonSnippet } from "./queryParams"
 
 const { useListVisitsQuery } = vi.hoisted(() => ({
   useListVisitsQuery: vi.fn(),
-}))
-const { copyTextToClipboard } = vi.hoisted(() => ({
-  copyTextToClipboard: vi.fn(),
 }))
 
 vi.mock("../../env", () => ({
@@ -26,10 +22,6 @@ vi.mock("../../store/api/openapi", async () => {
     useListVisitsQuery,
   }
 })
-
-vi.mock("../../utils/copyTextToClipboard", () => ({
-  copyTextToClipboard,
-}))
 
 function jsonResponse(payload: unknown): Response {
   return {
@@ -135,7 +127,6 @@ describe("QueryPage", () => {
   beforeEach(() => {
     sessionStorage.clear()
     useListVisitsQuery.mockReset()
-    copyTextToClipboard.mockReset()
     useListVisitsQuery.mockReturnValue({
       data: [
         {
@@ -191,6 +182,8 @@ describe("QueryPage", () => {
     const headers = screen.getAllByRole("columnheader")
     expect(headers[headers.length - 1]?.textContent).toBe("Header")
     expect(screen.getByRole("table").style.fontSize).toBe("small")
+    expect(screen.getByRole("button", { name: "Search" }).style.marginLeft).toBe("auto")
+    expect(screen.queryByRole("button", { name: "Copy Python" })).toBeNull()
     expect(screen.getByText("2026-01-28T03:42:00+00:00")).toBeTruthy()
     expect(screen.getByText("field-342")).toBeTruthy()
     expect(screen.queryByRole("button", { name: /Open by UUID/i })).toBeNull()
@@ -381,21 +374,6 @@ describe("QueryPage", () => {
       limit: 100,
       reverse: undefined,
     })
-  })
-
-  it("copies runnable python code for the current query string", async () => {
-    renderQueryPage(["/query?repository_name=embargo&collection=LSSTCam/raw/all&dataset_type=raw&limit=100"])
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue("embargo")).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByRole("button", { name: "Copy Python" }))
-
-    expect(copyTextToClipboard).toHaveBeenCalledTimes(1)
-    expect(copyTextToClipboard).toHaveBeenCalledWith(
-      buildQueryPythonSnippet("repository_name=embargo&collection=LSSTCam%2Fraw%2Fall&dataset_type=raw&limit=100"),
-    )
   })
 
   it("queries across all collections when collection is empty and shows a collection column", async () => {

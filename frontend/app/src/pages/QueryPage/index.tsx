@@ -6,9 +6,8 @@ import { env } from "../../env"
 import { buildScopeId } from "../../quicklookId"
 import { AppState } from "../../store"
 import { ButlerScopeConfig, useListVisitsQuery } from "../../store/api/openapi"
-import { copyTextToClipboard } from "../../utils/copyTextToClipboard"
 import { makeSessionStorageAccessor } from "../../utils/localStorage"
-import { buildDefaultQueryInput, buildQueryPythonSnippet, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
+import { buildDefaultQueryInput, buildVisitListArgs, normalizeQueryInput } from "./queryParams"
 import { VisitResultsTable } from "./VisitResultsTable"
 
 const DEFAULT_LIMIT = "100"
@@ -235,10 +234,6 @@ export function QueryPage() {
     commitQuery()
   }, [commitQuery])
 
-  const handleCopyPython = useCallback(async () => {
-    await copyTextToClipboard(buildQueryPythonSnippet(queryInput))
-  }, [queryInput])
-
   const handleOpenHeader = useCallback(async (visitId: string) => {
     setHeaderError(null)
     setOpeningHeaderVisitId(visitId)
@@ -353,9 +348,9 @@ export function QueryPage() {
             </label>
           </div>
           <div style={buttonRowStyle}>
-            <button type="submit">Search</button>
-            <button type="button" onClick={() => void handleCopyPython()}>Copy Python</button>
             {queryBuilderInputMode === "combobox" && loadingOptions && <span>Loading query options...</span>}
+            <button style={searchButtonStyle} type="submit">Search</button>
+            {/* <button type="button" onClick={() => void handleCopyPython()}>Copy Python</button> */}
           </div>
         </form>
       </div>
@@ -687,6 +682,10 @@ const buttonRowStyle = {
   display: "flex",
   gap: "12px",
   alignItems: "center",
+} as const
+
+const searchButtonStyle = {
+  marginLeft: "auto",
 } as const
 
 const summaryStyle = {
