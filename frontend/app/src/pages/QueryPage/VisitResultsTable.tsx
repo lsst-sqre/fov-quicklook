@@ -26,18 +26,18 @@ export const VisitResultsTable = memo(({
       <table style={tableStyle}>
         <thead>
           <tr>
-            <th>Visit</th>
-            <th>Header</th>
-            {showCollectionColumn && <th>Collection</th>}
-            <th>Day Obs</th>
-            <th>UTC</th>
-            <th>Filter</th>
-            <th>Exposure Time</th>
-            <th>Observation Type</th>
-            <th>Observation Reason</th>
-            <th>Science Program</th>
-            <th>Target</th>
-            <th>Obs ID</th>
+            <th style={headerCellStyle}>Visit</th>
+            <th style={headerCellStyle}>Header</th>
+            {showCollectionColumn && <th style={headerCellStyle}>Collection</th>}
+            <th style={headerCellStyle}>Day Obs</th>
+            <th style={headerCellStyle}>UTC</th>
+            <th style={headerCellStyle}>Filter</th>
+            <th style={headerCellStyle}>Exposure Time</th>
+            <th style={headerCellStyle}>Observation Type</th>
+            <th style={headerCellStyle}>Observation Reason</th>
+            <th style={headerCellStyle}>Science Program</th>
+            <th style={headerCellStyle}>Target</th>
+            <th style={headerCellStyle}>Obs ID</th>
           </tr>
         </thead>
         <tbody>
@@ -128,6 +128,7 @@ function getVisitCollection(visitId: string): string {
 
 const tableContainerStyle = {
   position: "relative",
+  height: "100%",
   overflow: "auto",
   border: "1px solid rgba(255, 255, 255, 0.12)",
   borderRadius: "8px",
@@ -147,4 +148,11 @@ const loadingOverlayStyle = {
   justifyContent: "center",
   background: "rgba(0, 0, 0, 0.35)",
   pointerEvents: "none",
+} as const
+
+const headerCellStyle = {
+  position: "sticky",
+  top: 0,
+  background: "rgb(24, 24, 24)",
+  zIndex: 1,
 } as const

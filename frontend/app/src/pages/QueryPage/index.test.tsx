@@ -187,6 +187,7 @@ describe("QueryPage", () => {
     expect(useListVisitsQuery).toHaveBeenCalled()
     expect(screen.getByText("exposure=2026012800342")).toBeTruthy()
     expect(screen.getByText("UTC")).toBeTruthy()
+    expect(screen.getByText("Visit").style.position).toBe("sticky")
     expect(screen.getByText("2026-01-28T03:42:00+00:00")).toBeTruthy()
     expect(screen.getByText("field-342")).toBeTruthy()
     expect(screen.queryByRole("button", { name: /Open by UUID/i })).toBeNull()

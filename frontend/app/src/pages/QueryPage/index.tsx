@@ -363,7 +363,7 @@ export function QueryPage() {
       {queryBuilderInputMode === "combobox" && optionsError && <p role="alert">{optionsError}</p>}
       {parsedQuery.error && <p role="alert">{parsedQuery.error}</p>}
       {parsedQuery.args !== null && (
-        <>
+        <div style={resultsSectionStyle}>
           <div style={summaryStyle}>
             <span>Results: {data?.length ?? 0}</span>
           </div>
@@ -371,16 +371,18 @@ export function QueryPage() {
           {error && <p role="alert">{formatQueryError(error)}</p>}
           {!isLoading && !isFetching && !error && data?.length === 0 && <p>No visits matched the query.</p>}
           {(data || isLoading || isFetching) && (
-            <VisitResultsTable
-              data={data ?? []}
-              isFetching={isFetching}
-              isLoading={isLoading}
-              onOpenHeader={handleOpenHeader}
-              openingHeaderVisitId={openingHeaderVisitId}
-              showCollectionColumn={showCollectionColumn}
-            />
+            <div style={resultsTableAreaStyle}>
+              <VisitResultsTable
+                data={data ?? []}
+                isFetching={isFetching}
+                isLoading={isLoading}
+                onOpenHeader={handleOpenHeader}
+                openingHeaderVisitId={openingHeaderVisitId}
+                showCollectionColumn={showCollectionColumn}
+              />
+            </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
@@ -634,7 +636,8 @@ const pageStyle = {
   flexDirection: "column",
   gap: "16px",
   height: "100%",
-  overflow: "auto",
+  minHeight: 0,
+  overflow: "hidden",
   padding: "16px",
   boxSizing: "border-box",
 } as const
@@ -690,4 +693,17 @@ const summaryStyle = {
   display: "flex",
   gap: "16px",
   alignItems: "center",
+} as const
+
+const resultsSectionStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "16px",
+  minHeight: 0,
+  flex: "1 1 auto",
+} as const
+
+const resultsTableAreaStyle = {
+  minHeight: 0,
+  flex: "1 1 auto",
 } as const
