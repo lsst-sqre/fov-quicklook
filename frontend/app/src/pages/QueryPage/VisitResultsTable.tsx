@@ -27,7 +27,6 @@ export const VisitResultsTable = memo(({
         <thead>
           <tr>
             <th style={headerCellStyle}>Visit</th>
-            <th style={headerCellStyle}>Header</th>
             {showCollectionColumn && <th style={headerCellStyle}>Collection</th>}
             <th style={headerCellStyle}>Day Obs</th>
             <th style={headerCellStyle}>UTC</th>
@@ -38,6 +37,7 @@ export const VisitResultsTable = memo(({
             <th style={headerCellStyle}>Science Program</th>
             <th style={headerCellStyle}>Target</th>
             <th style={headerCellStyle}>Obs ID</th>
+            <th style={headerCellStyle}>Header</th>
           </tr>
         </thead>
         <tbody>
@@ -75,16 +75,6 @@ function VisitRow(
       <td>
         <Link to={`/visits/${encodeURIComponent(entry.id)}`}>{formatVisitTail(entry.id)}</Link>
       </td>
-      <td>
-        <button
-          disabled={openingHeaderVisitId === entry.id}
-          onClick={() => void onOpenHeader(entry.id)}
-          title="Show the Header of the first CCD"
-          type="button"
-        >
-          Header
-        </button>
-      </td>
       {showCollectionColumn && <td>{collection}</td>}
       <td>{entry.day_obs}</td>
       <td>{entry.utc_start ?? ""}</td>
@@ -95,6 +85,16 @@ function VisitRow(
       <td>{entry.science_program}</td>
       <td>{entry.target_name}</td>
       <td>{entry.obs_id}</td>
+      <td style={actionCellStyle}>
+        <button
+          disabled={openingHeaderVisitId === entry.id}
+          onClick={() => void onOpenHeader(entry.id)}
+          title="Show the Header of the first CCD"
+          type="button"
+        >
+          Header
+        </button>
+      </td>
     </tr>
   )
 }
@@ -155,4 +155,9 @@ const headerCellStyle = {
   top: 0,
   background: "rgb(24, 24, 24)",
   zIndex: 1,
+} as const
+
+const actionCellStyle = {
+  textAlign: "right",
+  whiteSpace: "nowrap",
 } as const
