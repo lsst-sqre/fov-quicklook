@@ -40,20 +40,27 @@ def run_verification(
     *,
     sleep: Callable[[int], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
+    on_step: Callable[[VerificationStep], None] | None = None,
+    on_progress: Callable[[str], None] | None = None,
 ) -> list[VerificationStep]:
-    steps = [
-        _verify_healthz(client),
-        _verify_app_token(client),
-        _verify_argocd_status(client),
-        _verify_argocd_branch(client),
-        _verify_argocd_logs(client, options.logs_component, options.logs_since_seconds),
-    ]
+    steps: list[VerificationStep] = []
+
+    def record(step: VerificationStep) -> None:
+        steps.append(step)
+        if on_step is not None:
+            on_step(step)
+
+    record(_verify_healthz(client))
+    record(_verify_app_token(client))
+    record(_verify_argocd_status(client))
+    record(_verify_argocd_branch(client))
+    record(_verify_argocd_logs(client, options.logs_component, options.logs_since_seconds))
 
     if options.include_sync:
-        steps.append(_verify_argocd_sync(client))
+        record(_verify_argocd_sync(client))
 
     if options.restart_components is not None:
-        steps.append(_verify_argocd_restart(client, options.restart_components))
+        record(_verify_argocd_restart(client, options.restart_components))
 
     if options.deploy_tracked_branch is not None:
         if options.app_repo is None:
@@ -72,6 +79,8 @@ def run_verification(
                 deploy_poll_seconds=options.deploy_poll_seconds,
                 sleep=sleep,
                 monotonic=monotonic,
+                on_step=on_step,
+                on_progress=on_progress,
             )
         )
 
@@ -156,6 +165,8 @@ def _verify_deploy_request(
     deploy_poll_seconds: int,
     sleep: Callable[[int], None],
     monotonic: Callable[[], float],
+    on_step: Callable[[VerificationStep], None] | None,
+    on_progress: Callable[[str], None] | None,
 ) -> list[VerificationStep]:
     response = client.request_deploy(
         tracked_branch=tracked_branch,
@@ -178,18 +189,43 @@ def _verify_deploy_request(
             f"request_id={request_id} status={status}",
         )
     ]
+    if on_step is not None:
+        on_step(steps[0])
     if not wait_for_deploy:
         return steps
 
-    deadline = monotonic() + deploy_timeout_seconds
+    started_at = monotonic()
+    deadline = started_at + deploy_timeout_seconds
+    seen_logs = _report_deploy_progress(
+        response,
+        request_id=request_id,
+        elapsed_seconds=0,
+        seen_logs=0,
+        on_progress=on_progress,
+    )
     while status not in {"succeeded", "failed"}:
         if monotonic() >= deadline:
             raise RuntimeError(
                 f"deploy request {request_id} did not finish within {deploy_timeout_seconds} seconds"
             )
+        _emit_progress(
+            on_progress,
+            (
+                "get-deploy-status:"
+                f" waiting {deploy_poll_seconds}s for request_id={request_id}"
+                f" status={status} step={_format_step(response)}"
+            ),
+        )
         sleep(deploy_poll_seconds)
         response = client.get_deploy_status(request_id)
         status = response.get("status")
+        seen_logs = _report_deploy_progress(
+            response,
+            request_id=request_id,
+            elapsed_seconds=int(monotonic() - started_at),
+            seen_logs=seen_logs,
+            on_progress=on_progress,
+        )
 
     if status != "succeeded":
         raise RuntimeError(
@@ -201,7 +237,55 @@ def _verify_deploy_request(
     if isinstance(verification, dict) and verification:
         detail += f" verification={verification}"
     steps.append(VerificationStep("get-deploy-status", detail))
+    if on_step is not None:
+        on_step(steps[-1])
     return steps
+
+
+def _emit_progress(
+    on_progress: Callable[[str], None] | None,
+    message: str,
+) -> None:
+    if on_progress is not None:
+        on_progress(message)
+
+
+def _report_deploy_progress(
+    response: dict[str, Any],
+    *,
+    request_id: str,
+    elapsed_seconds: int,
+    seen_logs: int,
+    on_progress: Callable[[str], None] | None,
+) -> int:
+    _emit_progress(
+        on_progress,
+        (
+            "get-deploy-status:"
+            f" request_id={request_id}"
+            f" status={response.get('status')}"
+            f" step={_format_step(response)}"
+            f" elapsed={elapsed_seconds}s"
+        ),
+    )
+    logs = response.get("logs")
+    if not isinstance(logs, list):
+        return seen_logs
+    for entry in logs[seen_logs:]:
+        if not isinstance(entry, dict):
+            continue
+        message = entry.get("message")
+        if not isinstance(message, str) or not message:
+            continue
+        timestamp = entry.get("timestamp")
+        prefix = f"{timestamp} " if isinstance(timestamp, str) and timestamp else ""
+        _emit_progress(on_progress, f"deploy-log: {prefix}{message}")
+    return len(logs)
+
+
+def _format_step(response: dict[str, Any]) -> str:
+    step = response.get("step")
+    return step if isinstance(step, str) and step else "-"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -267,12 +351,14 @@ def main() -> None:
 
     client = BrokerClient(args.server, args.api_token)
     try:
-        steps = run_verification(client, options)
+        run_verification(
+            client,
+            options,
+            on_step=lambda step: print(f"OK {step.name}: {step.detail}", flush=True),
+            on_progress=lambda message: print(f"INFO {message}", flush=True),
+        )
     except Exception as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
     finally:
         client.close()
-
-    for step in steps:
-        print(f"OK {step.name}: {step.detail}")

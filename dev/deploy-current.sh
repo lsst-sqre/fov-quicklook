@@ -20,6 +20,7 @@ TRACKED_BRANCH="u/michitaro/fov-quicklook-${TRACKED_SUFFIX}"
 uv run --project "$REPO_ROOT/dev/deploy-broker" deploy-broker-verify \
     --deploy-tracked-branch "$TRACKED_BRANCH" \
     --app-repo "$REPO_ROOT" \
+    --deploy-poll-seconds 5 \
     "$@"
 
 uv run --project "$REPO_ROOT/dev/deploy-broker" deploy-broker-client argocd-status

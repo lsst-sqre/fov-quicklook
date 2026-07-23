@@ -161,6 +161,66 @@ def test_run_verification_waits_for_deploy_success(tmp_path: Path) -> None:
     assert slept == [15, 15]
 
 
+def test_run_verification_reports_progress_during_deploy(tmp_path: Path) -> None:
+    client = _FakeClient()
+    client.deploy_status_responses = [
+        {
+            "request_id": "req-1",
+            "status": "running",
+            "step": "building",
+            "logs": [
+                {
+                    "timestamp": "2026-01-28T03:42:00+00:00",
+                    "message": "Pushing app commit to build branch broker-app-req-1",
+                }
+            ],
+        },
+        {
+            "request_id": "req-1",
+            "status": "succeeded",
+            "step": "complete",
+            "logs": [
+                {
+                    "timestamp": "2026-01-28T03:42:00+00:00",
+                    "message": "Pushing app commit to build branch broker-app-req-1",
+                },
+                {
+                    "timestamp": "2026-01-28T03:43:00+00:00",
+                    "message": "Resolved image tag ghcr.io/lsst-sqre/fov-quicklook:test",
+                },
+            ],
+            "verification": {"healthz_ok": True},
+        },
+    ]
+    now = 0.0
+    progress_messages: list[str] = []
+    reported_steps: list[str] = []
+
+    def _sleep(seconds: int) -> None:
+        nonlocal now
+        now += seconds
+
+    run_verification(
+        client,
+        _options(
+            deploy_tracked_branch="u/michitaro/fov-quicklook-test",
+            app_repo=tmp_path,
+            deploy_poll_seconds=5,
+        ),
+        sleep=_sleep,
+        monotonic=lambda: now,
+        on_step=lambda step: reported_steps.append(step.name),
+        on_progress=progress_messages.append,
+    )
+
+    assert reported_steps[-2:] == ["request-deploy", "get-deploy-status"]
+    assert any("status=queued" in message for message in progress_messages)
+    assert any("waiting 5s" in message for message in progress_messages)
+    assert any("status=running step=building elapsed=5s" in message for message in progress_messages)
+    assert sum("Pushing app commit to build branch broker-app-req-1" in message for message in progress_messages) == 1
+    assert any("Resolved image tag ghcr.io/lsst-sqre/fov-quicklook:test" in message for message in progress_messages)
+
+
 def test_run_verification_requires_app_repo_for_deploy() -> None:
     with pytest.raises(ValueError, match="--app-repo"):
         run_verification(_FakeClient(), _options(deploy_tracked_branch="u/michitaro/fov-quicklook-test"))

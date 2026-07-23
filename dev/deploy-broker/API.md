@@ -218,6 +218,7 @@ response は `DeployRequestRecord`:
 - `--include-sync` を付けると `POST /v1/argocd/sync` も実行する
 - `--restart-components ...` を付けると `POST /v1/argocd/restart` も実行する
 - `--deploy-tracked-branch ... --app-repo ...` を付けると `POST /v1/deploy-requests` と `GET /v1/deploy-requests/{request_id}` も実行する
+- deploy request 完了待ちでは poll ごとの status と新着 `logs` を逐次表示する
 
 例:
 
