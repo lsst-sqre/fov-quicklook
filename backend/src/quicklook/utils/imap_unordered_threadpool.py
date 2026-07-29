@@ -55,11 +55,15 @@ def imap_unordered_threadpool(
         refill_future: Future | None = None
 
         while in_flight or refill_future is not None:
+            # 最初の1件完了待ちで詰まらないよう、空きがあれば先に refill を走らせる。
+            if not input_exhausted and refill_future is None and len(in_flight) < max_in_flight:
+                refill_future = refill_executor.submit(_try_next, it)
+
             wait_set: set[Future] = set(in_flight)
             if refill_future is not None:
                 wait_set.add(refill_future)
 
-            done, remaining = wait(wait_set, return_when=FIRST_COMPLETED)
+            done, _ = wait(wait_set, return_when=FIRST_COMPLETED)
 
             for fut in done:
                 if fut is refill_future:
@@ -72,7 +76,3 @@ def imap_unordered_threadpool(
                 else:
                     in_flight.discard(fut)
                     yield fut.result()
-
-            # in_flight が max_in_flight 未満なら refill を開始
-            if not input_exhausted and refill_future is None and len(in_flight) < max_in_flight:
-                refill_future = refill_executor.submit(_try_next, it)
