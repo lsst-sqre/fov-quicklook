@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { JobList } from '../../../components/JobList'
 import { GenerateSingleFitsTilesVisualizer } from '../../../components/JobStatusVisualizer/JobStatusVisualizer'
 import { LoadingSpinner } from '../../../components/Loading'
+import { formatVisitIdForDisplay } from '../../../quicklookId'
 import { useGetQuicklooksStatusQuery } from '../../../store/api/base'
 import { useCreateQuicklookMutation } from '../../../store/api/openapi'
 import { useHomeContext } from '../context'
@@ -19,7 +20,7 @@ export function QuicklookJobMonitor() {
   const statusListCount = statusList ? Object.keys(statusList).length : 0
 
   useEffect(() => {
-    if (jobListRef.current && currentQuicklook.id && statusList) {
+    if (jobListRef.current && currentQuicklook.id && statusListCount > 0) {
       const element = jobListRef.current.querySelector(`[data-visit="${currentQuicklook.id}"]`)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -66,7 +67,12 @@ export function QuicklookJobMonitor() {
                 <LoadingSpinner />
               </div>
             )}
-            <GenerateSingleFitsTilesVisualizer tiles={metadata.progress} height="10vh" gap={true} />
+            <GenerateSingleFitsTilesVisualizer
+              tiles={metadata.progress}
+              targetLabel={formatVisitIdForDisplay(metadata.visit_name)}
+              height="10vh"
+              gap={true}
+            />
           </div>
         </div>
       </div>

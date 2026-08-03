@@ -19,6 +19,7 @@ from .storage import TokenStore
 
 DEPLOYMENTS = ("coordinator", "generator", "frontend", "db", "debug")
 DEFAULT_RESTART_DEPLOYMENTS = ("coordinator", "generator", "frontend", "debug")
+AUTH_FAILURE_STATUS_CODES = {401, 403}
 
 
 class ArgoCdClient:
@@ -26,16 +27,45 @@ class ArgoCdClient:
         self._settings = settings
         self._token_store = token_store
 
-    def _headers(self) -> dict[str, str]:
-        token = self._token_store.get_argocd_token()
+    def _headers(self, *, refresh: bool = False) -> dict[str, str]:
+        token = self._token_store.get_argocd_token(refresh=refresh)
         return {"Cookie": f"argocd.token={token}"}
 
-    def _json_headers(self) -> dict[str, str]:
-        return {**self._headers(), "Content-Type": "application/json"}
+    def _json_headers(self, *, refresh: bool = False) -> dict[str, str]:
+        return {**self._headers(refresh=refresh), "Content-Type": "application/json"}
 
     def _http(self) -> httpx.Client:
         timeout = httpx.Timeout(self._settings.argocd_timeout_seconds)
         return httpx.Client(timeout=timeout)
+
+    def _request(
+        self,
+        client: httpx.Client,
+        method: str,
+        url: str,
+        *,
+        params: dict[str, object] | None = None,
+        content: str | None = None,
+        json_headers: bool = False,
+    ) -> httpx.Response:
+        response: httpx.Response | None = None
+        for refresh in (False, True):
+            headers = (
+                self._json_headers(refresh=refresh)
+                if json_headers
+                else self._headers(refresh=refresh)
+            )
+            response = client.request(
+                method,
+                url,
+                params=params,
+                content=content,
+                headers=headers,
+            )
+            if response.status_code not in AUTH_FAILURE_STATUS_CODES or refresh:
+                return response
+        assert response is not None
+        return response
 
     def _resource_name(self, component: str) -> str:
         if component in DEPLOYMENTS:
@@ -53,9 +83,10 @@ class ArgoCdClient:
 
     def get_app_info(self) -> dict[str, Any]:
         with self._http() as client:
-            response = client.get(
+            response = self._request(
+                client,
+                "GET",
                 f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}",
-                headers=self._headers(),
             )
             response.raise_for_status()
             app_info = response.json()
@@ -85,7 +116,9 @@ class ArgoCdClient:
         with self._http() as client:
             for component in DEPLOYMENTS:
                 deployment = self._resource_name(component)
-                response = client.get(
+                response = self._request(
+                    client,
+                    "GET",
                     f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/resource",
                     params={
                         "namespace": self._settings.argocd_namespace,
@@ -94,7 +127,6 @@ class ArgoCdClient:
                         "group": "apps",
                         "kind": "Deployment",
                     },
-                    headers=self._headers(),
                 )
                 if response.is_error:
                     entries.append(
@@ -120,9 +152,10 @@ class ArgoCdClient:
     def logs(self, component: str, since_seconds: int = 600) -> ArgoCdLogsResponse:
         deployment = self._resource_name(component)
         with self._http() as client:
-            tree_response = client.get(
+            tree_response = self._request(
+                client,
+                "GET",
                 f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/resource-tree",
-                headers=self._headers(),
             )
             tree_response.raise_for_status()
             nodes = tree_response.json().get("nodes", [])
@@ -137,7 +170,9 @@ class ArgoCdClient:
             if not pod_name:
                 raise RuntimeError(f"pod not found for component: {component}")
 
-            logs_response = client.get(
+            logs_response = self._request(
+                client,
+                "GET",
                 f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/logs",
                 params={
                     "namespace": self._settings.argocd_namespace,
@@ -145,7 +180,6 @@ class ArgoCdClient:
                     "container": deployment,
                     "sinceSeconds": since_seconds,
                 },
-                headers=self._headers(),
             )
             logs_response.raise_for_status()
 
@@ -176,10 +210,12 @@ class ArgoCdClient:
             "patchType": "merge",
         }
         with self._http() as client:
-            response = client.patch(
+            response = self._request(
+                client,
+                "PATCH",
                 f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}",
-                headers=self._json_headers(),
                 content=json.dumps(payload),
+                json_headers=True,
             )
             response.raise_for_status()
             self.validate_app_source(response.json())
@@ -187,10 +223,12 @@ class ArgoCdClient:
     def sync(self) -> ArgoCdSyncResponse:
         self.get_app_info()
         with self._http() as client:
-            response = client.post(
+            response = self._request(
+                client,
+                "POST",
                 f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/sync",
-                headers=self._json_headers(),
                 content=json.dumps({"name": self._settings.argocd_app_name}),
+                json_headers=True,
             )
             response.raise_for_status()
         return ArgoCdSyncResponse()
@@ -202,9 +240,10 @@ class ArgoCdClient:
         with self._http() as client:
             for component in targets:
                 deployment = self._resource_name(component)
-                response = client.post(
+                response = self._request(
+                    client,
+                    "POST",
                     f"{self._settings.argocd_base_url}/api/v1/applications/{self._settings.argocd_app_name}/resource/actions/v2",
-                    headers=self._json_headers(),
                     content=json.dumps(
                         {
                             "name": self._settings.argocd_app_name,
@@ -216,6 +255,7 @@ class ArgoCdClient:
                             "action": "restart",
                         }
                     ),
+                    json_headers=True,
                 )
                 response.raise_for_status()
                 restarted.append(deployment)

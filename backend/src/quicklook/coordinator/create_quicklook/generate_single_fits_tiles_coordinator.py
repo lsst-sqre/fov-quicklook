@@ -124,6 +124,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                 # resubmitフローで事前取得したCCDがある場合、最初に割り当て
                 if initial_ccd is not None:
                     logger.info(f"Assigning pre-fetched resubmit CCD {initial_ccd.ccd} to generator {generator.id}")
+                    await _record_assigned_ccd(job, initial_ccd.ccd)
                     await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=initial_ccd)))
                     has_initial_batch = True
 
@@ -132,6 +133,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                     ccd_ref = await dispatcher.get_next_ccd(generator.id)
                     if ccd_ref is not None:
                         logger.debug(f"Assigning CCD {ccd_ref.ccd} to generator {generator.id}")
+                        await _record_assigned_ccd(job, ccd_ref.ccd)
                         await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
                         has_initial_batch = True
 
@@ -141,6 +143,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                     if ccd_ref is None:
                         await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=None)))
                         return
+                    await _record_assigned_ccd(job, ccd_ref.ccd)
                     await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
 
                 logger.info(f"Initial batch sent to generator {generator.id}, waiting for responses")
@@ -387,6 +390,7 @@ async def _handle_generator_message(
             # 追加CCD割り当て
             next_ccd = await dispatcher.get_next_ccd(generator.id)
             if next_ccd is not None:
+                await _record_assigned_ccd(job, next_ccd.ccd)
                 await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=next_ccd)))
             elif not dispatcher.all_completed.is_set():
                 # 追加CCDがない場合でも、Generatorが消失して再割り当てが発生する可能性がある
@@ -395,6 +399,7 @@ async def _handle_generator_message(
                     ccd_ref = await _wait_for_next_ccd(dispatcher, generator.id)
                     if ccd_ref is not None:
                         try:
+                            await _record_assigned_ccd(job, ccd_ref.ccd)
                             await ws.send_bytes(pickle.dumps(AssignCcdMessage(ccd_ref=ccd_ref)))
                         except Exception as e:
                             # WebSocketが閉じられている場合、worker()レベルの
@@ -407,6 +412,7 @@ async def _handle_generator_message(
 
         case ErrorMessage(ccd_name=ccd_name, error=error):
             logger.error(f"Generator {generator.id} error for CCD {ccd_name}: {error}")
+            raise RuntimeError(f"Generator {generator.id} error for CCD {ccd_name}: {error}")
 
 
 async def _wait_for_next_ccd(dispatcher: CcdDispatcher, generator_id: GeneratorId) -> CcdDataRef | None:
@@ -428,6 +434,11 @@ async def _wait_for_next_ccd(dispatcher: CcdDispatcher, generator_id: GeneratorI
                 await asyncio.wait_for(dispatcher.ccd_available_condition.wait(), timeout=1.0)
         except asyncio.TimeoutError:
             pass  # タイムアウト後に再度チェック
+
+
+async def _record_assigned_ccd(job: Job, ccd_name: CcdName) -> None:
+    async with job.watcher.watch_status():
+        job.status.generate_single_fits_tiles.setdefault(ccd_name, Progress(total=4, count=0))
 
 
 def _save_job_metadata_rpc(job: Job) -> None:

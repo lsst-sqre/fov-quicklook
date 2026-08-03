@@ -1,12 +1,16 @@
 import pickle
+import socket
+from typing import cast
 
 import pytest
 from fastapi import HTTPException
 
 from quicklook.coordinator.api.types import CreateQuicklookRequest
+from quicklook.coordinator.api.types import SharedStatusMessageJobSharedLargeStatus
 from quicklook.coordinator.api.types import SharedStatusMessageJobStatusList
 from quicklook.datasource.types import ResolvedVisitInfo, VisitResolutionError
 from quicklook.frontend.api import quicklooks
+from quicklook.generator.generate_single_fits_tiles import CcdMetadata
 from quicklook.job.job import Job
 from quicklook.utils.broadcast import Broadcast
 from quicklook.types import VisitName
@@ -19,7 +23,7 @@ async def test_create_quicklook_resolves_visit_before_forwarding(monkeypatch):
     class FakeDataSource:
         async def resolve_visit_info(self, visit: VisitName) -> ResolvedVisitInfo:
             received_visits.append(visit)
-            return ResolvedVisitInfo(visit_name=VisitName('repo:raw:4242'))
+            return ResolvedVisitInfo(visit_name=VisitName('repo:LSSTCam!-raw!-all:raw:exposure=4242'))
 
     async def fake_http_request(method: str, url: str, **kwargs):
         forwarded_requests.append((method, url, kwargs))
@@ -36,7 +40,7 @@ async def test_create_quicklook_resolves_visit_before_forwarding(monkeypatch):
         (
             'post',
             f'{quicklooks.config.coordinator_base_url}/quicklooks',
-            {'json': {'visit': 'repo:raw:4242'}},
+            {'json': {'visit': 'repo:LSSTCam!-raw!-all:raw:exposure=4242'}},
         )
     ]
 
@@ -99,6 +103,34 @@ async def test_status_relay_keeps_retrying_without_shutdown(monkeypatch):
     assert len(connect_calls) == 7
     assert sleep_calls == [1, 2, 4, 8, 16, 32]
     assert {kwargs['max_size'] for _, kwargs in connect_calls} == {None}
+    assert all('family' not in kwargs for _, kwargs in connect_calls)
+
+
+async def test_status_relay_uses_ipv4_when_enabled(monkeypatch):
+    connect_calls: list[tuple[str, dict]] = []
+
+    class StopLoop(BaseException):
+        pass
+
+    class FakeConnect:
+        async def __aenter__(self):
+            raise StopLoop()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+    def fake_connect(url: str, **kwargs):
+        connect_calls.append((url, kwargs))
+        return FakeConnect()
+
+    monkeypatch.setattr(quicklooks.config, "comm_force_ipv4_internal", True)
+    monkeypatch.setattr(quicklooks.websockets, 'connect', fake_connect)
+
+    with pytest.raises(StopLoop):
+        await quicklooks._status_relay_main_loop()
+
+    assert {kwargs['family'] for _, kwargs in connect_calls} == {socket.AF_INET}
 
 
 async def test_status_relay_updates_job_status_from_binary_message(monkeypatch):
@@ -135,3 +167,127 @@ async def test_status_relay_updates_job_status_from_binary_message(monkeypatch):
         await quicklooks._status_relay_main_loop()
 
     assert quicklooks._job_status_dict.last_value() == {job.visit: job.status}
+
+
+def test_get_coordinator_base_url_ignores_service_host_by_default(monkeypatch):
+    monkeypatch.setattr(quicklooks.config, "coordinator_base_url", "http://fov-quicklook-coordinator:9501")
+    monkeypatch.setenv("FOV_QUICKLOOK_COORDINATOR_SERVICE_HOST", "10.96.123.45")
+
+    assert quicklooks.get_coordinator_base_url() == "http://fov-quicklook-coordinator:9501"
+
+
+def test_get_coordinator_base_url_prefers_service_host_when_enabled(monkeypatch):
+    monkeypatch.setattr(quicklooks.config, "coordinator_base_url", "http://fov-quicklook-coordinator:9501")
+    monkeypatch.setattr(quicklooks.config, "comm_use_coordinator_service_host", True)
+    monkeypatch.setenv("FOV_QUICKLOOK_COORDINATOR_SERVICE_HOST", "10.96.123.45")
+
+    assert quicklooks.get_coordinator_base_url() == "http://10.96.123.45:9501"
+
+
+def test_apply_shared_status_message_moves_ready_metadata_to_short_lived_cache(monkeypatch):
+    job = Job(VisitName('repo:raw:4242'))
+    job.status.stage = 'ready'
+
+    ccd_metadata = [cast(CcdMetadata, object())]
+    job.shared_large_status.ccd_metadata_list = ccd_metadata
+
+    status_dict = Broadcast(max_queue_size=2)
+    status_dict.put({job.visit: job.status})
+
+    monkeypatch.setattr(quicklooks, '_job_status_dict', status_dict)
+    monkeypatch.setattr(quicklooks, '_job_shared_large_status_dict', {job.visit: job.shared_large_status})
+    monkeypatch.setattr(quicklooks, '_recent_ready_metadata_dict', {})
+    monkeypatch.setattr(quicklooks.time, 'monotonic', lambda: 100.0)
+
+    quicklooks._apply_shared_status_message(SharedStatusMessageJobStatusList(data={}))
+
+    assert quicklooks._job_status_dict.last_value() == {}
+    assert quicklooks._job_shared_large_status_dict == {}
+    assert quicklooks._get_ccd_metadata_list_for_shared_status(job.visit, allow_recent_ready=True) == ccd_metadata
+
+
+def test_recent_ready_metadata_expires(monkeypatch):
+    visit = VisitName('repo:raw:4242')
+    ccd_metadata = [cast(CcdMetadata, object())]
+
+    monkeypatch.setattr(quicklooks, '_job_shared_large_status_dict', {})
+    monkeypatch.setattr(
+        quicklooks,
+        '_recent_ready_metadata_dict',
+        {
+            visit: quicklooks.RecentReadyMetadata(
+                ccd_metadata_list=ccd_metadata,
+                expires_at=100.0,
+            )
+        },
+    )
+    monkeypatch.setattr(quicklooks.time, 'monotonic', lambda: 101.0)
+
+    with pytest.raises(KeyError):
+        quicklooks._get_ccd_metadata_list_for_shared_status(visit, allow_recent_ready=True)
+
+    assert quicklooks._recent_ready_metadata_dict == {}
+
+
+def test_shared_large_status_replaces_recent_ready_metadata(monkeypatch):
+    visit = VisitName('repo:raw:4242')
+    job = Job(visit)
+    active_metadata = [cast(CcdMetadata, object())]
+    job.shared_large_status.ccd_metadata_list = active_metadata
+
+    monkeypatch.setattr(quicklooks, '_job_status_dict', Broadcast(max_queue_size=2))
+    monkeypatch.setattr(quicklooks, '_job_shared_large_status_dict', {})
+    monkeypatch.setattr(
+        quicklooks,
+        '_recent_ready_metadata_dict',
+        {
+            visit: quicklooks.RecentReadyMetadata(
+                ccd_metadata_list=[cast(CcdMetadata, object())],
+                expires_at=100.0,
+            )
+        },
+    )
+    monkeypatch.setattr(quicklooks.time, 'monotonic', lambda: 50.0)
+
+    quicklooks._apply_shared_status_message(
+        SharedStatusMessageJobSharedLargeStatus(
+            visit=visit,
+            data=job.shared_large_status,
+        )
+    )
+
+    assert quicklooks._recent_ready_metadata_dict == {}
+    assert quicklooks._get_ccd_metadata_list_for_shared_status(visit) == active_metadata
+
+async def test_get_all_quicklook_jobs_returns_cached_broadcast_value(monkeypatch):
+    job = Job(VisitName('repo:raw:4242'))
+    broadcast = Broadcast(max_queue_size=2)
+    broadcast.put({job.visit: job.status})
+
+    monkeypatch.setattr(quicklooks, '_job_status_dict', broadcast)
+
+    async def fail_http_request(*args, **kwargs):
+        raise AssertionError((args, kwargs))
+
+    monkeypatch.setattr(quicklooks, 'http_request', fail_http_request)
+
+    jobs = await quicklooks.get_all_quicklook_jobs()
+
+    assert jobs == {job.visit: job.status}
+
+
+async def test_get_all_quicklook_jobs_falls_back_to_coordinator(monkeypatch):
+    monkeypatch.setattr(quicklooks, '_job_status_dict', Broadcast(max_queue_size=2))
+    received: list[tuple[str, str, dict]] = []
+
+    async def fake_http_request(method: str, url: str, **kwargs):
+        received.append((method, url, kwargs))
+        return {}
+
+    monkeypatch.setattr(quicklooks, 'http_request', fake_http_request)
+
+    jobs = await quicklooks.get_all_quicklook_jobs()
+
+    assert jobs == {}
+    assert received == [('get', f'{quicklooks.config.coordinator_base_url}/quicklooks/*/status', {})]
+    assert quicklooks._job_status_dict.last_value() == {}

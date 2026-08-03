@@ -2,7 +2,7 @@
 name: argocd-deployment
 description: >
   deploy broker または ArgoCD経由でfov-quicklookアプリケーションを操作する。
-  デプロイ、状態確認、ログ取得、再起動、ロールアウト、ArgoCD操作、Phalanxブランチ切替に関するタスクで使用する。
+  デプロイ要求、ArgoCD状態確認、ログ取得、再起動、ロールアウト、Phalanx参照ブランチ切替に関するタスクで使用する。
   対象はusdf-rsp-devのfov-quicklookアプリケーションのみ。
 ---
 
@@ -13,9 +13,15 @@ description: >
 標準の agent-safe 経路では `dev/deploy-broker/` を使い、必要な場合だけ
 `dev/argocd.sh` を使って ArgoCD 上の fov-quicklook アプリケーションを操作する。
 
-> **デフォルト前提**: 特に指定がない限り、agent は **deploy daemon が
-> `http://127.0.0.1:8010` で動いている**前提で `deploy-broker-client` を使ってよい。
-> 必要なら SSH tunnel でこの localhost endpoint に届くようにする。
+> **デフォルト前提**: 特に指定がない限り、agent はまず
+> `~/.fov-quicklook2/broker-url` と `~/.fov-quicklook2/broker-token` を見て、
+> その値を `deploy-broker-client --server ... --api-token ...` に渡す。
+> localhost (`http://127.0.0.1:8010`) は SSH tunnel などで届く場合の fallback。
+
+> **この repo の既定 client 設定**: `~/.fov-quicklook2/broker-url` と
+> `~/.fov-quicklook2/broker-token` が存在する場合、agent はその値を
+> `deploy-broker-client --server ... --api-token ...` に渡して使ってよい。
+> localhost 既定値よりこちらを優先する。
 
 > **agent-safe 運用**: agent に GitHub / ArgoCD への直接権限を渡さない場合は、
 > `dev/deploy-broker/` の broker daemon を優先する。broker は ArgoCD token を
@@ -28,35 +34,53 @@ description: >
 
 - `cd dev/deploy-broker`
 - broker daemon が起動していること
-- ArgoCD token は broker daemon に登録済みであること
+- ArgoCD token / app token を返す command が broker daemon 側で設定済みであること
+- client 側では `~/.fov-quicklook2/broker-url` と `~/.fov-quicklook2/broker-token` が使えること
 - 標準運用では client から `http://127.0.0.1:8010` に届くこと（通常は SSH tunnel）
+- この repo では `~/.fov-quicklook2/broker-url` / `~/.fov-quicklook2/broker-token`
+  があれば、それを client の接続先と bearer token に使ってよい
 
-### トークンの取得と設定
+### client 側の標準設定
 
-1. ブラウザで https://usdf-rsp-dev.slac.stanford.edu/argo-cd/applications/fov-quicklook にアクセス
-2. 開発者ツールを開く
-3. 任意のAPIリクエストを選択し「Copy as cURL」を実行
-4. daemon ノードの state dir に `bootstrap/argocd.curl` として保存してから daemon を起動:
+```bash
+export BROKER_URL="$(cat ~/.fov-quicklook2/broker-url)"
+export BROKER_TOKEN="$(cat ~/.fov-quicklook2/broker-token)"
+```
+
+以降の `deploy-broker-client` 例では、この 2 つを
+`--server "$BROKER_URL"` と `--api-token "$BROKER_TOKEN"` に渡す前提で読む。
+
+### daemon 側の token 設定
+
+1. daemon ノード側で token を返す command を用意する
+2. command の stdout が `{"argocd_token":"...","gafaelfawr_token":"..."}` を返すようにする
+3. `DEPLOY_BROKER_TOKEN_COMMAND` でその command を指定して daemon を起動する
 
 ```bash
 cd /srv/fov-quicklook-broker-state
-mkdir -p bootstrap
-cat > bootstrap/argocd.curl <<'EOF'
-  curl 'https://usdf-rsp-dev.slac.stanford.edu/argo-cd/api/v1/applications/fov-quicklook' \
-  -H 'Cookie: argocd.token=...'
+cat > fetch-tokens.sh <<'EOF'
+#!/bin/sh
+exec /path/to/real-token-command
 EOF
+chmod 700 fetch-tokens.sh
 
-uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
+DEPLOY_BROKER_TOKEN_COMMAND=/srv/fov-quicklook-broker-state/fetch-tokens.sh \
+  uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
 ```
 
-daemon は起動時に `bootstrap/argocd.curl` を読んで token を保存し、元 file を削除する。
+daemon 起動時には、現在使われる broker bearer token も端末に表示される。`DEPLOY_BROKER_TOKEN_COMMAND` が未設定なら daemon は起動せずエラー終了する。
+
+daemon は token cache が無いとき、または認証失敗 (`401` / `403`) を受けたときに command を再実行して token を更新する。cache は `state/tokens/*.token` に保存され、別プロセスからも再利用される。
 
 ### デプロイ要求
 
 ```bash
 cd dev/deploy-broker
 
-uv run deploy-broker-client request-deploy \
+BROKER_URL=$(cat ~/.fov-quicklook2/broker-url)
+BROKER_TOKEN=$(cat ~/.fov-quicklook2/broker-token)
+
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" request-deploy \
   u/michitaro/fov-quicklook-my-topic \
   --app-repo ../.. \
   --verify-mode auto
@@ -66,25 +90,41 @@ uv run deploy-broker-client request-deploy \
 
 ```bash
 cd dev/deploy-broker
-uv run deploy-broker-client argocd-status
-uv run deploy-broker-client argocd-get-branch
-uv run deploy-broker-client argocd-logs coordinator
+BROKER_URL=$(cat ~/.fov-quicklook2/broker-url)
+BROKER_TOKEN=$(cat ~/.fov-quicklook2/broker-token)
+
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-status
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-get-branch
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-logs coordinator
+
+# broker 全体の smoke test
+uv run deploy-broker-verify --server "$BROKER_URL" --api-token "$BROKER_TOKEN"
 ```
+
+### deploy 完了待ちの目安
+
+- broker deploy は image build / push / phalanx sync を含むため、完了まで数分〜10分以上かかることがある。短時間で失敗扱いしない。
+- `request-deploy` のあとは `get-deploy-status <request_id>` を数分おきに poll し、必要なら **10〜15分程度** は待つ。
+- `get-deploy-status` が `succeeded` でも、続けて `argocd-status` と必要に応じて `argocd-logs coordinator` を見て、ArgoCD 上の replica 数と image を確認する。
+- 同じ image tag を再利用する branch では `healthz.revision` が旧 commit のまま残ることがある。その場合は `argocd-status` / `argocd-logs` を見たうえで `argocd-restart coordinator generator frontend` を検討する。
+- broker の `get-app-token` は JSON (`{"token":"..."}`) を返すので、`verify-deploy.sh` に渡すときは `token` フィールドだけを `dev/.gafaelfawr-token` に保存する。
 
 ### sync / restart
 
 ```bash
 cd dev/deploy-broker
+BROKER_URL=$(cat ~/.fov-quicklook2/broker-url)
+BROKER_TOKEN=$(cat ~/.fov-quicklook2/broker-token)
 
 # ArgoCD sync
-uv run deploy-broker-client argocd-sync
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-sync
 
 # 主要コンポーネント(coordinator, generator, frontend, debug)を再起動
-uv run deploy-broker-client argocd-restart
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-restart
 
 # 特定のDeploymentだけ再起動
-uv run deploy-broker-client argocd-restart coordinator
-uv run deploy-broker-client argocd-restart generator frontend
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-restart coordinator
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-restart generator frontend
 ```
 
 ## `argocd.sh` を使う手動運用
@@ -252,4 +292,4 @@ git push origin --delete old-name
 4. 必要なら追加 sync: `uv run deploy-broker-client argocd-sync`
 5. 必要なら再起動: `uv run deploy-broker-client argocd-restart`
 6. 必要ならログ確認: `uv run deploy-broker-client argocd-logs coordinator`
-7. deploy 後の HTTP 検証: `./dev/verify-deploy.sh all` または broker から app token を取って直接確認
+7. deploy 後の app 確認は `deploy-verification` skill に委譲する

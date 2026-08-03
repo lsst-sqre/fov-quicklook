@@ -69,7 +69,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     },
@@ -134,7 +134,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     },
@@ -225,7 +225,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     }
@@ -263,7 +263,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     }
@@ -319,7 +319,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     }
@@ -359,7 +359,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     }
@@ -386,41 +386,169 @@
                 }
             }
         },
+        "/api/visits/query_builder_options": {
+            "get": {
+                "summary": "Get Query Builder Options",
+                "operationId": "get_query_builder_options",
+                "parameters": [
+                    {
+                        "name": "repository_name",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Repository Name"
+                        }
+                    },
+                    {
+                        "name": "collection",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Collection"
+                        }
+                    },
+                    {
+                        "name": "dataset_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Dataset Type"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QueryBuilderOptions"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/visits": {
             "get": {
                 "summary": "List Visits",
                 "operationId": "list_visits",
                 "parameters": [
                     {
-                        "name": "exposure",
+                        "name": "repository_name",
                         "in": "query",
-                        "required": false,
+                        "required": true,
                         "schema": {
-                            "anyOf": [
-                                {
-                                    "type": "integer"
-                                },
-                                {
-                                    "type": "null"
-                                }
-                            ],
-                            "title": "Exposure"
+                            "type": "string",
+                            "title": "Repository Name"
                         }
                     },
                     {
-                        "name": "day_obs",
+                        "name": "collection",
                         "in": "query",
                         "required": false,
                         "schema": {
                             "anyOf": [
                                 {
-                                    "type": "integer"
+                                    "type": "string"
                                 },
                                 {
                                     "type": "null"
                                 }
                             ],
-                            "title": "Day Obs"
+                            "title": "Collection"
+                        }
+                    },
+                    {
+                        "name": "dataset_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Dataset Type"
+                        }
+                    },
+                    {
+                        "name": "where",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Where"
+                        }
+                    },
+                    {
+                        "name": "order_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Order By"
+                        }
+                    },
+                    {
+                        "name": "reverse",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "boolean"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Reverse"
                         }
                     },
                     {
@@ -430,26 +558,19 @@
                         "schema": {
                             "type": "integer",
                             "maximum": 10000,
-                            "default": 1000,
+                            "default": 100,
                             "title": "Limit"
                         }
                     },
                     {
-                        "name": "data_type",
+                        "name": "offset",
                         "in": "query",
-                        "required": true,
+                        "required": false,
                         "schema": {
-                            "type": "string",
-                            "title": "Data Type"
-                        }
-                    },
-                    {
-                        "name": "repository_name",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "title": "Repository Name"
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0,
+                            "title": "Offset"
                         }
                     }
                 ],
@@ -464,6 +585,77 @@
                                         "$ref": "#/components/schemas/VisitEntry"
                                     },
                                     "title": "Response List Visits Api Visits Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/visits/day_counts": {
+            "get": {
+                "summary": "List Visit Day Counts",
+                "operationId": "list_visit_day_counts",
+                "parameters": [
+                    {
+                        "name": "calendar_month",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}$",
+                            "title": "Calendar Month"
+                        }
+                    },
+                    {
+                        "name": "repository_name",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Repository Name"
+                        }
+                    },
+                    {
+                        "name": "collection",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Collection"
+                        }
+                    },
+                    {
+                        "name": "dataset_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Dataset Type"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/VisitDayCount"
+                                    },
+                                    "title": "Response List Visit Day Counts Api Visits Day Counts Get"
                                 }
                             }
                         }
@@ -568,6 +760,45 @@
                 }
             }
         },
+        "/api/visits/{visit_name}/representative_uuid": {
+            "get": {
+                "summary": "Get Visit Representative Uuid",
+                "operationId": "get_visit_representative_uuid",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VisitRepresentativeUuid"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/exposures/{id}/types": {
             "get": {
                 "summary": "Get Exposure Data Types",
@@ -622,7 +853,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "^[^:/]+:[^:/]+:[^:/]+$",
+                            "pattern": "^[^/]+$",
                             "title": "Visit Name"
                         }
                     },
@@ -869,6 +1100,51 @@
                 ],
                 "title": "BBox"
             },
+            "ButlerScopeConfig": {
+                "properties": {
+                    "id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Id"
+                    },
+                    "dataset_type": {
+                        "type": "string",
+                        "title": "Dataset Type"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "title": "Display Name"
+                    },
+                    "collection": {
+                        "type": "string",
+                        "title": "Collection"
+                    },
+                    "repository_name": {
+                        "type": "string",
+                        "title": "Repository Name",
+                        "default": "embargo"
+                    },
+                    "instrument": {
+                        "type": "string",
+                        "title": "Instrument",
+                        "default": "LSSTCam"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "dataset_type",
+                    "display_name",
+                    "collection"
+                ],
+                "title": "ButlerScopeConfig",
+                "description": "UI \u4e0a\u306e\u691c\u7d22\u30d7\u30ea\u30bb\u30c3\u30c8\u3002"
+            },
             "CacheEntry": {
                 "properties": {
                     "visit_name": {
@@ -916,63 +1192,6 @@
                 "type": "array",
                 "maxItems": 4,
                 "minItems": 4
-            },
-            "CcdDataTypeConfig": {
-                "properties": {
-                    "data_type": {
-                        "type": "string",
-                        "title": "Data Type"
-                    },
-                    "display_name": {
-                        "type": "string",
-                        "title": "Display Name"
-                    },
-                    "collections": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "title": "Collections"
-                    },
-                    "data_id_dimension": {
-                        "type": "string",
-                        "title": "Data Id Dimension",
-                        "default": "exposure"
-                    },
-                    "order_by": {
-                        "items": {
-                            "type": "string"
-                        },
-                        "type": "array",
-                        "title": "Order By",
-                        "default": [
-                            "-exposure"
-                        ]
-                    },
-                    "partial": {
-                        "type": "boolean",
-                        "title": "Partial",
-                        "default": false
-                    },
-                    "repository_name": {
-                        "type": "string",
-                        "title": "Repository Name",
-                        "default": "embargo"
-                    },
-                    "instrument": {
-                        "type": "string",
-                        "title": "Instrument",
-                        "default": "LSSTCam"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "data_type",
-                    "display_name",
-                    "collections"
-                ],
-                "title": "CcdDataTypeConfig",
-                "description": "CCD\u30c7\u30fc\u30bf\u30bf\u30a4\u30d7\u306e\u8a2d\u5b9a"
             },
             "CcdMetadata": {
                 "properties": {
@@ -1236,6 +1455,10 @@
                     "id": {
                         "type": "string",
                         "title": "Id"
+                    },
+                    "cache_version": {
+                        "type": "integer",
+                        "title": "Cache Version"
                     }
                 },
                 "type": "object",
@@ -1436,6 +1659,74 @@
                 ],
                 "title": "Progress"
             },
+            "QueryBuilderOptions": {
+                "properties": {
+                    "repositories": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Repositories"
+                    },
+                    "collections": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Collections"
+                    },
+                    "dataset_types": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Dataset Types"
+                    },
+                    "where_examples": {
+                        "items": {
+                            "$ref": "#/components/schemas/QueryWhereExample"
+                        },
+                        "type": "array",
+                        "title": "Where Examples"
+                    },
+                    "collections_truncated": {
+                        "type": "boolean",
+                        "title": "Collections Truncated",
+                        "default": false
+                    },
+                    "dataset_types_truncated": {
+                        "type": "boolean",
+                        "title": "Dataset Types Truncated",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "repositories",
+                    "collections",
+                    "dataset_types",
+                    "where_examples"
+                ],
+                "title": "QueryBuilderOptions"
+            },
+            "QueryWhereExample": {
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "title": "Label"
+                    },
+                    "where": {
+                        "type": "string",
+                        "title": "Where"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "label",
+                    "where"
+                ],
+                "title": "QueryWhereExample"
+            },
             "QuicklookMetadata": {
                 "anyOf": [
                     {
@@ -1604,12 +1895,24 @@
                         "type": "integer",
                         "title": "Max Object Storage Usage"
                     },
-                    "ccd_data_types": {
+                    "query_builder_input_mode": {
+                        "type": "string",
+                        "title": "Query Builder Input Mode"
+                    },
+                    "butler_scopes": {
                         "items": {
-                            "$ref": "#/components/schemas/CcdDataTypeConfig"
+                            "$ref": "#/components/schemas/ButlerScopeConfig"
                         },
                         "type": "array",
-                        "title": "Ccd Data Types"
+                        "title": "Butler Scopes"
+                    },
+                    "datasets": {
+                        "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "type": "array",
+                        "title": "Datasets"
                     }
                 },
                 "type": "object",
@@ -1617,7 +1920,9 @@
                     "admin_page",
                     "context_menu_templates",
                     "max_object_storage_usage",
-                    "ccd_data_types"
+                    "query_builder_input_mode",
+                    "butler_scopes",
+                    "datasets"
                 ],
                 "title": "SystemInfo"
             },
@@ -1679,11 +1984,37 @@
                 ],
                 "title": "ValidationError"
             },
+            "VisitDayCount": {
+                "properties": {
+                    "day_obs": {
+                        "type": "integer",
+                        "title": "Day Obs"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "title": "Count"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "day_obs",
+                    "count"
+                ],
+                "title": "VisitDayCount"
+            },
             "VisitEntry": {
                 "properties": {
                     "id": {
                         "type": "string",
                         "title": "Id"
+                    },
+                    "display_id": {
+                        "type": "string",
+                        "title": "Display Id"
+                    },
+                    "scope_id": {
+                        "type": "string",
+                        "title": "Scope Id"
                     },
                     "day_obs": {
                         "type": "integer",
@@ -1716,11 +2047,36 @@
                     "target_name": {
                         "type": "string",
                         "title": "Target Name"
+                    },
+                    "uuid": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Uuid"
+                    },
+                    "utc_start": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Utc Start"
                     }
                 },
                 "type": "object",
                 "required": [
                     "id",
+                    "display_id",
+                    "scope_id",
                     "day_obs",
                     "physical_filter",
                     "obs_id",
@@ -1731,6 +2087,19 @@
                     "target_name"
                 ],
                 "title": "VisitEntry"
+            },
+            "VisitRepresentativeUuid": {
+                "properties": {
+                    "uuid": {
+                        "type": "string",
+                        "title": "Uuid"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "uuid"
+                ],
+                "title": "VisitRepresentativeUuid"
             }
         }
     }

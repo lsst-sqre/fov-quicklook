@@ -3,10 +3,11 @@ import ccdNameTable from './ccdname-table.json'
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { angle, V2 } from "@stellar-globe/stellar-globe"
 import { initialSearchParams } from "../../hooks/useHashSync"
+import { buildScopeId } from "../../quicklookId"
 import { RubinImageFilter, RubinImageFilterParams } from "../../StellarGlobe/Quicklook/QuicklookTileRenderer/ImageFilter"
 import { ListVisitsApiArg, SystemInfo } from "../api/openapi"
 
-export type CcdDataType = NonNullable<ListVisitsApiArg["dataType"]>
+export type ButlerScopeId = string
 
 type State = {
   currentQuicklook: string | undefined
@@ -16,7 +17,7 @@ type State = {
   lineProfiler: LineProfilerState
   filterParams: RubinImageFilterParams
   searchString: string
-  dataSource: CcdDataType
+  dataSource: ButlerScopeId
   showFrame: boolean
   showCompactStatus: boolean
   showMemoryUsageInCompactStatus: boolean
@@ -42,8 +43,14 @@ type LineProfilerState = {
 }
 
 function initialState(systemInfo?: SystemInfo): State {
-  const dt = systemInfo?.ccd_data_types?.[0]
-  const defaultDataSource = dt ? `${dt.repository_name}:${dt.data_type}` as CcdDataType : '' as CcdDataType
+  const scope = systemInfo?.butler_scopes?.[0]
+  const defaultDataSource = scope?.id
+    ? scope.id as ButlerScopeId
+    : (scope ? buildScopeId({
+      repositoryName: scope.repository_name ?? "embargo",
+      collection: scope.collection,
+      datasetType: scope.dataset_type,
+    }) : '' as ButlerScopeId)
   return {
     currentQuicklook: undefined,
     cameraRevision: 0,
@@ -91,7 +98,7 @@ export const homeSlice = createSlice({
     setSearchString: (state, action: PayloadAction<string>) => {
       state.searchString = action.payload
     },
-    setDataSource: (state, action: PayloadAction<CcdDataType>) => {
+    setDataSource: (state, action: PayloadAction<ButlerScopeId>) => {
       state.dataSource = action.payload
     },
     setShowFrame: (state, action: PayloadAction<boolean>) => {

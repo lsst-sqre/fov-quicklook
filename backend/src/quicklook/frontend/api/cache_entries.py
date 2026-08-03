@@ -8,6 +8,7 @@ from sqlalchemy import select
 from quicklook.coordinator.housekeeping import delete_one_quicklook, select_quicklook_to_delete
 from quicklook.db import Quicklook
 from quicklook.db.session import get_db_session
+from quicklook.types import VisitName
 
 logger = quicklook.mylogging.getLogger('uvicorn')
 
@@ -42,6 +43,6 @@ async def delete_all_cache_entries() -> None:
     print('Finished deleting all quicklooks')
 
 
-@router.delete('/api/cache_entries/{visit_name}')
+@router.delete('/api/cache_entries/{visit_name:path}')
 async def delete_cache_entry(visit_name: str) -> None:
-    await delete_one_quicklook(visit_name)
+    await delete_one_quicklook(VisitName(visit_name).cache_key)

@@ -2,23 +2,24 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import lsst.daf.butler as butler_module
+import sqlalchemy
 
-from quicklook.config import CcdDataTypeConfig
+from quicklook.datasets import get_dataset
 from quicklook.datasource.butler_datasource import (
     ButlerDataSource,
-    DataTypeSpecificDataSource,
     Instrument,
+    ScopedButlerDataSource,
     _clear_resolved_visit_run_cache,
     _get_resolved_visit_run,
     _resolve_visit_cache,
 )
-from quicklook.datasource.types import VisitResolutionError
+from quicklook.datasource.types import VisitDayCount, VisitResolutionError
 from quicklook.datasource.types import Query
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName
 
 
 class FakeDimensionRecordResults:
-    def __init__(self, records: list[SimpleNamespace]):
+    def __init__(self, records: list[Any]):
         self._records = records
 
     def order_by(self, *args: str):
@@ -30,19 +31,20 @@ class FakeDimensionRecordResults:
     def __iter__(self):
         return iter(self._records)
 
+    def count(self, *, exact: bool = True, discard: bool = False):
+        del exact, discard
+        return len(self._records)
+
 
 def _make_datasource(*, data_type: str, data_id_dimension: str, order_by: list[str], registry: object):
-    ds = DataTypeSpecificDataSource.__new__(DataTypeSpecificDataSource)
-    ds._config = CcdDataTypeConfig(
-        data_type=data_type,
-        display_name=data_type,
-        collections=['dummy'],
-        data_id_dimension=data_id_dimension,
-        order_by=order_by,
-        partial=False,
-        repository_name='repo',
-        instrument='LSSTCam',
-    )
+    del data_id_dimension
+    del order_by
+    ds = ScopedButlerDataSource.__new__(ScopedButlerDataSource)
+    ds._repository_name = 'repo'
+    ds._collection = 'dummy'
+    ds._dataset_type = data_type
+    ds._instrument = 'LSSTCam'
+    ds._dataset = get_dataset(data_type)
     ds._butler = cast(Any, SimpleNamespace(registry=registry))
     return ds
 
@@ -115,6 +117,70 @@ def test_query_visits_uses_exposure_dimension_records(monkeypatch):
     assert [entry.id for entry in entries] == ['repo:raw:101', 'repo:raw:102']
 
 
+def test_query_visits_applies_offset_after_ordering(monkeypatch):
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            assert dimension == 'exposure'
+            assert kwargs == {
+                'datasets': 'raw',
+                'where': 'day_obs=20250301',
+            }
+            return FakeDimensionRecordResults([
+                SimpleNamespace(
+                    id=101,
+                    obs_id='obs-101',
+                    day_obs=20250301,
+                    physical_filter='r',
+                    exposure_time=30.0,
+                    science_program='program-1',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-101',
+                ),
+                SimpleNamespace(
+                    id=102,
+                    obs_id='obs-102',
+                    day_obs=20250301,
+                    physical_filter='i',
+                    exposure_time=31.0,
+                    science_program='program-2',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-102',
+                ),
+                SimpleNamespace(
+                    id=103,
+                    obs_id='obs-103',
+                    day_obs=20250301,
+                    physical_filter='z',
+                    exposure_time=32.0,
+                    science_program='program-3',
+                    observation_type='science',
+                    observation_reason='test',
+                    target_name='target-103',
+                ),
+            ])
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+    monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
+
+    entries = ds.query_visits(
+        Query(
+            data_type=CcdDataType('raw'),
+            repository_name='repo',
+            limit=1,
+            offset=1,
+        )
+    )
+
+    assert [entry.id for entry in entries] == ['repo:raw:102']
+
+
 def test_query_visits_uses_configured_dimension_for_visit_dataset():
     calls: list[tuple[str, dict[str, object]]] = []
 
@@ -162,6 +228,34 @@ def test_query_visits_uses_configured_dimension_for_visit_dataset():
         )
     ]
     assert [entry.id for entry in entries] == ['repo:preliminary_visit_image:7001']
+
+
+def test_get_visit_representative_uuid_uses_single_dataset_lookup(monkeypatch):
+    captured: dict[str, object] = {}
+
+    ds = _make_datasource(
+        data_type='difference_image',
+        data_id_dimension='visit',
+        order_by=['-visit'],
+        registry=object(),
+    )
+
+    visit = VisitName('repo:difference_image:7001')
+
+    def fake_query_datasets(where: str, *, visit: VisitName | None = None, limit: int | None = None):
+        captured['where'] = where
+        captured['visit'] = visit
+        captured['limit'] = limit
+        return [SimpleNamespace(id='019bbefe-465a-7815-a05c-13dc47a78418')]
+
+    monkeypatch.setattr(ds, '_query_datasets', fake_query_datasets)
+
+    assert ds.get_visit_representative_uuid_sync(visit) == '019bbefe-465a-7815-a05c-13dc47a78418'
+    assert captured == {
+        'where': 'visit=7001',
+        'visit': visit,
+        'limit': 1,
+    }
 
 
 def test_query_dimension_records_applies_order_and_limit_after_query():
@@ -214,6 +308,117 @@ def test_query_dimension_records_applies_order_and_limit_after_query():
     assert calls == [('exposure', {'datasets': 'raw', 'where': 'day_obs=20250303'})]
     assert order_calls == [('-day_obs', '-exposure')]
     assert limit_calls == [7]
+
+
+def test_query_visit_day_counts_uses_butler_counts_by_day():
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    class FakeRegistry:
+        def queryDataIds(self, dimensions: list[str], **kwargs: object):
+            calls.append((dimensions, kwargs))
+            if dimensions == ['day_obs', 'exposure']:
+                return FakeDimensionRecordResults([
+                    {'day_obs': 20250301, 'exposure': 101},
+                    {'day_obs': 20250301, 'exposure': 102},
+                    {'day_obs': 20250303, 'exposure': 103},
+                ])
+            raise AssertionError((dimensions, kwargs))
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+
+    counts = ds.query_visit_day_counts('2025-03')
+
+    assert counts == [
+        VisitDayCount(day_obs=20250301, count=2),
+        VisitDayCount(day_obs=20250303, count=1),
+    ]
+    assert calls == [
+        (
+            ['day_obs', 'exposure'],
+            {
+                'datasets': 'raw',
+                'where': 'day_obs>=20250301 and day_obs<20250401',
+            },
+        ),
+    ]
+
+
+def test_query_visit_day_counts_uses_sql_group_by_when_available(monkeypatch):
+    collection_table = sqlalchemy.table(
+        'collection',
+        sqlalchemy.column('collection_id'),
+        sqlalchemy.column('name'),
+    )
+    exposure_table = sqlalchemy.table(
+        'exposure',
+        sqlalchemy.column('instrument'),
+        sqlalchemy.column('id'),
+        sqlalchemy.column('day_obs'),
+    )
+    tag_table = sqlalchemy.table(
+        'dataset_tags',
+        sqlalchemy.column('collection_id'),
+        sqlalchemy.column('instrument'),
+        sqlalchemy.column('exposure'),
+    )
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def execute(self, sql):
+            selected = list(sql.selected_columns.keys())
+            if selected == ['collection_id']:
+                return SimpleNamespace(scalar_one_or_none=lambda: 77)
+            if selected == ['day_obs', 'visit_count']:
+                return SimpleNamespace(
+                    all=lambda: [
+                        SimpleNamespace(_mapping={'day_obs': 20250301, 'visit_count': 2}),
+                        SimpleNamespace(_mapping={'day_obs': 20250303, 'visit_count': 1}),
+                    ]
+                )
+            raise AssertionError(selected)
+
+    monkeypatch.setattr(
+        'quicklook.datasource.butler_datasource._get_sql_registry',
+        lambda registry: SimpleNamespace(
+            _managers=SimpleNamespace(
+                collections=SimpleNamespace(_tables=SimpleNamespace(collection=collection_table)),
+                dimensions=SimpleNamespace(_tables={'exposure': exposure_table}),
+                datasets=SimpleNamespace(
+                    _find_storage=lambda dataset_type: SimpleNamespace(dynamic_tables='raw-tags'),
+                    _get_tags_table=lambda dynamic_tables: tag_table,
+                ),
+            ),
+        ),
+    )
+    monkeypatch.setattr('quicklook.datasource.butler_datasource._get_db_connection', lambda registry: FakeConnection())
+
+    class FakeRegistry:
+        def queryDataIds(self, dimensions: list[str], **kwargs: object):
+            raise AssertionError((dimensions, kwargs))
+
+    ds = _make_datasource(
+        data_type='raw',
+        data_id_dimension='exposure',
+        order_by=['-day_obs', '-exposure'],
+        registry=FakeRegistry(),
+    )
+
+    counts = ds.query_visit_day_counts('2025-03')
+
+    assert counts == [
+        VisitDayCount(day_obs=20250301, count=2),
+        VisitDayCount(day_obs=20250303, count=1),
+    ]
 
 
 def test_resolve_visit_sync_uses_uuid_to_select_configured_dataset(monkeypatch):
@@ -551,3 +756,64 @@ def test_resolve_visit_sync_raises_visit_resolution_error_for_unsupported_datase
         )
     else:  # pragma: no cover
         raise AssertionError('VisitResolutionError was not raised')
+
+
+def test_get_data_uses_virtual_review_app_raw_generator(monkeypatch):
+    class FakeRegistry:
+        def queryDimensionRecords(self, dimension: str, **kwargs: object):
+            assert dimension == "exposure"
+            assert kwargs == {"where": "exposure=910001"}
+            return FakeDimensionRecordResults([
+                SimpleNamespace(
+                    id=910001,
+                    day_obs=20260501,
+                    physical_filter="r",
+                    obs_id="fixture-910001",
+                )
+            ])
+
+    ds = _make_datasource(
+        data_type="raw",
+        data_id_dimension="exposure",
+        order_by=["-day_obs", "-exposure"],
+        registry=FakeRegistry(),
+    )
+    ds._repository_name = "reviewapp-ci"
+    ds._collection = "dummy"
+    ds._dataset_type = "raw"
+    ds._instrument = "LSSTCam"
+    ds._dataset = get_dataset("raw")
+    ds._butler = cast(
+        Any,
+        SimpleNamespace(
+            registry=FakeRegistry(),
+            query_datasets=lambda *args, **kwargs: [SimpleNamespace(dataId={"detector": 0})],
+        ),
+    )
+
+    monkeypatch.setattr(
+        "quicklook.datasource.butler_datasource.Instrument.get",
+        lambda instrument: SimpleNamespace(ccd_2_detector={CcdName("R01_S00"): 0}),
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_render_virtual_raw_fits_bytes(**kwargs: object) -> bytes:
+        captured.update(kwargs)
+        return b"virtual-fits"
+
+    monkeypatch.setattr(
+        "quicklook.review_app.synthetic.render_virtual_raw_fits_bytes",
+        fake_render_virtual_raw_fits_bytes,
+    )
+
+    result = ds.get_data(CcdDataRef(VisitName("reviewapp-ci:raw:910001"), CcdName("R01_S00")))
+
+    assert result == b"virtual-fits"
+    assert captured == {
+        "ccd_name": CcdName("R01_S00"),
+        "exposure_id": 910001,
+        "day_obs": 20260501,
+        "physical_filter": "r",
+        "obs_id": "fixture-910001",
+    }

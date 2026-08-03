@@ -13,6 +13,7 @@ def _settings(tmp_path: Path) -> Settings:
     return Settings(
         api_token="secret-token",
         state_dir=tmp_path / "state",
+        token_command=None,
     )
 
 
@@ -50,6 +51,28 @@ def test_auth_is_not_required_for_loopback_requests(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"token": "stored-app-token"}
+
+
+def test_get_app_token_can_force_refresh(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    app = create_app(_settings(tmp_path))
+    captured: dict[str, bool] = {}
+
+    def _get_app_token(*, refresh: bool = False) -> str:
+        captured["refresh"] = refresh
+        return "fresh-app-token"
+
+    monkeypatch.setattr(app.state.service, "get_app_token", _get_app_token)
+    client = TestClient(app, base_url="http://example.invalid")
+
+    response = client.get(
+        "/v1/tokens/app",
+        headers={"Authorization": "Bearer secret-token"},
+        params={"refresh": "true"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"token": "fresh-app-token"}
+    assert captured == {"refresh": True}
 
 
 def test_argocd_sync_endpoint_calls_service(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:

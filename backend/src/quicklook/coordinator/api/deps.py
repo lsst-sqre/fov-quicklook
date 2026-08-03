@@ -4,7 +4,7 @@ import fastapi
 
 from quicklook.types import VisitName
 
-VISIT_NAME_PATH_PATTERN = r'^[^:/]+:[^:/]+:[^:/]+$'
+VISIT_NAME_PATH_PATTERN = r'^[^/]+$'
 
 
 async def dep_visit_name(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from typing import Callable, Optional, ParamSpec, TypeVar
+from typing import Callable, ParamSpec, TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -42,13 +42,11 @@ def imap_unordered_threadpool(
 
     in_flight: set[Future[R]] = set()
 
-    # 先行投入（初回は同期的に取得。パイプライン開始前なのでブロックしても問題ない）
-    for _ in range(max_in_flight):
-        try:
-            x = next(it)
-        except StopIteration:
-            break
-        in_flight.add(executor.submit(func, x))
+    try:
+        first_item = next(it)
+    except StopIteration:
+        return
+    in_flight.add(executor.submit(func, first_item))
 
     # refill を別スレッドで行うための executor（1スレッド）
     # メインの executor は download 用なので、refill で占有しないよう分離する。
@@ -57,11 +55,15 @@ def imap_unordered_threadpool(
         refill_future: Future | None = None
 
         while in_flight or refill_future is not None:
+            # 最初の1件完了待ちで詰まらないよう、空きがあれば先に refill を走らせる。
+            if not input_exhausted and refill_future is None and len(in_flight) < max_in_flight:
+                refill_future = refill_executor.submit(_try_next, it)
+
             wait_set: set[Future] = set(in_flight)
             if refill_future is not None:
                 wait_set.add(refill_future)
 
-            done, remaining = wait(wait_set, return_when=FIRST_COMPLETED)
+            done, _ = wait(wait_set, return_when=FIRST_COMPLETED)
 
             for fut in done:
                 if fut is refill_future:
@@ -74,7 +76,3 @@ def imap_unordered_threadpool(
                 else:
                     in_flight.discard(fut)
                     yield fut.result()
-
-            # in_flight が max_in_flight 未満なら refill を開始
-            if not input_exhausted and refill_future is None and len(in_flight) < max_in_flight:
-                refill_future = refill_executor.submit(_try_next, it)

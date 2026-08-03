@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 import shutil
+import tempfile
 from pathlib import Path
 
 from .config import Settings
@@ -29,6 +31,13 @@ ALLOWED_PHALANX_PATHS = (
     "docs/applications/fov-quicklook/",
     "environments/templates/applications/rsp/fov-quicklook.yaml",
 )
+FOV_QUICKLOOK_VALUES_PATH = "applications/fov-quicklook/values.yaml"
+ALLOWED_PHALANX_CHANGE_POLICIES = (
+    "fov-quicklook-paths",
+    "values-yaml-only",
+    "image-tag-only",
+)
+_IMAGE_TAG_DIFF_RE = re.compile(r"^tag:\s*\S.*$")
 
 
 def validate_tracked_branch(branch: str) -> None:
@@ -57,6 +66,10 @@ def ensure_clean_worktree(repo_path: Path) -> None:
         raise RuntimeError(f"repository has uncommitted changes: {repo_path}")
 
 
+def _worktree_is_clean(repo_path: Path) -> bool:
+    return not run_command(["git", "status", "--porcelain"], cwd=repo_path).strip()
+
+
 def current_branch(repo_path: Path, revision: str = "HEAD") -> str:
     return run_command(
         ["git", "rev-parse", "--abbrev-ref", revision],
@@ -76,23 +89,114 @@ def maybe_merge_base(repo_path: Path, left: str, right: str) -> str | None:
 
 
 def create_bundle(repo_path: Path, revision: str, output_path: Path) -> dict[str, str | None]:
-    ensure_clean_worktree(repo_path)
     branch_name = current_branch(repo_path, revision)
     if branch_name == "HEAD":
         raise RuntimeError("bundle creation requires a named branch, not detached HEAD")
-    head_sha = rev_parse(repo_path, revision)
     base_sha = maybe_merge_base(repo_path, revision, "origin/main")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    run_command(
-        ["git", "bundle", "create", str(output_path), branch_name],
-        cwd=repo_path,
-    )
+    if _worktree_is_clean(repo_path):
+        head_sha = rev_parse(repo_path, revision)
+        run_command(
+            ["git", "bundle", "create", str(output_path), branch_name],
+            cwd=repo_path,
+        )
+        return {
+            "branch_name": branch_name,
+            "head_sha": head_sha,
+            "base_sha": base_sha,
+        }
+
+    if rev_parse(repo_path, revision) != rev_parse(repo_path, "HEAD"):
+        raise RuntimeError(
+            "bundle creation from a dirty worktree requires revision to resolve to HEAD"
+        )
+    head_sha = _create_bundle_from_dirty_worktree(repo_path, branch_name, output_path)
     return {
         "branch_name": branch_name,
         "head_sha": head_sha,
         "base_sha": base_sha,
     }
+
+
+def _create_bundle_from_dirty_worktree(
+    repo_path: Path,
+    branch_name: str,
+    output_path: Path,
+) -> str:
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        workspace = Path(temp_dir_name) / "workspace"
+        clone_workspace(repo_path, workspace, str(repo_path))
+        _apply_dirty_worktree(repo_path, workspace)
+        run_command(["git", "add", "-A"], cwd=workspace)
+        if run_command(["git", "status", "--porcelain"], cwd=workspace).strip():
+            run_command(["git", "config", "user.name", "Deploy Broker"], cwd=workspace)
+            run_command(
+                ["git", "config", "user.email", "deploy-broker@example.invalid"],
+                cwd=workspace,
+            )
+            run_command(["git", "commit", "-m", "deploy-broker snapshot"], cwd=workspace)
+        head_sha = rev_parse(workspace, "HEAD")
+        run_command(["git", "bundle", "create", str(output_path), branch_name], cwd=workspace)
+        return head_sha
+
+
+def _apply_dirty_worktree(source_repo: Path, workspace: Path) -> None:
+    status_output = run_command(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        cwd=source_repo,
+    )
+    for line in status_output.splitlines():
+        if not line:
+            continue
+        status = line[:2]
+        if "U" in status:
+            raise RuntimeError(f"repository has unresolved merge conflicts: {source_repo}")
+        if status == "!!":
+            continue
+
+        path_text = line[3:]
+        if " -> " in path_text and "R" in status:
+            old_path, new_path = [part.strip() for part in path_text.split(" -> ", 1)]
+            _remove_path(workspace / old_path)
+            _copy_worktree_path(source_repo / new_path, workspace / new_path)
+            continue
+        if " -> " in path_text and "C" in status:
+            _copy_worktree_path(
+                source_repo / path_text.split(" -> ", 1)[1].strip(),
+                workspace / path_text.split(" -> ", 1)[1].strip(),
+            )
+            continue
+        if "D" in status:
+            _remove_path(workspace / path_text)
+            continue
+        _copy_worktree_path(source_repo / path_text, workspace / path_text)
+
+
+def _copy_worktree_path(source_path: Path, target_path: Path) -> None:
+    if not source_path.exists() and not source_path.is_symlink():
+        raise RuntimeError(f"dirty worktree path disappeared while bundling: {source_path}")
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    if source_path.is_symlink():
+        _remove_path(target_path)
+        target_path.symlink_to(source_path.readlink())
+        return
+    if source_path.is_dir():
+        _remove_path(target_path)
+        shutil.copytree(source_path, target_path, ignore=shutil.ignore_patterns(".git"))
+        return
+    if target_path.exists() and target_path.is_dir():
+        shutil.rmtree(target_path)
+    shutil.copy2(source_path, target_path)
+
+
+def _remove_path(path: Path) -> None:
+    if not path.exists() and not path.is_symlink():
+        return
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+        return
+    path.unlink()
 
 
 def validate_remote_url(repo_path: Path, expected_urls: set[str]) -> None:
@@ -146,32 +250,136 @@ def is_allowed_phalanx_path(path: str) -> bool:
     )
 
 
-def collect_changed_files(repo_path: Path, base_ref: str, head_ref: str = "HEAD") -> list[str]:
+def _diff_range_args(base_ref: str, head_ref: str | None = None) -> list[str]:
+    if head_ref is None:
+        return [base_ref]
+    return [base_ref, head_ref]
+
+
+def collect_changed_files(
+    repo_path: Path,
+    base_ref: str,
+    head_ref: str | None = None,
+) -> list[str]:
     output = run_command(
         [
             "git",
             "diff",
             "--name-only",
-            "--diff-filter=ACMR",
-            f"{base_ref}..{head_ref}",
+            "--diff-filter=ACDMRT",
+            *_diff_range_args(base_ref, head_ref),
         ],
         cwd=repo_path,
     )
     return [line for line in output.splitlines() if line.strip()]
 
 
-def validate_phalanx_changes(repo_path: Path) -> None:
-    merge_base = maybe_merge_base(repo_path, "HEAD", "origin/main")
-    if merge_base is None:
-        files = collect_changed_files(repo_path, "HEAD^")
-    else:
-        files = collect_changed_files(repo_path, merge_base)
+def collect_diff_text(
+    repo_path: Path,
+    base_ref: str,
+    path: str,
+    head_ref: str | None = None,
+) -> str:
+    return run_command(
+        [
+            "git",
+            "diff",
+            "--no-color",
+            "--unified=0",
+            *_diff_range_args(base_ref, head_ref),
+            "--",
+            path,
+        ],
+        cwd=repo_path,
+    )
 
+
+def _resolve_phalanx_base_ref(repo_path: Path) -> str:
+    merge_base = maybe_merge_base(repo_path, "HEAD", "origin/main")
+    if merge_base is not None:
+        return merge_base
+    try:
+        return rev_parse(repo_path, "HEAD^")
+    except Exception as exc:
+        raise RuntimeError(
+            "phalanx validation requires origin/main or at least one parent commit"
+        ) from exc
+
+
+def _validate_phalanx_change_policy(policy: str) -> None:
+    if policy not in ALLOWED_PHALANX_CHANGE_POLICIES:
+        raise ValueError(
+            "unknown phalanx change policy: "
+            f"{policy} (expected one of {', '.join(ALLOWED_PHALANX_CHANGE_POLICIES)})"
+        )
+
+
+def _validate_path_allowlist(files: list[str]) -> None:
     unsafe = [path for path in files if not is_allowed_phalanx_path(path)]
     if unsafe:
         raise RuntimeError(
             "phalanx changes include unsafe paths: " + ", ".join(sorted(unsafe))
         )
+
+
+def _validate_values_yaml_only(files: list[str]) -> None:
+    unsafe = [path for path in files if path != FOV_QUICKLOOK_VALUES_PATH]
+    if unsafe:
+        raise RuntimeError(
+            "phalanx policy values-yaml-only rejects changes outside "
+            f"{FOV_QUICKLOOK_VALUES_PATH}: {', '.join(sorted(unsafe))}"
+        )
+
+
+def _validate_image_tag_only(repo_path: Path, base_ref: str, files: list[str]) -> None:
+    _validate_values_yaml_only(files)
+    diff_text = collect_diff_text(repo_path, base_ref, FOV_QUICKLOOK_VALUES_PATH)
+    meaningful_lines: list[str] = []
+    for line in diff_text.splitlines():
+        if (
+            not line
+            or line.startswith("diff --git ")
+            or line.startswith("index ")
+            or line.startswith("--- ")
+            or line.startswith("+++ ")
+            or line.startswith("@@")
+            or line.startswith("\\ No newline at end of file")
+        ):
+            continue
+        if line[0] not in "+-":
+            raise RuntimeError("phalanx policy image-tag-only encountered unexpected diff")
+        changed = line[1:].strip()
+        meaningful_lines.append(changed)
+        if not _IMAGE_TAG_DIFF_RE.match(changed):
+            raise RuntimeError(
+                "phalanx policy image-tag-only allows only image.tag line changes"
+            )
+    if not meaningful_lines:
+        raise RuntimeError("phalanx policy image-tag-only found no image.tag changes")
+
+
+def validate_phalanx_changes(
+    repo_path: Path,
+    policy: str = "fov-quicklook-paths",
+) -> None:
+    _validate_phalanx_change_policy(policy)
+    base_ref = _resolve_phalanx_base_ref(repo_path)
+    files = collect_changed_files(repo_path, base_ref)
+
+    if not files:
+        return
+
+    if policy == "fov-quicklook-paths":
+        _validate_path_allowlist(files)
+        return
+    if policy == "values-yaml-only":
+        _validate_values_yaml_only(files)
+        return
+    if policy == "image-tag-only":
+        _validate_image_tag_only(repo_path, base_ref, files)
+        return
+
+    raise AssertionError(f"unhandled phalanx change policy: {policy}")
 
 
 def update_image_tag(values_path: Path, image_tag: str) -> None:

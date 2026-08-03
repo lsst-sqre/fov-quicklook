@@ -1,17 +1,20 @@
 """Status endpoint for frontend."""
 
+import asyncio
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
-import re
-import asyncio
-import json
 
+import quicklook.mylogging
 from quicklook.config import config
-from quicklook.utils.system_status import ContainerStatus, get_container_status
+from quicklook.utils.coordinator_url import get_coordinator_base_url
 from quicklook.utils.http_request import http_request
+from quicklook.utils.system_status import ContainerStatus, get_container_status, get_memory_current
 from quicklook.utils.ttlcache import ttlcache
 
 router = APIRouter()
+logger = quicklook.mylogging.getLogger(__name__)
+_active_status_ws_connections = 0
 
 
 class SystemStatus(BaseModel):
@@ -30,7 +33,7 @@ async def get_cached_status() -> SystemStatus:
     try:
         coordinator_data = await http_request(
             "get",
-            f"{config.coordinator_base_url}/status",
+            f"{get_coordinator_base_url()}/status",
         )
         coordinator_status = ContainerStatus(**coordinator_data["coordinator"])
         generators_status = {
@@ -65,6 +68,13 @@ async def route_get_status() -> SystemStatus:
 @router.websocket("/api/status/ws")
 async def status_websocket(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time system status updates."""
+    global _active_status_ws_connections
+    _active_status_ws_connections += 1
+    logger.info(
+        "Frontend status.ws connected active_connections=%d rss=%d",
+        _active_status_ws_connections,
+        get_memory_current(),
+    )
     await websocket.accept()
     try:
         while True:
@@ -75,3 +85,10 @@ async def status_websocket(websocket: WebSocket) -> None:
         pass
     except Exception:
         await websocket.close()
+    finally:
+        _active_status_ws_connections -= 1
+        logger.info(
+            "Frontend status.ws disconnected active_connections=%d rss=%d",
+            _active_status_ws_connections,
+            get_memory_current(),
+        )

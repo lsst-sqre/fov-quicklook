@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import secrets
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -38,6 +39,11 @@ class Settings(BaseSettings):
     port: int = 8010
     api_token: str | None = None
     api_token_file: Path | None = None
+    token_command: str | None = None
+    token_command_timeout_seconds: int = 30
+    phalanx_change_policy: Literal[
+        "fov-quicklook-paths", "values-yaml-only", "image-tag-only"
+    ] = "fov-quicklook-paths"
 
     state_dir: Path = Field(default_factory=_state_dir)
 
@@ -70,18 +76,6 @@ class Settings(BaseSettings):
         return self.state_dir / "tokens"
 
     @property
-    def bootstrap_dir(self) -> Path:
-        return self.state_dir / "bootstrap"
-
-    @property
-    def argocd_bootstrap_curl_path(self) -> Path:
-        return self.bootstrap_dir / "argocd.curl"
-
-    @property
-    def app_bootstrap_curl_path(self) -> Path:
-        return self.bootstrap_dir / "app.curl"
-
-    @property
     def job_dir(self) -> Path:
         return self.state_dir / "jobs"
 
@@ -102,7 +96,6 @@ class Settings(BaseSettings):
     def ensure_state_dirs(self) -> None:
         for path in (
             self.state_dir,
-            self.bootstrap_dir,
             self.token_dir,
             self.job_dir,
             self.repo_cache_dir,

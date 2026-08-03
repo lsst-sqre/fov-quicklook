@@ -12,6 +12,7 @@ import { Info } from './Info'
 import { ViewerContextMenu } from './ViewerContextMenu'
 import { QuicklookJobMonitor } from './QuicklookJobMonitor'
 import { CompactStatus } from './CompactStatus'
+import { VisitName } from './VisitName'
 
 type ViewerProps = {
   style?: React.CSSProperties
@@ -70,6 +71,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
         <HighlitedCcds />
       </Globe$>
       <CursorLine />
+      <VisitName />
       <Info />
       <QuicklookJobMonitor />
       <CompactStatus />

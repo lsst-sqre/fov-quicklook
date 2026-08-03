@@ -6,6 +6,7 @@ Coordinatorとの疎通を定期的に確認し、失敗した場合は自プロ
 """
 
 import asyncio
+import errno
 import quicklook.mylogging
 import os
 import uuid
@@ -19,6 +20,7 @@ from fastapi import APIRouter, HTTPException
 
 from quicklook.comm.types import CoordinatorId, GeneratorId
 from quicklook.config import config
+from quicklook.utils.coordinator_url import get_coordinator_base_url
 from quicklook.utils.http_client import get_session, managed_session
 
 from .types import GeneratorId, GeneratorRegistrationRequest, GeneratorRegistrationResponse
@@ -29,6 +31,28 @@ logger = quicklook.mylogging.getLogger(__name__)
 router = APIRouter()
 
 _shutdown_requested = False
+_REGISTRATION_RETRY_MAX_DELAY_SECONDS = 60
+
+
+class CoordinatorRestartedError(RuntimeError):
+    pass
+
+
+def _is_fatal_registration_error(exc: BaseException) -> bool:
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, PermissionError):
+            return True
+        if isinstance(current, OSError) and current.errno == errno.EPERM:
+            return True
+        os_error = getattr(current, "os_error", None)
+        if isinstance(os_error, BaseException) and id(os_error) not in seen:
+            current = os_error
+            continue
+        current = current.__cause__ or current.__context__
+    return False
 
 
 @router.get("/comm/healthz")
@@ -53,10 +77,10 @@ _coordinator_id: CoordinatorId | None = None
 
 @asynccontextmanager
 async def lifespan(app: Any) -> AsyncIterator[None]:
-    global _generator_id
+    global _generator_id, _shutdown_requested
     async with managed_session():
         _generator_id = GeneratorId(f'g-{uuid.uuid4().hex}')
-        await _register_to_coordinator()
+        _shutdown_requested = False
         registration_task = asyncio.create_task(_registration_loop())
         try:
             yield
@@ -99,42 +123,61 @@ async def _register_to_coordinator():
     )
     timeout = aiohttp.ClientTimeout(total=config.comm_heartbeat_timeout)
     session = get_session()
-    try:
-        async with session.post(
-            f"{config.coordinator_base_url}/comm/register",
-            json=registration_data.model_dump(),
-            timeout=timeout,
-        ) as response:
-            response.raise_for_status()
+    async with session.post(
+        f"{get_coordinator_base_url()}/comm/register",
+        json=registration_data.model_dump(),
+        timeout=timeout,
+    ) as response:
+        if response.status == 409:
             response_data = await response.json()
-            registration_response = GeneratorRegistrationResponse(**response_data)
-            
-            if _coordinator_id is None:
-                _coordinator_id = registration_response.coordinator_id
-                logger.info(f"Received coordinator ID: {_coordinator_id}")
-            elif _coordinator_id != registration_response.coordinator_id:
-                logger.error(
-                    f"Coordinator ID changed from {_coordinator_id} to {registration_response.coordinator_id}. "
-                    "Coordinator has been restarted."
-                )
-                raise RuntimeError("Coordinator ID mismatch")
-    except Exception:
-        if config.dev_generator_required_coordinator_connection:  # pragma: no cover
-            raise
+            if response_data.get("detail") == "Coordinator ID mismatch":
+                raise CoordinatorRestartedError("Coordinator ID mismatch")
+        response.raise_for_status()
+        response_data = await response.json()
+        registration_response = GeneratorRegistrationResponse(**response_data)
+
+        if _coordinator_id is None:
+            _coordinator_id = registration_response.coordinator_id
+            logger.info(f"Received coordinator ID: {_coordinator_id}")
+        elif _coordinator_id != registration_response.coordinator_id:
+            logger.error(
+                f"Coordinator ID changed from {_coordinator_id} to {registration_response.coordinator_id}. "
+                "Coordinator has been restarted."
+            )
+            raise CoordinatorRestartedError("Coordinator ID mismatch")
 
 
 async def _registration_loop():
+    retry_count = 0
+
     while True:
         if _shutdown_requested:
             logger.info("Registration loop stopped due to shutdown request")
             break
-        await asyncio.sleep(config.comm_registration_interval)
         try:
             await _register_to_coordinator()
-            continue
-        except Exception as e:  # pragma: no cover
-            logger.warning(f'Error occurred while registering generator: {e}')
+        except CoordinatorRestartedError as e:  # pragma: no cover
+            logger.warning(f'Generator registration detected coordinator restart: {e}')
             await _shutdown()
+            break
+        except Exception as e:  # pragma: no cover
+            if _is_fatal_registration_error(e):
+                logger.exception(
+                    "Fatal error while registering generator to coordinator; shutting down immediately"
+                )
+                await _immediate_shutdown()
+                break
+            retry_count += 1
+            delay_seconds = min(2 ** (retry_count - 1), _REGISTRATION_RETRY_MAX_DELAY_SECONDS)
+            logger.warning(
+                f"Error occurred while registering generator: {e}. "
+                f"Retrying in {delay_seconds} seconds (attempt {retry_count})"
+            )
+            await asyncio.sleep(delay_seconds)
+            continue
+
+        retry_count = 0
+        await asyncio.sleep(config.comm_registration_interval)
 
 
 async def _immediate_shutdown():

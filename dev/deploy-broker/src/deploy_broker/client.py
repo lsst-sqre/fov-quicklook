@@ -12,6 +12,17 @@ from .config import Settings
 from .gitops import create_bundle
 
 
+def _user_broker_config_dir() -> Path:
+    return Path.home() / ".fov-quicklook2"
+
+
+def _read_text_if_exists(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    value = path.read_text(encoding="utf-8").strip()
+    return value or None
+
+
 class BrokerClient:
     def __init__(self, base_url: str, api_token: str | None) -> None:
         headers = {"Authorization": f"Bearer {api_token}"} if api_token else None
@@ -24,8 +35,14 @@ class BrokerClient:
     def close(self) -> None:
         self._client.close()
 
-    def get_app_token(self) -> dict[str, Any]:
-        response = self._client.get("/v1/tokens/app")
+    def healthz(self) -> dict[str, Any]:
+        response = self._client.get("/healthz")
+        response.raise_for_status()
+        return response.json()
+
+    def get_app_token(self, *, refresh: bool = False) -> dict[str, Any]:
+        params = {"refresh": "true"} if refresh else None
+        response = self._client.get("/v1/tokens/app", params=params)
         response.raise_for_status()
         return response.json()
 
@@ -118,11 +135,15 @@ class BrokerClient:
 
 def _settings_defaults() -> tuple[str, str | None]:
     settings = Settings()
+    config_dir = _user_broker_config_dir()
+    base_url = _read_text_if_exists(config_dir / "broker-url") or "http://127.0.0.1:8010"
     api_token = settings.api_token
     if api_token is None and settings.api_token_file and settings.api_token_file.exists():
         api_token = settings.api_token_file.read_text(encoding="utf-8").strip() or None
+    if api_token is None:
+        api_token = _read_text_if_exists(config_dir / "broker-token")
     return (
-        "http://127.0.0.1:8010",
+        base_url,
         api_token,
     )
 
@@ -157,7 +178,12 @@ def main() -> None:
     restart_parser = subparsers.add_parser("argocd-restart")
     restart_parser.add_argument("components", nargs="*")
 
-    subparsers.add_parser("get-app-token")
+    get_app_token_parser = subparsers.add_parser("get-app-token")
+    get_app_token_parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="refresh the app token via the configured token command before returning it",
+    )
     subparsers.add_parser("argocd-status")
     subparsers.add_parser("argocd-get-branch")
     subparsers.add_parser("argocd-sync")
@@ -166,7 +192,7 @@ def main() -> None:
     client = BrokerClient(args.server, args.api_token)
     try:
         if args.command == "get-app-token":
-            _print_json(client.get_app_token())
+            _print_json(client.get_app_token(refresh=args.refresh))
         elif args.command == "argocd-status":
             _print_json(client.argocd_status())
         elif args.command == "argocd-get-branch":

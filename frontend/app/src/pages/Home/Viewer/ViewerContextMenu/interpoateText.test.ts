@@ -3,7 +3,7 @@ import { interpoateText } from './interpoateText'
 
 describe('interpoateText', () => {
   const meta = {
-    visit: { id: 'S2025:1234' },
+    visit_name: 'embargo:LSSTCam!-raw!-all:raw:exposure=2025051500271',
     ccd_name: 'ccd_01',
     ccd_id: 42,
     exposure: 2025051500271,
@@ -17,12 +17,12 @@ describe('interpoateText', () => {
 
   it('should replace %(visit)', () => {
     const template = 'Visit: %(visit)'
-    expect(interpoateText(template, meta)).toBe('Visit: [object Object]')
+    expect(interpoateText(template, meta)).toBe('Visit: embargo:LSSTCam!-raw!-all:raw:exposure=2025051500271')
   })
 
   it('should replace %(dataType)', () => {
     const template = 'Type: %(dataType)'
-    expect(interpoateText(template, meta)).toBe('Type: S2025')
+    expect(interpoateText(template, meta)).toBe('Type: embargo:LSSTCam!-raw!-all:raw')
   })
 
   it('should keep unknown keys as is', () => {

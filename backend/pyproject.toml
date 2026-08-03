@@ -2,7 +2,7 @@
 name = "quicklook"
 version = "0.1.0"
 description = "FOV-Quicklook backend"
-readme = "README.md"
+readme = "README.ja.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.117.0,<0.118.0",
@@ -23,6 +23,7 @@ dependencies = [
     "websockets",
     "alembic",
     "asyncpg",
+    "pillow>=12.2.0",
 ]
 
 [project.optional-dependencies]

@@ -1,13 +1,19 @@
-import { Menu, MenuItem, SubMenu } from '@szhsin/react-menu'
 import classNames from 'classnames'
-import React, { memo, useEffect, useMemo, useRef } from "react"
-import { MaterialSymbol } from '../../../components/MaterialSymbol'
-import { ListVisitsApiArg, ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
-import { homeSlice } from '../../../store/features/homeSlice'
-import { useAppDispatch, useAppSelector } from '../../../store/hooks'
+import React, { memo, useEffect, useMemo, useRef, useState } from "react"
+import { ListVisitsApiResponse, useListVisitsQuery } from "../../../store/api/openapi"
+import { getSingleDimensionValue } from '../../../quicklookId'
+import { useAppSelector } from '../../../store/hooks'
+import {
+  buildVisitListPageQuery,
+  getVisibleVisitEntries,
+  hasNextVisitPage,
+  shouldShowVisitPagination,
+} from './pagination'
+import { buildVisitListQuery } from '../visitSearch'
 import styles from './styles.module.scss'
 import { LoadingSpinner } from '../../../components/Loading'
 import { useChangeCurrentQuicklook } from '../../../hooks/useChangeCurrentQuicklook'
+import { SearchBox } from './SearchBox'
 
 
 type VisitListProps = {
@@ -30,29 +36,17 @@ function formatExposureTime(exposureTime: number, digits: number): string {
   return `${isRounded ? '~' : ''}${rounded}`
 }
 
-function isValidSearchString(s: string) {
-  // 20241021 or 2024102100002
-  return /^\d{8}(\d{5})?$/.test(s)
-}
-
-function useVisitList() {
+function useVisitList(page: number) {
   const searchString = useAppSelector(state => state.home.searchString)
   const dataSource = useAppSelector(state => state.home.dataSource)
-  const [repositoryName, dataType] = dataSource.split(':')
-  const query = useMemo(() => {
-    if (isValidSearchString(searchString)) {
-      switch (searchString.length) {
-        case 8:
-          return { dayObs: Number(searchString), dataType, repositoryName }
-        case 13:
-          return { exposure: Number.parseInt(searchString), dataType, repositoryName }
-      }
-    }
-    return {
-      dataType,
-      repositoryName,
-    } as ListVisitsApiArg
-  }, [dataType, repositoryName, searchString])
+  const baseQuery = useMemo(
+    () => buildVisitListQuery(searchString, dataSource),
+    [dataSource, searchString],
+  )
+  const query = useMemo(
+    () => buildVisitListPageQuery(baseQuery, page),
+    [baseQuery, page],
+  )
   const { data: list, refetch, isFetching } = useListVisitsQuery(query)
   return { list, refetch, isFetching }
 }
@@ -98,24 +92,49 @@ function groupVisitList(list: VisitListEntryType[] | undefined, timeToleranceDig
 const ListScrollContainerContext = React.createContext<React.RefObject<HTMLDivElement> | null>(null)
 
 export const VisitList = memo(({ style }: VisitListProps) => {
-  const { list, isFetching } = useVisitList()
+  const searchString = useAppSelector(state => state.home.searchString)
+  const dataSource = useAppSelector(state => state.home.dataSource)
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
   const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
   const listContainerRef = useRef<HTMLDivElement>(null)
+  const [page, setPage] = useState(0)
+  const { list, refetch, isFetching } = useVisitList(page)
+  const visibleEntries = useMemo(() => getVisibleVisitEntries(list), [list])
+  const hasNextPage = useMemo(() => hasNextVisitPage(list), [list])
+  const showPagination = shouldShowVisitPagination(page, hasNextPage)
 
   // リストをグループ化
-  const groupedList = useMemo(() => groupVisitList(list, listGroupingTimeToleranceDigits), [list, listGroupingTimeToleranceDigits])
+  const groupedList = useMemo(
+    () => groupVisitList(visibleEntries, listGroupingTimeToleranceDigits),
+    [listGroupingTimeToleranceDigits, visibleEntries],
+  )
 
   useEffect(() => {
-    if (currentQuicklook === undefined && list?.length) {
-      changeCurrentQuicklook(list[0].id)
+    setPage(0)
+  }, [dataSource, searchString])
+
+  useEffect(() => {
+    listContainerRef.current?.scrollTo({ top: 0 })
+  }, [page])
+
+  useEffect(() => {
+    if (currentQuicklook === undefined && visibleEntries.length) {
+      changeCurrentQuicklook(visibleEntries[0].id)
     }
-  }, [changeCurrentQuicklook, currentQuicklook, list])
+  }, [changeCurrentQuicklook, currentQuicklook, visibleEntries])
 
   return (
     <div className={styles.listWrapper}>
-      <SearchBox />
+      <SearchBox onRefresh={refetch} />
+      {showPagination && (
+        <VisitListPagination
+          hasNextPage={hasNextPage}
+          onNext={() => setPage(current => current + 1)}
+          onPrevious={() => setPage(current => Math.max(current - 1, 0))}
+          page={page}
+        />
+      )}
       <div className={styles.listContainer}>
         <ListScrollContainerContext.Provider value={listContainerRef}>
           <div className={styles.list} style={style} ref={listContainerRef}>
@@ -126,9 +145,48 @@ export const VisitList = memo(({ style }: VisitListProps) => {
         </ListScrollContainerContext.Provider>
         {isFetching && <div className={styles.loadingOverlay}><LoadingSpinner /></div>}
       </div>
+      {showPagination && (
+        <VisitListPagination
+          hasNextPage={hasNextPage}
+          onNext={() => setPage(current => current + 1)}
+          onPrevious={() => setPage(current => Math.max(current - 1, 0))}
+          page={page}
+        />
+      )}
     </div>
   )
 })
+
+type VisitListPaginationProps = {
+  hasNextPage: boolean
+  onNext: () => void
+  onPrevious: () => void
+  page: number
+}
+
+function VisitListPagination({ hasNextPage, onNext, onPrevious, page }: VisitListPaginationProps) {
+  return (
+    <div className={styles.pagination}>
+      <button
+        className={styles.paginationButton}
+        disabled={page === 0}
+        onClick={onPrevious}
+        type="button"
+      >
+        Previous
+      </button>
+      <span className={styles.paginationLabel}>Page {page + 1}</span>
+      <button
+        className={styles.paginationButton}
+        disabled={!hasNextPage}
+        onClick={onNext}
+        type="button"
+      >
+        Next
+      </button>
+    </div>
+  )
+}
 
 // グループを表示するコンポーネント
 function VisitGroup({ group }: { group: VisitListEntryType[] }) {
@@ -171,7 +229,7 @@ function VisitGroup({ group }: { group: VisitListEntryType[] }) {
 
 function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
   const currentQuicklook = useAppSelector(state => state.home.currentQuicklook)
-  const selected = currentQuicklook?.split(':').slice(-1)[0] === entry.id.split(':').slice(-1)[0]
+  const selected = currentQuicklook === entry.id
   const entryRef = useRef<HTMLDivElement>(null)
   const listContainerRef = React.useContext(ListScrollContainerContext)
   const changeCurrentQuicklook = useChangeCurrentQuicklook()
@@ -193,7 +251,7 @@ function VisitListEntry({ entry }: { entry: VisitListEntryType }) {
       onClick={select}
       title={`obs_id: ${entry.obs_id};\nexposure_time: ${entry.exposure_time}s`}
     >
-      {entry.id.split(':').slice(-1)[0]}
+      {getSingleDimensionValue(entry.id) ?? entry.display_id}
     </div>
   )
 }
@@ -278,71 +336,4 @@ function scrollToElementBelowSticky(
   } else {
     // console.log('DEBUG: スクロール不要')
   }
-}
-
-function SearchBox() {
-  const dispatch = useAppDispatch()
-  const searchString = useAppSelector(state => state.home.searchString)
-  const dataSource = useAppSelector(state => state.home.dataSource)
-  const listGroupingTimeToleranceDigits = useAppSelector(state => state.home.listGroupingTimeToleranceDigits)
-  const ccdDataTypes = useAppSelector(state => state.copyTemplate.ccdDataTypes)
-  const { refetch } = useVisitList()
-
-  return (
-    <div className={styles.searchBox}>
-      <div style={{ display: 'flex' }} >
-        <select
-          value={dataSource}
-          onChange={e => dispatch(homeSlice.actions.setDataSource(e.target.value as typeof dataSource))}
-          style={{
-            flexGrow: 1,
-          }}
-        >
-          {ccdDataTypes.map((dt) => {
-            const key = `${dt.repository_name}:${dt.data_type}`
-            return <option key={key} value={key}>{dt.display_name}</option>
-          })}
-        </select>
-        <Menu
-          menuButton={
-            <button >
-              <MaterialSymbol symbol='settings' />
-            </button>
-          }
-          theming='dark'
-        >
-          <SubMenu label="Exposure Time Grouping Tolerance">
-            {[
-              { digits: 100, label: "No grouping", description: "No grouping (exact match)" },
-              { digits: 0, label: "1 second tolerance", description: "1 second tolerance" },
-              { digits: 1, label: "1 digit (0.1 seconds)", description: "1 digit (0.1 seconds)" },
-              { digits: 2, label: "2 digits (0.01 seconds)", description: "2 digits (0.01 seconds)" },
-              { digits: 3, label: "3 digits (0.001 seconds)", description: "3 digits (0.001 seconds)" }
-            ].map(({ digits, label, description }) => (
-              <MenuItem
-                key={digits}
-                onClick={() => dispatch(homeSlice.actions.setListGroupingTimeToleranceDigits(digits))}
-                type='checkbox'
-                checked={digits === listGroupingTimeToleranceDigits}
-              >
-                {label}
-              </MenuItem>
-            ))}
-          </SubMenu>
-        </Menu>
-        <button onClick={refetch}>
-          <MaterialSymbol symbol='refresh' />
-        </button>
-      </div>
-      <input
-        type="search"
-        placeholder='Date or Exposure ex. 20241204 or 2024120400003'
-        value={searchString}
-        onChange={e => dispatch(homeSlice.actions.setSearchString(e.target.value))}
-        style={{
-          color: isValidSearchString(searchString) ? 'white' : 'gray',
-        }}
-      />
-    </div>
-  )
 }
