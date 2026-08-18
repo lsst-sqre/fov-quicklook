@@ -8,6 +8,7 @@ from quicklook.datasets import get_dataset
 from quicklook.datasource.butler_datasource import (
     ButlerDataSource,
     Instrument,
+    PostgresScopedButlerDataSource,
     ScopedButlerDataSource,
     _clear_resolved_visit_run_cache,
     _get_resolved_visit_run,
@@ -36,10 +37,17 @@ class FakeDimensionRecordResults:
         return len(self._records)
 
 
-def _make_datasource(*, data_type: str, data_id_dimension: str, order_by: list[str], registry: object):
+def _make_datasource(
+    *,
+    data_type: str,
+    data_id_dimension: str,
+    order_by: list[str],
+    registry: object,
+    cls: type[ScopedButlerDataSource] = ScopedButlerDataSource,
+):
     del data_id_dimension
     del order_by
-    ds = ScopedButlerDataSource.__new__(ScopedButlerDataSource)
+    ds = cls.__new__(cls)
     ds._repository_name = 'repo'
     ds._collection = 'dummy'
     ds._dataset_type = data_type
@@ -94,6 +102,7 @@ def test_query_visits_uses_exposure_dimension_records(monkeypatch):
         data_id_dimension='exposure',
         order_by=['-day_obs', '-exposure'],
         registry=FakeRegistry(),
+        cls=PostgresScopedButlerDataSource,
     )
     monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
 
@@ -166,6 +175,7 @@ def test_query_visits_applies_offset_after_ordering(monkeypatch):
         data_id_dimension='exposure',
         order_by=['-day_obs', '-exposure'],
         registry=FakeRegistry(),
+        cls=PostgresScopedButlerDataSource,
     )
     monkeypatch.setattr(ds, '_get_latest_day_obs', lambda: 20250301)
 
@@ -329,6 +339,7 @@ def test_query_visit_day_counts_uses_butler_counts_by_day():
         data_id_dimension='exposure',
         order_by=['-day_obs', '-exposure'],
         registry=FakeRegistry(),
+        cls=PostgresScopedButlerDataSource,
     )
 
     counts = ds.query_visit_day_counts('2025-03')
@@ -411,6 +422,7 @@ def test_query_visit_day_counts_uses_sql_group_by_when_available(monkeypatch):
         data_id_dimension='exposure',
         order_by=['-day_obs', '-exposure'],
         registry=FakeRegistry(),
+        cls=PostgresScopedButlerDataSource,
     )
 
     counts = ds.query_visit_day_counts('2025-03')
