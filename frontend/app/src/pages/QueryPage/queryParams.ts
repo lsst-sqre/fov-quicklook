@@ -63,7 +63,7 @@ export function buildQueryPythonSnippet(queryInput: string): string {
     "",
     "def default_order_by(dataset_type: str) -> str:",
     "    return {",
-    "        'raw': '-day_obs',",
+    "        'raw': '-exposure',",
     "        'post_isr_image': '-exposure',",
     "        'difference_image': '-visit',",
     "        'preliminary_visit_image': '-visit',",

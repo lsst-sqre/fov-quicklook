@@ -18,7 +18,7 @@ from quicklook.datasets import Dataset, get_dataset
 from quicklook.datasource.types import QueryBuilderOptions, QueryWhereExample, VisitDayCount, VisitDayCountQuery, VisitEntry
 from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName, build_scope_id
 
-from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError
+from ..types import DataSourceBase, DataSourceCcdMetadata, Query, ResolvedVisitInfo, VisitResolutionError, sort_visit_entries
 from .instrument import Instrument
 from .retrieve_data import retrieve_data
 
@@ -845,39 +845,8 @@ def _query_visits_across_scopes(q: Query) -> list[VisitEntry]:
             seen_ids.add(entry.id)
             entries.append(entry)
 
-    sorted_entries = _sort_visit_entries(entries, dataset_type=q.dataset_type, order_by=q.order_by, reverse=q.reverse)
+    sorted_entries = sort_visit_entries(entries, dataset_type=q.dataset_type, order_by=q.order_by, reverse=q.reverse)
     return sorted_entries[q.offset : q.offset + q.limit]
-
-
-def _sort_visit_entries(
-    entries: list[VisitEntry],
-    *,
-    dataset_type: str,
-    order_by: str | None,
-    reverse: bool | None,
-) -> list[VisitEntry]:
-    default = get_dataset(dataset_type).default_order_by[0]
-    default_field = default.removeprefix('-')
-    default_reverse = default.startswith('-')
-    selected_field = order_by or default_field
-    selected_reverse = default_reverse if selected_field == default_field else False
-    if reverse:
-        selected_reverse = not selected_reverse
-    return sorted(
-        entries,
-        key=lambda entry: (_visit_entry_sort_value(entry, selected_field), entry.display_id),
-        reverse=selected_reverse,
-    )
-
-
-def _visit_entry_sort_value(entry: VisitEntry, field: str) -> Any:
-    match field:
-        case 'exposure' | 'visit':
-            visit = VisitName(entry.id)
-            value = visit.dimensions.get(field)
-            return -1 if value is None else int(value)
-        case _:
-            return getattr(entry, field)
 
 
 def _get_visit_datasource(visit: VisitName) -> ScopedButlerDataSource:

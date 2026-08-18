@@ -18,13 +18,19 @@ from quicklook.types import CcdDataRef, CcdDataType, CcdName, VisitName, build_s
 from quicklook.utils.fits import fits_partial_load
 from quicklook.utils.s3 import s3_download_object, s3_list_objects
 
-from ..types import DataSourceBase, DataSourceCcdMetadata, Query
+from ..types import DataSourceBase, DataSourceCcdMetadata, Query, sort_visit_entries
 
 
 class DummyDataSource(DataSourceBase):
     def query_visits_sync(self, q: Query) -> list[VisitEntry]:
         visits = _default_dummy_visits()
         visits = _filter_visits(visits, q)
+        visits = sort_visit_entries(
+            visits,
+            dataset_type=q.dataset_type,
+            order_by=q.order_by,
+            reverse=q.reverse,
+        )
         return visits[q.offset : q.offset + q.limit]
 
     def query_visit_day_counts_sync(self, q: VisitDayCountQuery) -> list[VisitDayCount]:

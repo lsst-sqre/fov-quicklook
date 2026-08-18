@@ -1,6 +1,6 @@
 import { Globe$, GlobeEventLayer$, GridLayer$, PanLayer$, RollLayer$, TouchLayer$, ZoomLayer$ } from '@stellar-globe/react-stellar-globe'
 import { GlobeEventMap, GlobePointerEvent, V2 } from "@stellar-globe/stellar-globe"
-import { memo, useCallback } from "react"
+import { memo, useCallback, type ComponentType, type ForwardRefExoticComponent } from "react"
 import { Quicklook$ } from '../../../StellarGlobe/Quicklook/QuicklookLayer'
 import { homeSlice } from "../../../store/features/homeSlice"
 import { useAppDispatch, useAppSelector } from "../../../store/hooks"
@@ -17,6 +17,15 @@ import { VisitName } from './VisitName'
 type ViewerProps = {
   style?: React.CSSProperties
 }
+
+// ponytail: local file deps can bring their own React types; cast at the JSX boundary.
+const GlobeCompat = Globe$ as unknown as ForwardRefExoticComponent<any>
+const GlobeEventLayerCompat = GlobeEventLayer$ as unknown as ComponentType<any>
+const GridLayerCompat = GridLayer$ as unknown as ComponentType<any>
+const PanLayerCompat = PanLayer$ as unknown as ComponentType<any>
+const RollLayerCompat = RollLayer$ as unknown as ComponentType<any>
+const TouchLayerCompat = TouchLayer$ as unknown as ComponentType<any>
+const ZoomLayerCompat = ZoomLayer$ as unknown as ComponentType<any>
 
 export const Viewer = memo(({ style }: ViewerProps) => {
   const { globeHandle, quicklookLayerHandle: quicklookHandle, currentQuicklook } = useHomeContext()
@@ -44,18 +53,18 @@ export const Viewer = memo(({ style }: ViewerProps) => {
 
   return (
     <div style={{ ...style, position: 'relative', height: 0 }}>
-      <Globe$
+      <GlobeCompat
         ref={globeHandle}
         noDefaultLayers
         retina
         cameraParams={cameraParams}
       >
-        <GlobeEventLayer$ onPointerMove={onPointerMove} onCameraMove={onCameraMove} />
+        <GlobeEventLayerCompat onPointerMove={onPointerMove} onCameraMove={onCameraMove} />
         <ViewerContextMenu />
-        <ZoomLayer$ />
-        <RollLayer$ />
-        <TouchLayer$ />
-        <PanLayer$ />
+        <ZoomLayerCompat />
+        <RollLayerCompat />
+        <TouchLayerCompat />
+        <PanLayerCompat />
         {currentQuicklook.metadata?.type === 'ready' &&
           <Quicklook$
             ref={quicklookHandle}
@@ -64,12 +73,12 @@ export const Viewer = memo(({ style }: ViewerProps) => {
           />
         }
         {showFrame && (<>
-          <GridLayer$ />
+          <GridLayerCompat />
           <CcdFrames />
         </>)
         }
         <HighlitedCcds />
-      </Globe$>
+      </GlobeCompat>
       <CursorLine />
       <VisitName />
       <Info />
