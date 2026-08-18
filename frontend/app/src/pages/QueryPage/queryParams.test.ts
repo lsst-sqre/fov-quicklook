@@ -84,7 +84,7 @@ describe("query params helpers", () => {
       + "    return 'exposure'\n\n"
       + "def default_order_by(dataset_type: str) -> str:\n"
       + "    return {\n"
-      + "        'raw': '-day_obs',\n"
+      + "        'raw': '-exposure',\n"
       + "        'post_isr_image': '-exposure',\n"
       + "        'difference_image': '-visit',\n"
       + "        'preliminary_visit_image': '-visit',\n"
