@@ -8,9 +8,9 @@ from .types import DataSourceBase
 def get_datasource() -> DataSourceBase:
     match config.data_source:
         case 'butler':  # pragma: no cover
-            from .butler_datasource import ButlerDataSource
+            from .butler_datasource import make_butler_datasource
 
-            return ButlerDataSource()
+            return make_butler_datasource()
         case 'dummy':
             from .dummy_datasource import DummyDataSource
 
