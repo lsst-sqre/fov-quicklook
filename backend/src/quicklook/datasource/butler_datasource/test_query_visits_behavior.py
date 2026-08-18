@@ -3,7 +3,7 @@ from typing import Any, cast
 
 from quicklook.datasets import get_dataset
 from quicklook.datasource import butler_datasource as butler_datasource_module
-from quicklook.datasource.butler_datasource import ButlerDataSource, ScopedButlerDataSource
+from quicklook.datasource.butler_datasource import ButlerDataSource, PostgresScopedButlerDataSource, ScopedButlerDataSource
 from quicklook.datasource.types import Query
 
 
@@ -25,8 +25,8 @@ class FakeDimensionRecordResults:
         return len(self._records)
 
 
-def _make_datasource(*, dataset_type: str, registry: object):
-    ds = ScopedButlerDataSource.__new__(ScopedButlerDataSource)
+def _make_datasource(*, dataset_type: str, registry: object, cls: type[ScopedButlerDataSource] = ScopedButlerDataSource):
+    ds = cls.__new__(cls)
     ds._repository_name = 'repo'
     ds._collection = 'LSSTCam/raw/all'
     ds._dataset_type = dataset_type
@@ -98,6 +98,64 @@ def test_query_visits_reverse_flips_default_order(monkeypatch):
     )
 
     assert order_calls == [('exposure',)]
+
+
+def test_postgres_query_visits_uses_sql_order_and_offset(monkeypatch):
+    seen: dict[str, object] = {}
+
+    sql_record = SimpleNamespace(
+        id=2026012800342,
+        day_obs=20260128,
+        physical_filter='r_57',
+        exposure_time=30.0,
+        science_program='nightly',
+        observation_type='science',
+        observation_reason='survey',
+        target_name='field-342',
+        obs_id='obs-342',
+    )
+
+    ds = _make_datasource(
+        dataset_type='raw',
+        registry=object(),
+        cls=PostgresScopedButlerDataSource,
+    )
+    monkeypatch.setattr(ds, '_build_latest_day_where', lambda: 'day_obs=20260128')
+
+    def fake_query_dimension_records_with_sql(**kwargs: object):
+        seen['kwargs'] = kwargs
+        return [sql_record]
+
+    monkeypatch.setattr(
+        butler_datasource_module,
+        '_query_dimension_records_with_sql',
+        fake_query_dimension_records_with_sql,
+    )
+
+    visits = ds.query_visits(
+        Query(
+            repository_name='repo',
+            collection='LSSTCam/raw/all',
+            dataset_type='raw',
+            limit=5,
+            offset=10,
+        )
+    )
+
+    assert seen['kwargs'] == {
+        'registry': ds._butler.registry,
+        'collection': ['LSSTCam/raw/all'],
+        'dataset_type': 'raw',
+        'data_id_dimension': 'exposure',
+        'instrument': 'LSSTCam',
+        'where': 'day_obs=20260128',
+        'limit': 5,
+        'offset': 10,
+        'order_by': ['-exposure'],
+    }
+    assert [visit.id for visit in visits] == [
+        'repo:LSSTCam!-raw!-all:raw:exposure=2026012800342',
+    ]
 
 
 def test_query_visits_passes_all_collections_when_collection_is_empty(monkeypatch):
