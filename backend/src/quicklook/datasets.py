@@ -52,7 +52,7 @@ DEFAULT_DATASETS = {
     'raw': Dataset(
         dataset_type='raw',
         quicklook_dimension='exposure',
-        default_order_by=['-day_obs', '-exposure'],
+        default_order_by=['-exposure'],
         order_by_fields=COMMON_ORDER_BY_FIELDS,
         partial=False,
         preprocess_kind='raw',
