@@ -97,7 +97,7 @@ def test_query_visits_reverse_flips_default_order(monkeypatch):
         )
     )
 
-    assert order_calls == [('day_obs',)]
+    assert order_calls == [('exposure',)]
 
 
 def test_query_visits_passes_all_collections_when_collection_is_empty(monkeypatch):
@@ -203,7 +203,7 @@ def test_query_visits_sync_uses_matching_scopes_when_collection_is_empty(monkeyp
         '_get_scope_datasource',
         fake_get_scope_datasource,
     )
-    monkeypatch.setattr(butler_datasource_module, '_sort_visit_entries', lambda entries, **kwargs: entries)
+    monkeypatch.setattr(butler_datasource_module, 'sort_visit_entries', lambda entries, **kwargs: entries)
 
     ds = ButlerDataSource.__new__(ButlerDataSource)
     visits = ds.query_visits_sync(

@@ -42,10 +42,10 @@ def test_query_visits_returns_generated_fixture_visits(monkeypatch):
     )
 
     assert len(visits) == DEFAULT_DUMMY_VISIT_COUNT
-    assert visits[0].id == "reviewapp-ci:LSSTCam!-raw!-all:raw:exposure=910001"
+    assert visits[0].id == "reviewapp-ci:LSSTCam!-raw!-all:raw:exposure=910050"
     assert visits[0].utc_start is not None
-    assert visits[0].utc_start.isoformat() == "2026-05-01T03:00:00+00:00"
-    assert visits[-1].id == "reviewapp-ci:LSSTCam!-raw!-all:raw:exposure=910050"
+    assert visits[0].utc_start.isoformat() == "2026-05-01T03:49:43+00:00"
+    assert visits[-1].id == "reviewapp-ci:LSSTCam!-raw!-all:raw:exposure=910001"
 
 
 def test_query_visits_respects_offset(monkeypatch):
@@ -62,7 +62,7 @@ def test_query_visits_respects_offset(monkeypatch):
         )
     )
 
-    assert [visit.id for visit in visits] == ["reviewapp-ci:LSSTCam!-raw!-all:raw:exposure=910002"]
+    assert [visit.id for visit in visits] == ["reviewapp-ci:LSSTCam!-raw!-all:raw:exposure=910049"]
 
 
 def test_get_exposure_data_types_uses_generated_fixture_scope(monkeypatch):

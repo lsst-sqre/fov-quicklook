@@ -1,4 +1,4 @@
-import { Globe$, GlobeEventLayer$, GridLayer$, PanLayer$, RollLayer$, TouchLayer$, ZoomLayer$ } from '@stellar-globe/react-stellar-globe'
+import { Globe, GlobeEventLayer, GridLayer, PanLayer, RollLayer, TouchLayer, ZoomLayer } from '@stellar-globe/react-stellar-globe'
 import { GlobeEventMap, GlobePointerEvent, V2 } from "@stellar-globe/stellar-globe"
 import { memo, useCallback } from "react"
 import { Quicklook$ } from '../../../StellarGlobe/Quicklook/QuicklookLayer'
@@ -32,7 +32,7 @@ export const Viewer = memo(({ style }: ViewerProps) => {
     dispatch(homeSlice.actions.cameraParamsUpdated({ fovy, phi, roll, theta, za, zd, zp }))
   }), [dispatch])
 
-  const onCameraMove: NonNullable<Parameters<typeof GlobeEventLayer$>[0]["onCameraMove"]> = useCallback(e => {
+  const onCameraMove = useCallback((e: GlobeEventMap['camera-move']) => {
     dispatch(homeSlice.actions.cameraUpdated())
     debouncedCameraUpdate(e)
   }, [debouncedCameraUpdate, dispatch])
@@ -44,18 +44,18 @@ export const Viewer = memo(({ style }: ViewerProps) => {
 
   return (
     <div style={{ ...style, position: 'relative', height: 0 }}>
-      <Globe$
+      <Globe
         ref={globeHandle}
         noDefaultLayers
         retina
         cameraParams={cameraParams}
       >
-        <GlobeEventLayer$ onPointerMove={onPointerMove} onCameraMove={onCameraMove} />
+        <GlobeEventLayer onPointerMove={onPointerMove} onCameraMove={onCameraMove} />
         <ViewerContextMenu />
-        <ZoomLayer$ />
-        <RollLayer$ />
-        <TouchLayer$ />
-        <PanLayer$ />
+        <ZoomLayer />
+        <RollLayer />
+        <TouchLayer />
+        <PanLayer />
         {currentQuicklook.metadata?.type === 'ready' &&
           <Quicklook$
             ref={quicklookHandle}
@@ -64,12 +64,12 @@ export const Viewer = memo(({ style }: ViewerProps) => {
           />
         }
         {showFrame && (<>
-          <GridLayer$ />
+          <GridLayer />
           <CcdFrames />
         </>)
         }
         <HighlitedCcds />
-      </Globe$>
+      </Globe>
       <CursorLine />
       <VisitName />
       <Info />
