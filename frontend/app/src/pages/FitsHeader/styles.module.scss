@@ -21,6 +21,10 @@
   .odd {
     background-color: #122;
   }
+
+  .rowOdd {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.025));
+  }
 }
 
 .str {

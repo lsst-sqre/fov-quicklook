@@ -101,7 +101,7 @@ function FitsHeader({ ccdName: ccdId, visitId }: FitsHeaderProps) {
           </thead>
           <tbody>
             {filteredCards.map(([hduIndex, key, type, value, comment], i) => (
-              <tr key={i} className={classNames((hduIndex & 1) === 1 && styles.odd)} >
+              <tr key={i} className={classNames((hduIndex & 1) === 1 && styles.odd, (i & 1) === 1 && styles.rowOdd)} >
                 <td>{hduIndex}</td>
                 <td>{key}</td>
                 <td className={(styles as any)[type]} >{value}</td>
