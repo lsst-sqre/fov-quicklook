@@ -12,6 +12,7 @@ from quicklook.types import CcdDataRef
 from quicklook.utils.fitsheader import HeaderType, fitsheader_to_list
 from quicklook.utils.geom import BBox
 from quicklook.utils.timeit import timeit
+from quicklook.utils.wcs import FitsWcsHeader, extract_display_wcs, extract_display_wcs_from_lsst_exposure
 
 from .isr import bias_correction, parse_slice
 
@@ -51,6 +52,7 @@ def preprocess_ccd_calexp(
             pool=pool,
             stat=stat,
             amps=[],
+            wcs=_extract_display_wcs_from_hdul(hdul),
             headers=fitsheader_to_list(hdul),
         )
 
@@ -96,8 +98,23 @@ def preprocess_ccd_raw(
             pool=assembly.data,
             stat=stat,
             amps=assembly.amp_metas,
+            wcs=_extract_display_wcs_from_hdul(hdul),
             headers=fitsheader_to_list(hdul),
         )
+
+
+def _extract_display_wcs_from_hdul(hdul: Iterable[Any]) -> FitsWcsHeader | None:
+    hdus = list(hdul)
+    for hdu in hdus:
+        sky_wcs = extract_display_wcs(hdu.header)
+        if sky_wcs is not None:
+            return sky_wcs
+    primary_header = hdus[0].header if hdus else {}
+    ccd_name = primary_header.get("RAFTBAY")
+    ccd_slot = primary_header.get("CCDSLOT")
+    if isinstance(ccd_name, str) and isinstance(ccd_slot, str):
+        return extract_display_wcs_from_lsst_exposure(hdus, ccd_name=f"{ccd_name}_{ccd_slot}")
+    return None
 
 
 @dataclass
@@ -230,4 +247,5 @@ class PreProcessedCcd:
     pool: numpy.ndarray
     stat: ImageStat
     amps: list[AmpMetadata]
+    wcs: FitsWcsHeader | None
     headers: list[HeaderType]

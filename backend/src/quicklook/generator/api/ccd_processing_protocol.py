@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal
 from quicklook.generator.preprocess_ccd import AmpMetadata, ImageStat
 from quicklook.types import CcdDataRef, CcdName, Progress
 from quicklook.utils.geom import BBox
+from quicklook.utils.wcs import FitsWcsHeader
 
 if TYPE_CHECKING:
     from quicklook.job.job import Job
@@ -62,6 +63,7 @@ class CompletedMessage:
     image_stat: ImageStat | None = None
     amps: list[AmpMetadata] | None = None
     bbox: BBox | None = None
+    wcs: FitsWcsHeader | None = None
 
 
 @dataclass

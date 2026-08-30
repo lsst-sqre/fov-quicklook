@@ -115,6 +115,9 @@ const injectedRtkApi = api.injectEndpoints({
         },
       }),
     }),
+    listVisitCcds: build.query<ListVisitCcdsApiResponse, ListVisitCcdsApiArg>({
+      query: (queryArg) => ({ url: `/api/visits/${queryArg.visitName}/ccds` }),
+    }),
     getVisitMetadata: build.query<
       GetVisitMetadataApiResponse,
       GetVisitMetadataApiArg
@@ -276,6 +279,11 @@ export type ListVisitDayCountsApiArg = {
   repositoryName: string;
   collection: string;
   datasetType: string;
+};
+export type ListVisitCcdsApiResponse =
+  /** status 200 Successful Response */ string[];
+export type ListVisitCcdsApiArg = {
+  visitName: string;
 };
 export type GetVisitMetadataApiResponse =
   /** status 200 Successful Response */ DataSourceCcdMetadata;
@@ -461,18 +469,31 @@ export type AmpMetadata = {
   amp_id: number;
   bbox: BBox;
 };
+export type FitsWcsHeader = {
+  NAXIS1: number;
+  NAXIS2: number;
+  CRVAL1: number;
+  CRVAL2: number;
+  CRPIX1: number;
+  CRPIX2: number;
+  CD1_1: number;
+  CD1_2: number;
+  CD2_1: number;
+  CD2_2: number;
+  CTYPE1?: string;
+  CTYPE2?: string;
+};
 export type CcdMetadata = {
   ccd_name: string;
   image_stat: ImageStat;
   amps: AmpMetadata[];
   bbox: BBox;
+  wcs?: FitsWcsHeader | null;
 };
 export type QuicklookMetadataReady = {
   visit_name: string;
   ccd_metadata_list: CcdMetadata[];
-  wcs: {
-    [key: string]: any;
-  };
+  wcs: FitsWcsHeader;
   type?: "ready";
 };
 export type QuicklookMetadataProgress = {
@@ -574,6 +595,7 @@ export const {
   useGetQueryBuilderOptionsQuery,
   useListVisitsQuery,
   useListVisitDayCountsQuery,
+  useListVisitCcdsQuery,
   useGetVisitMetadataQuery,
   useGetVisitResolutionQuery,
   useGetVisitRepresentativeUuidQuery,

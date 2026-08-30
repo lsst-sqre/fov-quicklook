@@ -6,7 +6,7 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Annotated, AsyncGenerator, Literal
+from typing import Any, Annotated, AsyncGenerator, Literal
 
 import websockets
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, WebSocket
@@ -38,6 +38,7 @@ from quicklook.utils.hash_utils import json_digest
 from quicklook.utils.http_request import http_request
 from quicklook.utils.s3 import NoSuchKey
 from quicklook.utils.system_status import get_memory_current
+from quicklook.utils.wcs import FitsWcsHeader
 from quicklook.utils.websocket import run_until_disconnect, safe_websocket
 
 
@@ -131,7 +132,7 @@ async def websocket_quicklooks_status(ws: WebSocket):
 class QuicklookMetadataReady:
     visit_name: VisitName
     ccd_metadata_list: list[CcdMetadata]
-    wcs: dict
+    wcs: FitsWcsHeader
     type: Literal['ready'] = 'ready'
 
 
@@ -405,7 +406,7 @@ async def _status_relay_main_loop():
 
     while True:
         try:
-            connect_kwargs = {"max_size": None}
+            connect_kwargs: dict[str, Any] = {"max_size": None}
             if config.comm_force_ipv4_internal:
                 connect_kwargs["family"] = socket.AF_INET
             async with websockets.connect(ws_url, **connect_kwargs) as ws:

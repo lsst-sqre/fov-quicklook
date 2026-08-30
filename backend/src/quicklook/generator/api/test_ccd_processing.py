@@ -11,6 +11,7 @@ from quicklook.generator.preprocess_ccd import ImageStat
 from quicklook.job.job import Job
 from quicklook.types import CcdDataRef, CcdName, Progress, VisitName
 from quicklook.utils.geom import BBox
+from quicklook.utils.wcs import FitsWcsHeader
 
 
 @pytest.fixture
@@ -44,6 +45,18 @@ def test_generate_tiles_websocket_relays_progress_and_completion(monkeypatch, cl
                 ),
                 amps=[],
                 bbox=BBox(0, 0, 1, 1),
+                wcs=FitsWcsHeader(
+                    NAXIS1=1,
+                    NAXIS2=1,
+                    CRVAL1=10.0,
+                    CRVAL2=20.0,
+                    CRPIX1=1.0,
+                    CRPIX2=1.0,
+                    CD1_1=-0.0001,
+                    CD1_2=0.0,
+                    CD2_1=0.0,
+                    CD2_2=0.0001,
+                ),
             )
 
     monkeypatch.setattr(ccd_processing, 'generate_single_fits_tiles_pipeline', fake_pipeline)
@@ -66,3 +79,4 @@ def test_generate_tiles_websocket_relays_progress_and_completion(monkeypatch, cl
 
     assert isinstance(completed_msg, CompletedMessage)
     assert completed_msg.ccd_name == ref.ccd
+    assert completed_msg.wcs is not None

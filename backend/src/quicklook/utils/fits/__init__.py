@@ -23,18 +23,21 @@ def fits_partial_load(
     '''
     FITSファイルの一部を読み込む
     '''
-    assert hdu_index == [0, 1]
     size = -1
+    target_hdu_index = max(hdu_index)
     probe_pos = 1440 * 20
-    while probe_pos < 500_000:
+    probe_limit = 64 * 1024 * 1024 if target_hdu_index > 1 else 500_000
+    while probe_pos < probe_limit:
         f = io.BytesIO(read(0, probe_pos))
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=AstropyUserWarning)
             try:
                 with pyfits.open(f) as hdul:  # type: ignore
+                    if len(hdul) <= target_hdu_index:
+                        raise IndexError(target_hdu_index)
                     # ここは内部実装によるのでastropyのバージョンが変わると動かなくなるかもしれない
                     # ローカルでは動くがk8sでは動かないなどの場合、ローカルでも `pip install -U -e .` などしてライブラリをアップデートすること
-                    hdu = hdul[1]
+                    hdu = hdul[target_hdu_index]
                     size: int = hdu._data_offset + hdu._data_size  # type: ignore
                     # fi = hdul[1].fileinfo()  # type: ignore
                     # "hdrLoc": self._header_offset,
@@ -46,7 +49,7 @@ def fits_partial_load(
                 # TODO: test: ここを通るテストを書く。テスト内でサンプルのFITSファイルを作る必要がある。
                 pass
         probe_pos *= 2
-    assert size >= 0
+    assert size >= 0, hdu_index
     return read(0, size)
 
 

@@ -24,6 +24,7 @@ dependencies = [
     "alembic",
     "asyncpg",
     "pillow>=12.2.0",
+    "starlink-pyast>=4.0.1",
 ]
 
 [project.optional-dependencies]
