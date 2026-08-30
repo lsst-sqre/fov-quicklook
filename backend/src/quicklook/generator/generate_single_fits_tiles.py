@@ -23,6 +23,7 @@ from quicklook.types import CcdDataRef, CcdName, Progress, ReturnValue, Tile
 from quicklook.utils.geom import BBox
 from quicklook.utils.imap_unordered_threadpool import imap_unordered_threadpool
 from quicklook.utils.timer import Timer
+from quicklook.utils.wcs import FitsWcsHeader
 
 logger = quicklook.mylogging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class CcdMetadata:
     image_stat: ImageStat
     amps: list[AmpMetadata]
     bbox: BBox
+    wcs: FitsWcsHeader | None = None
 
 
 def _initialize_pool_worker(initializers: list[Callable[[], ContextManager]]) -> None:
@@ -170,7 +172,7 @@ def generate_single_fits_tiles_pipeline(
                 if msg is _QUEUE_DONE:
                     done_count += 1
                     continue
-                yield msg
+                yield cast(GenerateSingleFitsTilesProgress | CcdMetadata, msg)
             fut.result()
             progress_fut.result()
 
@@ -237,6 +239,7 @@ def _process_ccd(args: ProcessCcdArgs):
         image_stat=ppccd.stat,
         amps=ppccd.amps,
         bbox=ppccd.bbox,
+        wcs=ppccd.wcs,
     )
     return ccd_metadata
 

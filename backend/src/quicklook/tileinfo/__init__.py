@@ -12,6 +12,7 @@ from quicklook.config import config
 from quicklook.types import CcdName, TilePos
 from quicklook.utils.geom import BBox
 from quicklook.utils.rtree import RectangleIndex
+from quicklook.utils.wcs import FitsWcsHeader
 
 ccd_info_path = Path(__file__).parent / 'ccd-info.json'
 
@@ -188,18 +189,18 @@ if __name__ == '__main__':  # pragma: no cover
     regenerate_ccd_info()
 
 
-def focal_plane_wcs() -> dict[str, float | int]:
+def focal_plane_wcs() -> FitsWcsHeader:
     """焦点面全体の WCS パラメータを返す（TAN投影）"""
     scale = FOCAL_PLANE_PIXEL_SCALE_ARCSEC / 3600.0  # arcsec → degree
-    return {
-        "NAXIS1": FOCAL_PLANE_NAXIS1,
-        "NAXIS2": FOCAL_PLANE_NAXIS2,
-        "CRVAL1": 0,
-        "CRVAL2": 0,
-        "CRPIX1": FOCAL_PLANE_CRPIX1,
-        "CRPIX2": FOCAL_PLANE_CRPIX2,
-        "CD1_1": -scale,
-        "CD1_2": 0,
-        "CD2_1": 0,
-        "CD2_2": scale,
-    }
+    return FitsWcsHeader(
+        NAXIS1=FOCAL_PLANE_NAXIS1,
+        NAXIS2=FOCAL_PLANE_NAXIS2,
+        CRVAL1=0,
+        CRVAL2=0,
+        CRPIX1=FOCAL_PLANE_CRPIX1,
+        CRPIX2=FOCAL_PLANE_CRPIX2,
+        CD1_1=-scale,
+        CD1_2=0,
+        CD2_1=0,
+        CD2_2=scale,
+    )

@@ -245,11 +245,12 @@ def _run_pipeline_sync(
                     stage="generating",
                     progress=progress,
                 ))
-            case CcdMetadata(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox):
+            case CcdMetadata(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox, wcs=wcs):
                 # CcdMetadata は cancel_event に関係なく必ず送信する
                 put_result(CompletedMessage(
                     ccd_name=ccd_name,
                     image_stat=image_stat,
                     amps=amps,
                     bbox=bbox,
+                    wcs=wcs,
                 ))
