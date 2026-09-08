@@ -37,6 +37,8 @@ checkout 上のファイル変更は pod 内にも即時で見える。backend �
 sh dev/microk8s-dev/run.sh all
 ```
 
+`redeploy` でも Dockerfile と Python 依存ファイルの変更を自動検出して、必要な場合は dev イメージを再ビルドする。
+
 既存の dev 環境を捨てて作り直したいとき:
 
 ```bash

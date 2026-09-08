@@ -95,6 +95,34 @@ image_ref() {
   printf '%s\n' "${FQ_DEV_IMAGE_REPOSITORY:-fov-quicklook/dev-pod}:${FQ_DEV_IMAGE_TAG:-dev}"
 }
 
+image_input_digest() {
+  # These files are copied into the image or determine its Python environment.
+  # Keep the digest stable for source-only changes, which are mounted into the
+  # dev pods and do not require an image rebuild.
+  sha256sum \
+    "${repo_root}/backend/pyproject.toml" \
+    "${repo_root}/backend/uv.lock" \
+    "${script_dir}/Dockerfile" \
+    "${script_dir}/config.fish" \
+    "${script_dir}/fish_prompt.fish" \
+    "${script_dir}/fish_right_prompt.fish" \
+    "${script_dir}/tmux.conf" \
+    "${script_dir}/entrypoint.sh" \
+    | sha256sum | awk '{print $1}'
+}
+
+image_needs_rebuild() {
+  require_command docker
+
+  image=$1
+  expected_digest=$2
+  actual_digest=$(docker image inspect \
+    --format '{{index .Config.Labels "io.fov-quicklook.dev.image-input-digest"}}' \
+    "${image}" 2>/dev/null || true)
+
+  [ "${actual_digest}" != "${expected_digest}" ]
+}
+
 build_image() {
   require_command docker
   require_command sudo
@@ -102,9 +130,11 @@ build_image() {
 
   image=$(image_ref)
   git_revision=$(git -C "${repo_root}" rev-parse HEAD 2>/dev/null || printf 'local\n')
+  input_digest=$(image_input_digest)
 
   docker build \
     --build-arg "GIT_REVISION=${git_revision}" \
+    --label "io.fov-quicklook.dev.image-input-digest=${input_digest}" \
     -f "${script_dir}/Dockerfile" \
     -t "${image}" \
     "${repo_root}"
@@ -548,6 +578,13 @@ stop() {
 }
 
 redeploy() {
+  ensure_source_root
+  image=$(image_ref)
+  input_digest=$(image_input_digest)
+  if image_needs_rebuild "${image}" "${input_digest}"; then
+    echo "dev image is missing or out of date; rebuilding ${image}"
+    build_image
+  fi
   stop
   deploy
   start
@@ -583,7 +620,6 @@ case "${command_name}" in
     status
     ;;
   all)
-    build_image
     redeploy
     ;;
   help|-h|--help)
