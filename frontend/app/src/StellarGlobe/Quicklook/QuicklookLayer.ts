@@ -16,6 +16,7 @@ class QuicklookLayer extends Layer {
   ) {
     super(globe)
     this.r = new QuicklookRenderer(globe, metadata, filterParams)
+    this.onRelease(() => this.r.release())
   }
 
   render(view: View): void {

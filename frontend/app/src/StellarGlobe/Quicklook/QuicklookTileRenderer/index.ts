@@ -63,6 +63,7 @@ type PixelInfo = {
 
 class QuicklookTextureProvider extends tile.AsyncTextureProvider {
   private tracts: tile.Tract[]
+  private readonly requestAbortController = new AbortController()
 
   constructor(
     globe: Globe,
@@ -91,6 +92,11 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
     }
   }
 
+  release() {
+    this.requestAbortController.abort()
+    super.release()
+  }
+
   private getNpyImmediately(level: number, p: number, q: number) {
     const tileId = Tract.encodeTileId(this.tracts[0], level, p, q)
     const npy = this.npyCache.get(tileId)
@@ -106,7 +112,7 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
     }
     const tileId = Tract.encodeTileId(this.tracts[0], level, p, q)
     const url = `${env.baseUrl}/api/quicklooks/${this.metadata.visit_name}/tiles/${level}/${p}/${q}`
-    const fresh = normalizeNpy(await loadRemoteNpy(url))
+    const fresh = normalizeNpy(await loadRemoteNpy(url, this.requestAbortController.signal))
     this.npyCache.set(tileId, fresh)
     return fresh
   }
@@ -116,6 +122,9 @@ class QuicklookTextureProvider extends tile.AsyncTextureProvider {
     const { revision } = this
     const gl = this.globe.gl
     const npy = await this.getNpy(level, p, q)
+    if (this.alreadyReleased) {
+      throw new DOMException('Texture provider released', 'AbortError')
+    }
     const tt = new TileTexture(this, { fadeIn, revision })
     tt.beforeRenderCallback = () => {
       this.getNpyImmediately(level, p, q)
@@ -198,11 +207,11 @@ class TileTexture extends tile.TileTexture {
 }
 
 
-async function loadRemoteNpy(url: string) {
+async function loadRemoteNpy(url: string, signal: AbortSignal) {
   // urlで取得したレスポンスのcontent-typeによってzstd解答をする
   // ponytail: keep cache in npyCache, not the browser; delete-regenerate reuses
   // the same tile URL for a visit and stale HTTP cache breaks reloads.
-  const response = await fetch(url, { cache: 'no-store' })
+  const response = await fetch(url, { cache: 'no-store', signal })
   const contentType = response.headers.get('content-type')
 
   switch (contentType) {
