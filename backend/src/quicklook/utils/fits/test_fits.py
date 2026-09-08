@@ -1,4 +1,5 @@
 import tempfile
+from typing import Any
 
 import astropy.io.fits as pyfits
 import numpy
@@ -26,7 +27,7 @@ def test_s3_partial_load():
 
 
 def test_partial_load_supports_later_hdu_indices():
-    hdus = [pyfits.PrimaryHDU()]
+    hdus: list[Any] = [pyfits.PrimaryHDU()]
     hdus.append(pyfits.ImageHDU(data=numpy.zeros((2, 2), dtype=numpy.float32), name="IMAGE"))
     hdus.append(pyfits.ImageHDU(data=numpy.zeros((2, 2), dtype=numpy.float32), name="MASK"))
     hdus.append(pyfits.ImageHDU(data=numpy.zeros((2, 2), dtype=numpy.float32), name="VARIANCE"))
@@ -61,4 +62,4 @@ def test_partial_load_supports_later_hdu_indices():
         f.flush()
         with pyfits.open(f.name) as hdul:  # type: ignore
             assert len(hdul) == 9
-            assert hdul[8].name == "TRANSFORMPOINT2TOPOINT2"
+            assert getattr(hdul[8], "name") == "TRANSFORMPOINT2TOPOINT2"

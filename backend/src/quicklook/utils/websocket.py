@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
-from typing import Any, Coroutine
+from typing import Any, Coroutine, Protocol
 
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketDisconnect
@@ -12,7 +12,11 @@ async def safe_websocket(ws: WebSocket):
     yield
 
 
-async def run_until_disconnect(ws: WebSocket, coro: Coroutine[Any, Any, None]) -> None:
+class ReceivesText(Protocol):
+    async def receive_text(self) -> str: ...
+
+
+async def run_until_disconnect(ws: ReceivesText, coro: Coroutine[Any, Any, None]) -> None:
     """
     WebSocket接続が切断されるか、指定されたコルーチンが完了するまで実行する。
 

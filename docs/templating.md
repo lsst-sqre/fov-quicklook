@@ -24,7 +24,7 @@ Fields from the `DataSourceCcdMetadata` class are available in templates:
 | exposure | number | Exposure number | 2025052000278 |
 | day_obs | number | Observation date (YYYYMMDD format) | 20250521 |
 | uuid | string | Unique identifier | "919c991d-706d-50f1-bd8a-aee69b457ba4" |
-| dataType | string | Data type (derived from visit.id) | "raw", "post_isr_image", or "preliminary_visit_image" |
+| dataType | string | Legacy scope identifier derived from visit.id | "embargo:LSSTCam!-raw!-all:raw" |
 
 ## Pipeline Feature
 
@@ -74,10 +74,15 @@ CCD: %(ccd_name), ID: %(detector)
 ### Butler Script Generation
 ```
 from lsst.daf.butler import Butler
-butler = Butler('/path/to/butler/repo')
-dataId = {'exposure': %(exposure), 'detector': %(detector)}
-data = butler.get('%(dataType)', dataId)
+butler = Butler('reviewapp-ci')
+ref = butler.get_dataset('%(uuid)')
+if ref is None:
+    raise LookupError('Dataset was not found')
+data = butler.get(ref)
 ```
+
+The UUID-based form selects the exact CCD dataset and does not depend on the
+dataset type or on whether its quicklook dimension is `exposure` or `visit`.
 
 ### URL Generation
 ```

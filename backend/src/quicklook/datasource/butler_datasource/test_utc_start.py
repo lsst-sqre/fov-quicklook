@@ -1,5 +1,6 @@
 from datetime import timezone
 from types import SimpleNamespace
+from typing import Any, cast
 
 from astropy.time import Time
 import lsst.daf.butler as butler_module
@@ -15,7 +16,7 @@ def test_record_utc_start_attr_reads_butler_timespan_begin():
         )
     )
 
-    value = _record_utc_start_attr(record)
+    value = _record_utc_start_attr(cast(Any, record))
 
     assert value is not None
     assert value.tzinfo == timezone.utc

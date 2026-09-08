@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any, cast
 
 from quicklook.config import ButlerScopeConfig, config
 from quicklook.datasource.dummy_datasource import DummyDataSource
@@ -91,10 +92,10 @@ def test_get_data_sync_reuses_single_shared_visit(monkeypatch):
 
     ds = DummyDataSource()
     data = ds.get_data_sync(
-        ref=SimpleNamespace(
+        ref=cast(Any, SimpleNamespace(
             visit=VisitName("reviewapp-ci:LSSTCam!-raw!-all:raw:exposure=910050"),
             ccd="R22_S00",
-        )
+        )),
     )
 
     assert data == b"fits"

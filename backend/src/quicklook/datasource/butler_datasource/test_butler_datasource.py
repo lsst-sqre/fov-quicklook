@@ -108,8 +108,9 @@ def test_query_visits_uses_exposure_dimension_records(monkeypatch):
 
     entries = ds.query_visits(
         Query(
-            data_type=CcdDataType('raw'),
             repository_name='repo',
+            collection='dummy',
+            dataset_type='raw',
             limit=5,
         )
     )
@@ -181,8 +182,9 @@ def test_query_visits_applies_offset_after_ordering(monkeypatch):
 
     entries = ds.query_visits(
         Query(
-            data_type=CcdDataType('raw'),
             repository_name='repo',
+            collection='dummy',
+            dataset_type='raw',
             limit=1,
             offset=1,
         )
@@ -220,11 +222,11 @@ def test_query_visits_uses_configured_dimension_for_visit_dataset():
 
     entries = ds.query_visits(
         Query(
-            data_type=CcdDataType('preliminary_visit_image'),
             repository_name='repo',
+            collection='dummy',
+            dataset_type='preliminary_visit_image',
             limit=1,
-            exposure=7001,
-            day_obs=20250302,
+            where='visit=7001 and day_obs=20250302',
         )
     )
 
@@ -618,11 +620,11 @@ def test_query_visits_difference_image_uses_all_run_collections():
 
     entries = ds.query_visits(
         Query(
-            data_type=CcdDataType('difference_image'),
             repository_name='repo',
+            collection='dummy',
+            dataset_type='difference_image',
             limit=1,
-            exposure=7001,
-            day_obs=20250302,
+            where='visit=7001 and day_obs=20250302',
         )
     )
 
@@ -660,11 +662,11 @@ def test_query_visits_difference_image_falls_back_when_visit_record_lacks_obs_id
 
     [entry] = ds.query_visits(
         Query(
-            data_type=CcdDataType('difference_image'),
             repository_name='repo',
+            collection='dummy',
+            dataset_type='difference_image',
             limit=1,
-            exposure=7001,
-            day_obs=20250302,
+            where='visit=7001 and day_obs=20250302',
         )
     )
 

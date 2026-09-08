@@ -8,6 +8,7 @@ lifespan で初期化・後始末し、利用側は get_session() で取得す�
 import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import aiohttp
 
@@ -36,7 +37,7 @@ async def managed_session() -> AsyncIterator[None]:
         yield
         return
 
-    connector_kwargs = dict(
+    connector_kwargs: dict[str, Any] = dict(
         limit=config.http_client_connection_limit,
         ttl_dns_cache=config.http_client_dns_cache_ttl,
         keepalive_timeout=config.http_client_keepalive_timeout,

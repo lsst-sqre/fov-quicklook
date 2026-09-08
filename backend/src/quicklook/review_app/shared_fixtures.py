@@ -589,14 +589,23 @@ def _write_butler_fixture(
             },
         )
 
-        refs = registry.insertDatasets(
-            raw_dataset,
-            dataIds=[
-                {"instrument": "LSSTCam", "detector": detector_ids[ccd_name], "exposure": visit.exposure_id}
-                for ccd_name in ccd_names
-            ],
-            run=FIXTURE_RUN,
-        )
+        refs = [
+            butler.put(
+                {
+                    "instrument": "LSSTCam",
+                    "detector": detector_ids[ccd_name],
+                    "exposure": visit.exposure_id,
+                },
+                raw_dataset,
+                dataId={
+                    "instrument": "LSSTCam",
+                    "detector": detector_ids[ccd_name],
+                    "exposure": visit.exposure_id,
+                },
+                run=FIXTURE_RUN,
+            )
+            for ccd_name in ccd_names
+        ]
         registry.associate(FIXTURE_COLLECTION, refs)
     _log_progress("Butler fixture registration finished")
 

@@ -136,4 +136,8 @@ sh dev/microk8s-dev/run.sh stop
 | `FQ_DEV_IMAGE` | 使う image を丸ごと上書き |
 | `FQ_DEV_BASE_PATH` | Vite / backend の共通 path prefix |
 | `FQ_DEV_DUMMY_VISIT_COUNT` | DummyDataSource で作る visit 数（既定 50） |
-| `FQ_DEV_BUTLER_VISIT_COUNT` | 併せて作る Butler catalog 件数（既定 0） |
+| `FQ_DEV_BUTLER_VISIT_COUNT` | Butler fixtureのcatalog件数（既定 50） |
+| `FQ_DEV_FIXTURE_ROOT` | seed jobとbackend podで共有するfixtureの保存先（既定 `copilot/microk8s-fixtures`） |
+
+microk8sではButler fixtureを共有して起動するため、Butler Snippetでコピーした
+UUIDを使って `DatasetRef` を取得し、`Butler.get()` まで実行できる。

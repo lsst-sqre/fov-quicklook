@@ -1615,7 +1615,7 @@ def _resolve_sql_collection_names(collection: ButlerCollectionArgType | Ellipsis
     if isinstance(collection, str):
         return [collection]
     try:
-        return [cast(str, value) for value in collection]
+        return [cast(str, value) for value in cast(Iterable[object], collection)]
     except TypeError:
         return None
 

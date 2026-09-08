@@ -3,6 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 from lsst.daf.butler import Butler
 
@@ -46,7 +47,8 @@ def test_prepare_shared_fixtures_builds_queryable_butler_repo(tmp_path, monkeypa
     paths = prepare_shared_fixtures(root, visits=default_fixture_visits(2), ccd_names=[ccd_name], butler_ccd_names=[ccd_name])
 
     monkeypatch.setenv("DAF_BUTLER_REPOSITORY_INDEX", str(paths.data_repos_path))
-    butler = Butler(FIXTURE_REPOSITORY_NAME, instrument="LSSTCam", collections=[FIXTURE_COLLECTION])
+    butler_class = cast(Any, Butler)
+    butler = butler_class(FIXTURE_REPOSITORY_NAME, instrument="LSSTCam", collections=[FIXTURE_COLLECTION])
 
     exposures = list(
         butler.registry.queryDimensionRecords(
@@ -60,6 +62,12 @@ def test_prepare_shared_fixtures_builds_queryable_butler_repo(tmp_path, monkeypa
 
     assert [record.id for record in exposures] == [910001, 910002]
     assert len(refs) == 1
+    assert butler.get_dataset(str(refs[0].id)) == refs[0]
+    assert butler.get(refs[0]) == {
+        "instrument": "LSSTCam",
+        "detector": refs[0].dataId["detector"],
+        "exposure": 910001,
+    }
 
 
 def test_prepare_shared_fixtures_uses_default_butler_catalog_size(tmp_path, monkeypatch):
@@ -70,7 +78,8 @@ def test_prepare_shared_fixtures_uses_default_butler_catalog_size(tmp_path, monk
     paths = prepare_shared_fixtures(root)
 
     monkeypatch.setenv("DAF_BUTLER_REPOSITORY_INDEX", str(paths.data_repos_path))
-    butler = Butler(FIXTURE_REPOSITORY_NAME, instrument="LSSTCam", collections=[FIXTURE_COLLECTION])
+    butler_class = cast(Any, Butler)
+    butler = butler_class(FIXTURE_REPOSITORY_NAME, instrument="LSSTCam", collections=[FIXTURE_COLLECTION])
 
     exposure_count = len(list(butler.registry.queryDimensionRecords("exposure", datasets="raw", collections=[FIXTURE_COLLECTION])))
     refs = list(
@@ -106,7 +115,7 @@ def test_default_butler_ccd_names_uses_central_raft():
 def test_prepare_shared_fixtures_uses_postgres_registry_config_when_requested(tmp_path, monkeypatch):
     root = tmp_path / "fixtures"
     paths = shared_fixtures.SharedFixturePaths.from_root(root)
-    calls: list[tuple[Path, dict[str, object]]] = []
+    calls: list[tuple[Path, dict[str, Any]]] = []
 
     class FakeRegistry:
         def insertDimensionData(self, *args, **kwargs):
@@ -130,6 +139,7 @@ def test_prepare_shared_fixtures_uses_postgres_registry_config_when_requested(tm
     fake_butler = SimpleNamespace(
         registry=FakeRegistry(),
         dimensions=SimpleNamespace(conform=lambda dimensions: tuple(dimensions)),
+        put=lambda obj, dataset_type, dataId, run: SimpleNamespace(dataId=dataId, run=run),
     )
 
     def fake_make_repo(path, **kwargs):

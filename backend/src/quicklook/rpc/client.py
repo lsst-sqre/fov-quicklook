@@ -56,7 +56,7 @@ class Rpc(Generic[P, R]):
         self.kwargs = kwargs
 
     async def run(self) -> R:
-        connect_kwargs = dict(
+        connect_kwargs: dict[str, Any] = dict(
             open_timeout=config.rpc_open_timeout,
             close_timeout=config.rpc_close_timeout,
             ping_interval=config.rpc_ping_interval,
@@ -96,7 +96,7 @@ class Rpc(Generic[P, R]):
             await self._close(ws)
 
     async def iterate(self) -> AsyncIterator[R]:
-        connect_kwargs = dict(
+        connect_kwargs: dict[str, Any] = dict(
             open_timeout=config.rpc_open_timeout,
             close_timeout=config.rpc_close_timeout,
             ping_interval=config.rpc_ping_interval,

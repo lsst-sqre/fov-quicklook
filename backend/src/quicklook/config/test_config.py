@@ -1,5 +1,10 @@
+from typing import Any, cast
+
 from quicklook.config import Config, config
 from quicklook.datasets import get_dataset
+
+
+ConfigForTest = cast(Any, Config)
 
 
 def test_difference_image_uses_visit_dimension():
@@ -12,7 +17,7 @@ def test_difference_image_uses_visit_dimension():
 def test_generate_single_fits_tiles_timeout_default_is_300_seconds(monkeypatch):
     monkeypatch.delenv("QUICKLOOK_generate_single_fits_tiles_timeout_seconds", raising=False)
 
-    loaded = Config()
+    loaded = ConfigForTest()
 
     assert loaded.generate_single_fits_tiles_timeout_seconds == 300.0
 
@@ -30,7 +35,7 @@ def test_config_ignores_non_quicklook_entries_in_env_file(tmp_path, monkeypatch)
     )
 
     monkeypatch.delenv("QUICKLOOK_data_source", raising=False)
-    loaded = Config(_env_file=env_file)
+    loaded = ConfigForTest(_env_file=env_file)
 
     assert loaded.data_source == "butler"
 
@@ -47,7 +52,7 @@ def test_config_adds_missing_default_butler_scopes_from_env_file(tmp_path, monke
     )
 
     monkeypatch.delenv("QUICKLOOK_ccd_data_types", raising=False)
-    loaded = Config(_env_file=env_file)
+    loaded = ConfigForTest(_env_file=env_file)
 
     difference_image = next(
         scope
@@ -70,7 +75,7 @@ def test_system_info_butler_scopes_excludes_injected_defaults_from_env_file(tmp_
     )
 
     monkeypatch.delenv("QUICKLOOK_ccd_data_types", raising=False)
-    loaded = Config(_env_file=env_file)
+    loaded = ConfigForTest(_env_file=env_file)
 
     assert [(scope.repository_name, scope.dataset_type) for scope in loaded.system_info_butler_scopes] == [
         ("embargo", "raw"),
@@ -91,7 +96,7 @@ def test_config_does_not_inject_default_repositories_into_custom_fixture_env(tmp
     )
 
     monkeypatch.delenv("QUICKLOOK_ccd_data_types", raising=False)
-    loaded = Config(_env_file=env_file)
+    loaded = ConfigForTest(_env_file=env_file)
 
     assert [(scope.repository_name, scope.dataset_type) for scope in loaded.butler_scopes] == [
         ("reviewapp-ci", "raw")

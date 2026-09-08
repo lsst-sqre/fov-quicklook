@@ -18,7 +18,8 @@ minio_secret_key=${FQ_DEV_MINIO_SECRET_KEY:-quicklook-secret}
 tile_bucket=${FQ_DEV_TILE_BUCKET:-quicklook-tile}
 test_data_bucket=${FQ_DEV_TEST_DATA_BUCKET:-quicklook-test-data}
 dummy_visit_count=${FQ_DEV_DUMMY_VISIT_COUNT:-50}
-butler_visit_count=${FQ_DEV_BUTLER_VISIT_COUNT:-0}
+butler_visit_count=${FQ_DEV_BUTLER_VISIT_COUNT:-50}
+fixture_root=${FQ_DEV_FIXTURE_ROOT:-${repo_root}/copilot/microk8s-fixtures}
 python_bin=${FQ_DEV_PYTHON:-/app/.venv/bin/python}
 
 usage() {
@@ -49,6 +50,7 @@ ensure_source_root() {
     echo "source tree not found at ${source_root}" >&2
     exit 1
   fi
+  mkdir -p "${fixture_root}"
 }
 
 namespace_exists() {
@@ -157,10 +159,12 @@ metadata:
   namespace: ${namespace}
 data:
   FQ_REPO_ROOT: /workspace/fov-quicklook
+  DAF_BUTLER_REPOSITORY_INDEX: /work/fixtures/butler/data-repos.yaml
   QUICKLOOK_admin_page: "true"
   QUICKLOOK_butler_scopes: '[{"dataset_type":"raw","display_name":"Raw","collection":"LSSTCam/raw/all","repository_name":"reviewapp-ci","instrument":"LSSTCam"}]'
+  QUICKLOOK_context_menu_templates: '[{"name":"UUID","template":"%(uuid)","is_url":false},{"name":"Data ID for Butler","template":"{\"exposure\": %(exposure), \"detector\": %(detector)}","is_url":false},{"name":"Butler Snippet","template":"from lsst.daf.butler import Butler\nbutler = Butler(\"reviewapp-ci\")\nref = butler.get_dataset(\"%(uuid)\")\nif ref is None:\n    raise LookupError(\"Dataset was not found\")\ndata = butler.get(ref)\n","is_url":false},{"name":"LSSTCam/Calexp mosaic","template":"https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?key=lsstcam/%(day_obs|iso8601)/calexp_mosaic/%(exposure|sequence|zeropadding(6))/lsstcam_calexp_mosaic_%(day_obs|iso8601)_%(exposure|sequence|zeropadding(6)).jpg","is_url":true}]'
   QUICKLOOK_coordinator_base_url: http://127.0.0.1:9501
-  QUICKLOOK_data_source: dummy
+  QUICKLOOK_data_source: butler
   QUICKLOOK_environment: development
   QUICKLOOK_frontend_app_prefix: ${base_path}
   QUICKLOOK_s3_test_data__bucket: ${test_data_bucket}
@@ -343,13 +347,15 @@ spec:
             --seed-s3 \
             --ensure-tile-bucket
         volumeMounts:
-        - name: work
-          mountPath: /work
+        - name: fixtures
+          mountPath: /work/fixtures
         - name: source
           mountPath: /workspace/fov-quicklook
       volumes:
-      - name: work
-        emptyDir: {}
+      - name: fixtures
+        hostPath:
+          path: ${fixture_root}
+          type: Directory
       - name: source
         hostPath:
           path: ${source_root}
@@ -377,6 +383,8 @@ spec:
         volumeMounts:
         - name: source
           mountPath: /workspace/fov-quicklook
+        - name: fixtures
+          mountPath: /work/fixtures
         command:
         - sh
         - -ceu
@@ -388,6 +396,10 @@ spec:
       - name: source
         hostPath:
           path: ${source_root}
+          type: Directory
+      - name: fixtures
+        hostPath:
+          path: ${fixture_root}
           type: Directory
 EOF
 
@@ -453,12 +465,18 @@ spec:
         volumeMounts:
         - name: source
           mountPath: /workspace/fov-quicklook
+        - name: fixtures
+          mountPath: /work/fixtures
         - name: workdir
           mountPath: /tmp/quicklook
       volumes:
       - name: source
         hostPath:
           path: ${source_root}
+          type: Directory
+      - name: fixtures
+        hostPath:
+          path: ${fixture_root}
           type: Directory
       - name: workdir
         emptyDir: {}

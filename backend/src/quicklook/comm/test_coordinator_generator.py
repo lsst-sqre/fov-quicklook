@@ -32,8 +32,9 @@ def test_coordinator_id_initialization():
     with TestClient(app) as client:
         response = client.get("/comm/healthz")
         assert response.status_code == 200
-        assert coordinator.get_coordinator_id() is not None
-        assert coordinator.get_coordinator_id().startswith("c-")
+        coordinator_id = coordinator.get_coordinator_id()
+        assert coordinator_id is not None
+        assert coordinator_id.startswith("c-")
 
 
 def test_generator_registration_initial():
