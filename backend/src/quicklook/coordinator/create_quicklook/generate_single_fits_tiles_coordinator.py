@@ -378,12 +378,13 @@ async def _handle_generator_message(
                         progress,
                     )
 
-        case CompletedMessage(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox):
+        case CompletedMessage(ccd_name=ccd_name, image_stat=image_stat, amps=amps, bbox=bbox, wcs=wcs):
             metadata = CcdMetadata(
                 ccd_name=ccd_name,
                 image_stat=image_stat,  # type: ignore
                 amps=amps,  # type: ignore
                 bbox=bbox,  # type: ignore
+                wcs=wcs,
             )
             await dispatcher.on_ccd_completed(ccd_name, metadata, generator.id)
 

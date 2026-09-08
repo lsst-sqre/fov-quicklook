@@ -1743,6 +1743,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "requests" },
     { name = "sqlalchemy" },
+    { name = "starlink-pyast" },
     { name = "uvicorn" },
     { name = "websockets" },
     { name = "zstandard" },
@@ -1782,6 +1783,7 @@ requires-dist = [
     { name = "pytest-watch", marker = "extra == 'dev'" },
     { name = "requests", specifier = ">=2.32.0,<3.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.43" },
+    { name = "starlink-pyast", specifier = ">=4.0.1" },
     { name = "uvicorn", specifier = ">=0.36.0,<0.37.0" },
     { name = "websockets" },
     { name = "zstandard" },
@@ -1870,6 +1872,29 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a7/a5/d6f429d43394057b67a6b5bbe6eae2f77a6bf7459d961fdb224bf206eee6/starlette-0.48.0.tar.gz", hash = "sha256:7e8cee469a8ab2352911528110ce9088fdc6a37d9876926e73da7ce4aa4c7a46", size = 2652949, upload-time = "2025-09-13T08:41:05.699Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/be/72/2db2f49247d0a18b4f1bb9a5a39a0162869acf235f3a96418363947b3d46/starlette-0.48.0-py3-none-any.whl", hash = "sha256:0764ca97b097582558ecb498132ed0c7d942f233f365b86ba37770e026510659", size = 73736, upload-time = "2025-09-13T08:41:03.869Z" },
+]
+
+[[package]]
+name = "starlink-pyast"
+version = "4.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/45/96/900b9dc692f91096ec7debe0a4e90e84cd87a26ac321027993b777bf1735/starlink_pyast-4.0.1.tar.gz", hash = "sha256:93e50eb5c05e4e3fe0e38260fbe7e25bf4354f2072657917f3c34217e0027199", size = 17552202, upload-time = "2026-02-25T16:11:09.369Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/c7/eeb6736bcefd7dd6b1714b700efa25cf4125ccabc82f565d00cf1a79e691/starlink_pyast-4.0.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:b11ed3e7bf7ef357770ee431200d9679e18b8a4e327a4e5592f898fbebcb80bc", size = 2982071, upload-time = "2026-02-25T16:10:44.558Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/98/b2377b0094aaa541d34528a900e498d711ae0dc164891c2c61ce25d61dab/starlink_pyast-4.0.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:cff395eec803458a62789ba0496371433198a932028f47eef64f0e34f2682dc7", size = 2513475, upload-time = "2026-02-25T16:10:46.036Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/d6/61ceb05a8e929f40e4ca2ae9c87bdcbfd06c0c7972ef5934701523f09ea5/starlink_pyast-4.0.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:706f70708090ca14d1341218381218c558408f7474ed91f7c943da3aa3fe8f8e", size = 10575072, upload-time = "2026-02-25T16:10:47.875Z" },
+    { url = "https://files.pythonhosted.org/packages/19/94/40c1b39e19c9e737971c80b707b28d5a8ec1e61dd9b7f00c98de096bd01b/starlink_pyast-4.0.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:4ca24b350ca6849f0e60917059f949334b5ad672b5ae29949d1ace71d1cbb764", size = 11311343, upload-time = "2026-02-25T16:10:50.157Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/b5/77b2885cc1377dcfb3b812bcc46415d34123bd70c81de9a368586e367f3c/starlink_pyast-4.0.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:c749b03c482b80b892a2e10fa25b08271b1aa131feabf2c7b3f915d37f33f9dc", size = 2982144, upload-time = "2026-02-25T16:10:52.382Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/43/db8bfebed308e4d422d35b010dde7a1c30e71b3aeec42ddbde2f366b42f4/starlink_pyast-4.0.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:f74607921fb56fa069c78148eb27f2973a52f1c9a3eebb6b42ceaebcab1875d0", size = 2513400, upload-time = "2026-02-25T16:10:54.051Z" },
+    { url = "https://files.pythonhosted.org/packages/db/06/a56277d516e945a54814bddc079ecfb774afa9657345fe35454d62ddd6e8/starlink_pyast-4.0.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3f14d2b2aa48a69a96ffb9538d728c02eb7f50ad3d2d4f11528873114c24d186", size = 10573967, upload-time = "2026-02-25T16:10:55.682Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/65/c599a0bf5e0c305e737409fe8d9d2536a8736627939b61dc344764fbdbe5/starlink_pyast-4.0.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:be9bf75a55d43c917c8ecbb0942465516961d516046e1424ab923d0258142e24", size = 11310148, upload-time = "2026-02-25T16:10:59.329Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/e2/af4bfb3212a215f357b4b4b1b559928597a5d1a060b3a170bd3f5ef4d940/starlink_pyast-4.0.1-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:1f28e0b95c6b1780a01ea90476aa90b15b3631cc227fdaf502083b72708c6e6f", size = 2984065, upload-time = "2026-02-25T16:11:01.45Z" },
+    { url = "https://files.pythonhosted.org/packages/48/fb/99602f230a544fb3a5a6b7049ead6bb8ba2dec2615a3ba930873cac1f232/starlink_pyast-4.0.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:06bd890e8aef40565ede016b54e0a1b4b1732716cbbc12e096cfbd0983e80c93", size = 2513896, upload-time = "2026-02-25T16:11:03.015Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/cb/005a00597db86af9e8feb1a7d67c51ee91a3508594e3dc2309effddfac97/starlink_pyast-4.0.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:84ac5b8207277b8576aade0e9f551727ff7ff9bf586c3440ecaff506e3ed4f25", size = 10557672, upload-time = "2026-02-25T16:11:04.721Z" },
+    { url = "https://files.pythonhosted.org/packages/48/79/fb9a2449b9765744589faf7484a064c3a9f47db1fdd039d287a5831237aa/starlink_pyast-4.0.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c53febb4cdd73e1747445c665be58807834fe76cf6989b67d9818e1d81c55883", size = 11300729, upload-time = "2026-02-25T16:11:06.972Z" },
 ]
 
 [[package]]

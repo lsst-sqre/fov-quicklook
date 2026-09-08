@@ -76,12 +76,21 @@ def retrieve_data(uri: ResourcePath, *, partial=False) -> bytes:  # pragma: no c
 
         match uri:
             case S3ResourcePath():
-                data = fits_partial_load(read=read, hdu_index=[0, 1])
+                # ponytail: image datasets need the archive HDUs for cursor RA/Dec,
+                # so read through the transform tables; optimize selective reads only
+                # if this becomes a measured bottleneck.
+                try:
+                    data = fits_partial_load(read=read, hdu_index=[0, 1, 7, 8])
+                except AssertionError:
+                    data = fits_partial_load(read=read, hdu_index=[0, 1])
                 logger.info("retrieve_data: partial read %d bytes from S3", len(data))
                 _log_memory("after_partial_read")
                 return data
             case FileResourcePath():
-                data = fits_partial_load(read=read, hdu_index=[0, 1])
+                try:
+                    data = fits_partial_load(read=read, hdu_index=[0, 1, 7, 8])
+                except AssertionError:
+                    data = fits_partial_load(read=read, hdu_index=[0, 1])
                 logger.info("retrieve_data: partial read %d bytes from file", len(data))
                 _log_memory("after_partial_read")
                 return data
