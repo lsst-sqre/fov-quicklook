@@ -673,6 +673,49 @@
                 }
             }
         },
+        "/api/visits/{visit_name}/ccds": {
+            "get": {
+                "summary": "List Visit Ccds",
+                "operationId": "list_visit_ccds",
+                "parameters": [
+                    {
+                        "name": "visit_name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Visit Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "title": "Response List Visit Ccds Api Visits  Visit Name  Ccds Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/visits/{visit_name}/ccds/{ccd_name}": {
             "get": {
                 "summary": "Get Visit Metadata",
@@ -1211,6 +1254,16 @@
                     },
                     "bbox": {
                         "$ref": "#/components/schemas/BBox"
+                    },
+                    "wcs": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/FitsWcsHeader"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 },
                 "type": "object",
@@ -1386,6 +1439,74 @@
                     "size"
                 ],
                 "title": "Entry"
+            },
+            "FitsWcsHeader": {
+                "properties": {
+                    "NAXIS1": {
+                        "type": "integer",
+                        "title": "Naxis1"
+                    },
+                    "NAXIS2": {
+                        "type": "integer",
+                        "title": "Naxis2"
+                    },
+                    "CRVAL1": {
+                        "type": "number",
+                        "title": "Crval1"
+                    },
+                    "CRVAL2": {
+                        "type": "number",
+                        "title": "Crval2"
+                    },
+                    "CRPIX1": {
+                        "type": "number",
+                        "title": "Crpix1"
+                    },
+                    "CRPIX2": {
+                        "type": "number",
+                        "title": "Crpix2"
+                    },
+                    "CD1_1": {
+                        "type": "number",
+                        "title": "Cd1 1"
+                    },
+                    "CD1_2": {
+                        "type": "number",
+                        "title": "Cd1 2"
+                    },
+                    "CD2_1": {
+                        "type": "number",
+                        "title": "Cd2 1"
+                    },
+                    "CD2_2": {
+                        "type": "number",
+                        "title": "Cd2 2"
+                    },
+                    "CTYPE1": {
+                        "type": "string",
+                        "title": "Ctype1",
+                        "default": "RA---TAN"
+                    },
+                    "CTYPE2": {
+                        "type": "string",
+                        "title": "Ctype2",
+                        "default": "DEC--TAN"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "NAXIS1",
+                    "NAXIS2",
+                    "CRVAL1",
+                    "CRVAL2",
+                    "CRPIX1",
+                    "CRPIX2",
+                    "CD1_1",
+                    "CD1_2",
+                    "CD2_1",
+                    "CD2_2"
+                ],
+                "title": "FitsWcsHeader"
             },
             "HTTPValidationError": {
                 "properties": {
@@ -1822,9 +1943,7 @@
                         "title": "Ccd Metadata List"
                     },
                     "wcs": {
-                        "additionalProperties": true,
-                        "type": "object",
-                        "title": "Wcs"
+                        "$ref": "#/components/schemas/FitsWcsHeader"
                     },
                     "type": {
                         "type": "string",

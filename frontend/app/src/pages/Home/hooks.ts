@@ -1,5 +1,6 @@
 import { SkyCoord, Tract, V2 } from "@stellar-globe/stellar-globe"
 import { useMemo } from "react"
+import { CcdMetadata } from "../../store/api/openapi"
 import { useAppSelector } from "../../store/hooks"
 import { includedInPolygon } from "../../utils/geometry"
 import { useGlobe, useHomeContext } from "./context"
@@ -40,6 +41,31 @@ export function useMouseCursorFocalPlaneCoord(): V2 {
     }
     return [0, 0]
   }, [skyCoord, wcs])
+}
+
+export function ccdSkyCoordFromFocalPlaneCoord(
+  focusedCcd: Pick<CcdMetadata, 'bbox' | 'wcs'> | undefined,
+  focalPlaneCoord: V2,
+): SkyCoord | undefined {
+  if (!focusedCcd?.wcs) {
+    return undefined
+  }
+
+  // ponytail: use the linear TAN WCS already in metadata; add full SIP terms
+  // only if the on-screen coordinate readout needs tighter astrometry.
+  const ccdWcs = Tract.fromFitsHeader(focusedCcd.wcs)
+  const [x, y] = focalPlaneCoord
+  const localCoord: V2 = [x - focusedCcd.bbox.minx, y - focusedCcd.bbox.miny]
+  return SkyCoord.fromXyz(ccdWcs.pixel2xyz(...localCoord))
+}
+
+export function useMouseCursorCcdSkyCoord(): SkyCoord | undefined {
+  const focusedCcd = useFocusedCcd()
+  const [x, y] = useMouseCursorFocalPlaneCoord()
+
+  return useMemo(() => {
+    return ccdSkyCoordFromFocalPlaneCoord(focusedCcd, [x, y])
+  }, [focusedCcd, x, y])
 }
 
 export function useFocusedCcd() {
