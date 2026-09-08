@@ -86,10 +86,10 @@ dataset type or on whether its quicklook dimension is `exposure` or `visit`.
 
 ### URL Generation
 ```
-https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?key=lsstcam/%(day_obs|iso8601)/calexp_mosaic/%(exposure|sequence|zeropadding(6))/lsstcam_calexp_mosaic_%(day_obs|iso8601)_%(exposure|sequence|zeropadding(6)).jpg
+https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?channel_name=calexp_mosaic&date_str=%(day_obs|iso8601)&seq_num=%(exposure|sequence)
 ```
 
-This would generate a URL with the date `2025-05-21` and sequence number `000278` (based on day_obs: 20250521 and exposure: 2025052000278):
+This would generate a URL with the date `2025-05-21` and sequence number `278` (based on day_obs: 20250521 and exposure: 2025052000278):
 ```
-https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?key=lsstcam/2025-05-21/calexp_mosaic/000278/lsstcam_calexp_mosaic_2025-05-21_000278.jpg
+https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?channel_name=calexp_mosaic&date_str=2025-05-21&seq_num=278
 ```

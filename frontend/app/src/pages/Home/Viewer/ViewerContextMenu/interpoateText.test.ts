@@ -44,4 +44,11 @@ describe('interpoateText', () => {
     const template = 'Padded: %(exposure|sequence|zeropadding(8))'
     expect(interpoateText(template, meta)).toBe('Padded: 00000271')
   })
+
+  it('should generate the Calexp mosaic event URL', () => {
+    const template = 'https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?channel_name=calexp_mosaic&date_str=%(day_obs|iso8601)&seq_num=%(exposure|sequence)'
+    expect(interpoateText(template, meta)).toBe(
+      'https://usdf-rsp.slac.stanford.edu/rubintv/summit-usdf/lsstcam/event?channel_name=calexp_mosaic&date_str=2025-05-16&seq_num=271'
+    )
+  })
 })
