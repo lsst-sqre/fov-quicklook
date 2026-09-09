@@ -554,6 +554,7 @@ export type DataSourceCcdMetadata = {
   exposure: number;
   day_obs: number;
   uuid: string;
+  repository_name: string;
 };
 export type ResolvedVisitInfo = {
   visit_name: string;

@@ -161,3 +161,4 @@ class DataSourceCcdMetadata:
     exposure: int
     day_obs: int
     uuid: str
+    repository_name: str

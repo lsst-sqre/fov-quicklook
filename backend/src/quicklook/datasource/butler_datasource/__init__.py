@@ -451,6 +451,7 @@ class ScopedButlerDataSource:
             exposure=butler_ref.dataId.get(self.data_id_dimension, -1),
             visit_name=ref.visit,
             uuid=str(butler_ref.id),
+            repository_name=self.repository_name,
         )
 
     def get_visit_representative_uuid_sync(self, visit: VisitName) -> str:

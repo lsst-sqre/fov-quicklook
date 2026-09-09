@@ -7,7 +7,8 @@ describe('interpoateText', () => {
     ccd_name: 'ccd_01',
     ccd_id: 42,
     exposure: 2025051500271,
-    day_obs: 20250516
+    day_obs: 20250516,
+    repository_name: 'embargo'
   } as any
 
   it('should replace %(ccd_name) and %(ccd_id)', () => {
@@ -23,6 +24,11 @@ describe('interpoateText', () => {
   it('should replace %(dataType)', () => {
     const template = 'Type: %(dataType)'
     expect(interpoateText(template, meta)).toBe('Type: embargo:LSSTCam!-raw!-all:raw')
+  })
+
+  it('should replace %(repository_name)', () => {
+    const template = 'Butler: %(repository_name)'
+    expect(interpoateText(template, meta)).toBe('Butler: embargo')
   })
 
   it('should keep unknown keys as is', () => {

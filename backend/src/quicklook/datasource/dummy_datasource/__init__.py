@@ -125,6 +125,7 @@ class DummyDataSource(DataSourceBase):
             exposure=-1,
             visit_name=ref.visit,
             uuid=f"dummy-uuid-{ref.visit.name}-{ref.ccd}",
+            repository_name=ref.visit.repository_name,
         )
 
     def get_visit_representative_uuid_sync(self, visit: VisitName) -> str:

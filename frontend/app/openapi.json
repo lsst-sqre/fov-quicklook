@@ -1393,6 +1393,10 @@
                     "uuid": {
                         "type": "string",
                         "title": "Uuid"
+                    },
+                    "repository_name": {
+                        "type": "string",
+                        "title": "Repository Name"
                     }
                 },
                 "type": "object",
@@ -1402,7 +1406,8 @@
                     "detector",
                     "exposure",
                     "day_obs",
-                    "uuid"
+                    "uuid",
+                    "repository_name"
                 ],
                 "title": "DataSourceCcdMetadata"
             },
