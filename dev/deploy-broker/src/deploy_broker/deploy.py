@@ -12,7 +12,6 @@ from .gitops import (
     derive_build_branch,
     ensure_clone,
     import_bundle,
-    rev_parse,
     settings_repos,
     validate_build_branch,
     validate_remote_url,
@@ -56,6 +55,10 @@ class DeployBrokerService:
     def argocd_sync(self):
         return self._argocd.sync()
 
+    def argocd_clear_image_tag(self) -> dict[str, bool]:
+        self._argocd.clear_image_tag_override_and_sync()
+        return {"cleared": True, "synced": True}
+
     def argocd_restart(self, components: list[str] | None = None):
         return self._argocd.restart(components)
 
@@ -68,7 +71,20 @@ class DeployBrokerService:
         app_bundle: bytes,
         phalanx_bundle: bytes | None,
     ) -> DeployRequestRecord:
-        record = self._job_store.create(metadata.tracked_branch, metadata.verify_mode)
+        has_phalanx_bundle = phalanx_bundle is not None
+        has_phalanx_target = metadata.phalanx_target_branch is not None
+        if has_phalanx_bundle != has_phalanx_target:
+            raise ValueError(
+                "phalanx_bundle and phalanx_target_branch must be specified together"
+            )
+        if has_phalanx_bundle and metadata.phalanx_branch_name is None:
+            raise ValueError("phalanx_branch_name is required with phalanx_bundle")
+
+        record = self._job_store.create(
+            metadata.deploy_name,
+            metadata.verify_mode,
+            phalanx_target_branch=metadata.phalanx_target_branch,
+        )
         artifact_dir = self._settings.request_dir / record.request_id
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
@@ -105,23 +121,27 @@ class DeployBrokerService:
             self._job_store.update(request_id, status="running", step="preparing")
             app_base_repo, phalanx_base_repo = settings_repos(self._settings)
 
-            self._log(request_id, "Ensuring clean base clones are available")
+            self._log(request_id, "Ensuring clean app base clone is available")
             ensure_clone(app_base_repo, self._settings.app_repo_url)
-            ensure_clone(phalanx_base_repo, self._settings.phalanx_repo_url)
             validate_remote_url(app_base_repo, EXPECTED_APP_REMOTE_URLS)
-            validate_remote_url(phalanx_base_repo, EXPECTED_PHALANX_REMOTE_URLS)
 
             workspace_root = self._settings.request_dir / request_id / "workspaces"
             app_workspace = workspace_root / "app"
-            phalanx_workspace = workspace_root / "phalanx"
             clone_workspace(app_base_repo, app_workspace, self._settings.app_repo_url)
-            clone_workspace(
-                phalanx_base_repo,
-                phalanx_workspace,
-                self._settings.phalanx_repo_url,
-            )
             validate_remote_url(app_workspace, EXPECTED_APP_REMOTE_URLS)
-            validate_remote_url(phalanx_workspace, EXPECTED_PHALANX_REMOTE_URLS)
+
+            phalanx_workspace: Path | None = None
+            if phalanx_bundle_path is not None:
+                self._log(request_id, "Ensuring clean Phalanx base clone is available")
+                ensure_clone(phalanx_base_repo, self._settings.phalanx_repo_url)
+                validate_remote_url(phalanx_base_repo, EXPECTED_PHALANX_REMOTE_URLS)
+                phalanx_workspace = workspace_root / "phalanx"
+                clone_workspace(
+                    phalanx_base_repo,
+                    phalanx_workspace,
+                    self._settings.phalanx_repo_url,
+                )
+                validate_remote_url(phalanx_workspace, EXPECTED_PHALANX_REMOTE_URLS)
 
             self._job_store.update(request_id, step="importing-bundles")
             self._log(request_id, "Importing app bundle into clean workspace")
@@ -139,7 +159,9 @@ class DeployBrokerService:
             self._job_store.update(request_id, app_commit_sha=app_commit_sha)
 
             phalanx_import_branch: str | None = None
-            if phalanx_bundle_path is not None and metadata.phalanx_branch_name is not None:
+            if phalanx_bundle_path is not None:
+                if phalanx_workspace is None or metadata.phalanx_branch_name is None:
+                    raise RuntimeError("Phalanx workspace metadata is incomplete")
                 self._log(request_id, "Importing optional phalanx bundle")
                 phalanx_import_branch = f"broker-phalanx-{request_id}"
                 phalanx_commit_sha = import_bundle(
@@ -154,7 +176,7 @@ class DeployBrokerService:
                     )
                 self._job_store.update(request_id, phalanx_commit_sha=phalanx_commit_sha)
 
-            build_branch = derive_build_branch(metadata.tracked_branch)
+            build_branch = derive_build_branch(metadata.deploy_name)
             validate_build_branch(build_branch)
             self._job_store.update(request_id, build_branch=build_branch, step="building")
             self._log(request_id, f"Pushing app commit to build branch {build_branch}")
@@ -164,27 +186,31 @@ class DeployBrokerService:
             self._job_store.update(request_id, run_id=run_id, image_tag=image_tag)
             self._log(request_id, f"Resolved image tag {image_tag}")
 
-            self._job_store.update(request_id, step="materializing-phalanx")
-            self._phalanx.prepare_workspace(
-                phalanx_workspace,
-                metadata.tracked_branch,
-                imported_branch=phalanx_import_branch,
-            )
-            self._phalanx.validate_changes(phalanx_workspace)
-            self._phalanx.update_image_tag(phalanx_workspace, image_tag)
-            self._phalanx.validate_changes(phalanx_workspace)
-            phalanx_commit_sha = self._phalanx.commit_and_push(
-                phalanx_workspace,
-                metadata.tracked_branch,
-                app_commit_sha,
-                image_tag,
-            )
-            self._job_store.update(request_id, phalanx_commit_sha=phalanx_commit_sha)
-            self._log(request_id, f"Pushed phalanx branch {metadata.tracked_branch}")
+            if phalanx_workspace is not None:
+                target_branch = metadata.phalanx_target_branch
+                if target_branch is None:
+                    raise RuntimeError("Phalanx target branch is missing")
+                self._job_store.update(request_id, step="materializing-phalanx")
+                self._phalanx.prepare_workspace(
+                    phalanx_workspace,
+                    target_branch,
+                    imported_branch=phalanx_import_branch,
+                )
+                self._phalanx.validate_changes(phalanx_workspace)
+                phalanx_commit_sha = self._phalanx.push_branch(
+                    phalanx_workspace,
+                    target_branch,
+                )
+                self._job_store.update(request_id, phalanx_commit_sha=phalanx_commit_sha)
+                self._log(request_id, f"Pushed Phalanx branch {target_branch}")
+                self._argocd.set_target_revision(target_branch)
+                self._log(request_id, f"ArgoCD targetRevision updated to {target_branch}")
+            else:
+                self._log(request_id, "Keeping current ArgoCD targetRevision unchanged")
 
             self._job_store.update(request_id, step="argocd-sync")
-            self._argocd.set_branch_and_sync(metadata.tracked_branch, image_tag=image_tag)
-            self._log(request_id, "ArgoCD branch updated and sync triggered")
+            self._argocd.set_image_tag_and_sync(image_tag)
+            self._log(request_id, "ArgoCD image.tag override updated and sync triggered")
 
             self._job_store.update(request_id, step="verification")
             verification = self._verification.run_basic_checks(metadata.verify_mode)

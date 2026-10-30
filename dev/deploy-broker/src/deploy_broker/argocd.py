@@ -191,19 +191,7 @@ class ArgoCdClient:
                 continue
         return ArgoCdLogsResponse(component=component, pod_name=pod_name, logs="".join(lines))
 
-    def set_branch(self, branch: str, image_tag: str | None = None) -> None:
-        self._validate_target_revision(branch)
-        app_info = self.get_app_info()
-        patch_source: dict[str, Any] = {"targetRevision": branch}
-        if image_tag is not None:
-            current_parameters = app_info["spec"]["source"].get("helm", {}).get("parameters", [])
-            updated_parameters = [
-                parameter
-                for parameter in current_parameters
-                if parameter.get("name") != "image.tag"
-            ]
-            updated_parameters.append({"name": "image.tag", "value": image_tag})
-            patch_source["helm"] = {"parameters": updated_parameters}
+    def _patch_source(self, patch_source: dict[str, Any]) -> None:
         payload = {
             "name": self._settings.argocd_app_name,
             "patch": json.dumps({"spec": {"source": patch_source}}),
@@ -219,6 +207,34 @@ class ArgoCdClient:
             )
             response.raise_for_status()
             self.validate_app_source(response.json())
+
+    def set_target_revision(self, branch: str) -> None:
+        self._validate_target_revision(branch)
+        self.get_app_info()
+        self._patch_source({"targetRevision": branch})
+
+    def set_helm_parameter(self, name: str, value: str) -> None:
+        app_info = self.get_app_info()
+        current_parameters = app_info["spec"]["source"].get("helm", {}).get("parameters", [])
+        updated_parameters = [
+            parameter for parameter in current_parameters if parameter.get("name") != name
+        ]
+        updated_parameters.append({"name": name, "value": value})
+        self._patch_source({"helm": {"parameters": updated_parameters}})
+
+    def clear_helm_parameter(self, name: str) -> None:
+        app_info = self.get_app_info()
+        current_parameters = app_info["spec"]["source"].get("helm", {}).get("parameters", [])
+        updated_parameters = [
+            parameter for parameter in current_parameters if parameter.get("name") != name
+        ]
+        self._patch_source({"helm": {"parameters": updated_parameters}})
+
+    def set_image_tag(self, image_tag: str) -> None:
+        self.set_helm_parameter("image.tag", image_tag)
+
+    def clear_image_tag_override(self) -> None:
+        self.clear_helm_parameter("image.tag")
 
     def sync(self) -> ArgoCdSyncResponse:
         self.get_app_info()
@@ -261,6 +277,14 @@ class ArgoCdClient:
                 restarted.append(deployment)
         return ArgoCdRestartResponse(restarted=restarted)
 
-    def set_branch_and_sync(self, branch: str, image_tag: str | None = None) -> None:
-        self.set_branch(branch, image_tag=image_tag)
+    def set_target_revision_and_sync(self, branch: str) -> None:
+        self.set_target_revision(branch)
+        self.sync()
+
+    def set_image_tag_and_sync(self, image_tag: str) -> None:
+        self.set_image_tag(image_tag)
+        self.sync()
+
+    def clear_image_tag_override_and_sync(self) -> None:
+        self.clear_image_tag_override()
         self.sync()

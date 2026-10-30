@@ -189,12 +189,18 @@ class JobStore:
     def _job_path(self, request_id: str) -> Path:
         return self._settings.job_dir / f"{request_id}.json"
 
-    def create(self, tracked_branch: str, verify_mode: str) -> DeployRequestRecord:
+    def create(
+        self,
+        deploy_name: str,
+        verify_mode: str,
+        phalanx_target_branch: str | None = None,
+    ) -> DeployRequestRecord:
         request_id = uuid.uuid4().hex
         record = DeployRequestRecord(
             request_id=request_id,
             status="queued",
-            tracked_branch=tracked_branch,
+            deploy_name=deploy_name,
+            phalanx_target_branch=phalanx_target_branch,
             verify_mode=verify_mode,  # type: ignore[arg-type]
         )
         self.save(record)

@@ -74,6 +74,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as exc:
             _raise_http_error(exc)
 
+    @app.post(
+        "/v1/argocd/image-tag/clear",
+        dependencies=[Depends(require_bearer_token)],
+    )
+    def argocd_clear_image_tag():
+        try:
+            return service.argocd_clear_image_tag()
+        except Exception as exc:
+            _raise_http_error(exc)
+
     @app.post("/v1/argocd/restart", dependencies=[Depends(require_bearer_token)])
     def argocd_restart(payload: ArgoCdRestartRequest):
         try:
@@ -83,11 +93,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/v1/deploy-requests", dependencies=[Depends(require_bearer_token)])
     async def request_deploy(
-        tracked_branch: str = Form(...),
+        deploy_name: str | None = Form(None),
+        tracked_branch: str | None = Form(None),
         verify_mode: str = Form("auto"),
         app_branch_name: str = Form(...),
         app_head_sha: str = Form(...),
         app_base_sha: str | None = Form(None),
+        phalanx_target_branch: str | None = Form(None),
         phalanx_branch_name: str | None = Form(None),
         phalanx_head_sha: str | None = Form(None),
         phalanx_base_sha: str | None = Form(None),
@@ -95,8 +107,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         phalanx_bundle: UploadFile | None = File(None),
     ):
         try:
+            resolved_deploy_name = deploy_name or tracked_branch
+            if not resolved_deploy_name:
+                raise ValueError("deploy_name is required")
+
+            resolved_phalanx_target = phalanx_target_branch
+            if phalanx_bundle is not None and resolved_phalanx_target is None:
+                if tracked_branch and tracked_branch.startswith("u/michitaro/fov-quicklook-"):
+                    resolved_phalanx_target = tracked_branch
+                else:
+                    raise ValueError(
+                        "phalanx_target_branch is required when phalanx_bundle is provided"
+                    )
+
             metadata = DeployRequestArtifacts(
-                tracked_branch=tracked_branch,
+                deploy_name=resolved_deploy_name,
+                phalanx_target_branch=resolved_phalanx_target,
                 verify_mode=verify_mode,  # type: ignore[arg-type]
                 app_branch_name=app_branch_name,
                 app_head_sha=app_head_sha,

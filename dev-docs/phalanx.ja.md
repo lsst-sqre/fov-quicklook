@@ -191,43 +191,65 @@ Phalanx / `system_info` に `difference_image` を明示しなくても、Data Q
 
 - trusted maintainer 用マシンであること
 - app repo (`lsst-sqre/fov-quicklook`) への push 権限があること
-- `k8s/phalanx/` に `lsst-sqre/phalanx` を clone 済みであること
+- Phalanx 設定も変更する場合だけ、`k8s/phalanx/` に `lsst-sqre/phalanx` を clone 済みであること
 - broker の state dir に token cache があるか、`DEPLOY_BROKER_TOKEN_COMMAND` が設定済みであること
 
 ### 標準手順
 
 ```bash
-# 今の作業ツリーをそのまま deploy する
+# 今の作業ツリーをそのまま deploy する。
+# Phalanx branch は作らず、現在の ArgoCD targetRevision を維持する。
 ./dev/deploy-current.sh
 
-# tracked branch を明示したいときは従来どおり request-deploy でもよい
+# request-deploy を直接使う場合、最初の引数は build/deploy の識別名。
 cd dev/deploy-broker
 uv run deploy-broker-client request-deploy \
-  u/michitaro/fov-quicklook-diffimage-20260311-0512 \
+  diffimage-test \
   --app-repo ../.. \
   --verify-mode auto
 ```
 
-`deploy-broker-client request-deploy` は次をまとめて実行する。
+通常の `deploy-broker-client request-deploy` は次をまとめて実行する。
 
 1. app repo の current branch snapshot（未コミット差分を含んでよい）を `git bundle` 化して broker に送る
-2. broker が `fov-quicklook-local-*` build branch に push
+2. broker が識別名から `fov-quicklook-local-*` build branch を作って push
 3. GitHub Actions `build-and-push.yml` の完了待ち
-4. broker が `k8s/phalanx/applications/fov-quicklook/values.yaml` の `image.tag` を更新して push
-5. broker が ArgoCD の branch 切り替えと sync を実行
+4. ArgoCD Application の Helm parameter `image.tag` だけを新しい image tag に override
+5. **ArgoCD の `targetRevision` は変更せず** sync
 6. app token を使った HTTP 動作確認を agent / operator が直接行う
+
+Phalanx 自体の設定変更も同時に試す場合だけ、Phalanx bundle と target branch を明示する。
+
+```bash
+uv run deploy-broker-client request-deploy \
+  diffimage-test \
+  --app-repo ../.. \
+  --phalanx-repo ../../k8s/phalanx \
+  --phalanx-target-branch u/michitaro/fov-quicklook-diffimage-test \
+  --verify-mode auto
+```
+
+この場合は Phalanx bundle を指定 branch に push し、その branch を ArgoCD の
+`targetRevision` に設定してから `image.tag` override と sync を行う。image tag 自体は
+Phalanx の `values.yaml` へ書き戻さない。
+
+開発版 image の確認後に Phalanx 側の `image.tag` へ戻すには、override を削除して sync する。
+
+```bash
+uv run deploy-broker-client argocd-clear-image-tag
+```
 
 ### agent-safe な broker フロー
 
 agent に GitHub / ArgoCD の直接権限を渡したくない場合は、`dev/deploy-broker/`
 配下の broker daemon を使う。broker は認証付き HTTP API を公開し、次を担当する。
 
-1. app repo の `git bundle` と必要なら Phalanx bundle の受け取り
+1. app repo の `git bundle` と必要な場合だけ Phalanx bundle の受け取り
 2. dedicated deploy 権限での GitHub build branch push と build 完了待ち
-3. Phalanx branch の materialization と image tag 更新
-4. ArgoCD の branch 切り替え、必要な `image.tag` override 更新、sync
+3. 通常 deploy では ArgoCD の `image.tag` override だけを更新し、`targetRevision` は維持
+4. Phalanx bundle がある場合だけ branch を materialize / push し、`targetRevision` を切り替え
 5. ArgoCD status / branch / logs の安全に制限された取得
-6. ArgoCD sync / Deployment restart の安全に制限された実行
+6. ArgoCD sync / Deployment restart / image tag override の解除を安全に制限して実行
 
 ArgoCD token は broker 側だけが保持し、agent には返さない。app access token は
 broker 側で保持し、agent は必要時に broker から受け取って `healthz` などの
@@ -263,7 +285,7 @@ uv run deploy-broker-client get-app-token
 
 # app repo の現在 branch を bundle 化して deploy request を送る
 uv run deploy-broker-client request-deploy \
-  u/michitaro/fov-quicklook-my-topic \
+  my-topic \
   --app-repo ../.. \
   --verify-mode none
 ```
@@ -288,7 +310,7 @@ GitHub push / GitHub Actions / ArgoCD token / app token を持たせる。
 | ノード | 必要な権限・設定 | 不要なもの |
 |---|---|---|
 | thin client / agent ノード | app repo の checkout、`deploy-broker-client`、daemon node の `127.0.0.1:8010` へ届く経路（通常は SSH tunnel） | `gh auth`、app repo への `git push`、Phalanx への `git push`、ArgoCD token、app token |
-| broker daemon ノード | `gh auth`、app repo build branch (`fov-quicklook-local-*`) への `git push`、Phalanx tracked branch (`u/michitaro/fov-quicklook-*`) への `git push`、ArgoCD token / app token を返す command、daemon 用 state dir (`tokens/*.token` cache を含む) | agent 側の作業ツリーや editor |
+| broker daemon ノード | `gh auth`、app repo build branch (`fov-quicklook-local-*`) への `git push`、ArgoCD token / app token を返す command、daemon 用 state dir (`tokens/*.token` cache を含む)。Phalanx 設定を deploy する場合だけ `u/michitaro/fov-quicklook-*` への push 権限も必要 | agent 側の作業ツリーや editor |
 
 つまり、**agent 用ノードは app repo に `git push` できなくてよい**。その代わり、
 **broker daemon ノードは app repo の build branch に push できる必要がある**。
@@ -301,10 +323,10 @@ GitHub push / GitHub Actions / ArgoCD token / app token を持たせる。
 ##### サーバー側の前提
 
 - `git` / `gh` / `uv` が使えること
-- app repo の build branch と Phalanx tracked branch へ HTTPS で push できること
+- app repo の build branch へ HTTPS で push できること
+- Phalanx 設定も deploy する場合だけ、Phalanx target branch へ HTTPS で push できること
 - `gh auth status` が成功し、`repo` と `workflow` scope を持つこと
 - `gh auth setup-git` 済みで、`git push https://github.com/...` が `gh` の credential を使えること
-- `git config user.name` / `git config user.email` が設定済みであること（Phalanx commit 用）
 - ArgoCD API (`https://usdf-rsp-dev.slac.stanford.edu/argo-cd`) へ HTTPS で到達できること
 
 ##### サーバー側の初期セットアップ
@@ -321,9 +343,7 @@ gh auth login --hostname github.com
 gh auth setup-git
 gh auth status
 
-# Phalanx commit 用の identity
-git config --global user.name "fov-quicklook deploy broker"
-git config --global user.email "your-account@users.noreply.github.com"
+# Phalanx bundle 内の commit をそのまま push するため、broker 側で追加 commit は作らない
 ```
 
 ##### broker API 認証
@@ -389,7 +409,7 @@ uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-cli
 
 uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-client \
   request-deploy \
-  u/michitaro/fov-quicklook-my-topic \
+  my-topic \
   --app-repo /path/to/your/fov-quicklook \
   --verify-mode auto
 ```
@@ -432,7 +452,7 @@ Phalanx 側の変更許可範囲は `DEPLOY_BROKER_PHALANX_CHANGE_POLICY` で切
 |---|---|---|
 | `fov-quicklook-paths` | `applications/fov-quicklook/` など既存 allowlist path 配下 | 現行互換。fov-quicklook 関連の Phalanx 修正をまとめて通したいとき |
 | `values-yaml-only` | `applications/fov-quicklook/values.yaml` のみ | values だけを手動調整したいが、他 path は止めたいとき |
-| `image-tag-only` | `applications/fov-quicklook/values.yaml` の `image.tag` 行のみ | broker が付ける image tag 更新以外は止めたいとき |
+| `image-tag-only` | `applications/fov-quicklook/values.yaml` の `image.tag` 行のみ | 旧運用互換。通常 deploy は ArgoCD override を使うため、この mode を必要としない |
 
 `image-tag-only` と `values-yaml-only` は、Phalanx bundle に別の変更が混ざっていた場合も reject する。  
 判定は `origin/main` との差分を基準に行い、未コミット差分も含めて検証する。
@@ -477,7 +497,7 @@ uv run deploy-broker-verify --include-sync --restart-components frontend
 
 # deploy request まで確認（実際に build / push / sync が走る）
 uv run deploy-broker-verify \
-  --deploy-tracked-branch u/michitaro/fov-quicklook-verify-20260505 \
+  --deploy-name verify-20260505 \
   --app-repo /srv/fov-quicklook \
   --verify-mode auto
 ```
@@ -490,7 +510,7 @@ uv run deploy-broker-verify \
 4. `argocd-get-branch`
 5. `argocd-logs coordinator`
 
-`--include-sync`、`--restart-components ...`、`--deploy-tracked-branch ...` はいずれも mutating operation なので、検証用 branch / 時間帯でだけ使うこと。
+`--include-sync`、`--restart-components ...`、`--deploy-name ...` はいずれも mutating operation なので、検証用 branch / 時間帯でだけ使うこと。
 
 ##### systemd で常駐させる例
 
@@ -504,7 +524,7 @@ Wants=network-online.target
 User=fovquicklook
 WorkingDirectory=/srv/fov-quicklook-broker-state
 Environment=DEPLOY_BROKER_TOKEN_COMMAND=/srv/fov-quicklook-broker-state/fetch-tokens.sh
-Environment=DEPLOY_BROKER_PHALANX_CHANGE_POLICY=image-tag-only
+Environment=DEPLOY_BROKER_PHALANX_CHANGE_POLICY=fov-quicklook-paths
 ExecStart=/usr/local/bin/uv run --project /srv/fov-quicklook/dev/deploy-broker deploy-broker-daemon
 Restart=on-failure
 
@@ -545,7 +565,7 @@ uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-cli
 # deploy request
 uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-client \
   request-deploy \
-  u/michitaro/fov-quicklook-diffimage-20260311-0512 \
+  diffimage-test \
   --app-repo /path/to/your/fov-quicklook
 
 # broker 経由のログ確認
@@ -574,7 +594,8 @@ uv run --project /path/to/your/fov-quicklook/dev/deploy-broker deploy-broker-cli
 - `DEPLOY_BROKER_PHALANX_CHANGE_POLICY` に応じて、Phalanx 変更を `applications/fov-quicklook/` allowlist / `values.yaml` 限定 / `image.tag` 限定で検証すること
 - ArgoCD token を daemon 内に閉じ込めること
 - sync / restart の操作対象を `fov-quicklook` 配下の Deployment に限定すること
-- stale な ArgoCD `image.tag` override が残っていても、新しい deploy tag に更新すること
+- 通常 deploy では ArgoCD `targetRevision` を変更せず、`image.tag` override だけを新しい deploy tag に更新すること
+- `argocd-clear-image-tag` で override を削除し、現在の Phalanx branch の `image.tag` に戻せること
 
 このため、broker 経由の deploy フローでは他 application への accidental push を避けやすい。
 

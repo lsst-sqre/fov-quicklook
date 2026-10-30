@@ -40,17 +40,15 @@ ALLOWED_PHALANX_CHANGE_POLICIES = (
 _IMAGE_TAG_DIFF_RE = re.compile(r"^tag:\s*\S.*$")
 
 
-def validate_tracked_branch(branch: str) -> None:
+def validate_phalanx_target_branch(branch: str) -> None:
     if not branch.startswith("u/michitaro/fov-quicklook-"):
         raise ValueError(
-            f"tracked branch must match u/michitaro/fov-quicklook-*: {branch}"
+            f"Phalanx target branch must match u/michitaro/fov-quicklook-*: {branch}"
         )
 
 
-def derive_build_branch(tracked_branch: str) -> str:
-    validate_tracked_branch(tracked_branch)
-    suffix = tracked_branch.removeprefix("u/michitaro/fov-quicklook-")
-    safe = "".join(char if char.isalnum() or char in "._-" else "-" for char in suffix)
+def derive_build_branch(deploy_name: str) -> str:
+    safe = "".join(char if char.isalnum() or char in "._-" else "-" for char in deploy_name)
     safe = safe.strip("-") or "manual"
     return f"fov-quicklook-local-{safe}"
 

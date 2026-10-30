@@ -111,3 +111,23 @@ def test_argocd_restart_endpoint_passes_components(
     assert response.status_code == 200
     assert captured["components"] == ["frontend"]
     assert response.json() == {"restarted": ["fov-quicklook-frontend"]}
+
+
+def test_argocd_clear_image_tag_endpoint_calls_service(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    app = create_app(_settings(tmp_path))
+    monkeypatch.setattr(
+        app.state.service,
+        "argocd_clear_image_tag",
+        lambda: {"cleared": True, "synced": True},
+    )
+    client = TestClient(app, base_url="http://example.invalid")
+
+    response = client.post(
+        "/v1/argocd/image-tag/clear",
+        headers={"Authorization": "Bearer secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"cleared": True, "synced": True}

@@ -11,14 +11,8 @@ if [[ -z "$APP_BRANCH" ]]; then
     exit 1
 fi
 
-TRACKED_SUFFIX="$(printf '%s' "$APP_BRANCH" | tr -c '[:alnum:]._-' '-')"
-TRACKED_SUFFIX="${TRACKED_SUFFIX#-}"
-TRACKED_SUFFIX="${TRACKED_SUFFIX%-}"
-TRACKED_SUFFIX="${TRACKED_SUFFIX:-manual}"
-TRACKED_BRANCH="u/michitaro/fov-quicklook-${TRACKED_SUFFIX}"
-
 uv run --project "$REPO_ROOT/dev/deploy-broker" deploy-broker-verify \
-    --deploy-tracked-branch "$TRACKED_BRANCH" \
+    --deploy-name "$APP_BRANCH" \
     --app-repo "$REPO_ROOT" \
     --deploy-poll-seconds 5 \
     "$@"

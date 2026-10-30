@@ -23,12 +23,13 @@ class VerificationOptions:
     logs_since_seconds: int
     include_sync: bool
     restart_components: list[str] | None
-    deploy_tracked_branch: str | None
+    deploy_name: str | None
     app_repo: Path | None
     app_revision: str
     verify_mode: str
     phalanx_repo: Path | None
     phalanx_revision: str
+    phalanx_target_branch: str | None
     wait_for_deploy: bool
     deploy_timeout_seconds: int
     deploy_poll_seconds: int
@@ -62,18 +63,19 @@ def run_verification(
     if options.restart_components is not None:
         record(_verify_argocd_restart(client, options.restart_components))
 
-    if options.deploy_tracked_branch is not None:
+    if options.deploy_name is not None:
         if options.app_repo is None:
-            raise ValueError("--app-repo is required when --deploy-tracked-branch is set")
+            raise ValueError("--app-repo is required when --deploy-name is set")
         steps.extend(
             _verify_deploy_request(
                 client,
-                tracked_branch=options.deploy_tracked_branch,
+                deploy_name=options.deploy_name,
                 app_repo=options.app_repo,
                 app_revision=options.app_revision,
                 verify_mode=options.verify_mode,
                 phalanx_repo=options.phalanx_repo,
                 phalanx_revision=options.phalanx_revision,
+                phalanx_target_branch=options.phalanx_target_branch,
                 wait_for_deploy=options.wait_for_deploy,
                 deploy_timeout_seconds=options.deploy_timeout_seconds,
                 deploy_poll_seconds=options.deploy_poll_seconds,
@@ -154,12 +156,13 @@ def _verify_argocd_restart(
 def _verify_deploy_request(
     client: BrokerClient,
     *,
-    tracked_branch: str,
+    deploy_name: str,
     app_repo: Path,
     app_revision: str,
     verify_mode: str,
     phalanx_repo: Path | None,
     phalanx_revision: str,
+    phalanx_target_branch: str | None,
     wait_for_deploy: bool,
     deploy_timeout_seconds: int,
     deploy_poll_seconds: int,
@@ -169,12 +172,13 @@ def _verify_deploy_request(
     on_progress: Callable[[str], None] | None,
 ) -> list[VerificationStep]:
     response = client.request_deploy(
-        tracked_branch=tracked_branch,
+        deploy_name=deploy_name,
         app_repo_path=app_repo,
         app_revision=app_revision,
         verify_mode=verify_mode,
         phalanx_repo_path=phalanx_repo,
         phalanx_revision=phalanx_revision,
+        phalanx_target_branch=phalanx_target_branch,
     )
     request_id = response.get("request_id")
     status = response.get("status")
@@ -308,14 +312,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="also call argocd-restart; omit component names to use broker defaults",
     )
     parser.add_argument(
+        "--deploy-name",
         "--deploy-tracked-branch",
-        help="also submit a deploy request for the given tracked branch (mutating)",
+        dest="deploy_name",
+        help="also submit a deploy request using this build/deploy identifier (mutating)",
     )
-    parser.add_argument("--app-repo", help="required when --deploy-tracked-branch is used")
+    parser.add_argument("--app-repo", help="required when --deploy-name is used")
     parser.add_argument("--app-revision", default="HEAD")
     parser.add_argument("--verify-mode", default="auto", choices=("none", "auto", "all"))
     parser.add_argument("--phalanx-repo")
     parser.add_argument("--phalanx-revision", default="HEAD")
+    parser.add_argument("--phalanx-target-branch")
     parser.add_argument(
         "--no-wait-deploy",
         action="store_true",
@@ -332,12 +339,13 @@ def _options_from_args(args: argparse.Namespace) -> VerificationOptions:
         logs_since_seconds=args.logs_since_seconds,
         include_sync=args.include_sync,
         restart_components=args.restart_components,
-        deploy_tracked_branch=args.deploy_tracked_branch,
+        deploy_name=args.deploy_name,
         app_repo=Path(args.app_repo).resolve() if args.app_repo else None,
         app_revision=args.app_revision,
         verify_mode=args.verify_mode,
         phalanx_repo=Path(args.phalanx_repo).resolve() if args.phalanx_repo else None,
         phalanx_revision=args.phalanx_revision,
+        phalanx_target_branch=args.phalanx_target_branch,
         wait_for_deploy=not args.no_wait_deploy,
         deploy_timeout_seconds=args.deploy_timeout_seconds,
         deploy_poll_seconds=args.deploy_poll_seconds,

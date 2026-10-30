@@ -19,14 +19,8 @@ def _settings(tmp_path: Path) -> Settings:
     )
 
 
-def test_set_branch_updates_image_tag_override(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings(tmp_path)
-    token_store = TokenStore(settings)
-    token_store.set_argocd_token("bootstrap-argocd-token")
-    client = ArgoCdClient(settings, token_store)
-    requests: list[httpx.Request] = []
-
-    app_info = {
+def _app_info() -> dict[str, object]:
+    return {
         "spec": {
             "source": {
                 "repoURL": "https://github.com/lsst-sqre/phalanx.git",
@@ -42,6 +36,15 @@ def test_set_branch_updates_image_tag_override(tmp_path: Path, monkeypatch) -> N
         }
     }
 
+
+def _capture_patch(tmp_path: Path, monkeypatch, operation) -> dict[str, object]:
+    settings = _settings(tmp_path)
+    token_store = TokenStore(settings)
+    token_store.set_argocd_token("bootstrap-argocd-token")
+    client = ArgoCdClient(settings, token_store)
+    requests: list[httpx.Request] = []
+    app_info = _app_info()
+
     def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
         if request.method == "GET":
@@ -53,20 +56,62 @@ def test_set_branch_updates_image_tag_override(tmp_path: Path, monkeypatch) -> N
     transport = httpx.MockTransport(handler)
     monkeypatch.setattr(client, "_http", lambda: httpx.Client(transport=transport))
 
-    client.set_branch("u/michitaro/fov-quicklook-test", image_tag="new-tag")
+    operation(client)
 
-    patch_request = requests[1]
+    patch_request = next(request for request in requests if request.method == "PATCH")
     payload = json.loads(patch_request.content.decode("utf-8"))
-    patch = json.loads(payload["patch"])
-    parameters = patch["spec"]["source"]["helm"]["parameters"]
+    return json.loads(payload["patch"])
 
-    assert patch["spec"]["source"]["targetRevision"] == "u/michitaro/fov-quicklook-test"
+
+def test_set_image_tag_updates_only_helm_parameter(tmp_path: Path, monkeypatch) -> None:
+    patch = _capture_patch(
+        tmp_path,
+        monkeypatch,
+        lambda client: client.set_image_tag("new-tag"),
+    )
+
+    source = patch["spec"]["source"]
+    parameters = source["helm"]["parameters"]
+
+    assert "targetRevision" not in source
     assert {"name": "global.host", "value": "example.invalid"} in parameters
     assert {"name": "image.tag", "value": "new-tag"} in parameters
     assert not any(
         parameter.get("name") == "image.tag" and parameter.get("value") == "old-tag"
         for parameter in parameters
     )
+
+
+def test_set_target_revision_does_not_touch_helm_parameters(
+    tmp_path: Path, monkeypatch
+) -> None:
+    patch = _capture_patch(
+        tmp_path,
+        monkeypatch,
+        lambda client: client.set_target_revision(
+            "u/michitaro/fov-quicklook-phalanx-test"
+        ),
+    )
+
+    source = patch["spec"]["source"]
+    assert source == {
+        "targetRevision": "u/michitaro/fov-quicklook-phalanx-test"
+    }
+
+
+def test_clear_image_tag_override_preserves_other_parameters(
+    tmp_path: Path, monkeypatch
+) -> None:
+    patch = _capture_patch(
+        tmp_path,
+        monkeypatch,
+        lambda client: client.clear_image_tag_override(),
+    )
+
+    source = patch["spec"]["source"]
+    parameters = source["helm"]["parameters"]
+    assert parameters == [{"name": "global.host", "value": "example.invalid"}]
+    assert "targetRevision" not in source
 
 
 def test_get_branch_refreshes_token_after_auth_failure(

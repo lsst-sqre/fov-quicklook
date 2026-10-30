@@ -69,6 +69,11 @@ class BrokerClient:
         response.raise_for_status()
         return response.json()
 
+    def argocd_clear_image_tag(self) -> dict[str, Any]:
+        response = self._client.post("/v1/argocd/image-tag/clear")
+        response.raise_for_status()
+        return response.json()
+
     def argocd_restart(self, components: list[str]) -> dict[str, Any]:
         response = self._client.post("/v1/argocd/restart", json={"components": components})
         response.raise_for_status()
@@ -76,12 +81,13 @@ class BrokerClient:
 
     def request_deploy(
         self,
-        tracked_branch: str,
+        deploy_name: str,
         app_repo_path: Path,
         app_revision: str,
         verify_mode: str,
         phalanx_repo_path: Path | None,
         phalanx_revision: str | None,
+        phalanx_target_branch: str | None = None,
     ) -> dict[str, Any]:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             temp_dir = Path(temp_dir_name)
@@ -89,7 +95,7 @@ class BrokerClient:
             app_meta = create_bundle(app_repo_path, app_revision, app_bundle_path)
 
             data: dict[str, Any] = {
-                "tracked_branch": tracked_branch,
+                "deploy_name": deploy_name,
                 "verify_mode": verify_mode,
                 "app_branch_name": app_meta["branch_name"],
                 "app_head_sha": app_meta["head_sha"],
@@ -104,6 +110,10 @@ class BrokerClient:
             }
 
             if phalanx_repo_path is not None:
+                if phalanx_target_branch is None:
+                    raise ValueError(
+                        "--phalanx-target-branch is required when --phalanx-repo is used"
+                    )
                 phalanx_bundle_path = temp_dir / "phalanx.bundle"
                 phalanx_meta = create_bundle(
                     phalanx_repo_path,
@@ -112,6 +122,7 @@ class BrokerClient:
                 )
                 data.update(
                     {
+                        "phalanx_target_branch": phalanx_target_branch,
                         "phalanx_branch_name": phalanx_meta["branch_name"],
                         "phalanx_head_sha": phalanx_meta["head_sha"],
                         "phalanx_base_sha": phalanx_meta["base_sha"] or "",
@@ -161,12 +172,13 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     deploy_parser = subparsers.add_parser("request-deploy")
-    deploy_parser.add_argument("tracked_branch")
+    deploy_parser.add_argument("deploy_name")
     deploy_parser.add_argument("--app-repo", default=".")
     deploy_parser.add_argument("--app-revision", default="HEAD")
     deploy_parser.add_argument("--verify-mode", default="auto", choices=("none", "auto", "all"))
     deploy_parser.add_argument("--phalanx-repo")
     deploy_parser.add_argument("--phalanx-revision", default="HEAD")
+    deploy_parser.add_argument("--phalanx-target-branch")
 
     status_parser = subparsers.add_parser("get-deploy-status")
     status_parser.add_argument("request_id")
@@ -187,6 +199,7 @@ def main() -> None:
     subparsers.add_parser("argocd-status")
     subparsers.add_parser("argocd-get-branch")
     subparsers.add_parser("argocd-sync")
+    subparsers.add_parser("argocd-clear-image-tag")
 
     args = parser.parse_args()
     client = BrokerClient(args.server, args.api_token)
@@ -201,12 +214,14 @@ def main() -> None:
             _print_json(client.argocd_logs(args.component, args.since_seconds))
         elif args.command == "argocd-sync":
             _print_json(client.argocd_sync())
+        elif args.command == "argocd-clear-image-tag":
+            _print_json(client.argocd_clear_image_tag())
         elif args.command == "argocd-restart":
             _print_json(client.argocd_restart(args.components))
         elif args.command == "request-deploy":
             _print_json(
                 client.request_deploy(
-                    tracked_branch=args.tracked_branch,
+                    deploy_name=args.deploy_name,
                     app_repo_path=Path(args.app_repo).resolve(),
                     app_revision=args.app_revision,
                     verify_mode=args.verify_mode,
@@ -214,6 +229,7 @@ def main() -> None:
                     if args.phalanx_repo
                     else None,
                     phalanx_revision=args.phalanx_revision,
+                    phalanx_target_branch=args.phalanx_target_branch,
                 )
             )
         elif args.command == "get-deploy-status":

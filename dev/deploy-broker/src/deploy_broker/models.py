@@ -53,7 +53,9 @@ class JobLogEntry(BaseModel):
 class DeployRequestRecord(BaseModel):
     request_id: str
     status: Literal["queued", "running", "succeeded", "failed"]
-    tracked_branch: str
+    deploy_name: str | None = None
+    tracked_branch: str | None = None
+    phalanx_target_branch: str | None = None
     verify_mode: Literal["none", "auto", "all"]
     build_branch: str | None = None
     app_commit_sha: str | None = None
@@ -69,8 +71,9 @@ class DeployRequestRecord(BaseModel):
 
 
 class DeployRequestArtifacts(BaseModel):
-    tracked_branch: str
+    deploy_name: str
     verify_mode: Literal["none", "auto", "all"]
+    phalanx_target_branch: str | None = None
     app_branch_name: str
     app_head_sha: str
     app_base_sha: str | None = None

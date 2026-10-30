@@ -81,8 +81,22 @@ BROKER_URL=$(cat ~/.fov-quicklook2/broker-url)
 BROKER_TOKEN=$(cat ~/.fov-quicklook2/broker-token)
 
 uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" request-deploy \
-  u/michitaro/fov-quicklook-my-topic \
+  my-topic \
   --app-repo ../.. \
+  --verify-mode auto
+```
+
+通常の deploy request は現在の ArgoCD `targetRevision` を変更せず、build した image の
+`image.tag` Helm parameter override だけを更新して sync する。Phalanx branch は作らない。
+
+Phalanx 設定自体も試す場合だけ、次のように bundle と target branch を明示する。
+
+```bash
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" request-deploy \
+  my-topic \
+  --app-repo ../.. \
+  --phalanx-repo ../../k8s/phalanx \
+  --phalanx-target-branch u/michitaro/fov-quicklook-my-topic \
   --verify-mode auto
 ```
 
@@ -103,13 +117,13 @@ uv run deploy-broker-verify --server "$BROKER_URL" --api-token "$BROKER_TOKEN"
 
 ### deploy 完了待ちの目安
 
-- broker deploy は image build / push / phalanx sync を含むため、完了まで数分〜10分以上かかることがある。短時間で失敗扱いしない。
+- broker deploy は image build / push と ArgoCD sync を含むため、完了まで数分〜10分以上かかることがある。Phalanx push は明示的に Phalanx bundle を指定した場合だけ行う。短時間で失敗扱いしない。
 - `request-deploy` のあとは `get-deploy-status <request_id>` を数分おきに poll し、必要なら **10〜15分程度** は待つ。
 - `get-deploy-status` が `succeeded` でも、続けて `argocd-status` と必要に応じて `argocd-logs coordinator` を見て、ArgoCD 上の replica 数と image を確認する。
 - 同じ image tag を再利用する branch では `healthz.revision` が旧 commit のまま残ることがある。その場合は `argocd-status` / `argocd-logs` を見たうえで `argocd-restart coordinator generator frontend` を検討する。
 - broker の `get-app-token` は JSON (`{"token":"..."}`) を返すので、`verify-deploy.sh` に渡すときは `token` フィールドだけを `dev/.gafaelfawr-token` に保存する。
 
-### sync / restart
+### sync / override解除 / restart
 
 ```bash
 cd dev/deploy-broker
@@ -118,6 +132,9 @@ BROKER_TOKEN=$(cat ~/.fov-quicklook2/broker-token)
 
 # ArgoCD sync
 uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-sync
+
+# 開発版 image.tag override を削除し、Phalanx 側の値に戻して sync
+uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-clear-image-tag
 
 # 主要コンポーネント(coordinator, generator, frontend, debug)を再起動
 uv run deploy-broker-client --server "$BROKER_URL" --api-token "$BROKER_TOKEN" argocd-restart
@@ -208,7 +225,7 @@ ArgoCDのfov-quicklookアプリケーションは `lsst-sqre/phalanx` リポジ�
 > **注意**: `k8s/phalanx/` はプロジェクトルートとは別の独立した git リポジトリ（`https://github.com/lsst-sqre/phalanx.git`）です。
 > `.gitignore` で除外されており、サブモジュールではありません。
 
-ローカルの `k8s/phalanx` のブランチとArgoCDの参照ブランチが一致していない場合、設定のミスマッチが発生する。
+Phalanx 設定を明示的に deploy する場合だけ ArgoCD の参照ブランチを切り替える。通常の app deploy では現在の `targetRevision` を維持する。
 
 ```bash
 cd dev
@@ -248,7 +265,7 @@ cd dev
 - ArgoCD CLIのサーバ指定: `--server usdf-rsp-dev.slac.stanford.edu --grpc-web --grpc-web-root-path /argo-cd`
 - REST APIのベースURL: `https://usdf-rsp-dev.slac.stanford.edu/argo-cd/api/v1/applications/fov-quicklook/`
 - `phalanx-check` / `phalanx-push` は `applications/fov-quicklook/` など許可済み path 以外を含む push を停止する
-- Phalanx の安全 push は `u/michitaro/fov-quicklook-*` branch のみに制限される
+- 通常 deploy は Phalanx を push しない。Phalanx bundle を明示した場合の安全 push は `u/michitaro/fov-quicklook-*` branch のみに制限される
 
 ## ブランチ名のルール
 
@@ -286,10 +303,12 @@ git push origin --delete old-name
 
 ## 典型的なフロー
 
-1. 標準の deploy request: `uv run deploy-broker-client request-deploy ...`
-2. 参照ブランチ確認: `uv run deploy-broker-client argocd-get-branch`
+1. 標準の app deploy: `uv run deploy-broker-client request-deploy <deploy-name> ...`
+2. 通常 deploy では Phalanx branch を作らず、現在の `targetRevision` を維持したまま `image.tag` override を更新する
 3. 状態確認: `uv run deploy-broker-client argocd-status`
-4. 必要なら追加 sync: `uv run deploy-broker-client argocd-sync`
-5. 必要なら再起動: `uv run deploy-broker-client argocd-restart`
-6. 必要ならログ確認: `uv run deploy-broker-client argocd-logs coordinator`
-7. deploy 後の app 確認は `deploy-verification` skill に委譲する
+4. 必要なら参照ブランチ確認: `uv run deploy-broker-client argocd-get-branch`
+5. 開発版を外すとき: `uv run deploy-broker-client argocd-clear-image-tag`
+6. 必要なら再起動: `uv run deploy-broker-client argocd-restart`
+7. 必要ならログ確認: `uv run deploy-broker-client argocd-logs coordinator`
+8. Phalanx 設定変更が必要なときだけ `--phalanx-repo` と `--phalanx-target-branch` を付ける
+9. deploy 後の app 確認は `deploy-verification` skill に委譲する

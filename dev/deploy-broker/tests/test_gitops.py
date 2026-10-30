@@ -76,10 +76,10 @@ def test_create_bundle_requires_head_revision_for_dirty_worktree(tmp_path: Path)
         create_bundle(repo_path, "feature-branch", tmp_path / "bundle.bundle")
 
 
-def test_derive_build_branch_sanitizes_suffix() -> None:
+def test_derive_build_branch_sanitizes_deploy_name() -> None:
     assert (
-        derive_build_branch("u/michitaro/fov-quicklook-topic:alpha")
-        == "fov-quicklook-local-topic-alpha"
+        derive_build_branch("feature/topic:alpha")
+        == "fov-quicklook-local-feature-topic-alpha"
     )
 
 

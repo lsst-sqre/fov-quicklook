@@ -46,23 +46,25 @@ class _FakeClient:
 
     def request_deploy(
         self,
-        tracked_branch: str,
+        deploy_name: str,
         app_repo_path: Path,
         app_revision: str,
         verify_mode: str,
         phalanx_repo_path: Path | None,
         phalanx_revision: str | None,
+        phalanx_target_branch: str | None = None,
     ) -> dict[str, object]:
         self.calls.append(
             (
                 "request_deploy",
                 (
-                    tracked_branch,
+                    deploy_name,
                     app_repo_path,
                     app_revision,
                     verify_mode,
                     phalanx_repo_path,
                     phalanx_revision,
+                    phalanx_target_branch,
                 ),
             )
         )
@@ -81,12 +83,13 @@ def _options(**overrides: object) -> VerificationOptions:
         logs_since_seconds=600,
         include_sync=False,
         restart_components=None,
-        deploy_tracked_branch=None,
+        deploy_name=None,
         app_repo=None,
         app_revision="HEAD",
         verify_mode="auto",
         phalanx_repo=None,
         phalanx_revision="HEAD",
+        phalanx_target_branch=None,
         wait_for_deploy=True,
         deploy_timeout_seconds=1800,
         deploy_poll_seconds=15,
@@ -152,7 +155,7 @@ def test_run_verification_waits_for_deploy_success(tmp_path: Path) -> None:
 
     steps = run_verification(
         client,
-        _options(deploy_tracked_branch="u/michitaro/fov-quicklook-test", app_repo=tmp_path),
+        _options(deploy_name="feature-test", app_repo=tmp_path),
         sleep=_sleep,
         monotonic=lambda: now,
     )
@@ -203,7 +206,7 @@ def test_run_verification_reports_progress_during_deploy(tmp_path: Path) -> None
     run_verification(
         client,
         _options(
-            deploy_tracked_branch="u/michitaro/fov-quicklook-test",
+            deploy_name="feature-test",
             app_repo=tmp_path,
             deploy_poll_seconds=5,
         ),
@@ -223,7 +226,7 @@ def test_run_verification_reports_progress_during_deploy(tmp_path: Path) -> None
 
 def test_run_verification_requires_app_repo_for_deploy() -> None:
     with pytest.raises(ValueError, match="--app-repo"):
-        run_verification(_FakeClient(), _options(deploy_tracked_branch="u/michitaro/fov-quicklook-test"))
+        run_verification(_FakeClient(), _options(deploy_name="feature-test"))
 
 
 def test_run_verification_raises_on_failed_deploy(tmp_path: Path) -> None:
@@ -239,7 +242,7 @@ def test_run_verification_raises_on_failed_deploy(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="failed"):
         run_verification(
             client,
-            _options(deploy_tracked_branch="u/michitaro/fov-quicklook-test", app_repo=tmp_path),
+            _options(deploy_name="feature-test", app_repo=tmp_path),
             sleep=lambda _seconds: None,
             monotonic=lambda: 0.0,
         )

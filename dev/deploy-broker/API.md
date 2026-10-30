@@ -33,9 +33,9 @@ broker 自身が GitHub / Phalanx / ArgoCD / app access token を保持し、age
 - 利用可能な mode:
   - `fov-quicklook-paths`: 既定値。`applications/fov-quicklook/` など既存 allowlist path 配下の変更を許可
   - `values-yaml-only`: `applications/fov-quicklook/values.yaml` への変更だけを許可
-  - `image-tag-only`: `applications/fov-quicklook/values.yaml` の `image.tag` 行変更だけを許可
+  - `image-tag-only`: `applications/fov-quicklook/values.yaml` の `image.tag` 行変更だけを許可（旧運用互換）
 - 判定は `origin/main` からの差分を基準に行い、未コミット差分も含めて検証する
-- stricter mode ほど imported Phalanx bundle の変更を通しにくくなり、broker が付与する image tag 更新だけを通したい運用に向く
+- 通常の app deploy は Phalanx を変更せず ArgoCD の Helm parameter override を使う。change policy は Phalanx bundle を明示的に deploy するときだけ関係する
 
 ## エラーハンドリング
 
@@ -54,6 +54,7 @@ broker 自身が GitHub / Phalanx / ArgoCD / app access token を保持し、age
 | `GET` | `/v1/argocd/branch` | 必要 | ArgoCD が参照中の Phalanx repo / path / branch を取得 |
 | `GET` | `/v1/argocd/logs/{component}` | 必要 | 指定 component の Pod ログを取得 |
 | `POST` | `/v1/argocd/sync` | 必要 | ArgoCD sync を実行 |
+| `POST` | `/v1/argocd/image-tag/clear` | 必要 | `image.tag` override を削除して sync |
 | `POST` | `/v1/argocd/restart` | 必要 | 指定 Deployment を再起動 |
 | `POST` | `/v1/deploy-requests` | 必要 | deploy request を enqueue |
 | `GET` | `/v1/deploy-requests/{request_id}` | 必要 | deploy request の進捗と結果を取得 |
@@ -120,6 +121,15 @@ broker 自身が GitHub / Phalanx / ArgoCD / app access token を保持し、age
 {"synced": true}
 ```
 
+### `POST /v1/argocd/image-tag/clear`
+
+ArgoCD Application の Helm parameter `image.tag` override を削除して sync する。
+これにより、現在の Phalanx `targetRevision` が持つ `image.tag` が再び有効になる。
+
+```json
+{"cleared": true, "synced": true}
+```
+
 ### `POST /v1/argocd/restart`
 
 request body:
@@ -142,7 +152,7 @@ response:
 
 必須 form field:
 
-- `tracked_branch`
+- `deploy_name`
 - `verify_mode` (`none` / `auto` / `all`)
 - `app_branch_name`
 - `app_head_sha`
@@ -150,11 +160,21 @@ response:
 
 任意 form field:
 
+- `tracked_branch`（旧 client 互換。`deploy_name` が無い場合だけ deploy 識別名として扱う）
 - `app_base_sha`
+- `phalanx_target_branch`
 - `phalanx_branch_name`
 - `phalanx_head_sha`
 - `phalanx_base_sha`
 - `phalanx_bundle`
+
+通常 deploy では Phalanx 関連 field を送らない。この場合、broker は ArgoCD の
+`targetRevision` を変更せず、build 後に `image.tag` Helm parameter だけを override して sync する。
+
+`phalanx_bundle` を送る場合は `phalanx_target_branch` も必須で、
+`u/michitaro/fov-quicklook-*` の branch に bundle の snapshot を push してから
+ArgoCD の `targetRevision` をその branch に切り替える。broker は Phalanx の
+`values.yaml` に image tag を書き戻さない。
 
 response は `DeployRequestRecord`:
 
@@ -162,7 +182,9 @@ response は `DeployRequestRecord`:
 {
   "request_id": "4f6d...",
   "status": "queued",
-  "tracked_branch": "u/michitaro/fov-quicklook-example",
+  "deploy_name": "feature-example",
+  "tracked_branch": null,
+  "phalanx_target_branch": null,
   "verify_mode": "auto",
   "build_branch": null,
   "app_commit_sha": null,
@@ -217,7 +239,7 @@ response は `DeployRequestRecord`:
   - `GET /v1/argocd/logs/{component}`
 - `--include-sync` を付けると `POST /v1/argocd/sync` も実行する
 - `--restart-components ...` を付けると `POST /v1/argocd/restart` も実行する
-- `--deploy-tracked-branch ... --app-repo ...` を付けると `POST /v1/deploy-requests` と `GET /v1/deploy-requests/{request_id}` も実行する
+- `--deploy-name ... --app-repo ...` を付けると `POST /v1/deploy-requests` と `GET /v1/deploy-requests/{request_id}` も実行する。`--deploy-tracked-branch` は互換 alias
 - deploy request 完了待ちでは poll ごとの status と新着 `logs` を逐次表示する
 
 例:
@@ -233,9 +255,9 @@ uv run deploy-broker-verify --include-sync --restart-components frontend
 
 # deploy request まで含めて完走確認
 uv run deploy-broker-verify \
-  --deploy-tracked-branch u/michitaro/fov-quicklook-verify-20260505 \
+  --deploy-name verify-20260505 \
   --app-repo ../.. \
   --verify-mode auto
 ```
 
-`--deploy-tracked-branch` は実際に build / Phalanx push / ArgoCD sync を伴うため、検証用 branch だけで使うこと。
+`--deploy-name` は実際に app image build と ArgoCD `image.tag` override / sync を伴う。Phalanx push は `--phalanx-repo` と `--phalanx-target-branch` を明示した場合だけ行う。
