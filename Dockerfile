@@ -1,6 +1,5 @@
 # for frontend
-# FROM node:24 AS frontend
-FROM public.ecr.aws/docker/library/node:24 AS frontend
+FROM node:24 AS frontend
 
 COPY ./frontend/ /frontend
 
