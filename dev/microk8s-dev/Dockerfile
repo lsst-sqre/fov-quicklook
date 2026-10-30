@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/node:24-bookworm AS node
+FROM node:24-bookworm AS node
 
 FROM python:3.13-bookworm
 
