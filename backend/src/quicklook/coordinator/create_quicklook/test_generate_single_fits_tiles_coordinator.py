@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from quicklook.comm.types import GeneratorId, GeneratorInfo
@@ -5,7 +7,12 @@ from quicklook.generator.api.ccd_processing_protocol import ErrorMessage
 from quicklook.job.job import Job
 from quicklook.types import CcdName, Progress, VisitName
 
-from .generate_single_fits_tiles_coordinator import _handle_generator_message, _merge_generate_progress, _record_assigned_ccd
+from .generate_single_fits_tiles_coordinator import (
+    _handle_generator_message,
+    _merge_generate_progress,
+    _record_assigned_ccd,
+    _wait_for_completion_or_error,
+)
 
 
 def test_merge_generate_progress_keeps_higher_existing_ratio() -> None:
@@ -47,6 +54,31 @@ async def test_handle_generator_message_raises_on_error_message():
             ws=None,  # type: ignore[arg-type]
             pending_wait_tasks=[],
         )
+
+
+async def test_wait_for_completion_or_error_raises_worker_error_immediately():
+    all_completed = asyncio.Event()
+    worker_errors: asyncio.Queue[Exception] = asyncio.Queue()
+    worker_errors.put_nowait(RuntimeError('generator processing failed'))
+
+    with pytest.raises(RuntimeError, match='generator processing failed'):
+        await _wait_for_completion_or_error(
+            all_completed,
+            worker_errors,
+            timeout_seconds=60,
+        )
+
+
+async def test_wait_for_completion_or_error_accepts_completion():
+    all_completed = asyncio.Event()
+    all_completed.set()
+    worker_errors: asyncio.Queue[Exception] = asyncio.Queue()
+
+    await _wait_for_completion_or_error(
+        all_completed,
+        worker_errors,
+        timeout_seconds=60,
+    )
 
 
 async def test_record_assigned_ccd_initializes_zero_progress():

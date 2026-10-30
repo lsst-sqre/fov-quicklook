@@ -2,6 +2,8 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
+
 from quicklook.config import config
 from quicklook.generator.preprocess_ccd import preprocess_ccd
 from quicklook.review_app.shared_fixtures import FixtureVisit, generate_raw_fits_bytes
@@ -36,16 +38,17 @@ def test_preprocess_ccd_calexp():
         preprocess_ccd(ccd_ref, path)
 
 
-def test_preprocess_ccd_difference_image_uses_calexp_path(monkeypatch):
+@pytest.mark.parametrize('data_type', ['difference_image', 'future_difference_image'])
+def test_preprocess_ccd_image_dataset_uses_calexp_path(monkeypatch, data_type):
     expected = object()
-    ccd_ref = CcdDataRef(visit=VisitName('dummy:difference_image:192350'), ccd=CcdName('R01_S00'))
+    ccd_ref = CcdDataRef(visit=VisitName(f'dummy:{data_type}:192350'), ccd=CcdName('R01_S00'))
 
     monkeypatch.setattr(
         'quicklook.generator.preprocess_ccd.preprocess_ccd_calexp',
         lambda arg_ref, arg_path: expected,
     )
 
-    assert preprocess_ccd(ccd_ref, Path('difference_image.fits')) is expected
+    assert preprocess_ccd(ccd_ref, Path(f'{data_type}.fits')) is expected
 
 
 def fits_bytes(ref: CcdDataRef) -> bytes:

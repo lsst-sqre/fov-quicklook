@@ -1875,6 +1875,17 @@
                         "type": "string",
                         "title": "Visit Name"
                     },
+                    "error_message": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Error Message"
+                    },
                     "type": {
                         "type": "string",
                         "const": "error",

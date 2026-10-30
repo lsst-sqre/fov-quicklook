@@ -45,7 +45,7 @@ export function QuicklookJobMonitor() {
         <div className={styles.centerContent}>
           <div className={styles.errorContainer}>
             <div className={styles.errorMessage}>
-              Error loading quicklook
+              Error loading quicklook{metadata.error_message ? `: ${metadata.error_message}` : ''}
             </div>
             {/* <button className={styles.retryButton} onClick={handleRetry}>
               Retry Request

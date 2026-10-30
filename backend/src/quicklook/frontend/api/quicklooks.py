@@ -152,6 +152,7 @@ class QuicklookMetadataPending:
 @dataclass
 class QuicklookMetadataError:
     visit_name: VisitName
+    error_message: str | None = None
     type: Literal['error'] = 'error'
 
 
@@ -292,7 +293,10 @@ async def _get_quicklook_metadata_from_shared_status(visit: VisitName) -> AsyncG
                     wcs=focal_plane_wcs(),
                 )
             case JobStatus(stage='error'):
-                yield QuicklookMetadataError(visit_name=visit)
+                yield QuicklookMetadataError(
+                    visit_name=visit,
+                    error_message=job_status.error_message,
+                )
             case _:  # pragma: no cover
                 raise ValueError(f"Unknown job status stage: {job_status.stage}")
 

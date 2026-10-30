@@ -259,6 +259,26 @@ def test_shared_large_status_replaces_recent_ready_metadata(monkeypatch):
     assert quicklooks._recent_ready_metadata_dict == {}
     assert quicklooks._get_ccd_metadata_list_for_shared_status(visit) == active_metadata
 
+
+async def test_error_metadata_includes_job_error_message(monkeypatch):
+    job = Job(VisitName('repo:raw:4242'))
+    job.status.stage = 'error'
+    job.status.error_message = 'generator processing failed'
+
+    status_dict = Broadcast(max_queue_size=2)
+    status_dict.put({job.visit: job.status})
+    monkeypatch.setattr(quicklooks, '_job_status_dict', status_dict)
+
+    stream = quicklooks._get_quicklook_metadata_from_shared_status(job.visit)
+    try:
+        metadata = await anext(stream)
+    finally:
+        await stream.aclose()
+
+    assert isinstance(metadata, quicklooks.QuicklookMetadataError)
+    assert metadata.error_message == 'generator processing failed'
+
+
 async def test_get_all_quicklook_jobs_returns_cached_broadcast_value(monkeypatch):
     job = Job(VisitName('repo:raw:4242'))
     broadcast = Broadcast(max_queue_size=2)

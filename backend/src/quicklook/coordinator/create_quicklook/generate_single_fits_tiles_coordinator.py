@@ -68,6 +68,32 @@ class GenerateSingleFitsTilesResult:
     generator_profiles: list[GeneratorProfile]
 
 
+async def _wait_for_completion_or_error(
+    all_completed: asyncio.Event,
+    worker_errors: asyncio.Queue[Exception],
+    timeout_seconds: float,
+) -> None:
+    """全CCD完了、またはworkerの致命的エラーのどちらかを待つ。"""
+    completion_task = asyncio.create_task(all_completed.wait())
+    error_task = asyncio.create_task(worker_errors.get())
+    try:
+        done, _ = await asyncio.wait(
+            (completion_task, error_task),
+            timeout=timeout_seconds,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if completion_task in done:
+            return
+        if error_task in done:
+            raise error_task.result()
+        raise asyncio.TimeoutError()
+    finally:
+        for task in (completion_task, error_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(completion_task, error_task, return_exceptions=True)
+
+
 async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDataRef]) -> GenerateSingleFitsTilesResult:
     """
     WebSocket API方式によるFITSタイル生成
@@ -96,6 +122,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
     max_concurrent_ccds = config.generator_max_concurrent_ccds_per_job
     max_worker_connect_retries = 3
     worker_connect_retry_interval = 2.0
+    worker_errors: asyncio.Queue[Exception] = asyncio.Queue()
 
     async def _run_worker_session(generator: GeneratorInfo, initial_ccd: CcdDataRef | None = None) -> None:
         """
@@ -208,6 +235,7 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
         current_generator = generator
         consecutive_failures = 0
         pending_resubmit_ccd: CcdDataRef | None = None
+        fatal_error = False
         try:
             while not dispatcher.all_completed.is_set():
                 try:
@@ -268,12 +296,19 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
                     raise
                 except Exception as e:
                     logger.error(f"Worker error for generator {generator_id}: {e}")
-                    break  # 予期しないエラーはリトライしない
+                    # 通信断は上のaiohttp.ClientErrorで再試行する。
+                    # Generatorが返した処理エラーやCoordinator側の予期しない
+                    # エラーは別Generatorへ再配布しても解消しない可能性が高いため、
+                    # ジョブ全体を即座に失敗させる。
+                    fatal_error = True
+                    worker_errors.put_nowait(e)
+                    break
         finally:
-            if pending_resubmit_ccd is not None:
+            if pending_resubmit_ccd is not None and not fatal_error:
                 await dispatcher.return_unassigned_ccd(pending_resubmit_ccd)
             dispatcher.record_generator_end(generator_id)
-            await dispatcher.on_generator_lost(generator_id)
+            if not fatal_error:
+                await dispatcher.on_generator_lost(generator_id)
 
     # 全workerを起動
     active_worker_generator_ids: set[GeneratorId] = {g.id for g in generator_list}
@@ -309,8 +344,11 @@ async def generate_single_fits_tiles_coordinator(job: Job, ccd_refs: list[CcdDat
 
     timeout_seconds = config.generate_single_fits_tiles_timeout_seconds
     try:
-        # 全CCD完了を待機（タイムアウト付き）
-        await asyncio.wait_for(dispatcher.all_completed.wait(), timeout=timeout_seconds)
+        # 通信断はdispatcherによる再配布を継続する一方、Generatorから明示的に
+        # 返された処理エラーはタイムアウトを待たずにジョブ失敗へ遷移させる。
+        await _wait_for_completion_or_error(
+            dispatcher.all_completed, worker_errors, timeout_seconds
+        )
     except asyncio.TimeoutError:
         completed_ccds = set(dispatcher.ccd_metadata_dict.keys())
         all_ccds = {ref.ccd for ref in ccd_refs}

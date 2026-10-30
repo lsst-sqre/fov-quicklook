@@ -509,6 +509,7 @@ export type QuicklookMetadataPending = {
 };
 export type QuicklookMetadataError = {
   visit_name: string;
+  error_message?: string | null;
   type?: "error";
 };
 export type QuicklookMetadata =

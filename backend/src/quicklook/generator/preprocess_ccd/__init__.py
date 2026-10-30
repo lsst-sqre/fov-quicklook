@@ -7,6 +7,7 @@ from typing import Any, Iterable
 import astropy.io.fits as afits
 import numpy
 
+from quicklook.datasets import get_dataset
 from quicklook.tileinfo import ccds_by_name
 from quicklook.types import CcdDataRef
 from quicklook.utils.fitsheader import HeaderType, fitsheader_to_list
@@ -21,13 +22,12 @@ def preprocess_ccd(
     ccd_ref: CcdDataRef,
     path: Path,
 ) -> 'PreProcessedCcd':
-    match ccd_ref.visit.data_type:
+    dataset = get_dataset(ccd_ref.visit.data_type)
+    match dataset.preprocess_kind:
         case 'raw':
             return preprocess_ccd_raw(ccd_ref, path)
-        case 'post_isr_image' | 'difference_image' | 'calexp' | 'preliminary_visit_image':
+        case 'image':
             return preprocess_ccd_calexp(ccd_ref, path)
-        case _:  # pragma: no cover
-            raise ValueError(f'Unknown data_type: {ccd_ref.visit.data_type}')
 
 
 def preprocess_ccd_calexp(
